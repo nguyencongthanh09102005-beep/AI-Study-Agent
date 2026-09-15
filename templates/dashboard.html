@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block page_title %}Dashboard{% endblock %}
+{% block page_desc %}Theo dõi tiến độ học tập của bạn{% endblock %}
+
+{% block page_styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/weekly-progress.css') }}">
+{% endblock %}
+
+{% block content %}
+
+
+<section class="hero card">
+  <div>
+    <span class="pill">AI Study Agent</span>
+
+    <h2>
+      Xin chào, {{ session.get('user_name') }} 👋
+    </h2>
+
+    <p>Hôm nay bạn muốn học gì?</p>
+  </div>
+
+  <a
+    class="btn primary"
+    href="{{ url_for('chat') }}"
+  >
+    Hỏi AI ngay
+  </a>
+</section>
+
+
+<section class="stats">
+
+  <div class="card stat">
+    <span>Môn học</span>
+    <strong>{{ subjects|length }}</strong>
+    <small>Đang theo học</small>
+  </div>
+
+  <div class="card stat">
+    <span>Tài liệu</span>
+    <strong>{{ documents|length }}</strong>
+    <small>Đã tải lên</small>
+  </div>
+
+  <div class="card stat">
+    <span>Quiz</span>
+    <strong>{{ quiz_count }}</strong>
+    <small>Bài đã làm</small>
+  </div>
+
+  <div class="card stat">
+    <span>Tiến độ TB</span>
+    <strong>{{ avg_progress }}%</strong>
+    <small>Toàn bộ môn</small>
+  </div>
+
+</section>
+
+
+<section class="grid two">
+
+  <!-- =====================================================
+       BIỂU ĐỒ DỮ LIỆU THẬT
+  ====================================================== -->
+  <div class="card weekly-progress-card">
+
+    <div class="weekly-progress-head">
+
+      <div>
+        <h3>Tiến độ học tập tuần này</h3>
+
+        <p>
+          {{ weekly_total_hours }} giờ từ các buổi học đã hoàn thành
+        </p>
+      </div>
+
+      <span
+        class="weekly-growth-badge {{ weekly_growth_class }}"
+      >
+        {{ weekly_growth_text }}
+      </span>
+
+    </div>
+
+    <div class="weekly-chart-wrap">
+      <canvas id="weeklyStudyChart"></canvas>
+    </div>
+
+  </div>
+
+
+  <!-- =====================================================
+       NHẮC VIỆC / DEADLINE THẬT
+  ====================================================== -->
+  <div class="card dashboard-reminder-card">
+
+    <div class="section-head">
+
+      <h3>Deadline & nhắc việc gần nhất</h3>
+
+      <a href="{{ url_for('study_plan') }}">
+        Xem tất cả
+      </a>
+
+    </div>
+
+    <div class="list">
+
+      {% for r in reminders %}
+
+      <div class="list-item dashboard-reminder-item">
+
+        <div class="dashboard-reminder-copy">
+
+          <b>{{ r.title }}</b>
+
+          <small>
+            {{ r.due_text }}
+          </small>
+
+          {% if r.status_text %}
+          <span
+            class="dashboard-reminder-status {{ r.status_class }}"
+          >
+            {{ r.status_text }}
+          </span>
+          {% endif %}
+
+        </div>
+
+        <span
+          class="dashboard-reminder-check {% if r.done %}is-done{% endif %}"
+          title="{{ 'Đã hoàn thành' if r.done else 'Chưa hoàn thành' }}"
+        >
+          {{ '✓' if r.done else '○' }}
+        </span>
+
+      </div>
+
+      {% else %}
+
+      <p class="muted">
+        Chưa có deadline hoặc nhắc việc.
+      </p>
+
+      {% endfor %}
+
+    </div>
+
+  </div>
+
+</section>
+
+
+<script>
+  window.weeklyStudyData =
+    {{ weekly_study_hours | tojson }};
+</script>
+
+<script
+  src="https://cdn.jsdelivr.net/npm/chart.js"
+></script>
+
+<script
+  src="{{ url_for('static', filename='js/weekly-progress.js') }}"
+></script>
+
+{% endblock %}

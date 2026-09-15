@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+
+{% block page_title %}Môn học{% endblock %}
+{% block page_desc %}Quản lý môn học và tiến độ{% endblock %}
+
+{% block page_styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/subjects.css') }}">
+{% endblock %}
+
+{% block content %}
+
+
+<section class="grid form-grid">
+
+  <!-- FORM THÊM MÔN HỌC -->
+  <form method="post" class="card form subject-form">
+    <h3>Thêm môn học</h3>
+
+    <label>
+      Tên môn
+
+      <input
+        type="text"
+        name="name"
+        required
+        placeholder="Ví dụ: Trí tuệ nhân tạo"
+      >
+    </label>
+
+    <label>
+      Mã môn
+
+      <input
+        type="text"
+        name="code"
+        maxlength="30"
+        placeholder="Ví dụ: 0104123039"
+      >
+    </label>
+
+    <label>
+      Mô tả
+
+      <textarea
+        name="description"
+        rows="4"
+        placeholder="Nhập mô tả ngắn về môn học"
+      ></textarea>
+    </label>
+
+    <div class="subject-form-grid">
+
+      <label>
+        Số tín chỉ
+
+        <input
+          type="number"
+          name="credits"
+          min="1"
+          max="20"
+          value="3"
+          placeholder="Ví dụ: 3"
+        >
+      </label>
+
+      <label>
+        Mục tiêu điểm số
+
+        <input
+          type="number"
+          name="target_score"
+          min="0"
+          max="10"
+          step="0.1"
+          placeholder="Ví dụ: 8.0"
+        >
+      </label>
+
+    </div>
+
+    <button class="btn primary" type="submit">
+      Thêm môn học
+    </button>
+  </form>
+
+  <!-- DANH SÁCH MÔN HỌC -->
+  <div class="subject-grid">
+
+    {% for s in subjects %}
+
+    <article class="card subject-card">
+
+      <div class="subject-card-top">
+
+        <div class="subject-icon">
+          📘
+        </div>
+
+        <div class="subject-title-area">
+          <h3>{{ s.name }}</h3>
+
+          {% if s.code %}
+          <span class="subject-code">
+            {{ s.code }}
+          </span>
+          {% endif %}
+        </div>
+
+      </div>
+
+      <p class="subject-description">
+        {{ s.description or 'Chưa có mô tả' }}
+      </p>
+
+      <div class="subject-meta">
+
+        {% if s.credits %}
+        <span>
+          🎓 {{ s.credits }} tín chỉ
+        </span>
+        {% endif %}
+
+        {% if s.target_score %}
+        <span>
+          🎯 Mục tiêu {{ s.target_score }}
+        </span>
+        {% endif %}
+
+      </div>
+
+      <div class="subject-progress-head">
+        <span>Tiến độ tự động</span>
+        <b>{{ s.progress or 0 }}%</b>
+      </div>
+
+      <div class="subject-progress-bar">
+        <i style="width: {{ s.progress or 0 }}%"></i>
+      </div>
+
+      <div class="subject-actions">
+
+        <a
+          class="btn secondary small"
+          href="{{ url_for('subjects') }}"
+        >
+          Chi tiết
+        </a>
+
+        <form
+          method="post"
+          action="{{ url_for('delete_subject', subject_id=s.id) }}"
+          data-confirm-title="Xóa môn học?"
+          data-confirm-message="Môn “{{ s.name }}” sẽ bị xóa. Bạn có chắc muốn tiếp tục?"
+          data-confirm-label="Xóa môn"
+        >
+          <button
+            class="btn danger small"
+            type="submit"
+          >
+            Xóa
+          </button>
+        </form>
+
+      </div>
+
+    </article>
+
+    {% else %}
+
+    <div class="card subject-empty">
+      <span>📚</span>
+      <p>Chưa có môn học.</p>
+    </div>
+
+    {% endfor %}
+
+  </div>
+
+</section>
+{% endblock %}

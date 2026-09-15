@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block page_title %}Tài liệu{% endblock %}
+{% block page_desc %}Tải lên PDF/TXT/Markdown và dùng làm dữ liệu cho AI{% endblock %}
+
+{% block page_styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/documents.css') }}">
+{% endblock %}
+{% block content %}
+
+<form method="post" enctype="multipart/form-data" class="card upload-box">
+  <div class="upload-icon">☁️</div>
+  <h2>Tải tài liệu học tập</h2>
+  <p>Hỗ trợ PDF, TXT và Markdown, tối đa 20 MB.</p>
+  <div class="upload-controls">
+    <input type="file" name="file" accept=".pdf,.txt,.md" required>
+    <select name="subject_id">
+      <option value="">Không gắn môn học</option>
+      {% for s in subjects %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
+    </select>
+    <button class="btn primary" type="submit">Tải lên</button>
+  </div>
+</form>
+
+<section class="card">
+  <div class="section-head">
+    <h3>Danh sách tài liệu</h3>
+    <span>{{ documents|length }} tài liệu</span>
+  </div>
+
+  <div class="list">
+    {% for d in documents %}
+    <div class="list-item document-item">
+      <div class="document-copy">
+        <b>📄 {{ d.original_name }}</b>
+        <small>{{ d.subject_name or 'Chưa phân loại' }} · {{ d.created_at }}</small>
+      </div>
+
+      <div class="row-actions document-actions">
+        <span class="pill">{{ 'Đã đọc nội dung' if d.extracted_text else 'Chưa trích xuất được' }}</span>
+
+        <form method="post" action="{{ url_for('update_document_subject', doc_id=d.id) }}" class="document-subject-form">
+          <select name="subject_id" aria-label="Môn học của tài liệu">
+            <option value="">Chưa phân loại</option>
+            {% for s in subjects %}
+              <option value="{{ s.id }}" {% if d.subject_id == s.id %}selected{% endif %}>{{ s.name }}</option>
+            {% endfor %}
+          </select>
+          <button class="btn secondary small" type="submit">Lưu môn</button>
+        </form>
+
+        <form
+          method="post"
+          action="{{ url_for('delete_document', doc_id=d.id) }}"
+          data-confirm-title="Xóa tài liệu?"
+          data-confirm-message="Tài liệu “{{ d.original_name }}” và các quiz được tạo từ tài liệu này sẽ bị xóa."
+          data-confirm-label="Xóa tài liệu"
+        >
+          <button class="btn danger small" type="submit">Xóa</button>
+        </form>
+      </div>
+    </div>
+    {% else %}
+    <p class="muted">Chưa có tài liệu. Hãy tải tệp đầu tiên.</p>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

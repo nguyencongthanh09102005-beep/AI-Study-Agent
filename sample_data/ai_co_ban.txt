@@ -1,0 +1,15 @@
+TÀI LIỆU MẪU: TRÍ TUỆ NHÂN TẠO CƠ BẢN
+
+Trí tuệ nhân tạo (Artificial Intelligence - AI) là lĩnh vực của khoa học máy tính tập trung vào việc xây dựng các hệ thống có khả năng thực hiện những nhiệm vụ thường đòi hỏi trí thông minh của con người.
+
+Machine Learning (Học máy) là một nhánh của AI. Hệ thống học máy sử dụng dữ liệu để học ra các mẫu và cải thiện khả năng dự đoán. Ba dạng học phổ biến gồm học có giám sát, học không giám sát và học tăng cường.
+
+Deep Learning (Học sâu) là một nhánh của Machine Learning sử dụng mạng nơ-ron nhiều lớp. Deep Learning thường được dùng trong nhận dạng hình ảnh, nhận dạng giọng nói và xử lý ngôn ngữ.
+
+Natural Language Processing (NLP) giúp máy tính hiểu, xử lý và sinh ra ngôn ngữ của con người. Ứng dụng gồm chatbot, dịch máy, tóm tắt văn bản và phân tích cảm xúc.
+
+Large Language Model (LLM) là mô hình AI được huấn luyện trên lượng dữ liệu văn bản lớn. LLM có thể trả lời câu hỏi, tóm tắt, viết nội dung, hỗ trợ lập trình và phân tích tài liệu.
+
+AI Agent là hệ thống có thể tiếp nhận mục tiêu, quan sát thông tin, đưa ra quyết định và thực hiện hành động để hoàn thành nhiệm vụ. AI Agent có thể kết hợp mô hình ngôn ngữ với công cụ, bộ nhớ và nguồn dữ liệu bên ngoài.
+
+Trong giáo dục, AI có thể hỗ trợ hỏi đáp học tập, tóm tắt tài liệu, tạo quiz, đề xuất kế hoạch học và theo dõi tiến độ. Tuy nhiên AI có thể tạo thông tin không chính xác (hallucination), vì vậy người dùng cần kiểm tra lại các thông tin quan trọng.

@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}AI Study Agent{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  {% block page_styles %}{% endblock %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/polish.css') }}">
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-logo">🎓</div>
+      <div><strong>Study Agent</strong><small>Trợ lý học tập AI</small></div>
+    </div>
+    <nav>
+      <a class="{{ 'active' if page=='dashboard' else '' }}" href="{{ url_for('dashboard') }}">🏠 Dashboard</a>
+      <a class="{{ 'active' if page=='subjects' else '' }}" href="{{ url_for('subjects') }}">📚 Môn học</a>
+      <a class="{{ 'active' if page=='documents' else '' }}" href="{{ url_for('documents') }}">📄 Tài liệu</a>
+      <a class="{{ 'active' if page=='chat' else '' }}" href="{{ url_for('chat') }}">🤖 AI Chat</a>
+      <a class="{{ 'active' if page=='quiz' else '' }}" href="{{ url_for('quiz') }}">✅ Quiz</a>
+      <a class="{{ 'active' if page=='study_plan' else '' }}" href="{{ url_for('study_plan') }}">🗓 Kế hoạch học</a>
+    </nav>
+    <div class="user-mini">
+      <div class="avatar">{{ session.get('user_name','U')[0] }}</div>
+      <div><strong>{{ session.get('user_name','Người dùng') }}</strong><small>Sinh viên</small></div>
+    </div>
+  </aside>
+  <main>
+    <header class="topbar">
+      <div>
+        <h1>{% block page_title %}{% endblock %}</h1>
+        <p>{% block page_desc %}{% endblock %}</p>
+      </div>
+      <a class="btn ghost" href="{{ url_for('logout') }}">Đăng xuất</a>
+    </header>
+    {% block content %}{% endblock %}
+  </main>
+</div>
+
+<!-- =====================================================
+     MODAL XÁC NHẬN DÙNG CHUNG
+===================================================== -->
+<div
+  class="app-confirm-modal"
+  id="appConfirmModal"
+  aria-hidden="true"
+>
+  <div
+    class="app-confirm-backdrop"
+    data-confirm-close
+  ></div>
+
+  <div
+    class="app-confirm-dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="appConfirmTitle"
+    aria-describedby="appConfirmMessage"
+  >
+    <div class="app-confirm-icon">🗑️</div>
+
+    <h3 id="appConfirmTitle">
+      Xác nhận xóa
+    </h3>
+
+    <p id="appConfirmMessage">
+      Bạn có chắc muốn xóa mục này?
+    </p>
+
+    <div class="app-confirm-actions">
+      <button
+        type="button"
+        class="app-confirm-cancel"
+        data-confirm-close
+      >
+        Hủy
+      </button>
+
+      <form
+        method="post"
+        id="appConfirmForm"
+      >
+        <button
+          type="submit"
+          class="app-confirm-delete"
+          id="appConfirmDeleteButton"
+        >
+          Xóa
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+<script src="{{ url_for('static', filename='js/confirm-modal.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

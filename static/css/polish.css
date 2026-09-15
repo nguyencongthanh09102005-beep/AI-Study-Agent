@@ -1,0 +1,1088 @@
+/* =====================================================
+   AI STUDY AGENT — FINAL UI POLISH
+   Chỉ tinh chỉnh giao diện, không thay đổi chức năng.
+===================================================== */
+
+:root {
+  --ui-bg: #f6f7fb;
+  --ui-card: rgba(255, 255, 255, .96);
+  --ui-text: #192235;
+  --ui-muted: #748096;
+  --ui-primary: #5965f2;
+  --ui-primary-2: #8062f2;
+  --ui-primary-soft: #f0f1ff;
+  --ui-border: #e5e8f0;
+  --ui-border-strong: #d9deea;
+  --ui-success: #2da56f;
+  --ui-warning: #d99020;
+  --ui-danger: #d84f61;
+  --ui-radius: 18px;
+  --ui-radius-sm: 12px;
+  --ui-shadow: 0 10px 30px rgba(35, 45, 82, .065);
+  --ui-shadow-hover: 0 16px 38px rgba(35, 45, 82, .105);
+  --ui-focus: 0 0 0 4px rgba(89, 101, 242, .11);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background:
+    radial-gradient(circle at 94% 3%, rgba(124, 103, 244, .055), transparent 27%),
+    radial-gradient(circle at 3% 97%, rgba(89, 101, 242, .04), transparent 24%),
+    var(--ui-bg);
+  color: var(--ui-text);
+  font-family: Inter, "Segoe UI", Roboto, Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+textarea,
+select {
+  font-family: inherit;
+}
+
+::selection {
+  background: rgba(89, 101, 242, .17);
+}
+
+/* =====================================================
+   KHUNG APP / SIDEBAR / TOPBAR
+===================================================== */
+
+.app-shell {
+  grid-template-columns: 264px minmax(0, 1fr);
+}
+
+.sidebar {
+  padding: 24px 18px;
+  border-right: 1px solid rgba(226, 230, 239, .9);
+  background: rgba(255, 255, 255, .94);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: 6px 0 24px rgba(42, 51, 82, .025);
+}
+
+.brand {
+  gap: 13px;
+  padding: 0 5px;
+}
+
+.brand-logo {
+  width: 46px;
+  height: 46px;
+  border-radius: 15px;
+  background: linear-gradient(135deg, #eef0ff, #e9e6ff);
+  box-shadow: 0 8px 18px rgba(82, 92, 202, .10);
+}
+
+.brand strong {
+  color: #1d2639;
+  font-size: 16px;
+  letter-spacing: -.2px;
+}
+
+.brand small,
+.user-mini small {
+  color: #8a94a7;
+  font-size: 12px;
+}
+
+.sidebar nav {
+  gap: 7px;
+  margin-top: 30px;
+}
+
+.sidebar nav a {
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  color: #616c81;
+  font-size: 14px;
+  font-weight: 650;
+  transition: background-color .2s ease, color .2s ease, border-color .2s ease, transform .2s ease;
+}
+
+.sidebar nav a:hover {
+  transform: translateX(2px);
+  border-color: #e5e7ff;
+  background: #f6f6ff;
+  color: #505ce4;
+}
+
+.sidebar nav a.active {
+  border-color: #dedfff;
+  background: linear-gradient(135deg, #f1f2ff, #f5f0ff);
+  color: #505be3;
+  box-shadow: inset 3px 0 0 #626cf3;
+  font-weight: 800;
+}
+
+.user-mini {
+  margin: auto 3px 0;
+  padding: 18px 5px 0;
+}
+
+.avatar {
+  width: 40px;
+  height: 40px;
+  box-shadow: 0 8px 18px rgba(79, 91, 255, .18);
+}
+
+main {
+  width: 100%;
+  min-width: 0;
+  padding: 0 32px 44px;
+}
+
+.topbar {
+  min-height: 94px;
+  height: auto;
+  padding: 19px 0 17px;
+}
+
+.topbar h1 {
+  margin: 0 0 4px;
+  color: #192235;
+  font-size: clamp(25px, 2vw, 29px);
+  line-height: 1.18;
+  letter-spacing: -.55px;
+}
+
+.topbar p {
+  color: #7d879a;
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+/* =====================================================
+   CARD / BUTTON / FORM CHUNG
+===================================================== */
+
+.card {
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  background: var(--ui-card);
+  box-shadow: var(--ui-shadow);
+}
+
+.btn,
+.planner-btn,
+.quiz-submit-btn,
+.quiz-reset-btn,
+.quiz-create-btn {
+  min-height: 42px;
+  border-radius: 11px;
+  font-size: 13.5px;
+  font-weight: 800;
+  letter-spacing: -.05px;
+  transition: transform .18s ease, box-shadow .18s ease, filter .18s ease, background-color .18s ease, border-color .18s ease;
+}
+
+.btn:hover,
+.planner-btn:hover,
+.quiz-submit-btn:hover,
+.quiz-reset-btn:hover,
+.quiz-create-btn:hover {
+  transform: translateY(-1px);
+}
+
+.btn.primary {
+  background: linear-gradient(135deg, var(--ui-primary), var(--ui-primary-2));
+  box-shadow: 0 10px 22px rgba(89, 101, 242, .19);
+}
+
+.btn.primary:hover {
+  box-shadow: 0 13px 27px rgba(89, 101, 242, .25);
+  filter: brightness(1.025);
+}
+
+.btn.secondary {
+  border: 1px solid #e0e4ed;
+  background: #f4f5f9;
+  color: #455066;
+}
+
+.btn.ghost {
+  min-height: 40px;
+  padding-inline: 15px;
+  border-color: #e1e5ee;
+  color: #4d586d;
+  background: rgba(255,255,255,.82);
+}
+
+.btn.ghost:hover {
+  border-color: #d4d9e7;
+  background: #fff;
+  box-shadow: 0 8px 18px rgba(41, 51, 84, .07);
+}
+
+.btn.danger {
+  border: 1px solid #f5dadd;
+  background: #fff5f5;
+  color: #d24c5d;
+}
+
+.btn.small {
+  min-height: 36px;
+  padding: 7px 12px;
+  font-size: 12.5px;
+}
+
+.form label,
+.subject-form label,
+.planner-form label > span {
+  color: #4d586d;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.form input,
+.form textarea,
+.form select,
+.inline-form input,
+.inline-form select,
+.upload-controls input,
+.upload-controls select,
+.subject-form input,
+.subject-form textarea,
+.planner-form input,
+.planner-form select,
+.planner-form textarea,
+.document-subject-form select,
+.quiz-create-actions select {
+  min-height: 46px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 11px;
+  background: #fff;
+  color: #202b3f;
+  font-size: 14px;
+  line-height: 1.45;
+  outline: none;
+  transition: border-color .18s ease, box-shadow .18s ease, background-color .18s ease;
+}
+
+textarea {
+  line-height: 1.6;
+}
+
+.form input:focus,
+.form textarea:focus,
+.form select:focus,
+.upload-controls input:focus,
+.upload-controls select:focus,
+.subject-form input:focus,
+.subject-form textarea:focus,
+.planner-form input:focus,
+.planner-form select:focus,
+.planner-form textarea:focus,
+.document-subject-form select:focus,
+.quiz-create-actions select:focus {
+  border-color: #737cf6;
+  box-shadow: var(--ui-focus);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #9aa3b4;
+}
+
+.section-head h3,
+.planner-section-head h3 {
+  color: #202a3d;
+  font-size: 18px;
+  letter-spacing: -.25px;
+}
+
+.section-head a,
+.view-all-link {
+  font-size: 12.5px;
+}
+
+.pill,
+.planner-badge {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.muted {
+  color: var(--ui-muted);
+  font-size: 13.5px;
+}
+
+/* =====================================================
+   DASHBOARD
+===================================================== */
+
+.hero {
+  position: relative;
+  min-height: 154px;
+  padding: 26px 28px;
+  overflow: hidden;
+  border-color: #e2e4f5;
+  background:
+    radial-gradient(circle at 90% 35%, rgba(128, 98, 242, .14), transparent 25%),
+    linear-gradient(135deg, #fff, #f4f4ff);
+}
+
+.hero::after {
+  content: "✦";
+  position: absolute;
+  right: 95px;
+  top: 17px;
+  color: rgba(105, 96, 238, .11);
+  font-size: 86px;
+  line-height: 1;
+  transform: rotate(10deg);
+  pointer-events: none;
+}
+
+.hero h2 {
+  margin: 10px 0 7px;
+  font-size: clamp(24px, 2.3vw, 30px);
+  letter-spacing: -.55px;
+}
+
+.hero p {
+  font-size: 14px;
+}
+
+.stats {
+  gap: 17px;
+  margin: 18px 0;
+}
+
+.stat {
+  position: relative;
+  min-height: 130px;
+  padding: 21px 22px;
+  overflow: hidden;
+  gap: 4px;
+  transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+}
+
+.stat::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 3px;
+  background: linear-gradient(90deg, #5d69f4, #8a67f0);
+  opacity: .75;
+}
+
+.stat:hover {
+  transform: translateY(-2px);
+  border-color: #dde0f7;
+  box-shadow: var(--ui-shadow-hover);
+}
+
+.stat span {
+  color: #727c90;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.stat strong {
+  margin: 2px 0;
+  color: #1d273a;
+  font-size: 31px;
+  line-height: 1.15;
+  letter-spacing: -.7px;
+}
+
+.stat small {
+  color: #9098a8;
+  font-size: 12px;
+}
+
+.weekly-progress-card,
+.dashboard-reminder-card {
+  padding: 22px;
+}
+
+.weekly-progress-head h3,
+.dashboard-reminder-card .section-head h3 {
+  font-size: 18px;
+}
+
+.weekly-progress-head p {
+  font-size: 12.5px;
+}
+
+.dashboard-reminder-item {
+  min-height: 70px;
+  padding: 13px 14px;
+  border: 1px solid #eceef4;
+  background: #fafbfe;
+  transition: background-color .18s ease, border-color .18s ease, transform .18s ease;
+}
+
+.dashboard-reminder-item:hover {
+  transform: translateY(-1px);
+  border-color: #e0e3f1;
+  background: #fff;
+}
+
+.dashboard-reminder-copy b {
+  color: #313b4f;
+  font-size: 13.5px;
+}
+
+.dashboard-reminder-copy small {
+  color: #8992a5;
+  font-size: 12px;
+}
+
+.dashboard-reminder-status {
+  font-size: 11px;
+}
+
+/* =====================================================
+   MÔN HỌC
+===================================================== */
+
+.subject-form {
+  border-radius: var(--ui-radius);
+  box-shadow: var(--ui-shadow);
+}
+
+.subject-form h3 {
+  font-size: 20px;
+  letter-spacing: -.3px;
+}
+
+.subject-form label {
+  font-size: 13px;
+}
+
+.subject-form input,
+.subject-form textarea {
+  font-size: 14px;
+}
+
+.subject-card {
+  border-radius: var(--ui-radius);
+  box-shadow: var(--ui-shadow);
+}
+
+.subject-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--ui-shadow-hover);
+}
+
+.subject-title-area h3 {
+  font-size: 19px;
+}
+
+.subject-code {
+  font-size: 11.5px;
+}
+
+.subject-description,
+.subject-progress-head {
+  font-size: 13.5px;
+}
+
+.subject-meta span {
+  font-size: 12px;
+}
+
+/* =====================================================
+   TÀI LIỆU
+===================================================== */
+
+.upload-box {
+  min-height: 290px;
+  border-radius: 22px;
+  box-shadow: var(--ui-shadow);
+}
+
+.upload-box h2 {
+  font-size: 25px;
+  letter-spacing: -.4px;
+}
+
+.upload-box > p {
+  font-size: 13.5px;
+}
+
+.upload-controls input,
+.upload-controls select {
+  min-height: 48px;
+  font-size: 13.5px;
+}
+
+.upload-controls input[type="file"] {
+  padding: 6px 8px;
+  color: #687287;
+}
+
+.upload-controls input[type="file"]::file-selector-button {
+  min-height: 34px;
+  margin-right: 10px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 9px;
+  background: #eef0ff;
+  color: #5862e7;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.document-item {
+  min-height: 78px;
+  padding: 14px 15px;
+  border: 1px solid #e7eaf1;
+  border-radius: 13px;
+  background: #fbfcfe;
+  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease, background-color .18s ease;
+}
+
+.document-item:hover {
+  transform: translateY(-1px);
+  border-color: #dcdfef;
+  background: #fff;
+  box-shadow: 0 9px 22px rgba(42, 51, 83, .055);
+}
+
+.document-copy b {
+  display: block;
+  color: #303a4e;
+  font-size: 13.5px;
+}
+
+.document-copy small {
+  margin-top: 5px;
+  color: #8a93a5;
+  font-size: 11.8px;
+}
+
+.document-subject-form select {
+  min-height: 38px;
+  font-size: 12px;
+}
+
+/* =====================================================
+   AI CHAT
+===================================================== */
+
+.ai-chat-layout {
+  border-radius: 20px;
+  box-shadow: 0 13px 34px rgba(37, 46, 81, .07);
+}
+
+.chat-history-panel {
+  background: #fbfbfe;
+}
+
+.subject-chat-heading strong,
+.chat-history-title {
+  font-size: 12.5px;
+}
+
+.subject-chat-heading small {
+  font-size: 11.5px;
+}
+
+.chat-history-item,
+.subject-chat-item {
+  min-height: 62px;
+  border-radius: 12px;
+}
+
+.history-text strong {
+  color: #3a455a;
+  font-size: 13px;
+}
+
+.history-text small {
+  color: #8993a6;
+  font-size: 11px;
+}
+
+.chat-history-item.active,
+.subject-chat-item.active {
+  border-color: #dbddff;
+  background: linear-gradient(135deg, #f0f1ff, #f6f2ff);
+  box-shadow: inset 3px 0 0 #6570f2;
+}
+
+.chat-header {
+  min-height: 74px;
+}
+
+.chat-ai-info strong,
+#chatSubjectName {
+  color: #202a3c;
+  font-size: 15px;
+}
+
+#chatContextStatus {
+  margin-top: 4px;
+  color: #8490a4;
+  font-size: 11.5px;
+}
+
+.chat-documents-link {
+  font-size: 12.5px;
+}
+
+.chat-messages {
+  padding-top: 22px;
+  padding-bottom: 22px;
+}
+
+.message-name {
+  color: #7d879a;
+  font-size: 11.5px;
+  font-weight: 800;
+}
+
+.message-bubble {
+  font-size: 14px;
+  line-height: 1.68;
+}
+
+.ai-message .message-bubble {
+  border: 1px solid #e7e9f2;
+  background: #f8f9fc;
+}
+
+.user-message .message-bubble {
+  box-shadow: 0 9px 20px rgba(85, 96, 236, .16);
+}
+
+.message-tools button,
+.copy-message {
+  font-size: 11.5px;
+}
+
+.chat-composer {
+  padding-top: 14px;
+}
+
+.composer-inner {
+  border-color: #dfe3ed;
+  border-radius: 15px;
+  box-shadow: 0 7px 22px rgba(42, 51, 83, .055);
+}
+
+.composer-inner:focus-within {
+  border-color: #737cf6;
+  box-shadow: var(--ui-focus), 0 8px 24px rgba(42, 51, 83, .055);
+}
+
+#chatInput {
+  color: #283247;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.chat-note {
+  color: #949daf;
+  font-size: 10.5px;
+}
+
+.subject-chat-empty strong {
+  font-size: 13px;
+}
+
+.subject-chat-empty small {
+  font-size: 11px;
+}
+
+.typing-bubble {
+  min-width: 64px;
+}
+
+/* =====================================================
+   QUIZ
+===================================================== */
+
+.quiz-create-card,
+.quiz-card {
+  border-radius: var(--ui-radius);
+  box-shadow: var(--ui-shadow);
+}
+
+.quiz-create-card {
+  padding: 20px 22px;
+}
+
+.quiz-create-left h3 {
+  font-size: 18px;
+}
+
+.quiz-create-left p,
+.quiz-date,
+.quiz-progress-info span {
+  font-size: 12.5px;
+}
+
+.quiz-create-actions select {
+  font-size: 13.5px;
+}
+
+.quiz-toggle h3 {
+  font-size: 17px;
+}
+
+.quiz-count {
+  font-size: 11.5px;
+}
+
+.quiz-question-card {
+  border-radius: 14px;
+  transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+
+.quiz-question-card:hover {
+  transform: translateY(-1px);
+  border-color: #dde0f0;
+  box-shadow: 0 9px 22px rgba(43, 52, 86, .05);
+}
+
+.question-number {
+  font-size: 13px;
+}
+
+.question-title {
+  color: #283247;
+  font-size: 14px;
+  line-height: 1.58;
+}
+
+.quiz-option {
+  min-height: 50px;
+  border-radius: 11px;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.quiz-option:hover {
+  border-color: #cfd4f6;
+  background: #fafaff;
+}
+
+.option-letter {
+  font-size: 13px;
+}
+
+.quiz-result-title {
+  font-size: 14px;
+}
+
+.quiz-result-text {
+  font-size: 12.5px;
+}
+
+.quiz-modal h3 {
+  font-size: 19px;
+}
+
+.quiz-modal p {
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+/* =====================================================
+   KẾ HOẠCH HỌC — TĂNG ĐỘ ĐỌC, GIỮ NGUYÊN LAYOUT
+===================================================== */
+
+.planner-hero,
+.planner-schedule-card,
+.deadline-card,
+.quick-stats-card,
+.agent-tip-card {
+  border-radius: var(--ui-radius);
+  box-shadow: var(--ui-shadow);
+}
+
+.planner-hero h2 {
+  font-size: clamp(25px, 2vw, 32px);
+}
+
+.planner-hero p {
+  font-size: 14px;
+}
+
+.planner-btn {
+  font-size: 13.5px;
+}
+
+.planner-section-head h3 {
+  font-size: 17.5px;
+}
+
+.planner-section-head p {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.view-all-link,
+.planner-small-btn {
+  font-size: 12px;
+}
+
+.schedule-item {
+  min-height: 82px;
+  padding: 11px 13px;
+  border-radius: 13px;
+}
+
+.schedule-day strong {
+  font-size: 12.5px;
+}
+
+.schedule-day span {
+  font-size: 11.5px;
+}
+
+.schedule-day small {
+  font-size: 10.5px;
+}
+
+.schedule-main strong {
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.schedule-main p {
+  color: #7c879b;
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+
+.subject-chip {
+  font-size: 10.5px;
+}
+
+.schedule-duration {
+  font-size: 11px;
+}
+
+.deadline-item {
+  min-height: 70px;
+  padding: 10px 11px;
+}
+
+.deadline-main strong {
+  font-size: 12.5px;
+}
+
+.deadline-main span {
+  font-size: 10.8px;
+}
+
+.deadline-badge {
+  font-size: 10px;
+}
+
+.quick-stat {
+  min-height: 88px;
+}
+
+.quick-stat small {
+  font-size: 10.5px;
+  line-height: 1.4;
+}
+
+.quick-stat strong {
+  font-size: 20px;
+}
+
+.agent-tip-copy p {
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.planner-empty strong {
+  font-size: 13px;
+}
+
+.planner-empty p {
+  font-size: 11.5px;
+}
+
+.planner-modal-panel {
+  border-radius: 19px;
+}
+
+.modal-head h3 {
+  font-size: 19px;
+}
+
+.planner-form label > span {
+  font-size: 12.5px;
+}
+
+.planner-form input,
+.planner-form select,
+.planner-form textarea {
+  font-size: 13.5px;
+}
+
+.modal-note {
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+
+.delete-reminder-form button {
+  font-size: 12px;
+}
+
+.deadline-toast strong {
+  font-size: 13px;
+}
+
+.deadline-toast p {
+  font-size: 11.5px;
+}
+
+/* =====================================================
+   LOGIN / REGISTER — ĐỒNG BỘ TYPOGRAPHY VỚI APP
+===================================================== */
+
+.auth-page {
+  font-family: Inter, "Segoe UI", Roboto, Arial, sans-serif;
+}
+
+.auth-page .wrapper {
+  border: 1px solid rgba(255,255,255,.62);
+}
+
+.auth-page .form-title {
+  font-size: clamp(32px, 3vw, 42px);
+  letter-spacing: -1.2px;
+}
+
+.auth-page .form-subtitle {
+  font-size: 14px;
+}
+
+.auth-page .input-group input {
+  font-size: 14px;
+}
+
+.auth-page .main-btn,
+.auth-page .switch-btn {
+  font-size: 13.5px;
+}
+
+/* =====================================================
+   MICRO-INTERACTIONS
+===================================================== */
+
+main > section,
+main > form {
+  animation: uiFadeUp .34s cubic-bezier(.22,.61,.36,1) both;
+}
+
+main > section:nth-of-type(2) {
+  animation-delay: .035s;
+}
+
+main > section:nth-of-type(3) {
+  animation-delay: .065s;
+}
+
+@keyframes uiFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.planner-modal.show .planner-modal-panel,
+.quiz-modal-overlay.show .quiz-modal,
+.quiz-modal-overlay.active .quiz-modal {
+  animation: uiModalIn .18s ease both;
+}
+
+@keyframes uiModalIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* =====================================================
+   RESPONSIVE
+===================================================== */
+
+@media (max-width: 1100px) {
+  .app-shell {
+    grid-template-columns: 92px minmax(0,1fr);
+  }
+
+  main {
+    padding-inline: 26px;
+  }
+}
+
+@media (max-width: 760px) {
+  body {
+    font-size: 14px;
+  }
+
+  main {
+    padding: 0 15px 30px;
+  }
+
+  .topbar h1 {
+    font-size: 24px;
+  }
+
+  .hero {
+    min-height: auto;
+    padding: 22px;
+  }
+
+  .hero::after {
+    display: none;
+  }
+
+  .stat {
+    min-height: 112px;
+  }
+
+  .upload-box h2 {
+    font-size: 22px;
+  }
+
+  .schedule-item,
+  .deadline-item {
+    min-height: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}

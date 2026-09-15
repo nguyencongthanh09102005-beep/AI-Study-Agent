@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block page_title %}AI Chat{% endblock %}
+{% block page_desc %}Mỗi môn học có một không gian AI riêng{% endblock %}
+
+{% block page_styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/chat.css') }}">
+{% endblock %}
+
+{% block content %}
+
+
+<section class="ai-chat-layout">
+
+  <!-- DANH SÁCH CHAT THEO MÔN -->
+  <aside class="chat-history-panel">
+
+    <div class="subject-chat-heading">
+      <span class="subject-chat-heading-icon">📚</span>
+      <div>
+        <strong>Chat theo môn học</strong>
+        <small>Tự tạo khi thêm môn</small>
+      </div>
+    </div>
+
+    <div class="chat-history-title">
+      Môn học của bạn
+    </div>
+
+    <div class="chat-history-list"></div>
+
+  </aside>
+
+
+  <!-- KHUNG CHAT CHÍNH -->
+  <section class="chat-main-panel">
+
+    <header class="chat-header">
+
+      <div class="chat-ai-info">
+
+        <div class="chat-ai-avatar">
+          🤖
+        </div>
+
+        <div>
+          <strong id="chatSubjectName">AI Study Agent</strong>
+
+          <span id="chatContextStatus">
+            <i></i>
+            Chọn một môn học để bắt đầu
+          </span>
+        </div>
+
+      </div>
+
+      <a
+        class="chat-documents-link"
+        href="{{ url_for('documents') }}"
+        title="Quản lý tài liệu"
+      >
+        📄 Tài liệu
+      </a>
+
+    </header>
+
+
+    <div
+      class="chat-messages"
+      id="chatMessages"
+    ></div>
+
+
+    <div class="chat-composer">
+
+      <div class="composer-inner">
+
+        <a
+          href="{{ url_for('documents') }}"
+          class="composer-action"
+          title="Tải tài liệu cho môn học"
+        >
+          📎
+        </a>
+
+        <textarea
+          id="chatInput"
+          rows="1"
+          placeholder="Chọn một môn học để bắt đầu..."
+        ></textarea>
+
+        <button
+          class="chat-send-button"
+          id="chatSendButton"
+          type="button"
+          title="Gửi"
+        >
+          ➤
+        </button>
+
+      </div>
+
+      <p class="chat-note">
+        Có tài liệu: AI ưu tiên nội dung của đúng môn đang chọn. Không đủ tài liệu: AI trả lời bằng kiến thức chung.
+      </p>
+
+    </div>
+
+  </section>
+
+</section>
+
+<script
+  src="{{ url_for('static', filename='js/chat.js') }}"
+></script>
+
+{% endblock %}

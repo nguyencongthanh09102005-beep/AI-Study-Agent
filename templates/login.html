@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>Đăng nhập - AI Study Agent</title>
+
+  <link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='styles.css') }}"
+  >
+  <link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/polish.css') }}"
+  >
+</head>
+
+<body class="auth-page">
+
+  <div class="scene">
+
+    <div class="wrapper">
+
+      <!-- Checkbox điều khiển animation -->
+      <input
+        type="checkbox"
+        id="toggle"
+        class="auth-toggle"
+        hidden
+      >
+
+      <!-- PANEL XANH TRƯỢT QUA LẠI -->
+      <div class="slider">
+
+        <!-- Hiện khi đang ở giao diện đăng ký -->
+        <div class="slider-login">
+          <div class="slider-content">
+
+            <div class="slider-icon">🎓</div>
+
+            <span class="badge">Chào mừng trở lại</span>
+
+            <h2>Bạn đã có tài khoản?</h2>
+
+            <p>
+              Đăng nhập để tiếp tục quản lý tài liệu,
+              làm quiz và sử dụng trợ lý học tập AI.
+            </p>
+
+            <label for="toggle" class="switch-btn">
+              Đăng nhập
+            </label>
+
+          </div>
+        </div>
+
+        <!-- Hiện khi đang ở giao diện đăng nhập -->
+        <div class="slider-signup">
+          <div class="slider-content">
+
+            <div class="slider-icon">🤖</div>
+
+            <span class="badge">AI Study Agent</span>
+
+            <h2>Học thông minh hơn cùng AI</h2>
+
+            <p>
+              Tải tài liệu, hỏi đáp bằng AI, tạo quiz
+              và xây dựng kế hoạch học tập cá nhân hóa.
+            </p>
+
+            <label for="toggle" class="switch-btn">
+              Tạo tài khoản
+            </label>
+
+          </div>
+        </div>
+
+      </div>
+
+      <!-- HAI FORM NỀN TRẮNG -->
+      <div class="forms">
+
+        <!-- ĐĂNG NHẬP -->
+        <div class="panel login-panel">
+
+          <div class="form-box">
+
+            <span class="form-badge">
+              Chào mừng bạn trở lại
+            </span>
+
+            <h1 class="form-title">
+              Đăng nhập
+            </h1>
+
+            <p class="form-subtitle">
+              Đăng nhập để tiếp tục hành trình học tập.
+            </p>
+
+            {% if error %}
+              <div class="message error-message">
+                <div class="message-icon">!</div>
+
+                <div class="message-text">
+                  <strong>Đăng nhập thất bại</strong>
+                  <span>{{ error }}</span>
+                </div>
+              </div>
+            {% endif %}
+
+            <form
+              method="post"
+              action="{{ url_for('login') }}"
+              class="auth-form"
+            >
+
+              <div class="input-group">
+                <label for="loginEmail">
+                  Email
+                </label>
+
+                <div class="input-wrapper">
+                  <span class="input-icon">✉</span>
+
+                  <input
+                    type="email"
+                    class="input"
+                    id="loginEmail"
+                    name="email"
+                    placeholder="Nhập địa chỉ email"
+                    autocomplete="email"
+                    required
+                  >
+                </div>
+              </div>
+
+              <div class="input-group">
+                <label for="loginPassword">
+                  Mật khẩu
+                </label>
+
+                <div class="input-wrapper">
+                  <span class="input-icon">🔒</span>
+
+                  <input
+                    type="password"
+                    class="input"
+                    id="loginPassword"
+                    name="password"
+                    placeholder="Nhập mật khẩu"
+                    autocomplete="current-password"
+                    required
+                  >
+
+                  <button
+                    type="button"
+                    class="password-toggle"
+                    data-target="loginPassword"
+                    aria-label="Hiện mật khẩu"
+                    aria-pressed="false"
+                  >
+                    👁
+                  </button>
+                </div>
+              </div>
+
+              <div class="options">
+
+                <label class="remember">
+                  <input
+                    type="checkbox"
+                    name="remember"
+                  >
+
+                  <span>
+                    Ghi nhớ đăng nhập
+                  </span>
+                </label>
+
+                <a href="#">
+                  Quên mật khẩu?
+                </a>
+
+              </div>
+
+              <button
+                type="submit"
+                class="submit-btn"
+              >
+                <span>Đăng nhập</span>
+                <span>→</span>
+              </button>
+
+            </form>
+
+            <div class="divider">
+              <span>hoặc tiếp tục với</span>
+            </div>
+
+            <div class="social-icons">
+
+              <button type="button">
+                <span>G</span>
+                Google
+              </button>
+
+              <button type="button">
+                <span>⌘</span>
+                Microsoft
+              </button>
+
+            </div>
+
+          </div>
+
+        </div>
+
+        <!-- ĐĂNG KÝ -->
+        <div class="panel signup-panel">
+
+          <div class="form-box">
+
+            <span class="form-badge">
+              Bắt đầu học thông minh hơn
+            </span>
+
+            <h1 class="form-title">
+              Tạo tài khoản
+            </h1>
+
+            <p class="form-subtitle">
+              Tạo tài khoản để sử dụng toàn bộ tính năng.
+            </p>
+
+            <form
+              method="post"
+              action="{{ url_for('register') }}"
+              class="auth-form"
+            >
+
+              <div class="input-group">
+                <label for="signupName">
+                  Họ và tên
+                </label>
+
+                <div class="input-wrapper">
+                  <span class="input-icon">👤</span>
+
+                  <input
+                    type="text"
+                    class="input"
+                    id="signupName"
+                    name="name"
+                    placeholder="Nhập họ và tên"
+                    autocomplete="name"
+                    required
+                  >
+                </div>
+              </div>
+
+              <div class="input-group">
+                <label for="signupEmail">
+                  Email
+                </label>
+
+                <div class="input-wrapper">
+                  <span class="input-icon">✉</span>
+
+                  <input
+                    type="email"
+                    class="input"
+                    id="signupEmail"
+                    name="email"
+                    placeholder="Nhập địa chỉ email"
+                    autocomplete="email"
+                    required
+                  >
+                </div>
+              </div>
+
+              <div class="input-group">
+                <label for="signupPassword">
+                  Mật khẩu
+                </label>
+
+                <div class="input-wrapper">
+                  <span class="input-icon">🔒</span>
+
+                  <input
+                    type="password"
+                    class="input"
+                    id="signupPassword"
+                    name="password"
+                    placeholder="Tối thiểu 6 ký tự"
+                    minlength="6"
+                    autocomplete="new-password"
+                    required
+                  >
+
+                  <button
+                    type="button"
+                    class="password-toggle"
+                    data-target="signupPassword"
+                    aria-label="Hiện mật khẩu"
+                    aria-pressed="false"
+                  >
+                    👁
+                  </button>
+                </div>
+              </div>
+
+              <div class="input-group">
+                <label for="confirmPassword">
+                  Xác nhận mật khẩu
+                </label>
+
+                <div class="input-wrapper">
+                  <span class="input-icon">✓</span>
+
+                  <input
+                    type="password"
+                    class="input"
+                    id="confirmPassword"
+                    placeholder="Nhập lại mật khẩu"
+                    autocomplete="new-password"
+                    required
+                  >
+
+                  <button
+                    type="button"
+                    class="password-toggle"
+                    data-target="confirmPassword"
+                    aria-label="Hiện mật khẩu"
+                    aria-pressed="false"
+                  >
+                    👁
+                  </button>
+                </div>
+              </div>
+
+              <label class="remember terms-row">
+                <input
+                  type="checkbox"
+                  id="termsCheck"
+                  required
+                >
+
+                <span>
+                  Tôi đồng ý với
+                  <a href="#">điều khoản sử dụng</a>
+                </span>
+              </label>
+
+              <button
+                type="submit"
+                class="submit-btn"
+              >
+                <span>Tạo tài khoản</span>
+                <span>→</span>
+              </button>
+
+            </form>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      document.querySelectorAll(".password-toggle").forEach(function (button) {
+        button.addEventListener("click", function () {
+          const targetId = button.dataset.target;
+          const input = document.getElementById(targetId);
+
+          if (!input) return;
+
+          const isHidden = input.type === "password";
+
+          input.type = isHidden ? "text" : "password";
+          button.textContent = isHidden ? "🙈" : "👁";
+          button.setAttribute(
+            "aria-label",
+            isHidden ? "Ẩn mật khẩu" : "Hiện mật khẩu"
+          );
+          button.setAttribute(
+            "aria-pressed",
+            isHidden ? "true" : "false"
+          );
+        });
+      });
+    });
+  </script>
+
+</body>
+</html>

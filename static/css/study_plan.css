@@ -1,0 +1,174 @@
+/* =====================================================
+   STUDY PLAN
+===================================================== */
+
+.planner-hero,
+.planner-schedule-card,
+.deadline-card,
+.quick-stats-card,
+.agent-tip-card {
+  border: 1px solid #e4e8f2;
+  box-shadow: 0 12px 34px rgba(39, 49, 89, 0.055);
+}
+
+.planner-hero {
+  min-height: 245px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 30px;
+  margin-bottom: 18px;
+  padding: 28px 30px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 82% 30%, rgba(128, 112, 255, .14), transparent 25%),
+    linear-gradient(135deg, #fff 0%, #fbfbff 55%, #f0efff 100%);
+}
+
+.planner-hero-copy { position: relative; z-index: 2; max-width: 680px; }
+.planner-badge { display: inline-flex; align-items: center; gap: 6px; width: max-content; padding: 6px 12px; border: 1px solid #cfd2ff; border-radius: 999px; background: #f2f1ff; color: #5862f1; font-size: 12px; font-weight: 800; }
+.planner-hero h2 { margin: 13px 0 8px; color: #172033; font-size: clamp(24px, 2vw, 34px); }
+.planner-hero p { max-width: 610px; margin: 0; color: #758096; font-size: 14px; line-height: 1.7; }
+.planner-hero-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+
+.planner-btn { min-height: 44px; padding: 0 17px; border-radius: 11px; font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; transition: .2s ease; }
+.planner-btn:hover { transform: translateY(-1px); }
+.planner-btn.primary { border: 0; background: linear-gradient(135deg, #4f63ff, #875bf5); color: #fff; box-shadow: 0 10px 24px rgba(83, 99, 255, .2); }
+.planner-btn.secondary { border: 1px solid #dfe3ec; background: #fff; color: #334057; }
+
+.planner-hero-art { position: relative; width: 360px; min-width: 300px; height: 180px; }
+.planner-hero-art > div { position: absolute; display: grid; place-items: center; filter: drop-shadow(0 14px 18px rgba(74, 70, 150, .15)); }
+.art-calendar { left: 35px; top: 22px; width: 135px; height: 115px; border-radius: 26px; background: rgba(255,255,255,.55); font-size: 78px; transform: rotate(-4deg); }
+.art-checklist { right: 24px; top: 32px; width: 125px; height: 110px; border-radius: 24px; background: rgba(255,255,255,.55); font-size: 72px; transform: rotate(5deg); }
+.art-clock { left: 145px; bottom: 5px; z-index: 3; font-size: 55px; }
+.art-bell { right: 5px; bottom: 1px; z-index: 3; font-size: 40px; }
+
+.planner-main-grid { display: grid; grid-template-columns: minmax(0, 1.12fr) minmax(350px, .88fr); gap: 18px; }
+.planner-bottom-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(360px, 1fr); gap: 18px; margin-top: 18px; }
+.planner-schedule-card, .deadline-card, .quick-stats-card, .agent-tip-card { padding: 20px; }
+.planner-section-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 14px; }
+.planner-section-head h3 { margin: 0; color: #1c263a; font-size: 17px; }
+.planner-section-head p { margin: 5px 0 0; color: #8a94a8; font-size: 11px; }
+.planner-section-head.simple { margin-bottom: 13px; }
+.view-all-link { color: #5862f1; font-size: 11px; font-weight: 700; text-decoration: none; white-space: nowrap; }
+.planner-small-btn { border: 1px solid #d9deea; border-radius: 9px; background: #fff; color: #5963ea; padding: 7px 10px; font-size: 11px; font-weight: 800; cursor: pointer; }
+
+.schedule-list, .deadline-list { display: grid; gap: 8px; }
+.schedule-item { display: grid; grid-template-columns: 75px minmax(0,1fr) auto 34px auto; align-items: center; gap: 10px; min-height: 76px; padding: 10px 12px; border: 1px solid #e4e7ef; border-radius: 13px; background: #fff; transition: .2s ease; }
+.schedule-item:hover { border-color: #cfd4ff; box-shadow: 0 8px 20px rgba(54, 64, 116, .055); }
+.schedule-item.done { opacity: .67; background: #fafbfc; }
+.schedule-item.done .schedule-main strong { text-decoration: line-through; }
+.schedule-item.overdue:not(.done) { border-color: #ffc9a0; background: #fffaf6; }
+.schedule-day { align-self: stretch; display: flex; flex-direction: column; justify-content: center; padding-right: 10px; border-right: 1px solid #eef0f5; }
+.schedule-day strong { color: #253047; font-size: 12px; }
+.schedule-day span { margin-top: 3px; color: #7f899d; font-size: 11px; }
+.schedule-day small { width: max-content; margin-top: 5px; padding: 2px 6px; border-radius: 999px; background: #edf1ff; color: #5562f1; font-size: 9px; font-weight: 800; }
+.schedule-main { min-width: 0; }
+.schedule-title-row { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; }
+.schedule-main strong { color: #263148; font-size: 12px; }
+.schedule-main p { margin: 5px 0 0; color: #8791a5; font-size: 10.5px; line-height: 1.45; }
+.subject-chip { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 3px 8px; border: 1px solid #d7dcff; border-radius: 999px; background: #f1f3ff; color: #5864e9; font-size: 9px; font-weight: 800; }
+.schedule-duration { padding: 6px 9px; border: 1px solid #d6dcff; border-radius: 8px; background: #f3f5ff; color: #5060de; font-size: 10px; font-weight: 800; white-space: nowrap; }
+.task-check { width: 28px; height: 28px; display: grid; place-items: center; border: 2px solid #d6dbe7; border-radius: 50%; background: #fff; color: #fff; font-weight: 900; cursor: pointer; }
+.task-check.checked { border-color: #2ebd78; background: #2ebd78; }
+.task-actions { display: flex; gap: 4px; }
+.task-actions form { margin: 0; }
+.icon-action { width: 29px; height: 29px; border: 0; border-radius: 8px; background: #f4f5fa; color: #606b81; cursor: pointer; }
+.icon-action.danger { color: #e05263; }
+.edit-only { display: none; }
+.planner-edit-mode .edit-only { display: flex; }
+
+.deadline-item { display: grid; grid-template-columns: 40px minmax(0,1fr) auto 31px 27px; align-items: center; gap: 9px; min-height: 64px; padding: 9px 10px; border: 1px solid #e6e8f0; border-radius: 12px; background: #fff; }
+.deadline-item.completed { opacity: .62; }
+.deadline-icon { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 50%; background: linear-gradient(135deg, #6b61ff, #8d64ee); color: #fff; font-size: 16px; }
+.deadline-main { min-width: 0; }
+.deadline-main strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #29334a; font-size: 11px; }
+.deadline-main span { display: block; margin-top: 5px; color: #8b94a7; font-size: 9.5px; }
+.deadline-badge { padding: 5px 8px; border-radius: 7px; font-size: 9px; font-weight: 800; white-space: nowrap; }
+.deadline-badge.warning { border: 1px solid #ffd6b0; background: #fff7ed; color: #e56f18; }
+.deadline-badge.danger { border: 1px solid #ffcbd0; background: #fff1f2; color: #dc4657; }
+.deadline-badge.late { border: 1px solid #f2b6bc; background: #fff0f1; color: #c73548; }
+.deadline-badge.info { border: 1px solid #d7e0ff; background: #f2f5ff; color: #4d65df; }
+.deadline-badge.done { border: 1px solid #bde7cf; background: #effaf4; color: #269d60; }
+.deadline-badge.neutral { background: #f2f3f6; color: #7c8597; }
+.deadline-bell, .deadline-more { width: 29px; height: 29px; border: 0; border-radius: 8px; background: transparent; color: #676fff; cursor: pointer; }
+.deadline-bell:hover, .deadline-more:hover { background: #f1f2ff; }
+
+.quick-stats { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 9px; }
+.quick-stat { min-height: 82px; display: flex; align-items: center; gap: 9px; padding: 12px; border-radius: 12px; }
+.quick-stat > span { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; background: rgba(255,255,255,.65); }
+.quick-stat small { display: block; color: #687287; font-size: 9px; line-height: 1.35; }
+.quick-stat strong { display: block; margin-top: 5px; color: #263148; font-size: 19px; }
+.quick-stat.purple { background: #f3f0ff; }
+.quick-stat.orange { background: #fff5eb; }
+.quick-stat.blue { background: #eef4ff; }
+.quick-stat.green { background: #eefaf4; }
+
+.agent-tip-card { min-height: 126px; display: flex; align-items: center; justify-content: space-between; gap: 20px; background: linear-gradient(135deg, #fff, #fbfaff); }
+.agent-tip-copy p { margin: 12px 0 0; color: #59657b; font-size: 11px; line-height: 1.65; }
+.agent-robot { flex: 0 0 78px; display: grid; place-items: center; font-size: 58px; filter: drop-shadow(0 10px 16px rgba(82, 86, 160, .15)); }
+
+.planner-empty { min-height: 180px; display: grid; place-items: center; align-content: center; gap: 6px; color: #8a94a6; text-align: center; }
+.planner-empty > div { font-size: 35px; }
+.planner-empty strong { color: #4b566c; font-size: 12px; }
+.planner-empty p { margin: 0; font-size: 10px; }
+.planner-empty.compact { min-height: 130px; }
+
+/* =====================================================
+   MODAL
+===================================================== */
+.planner-modal { position: fixed; inset: 0; z-index: 2000; display: none; align-items: center; justify-content: center; padding: 22px; }
+.planner-modal.show { display: flex; }
+.planner-modal-backdrop { position: absolute; inset: 0; background: rgba(22, 29, 52, .42); backdrop-filter: blur(4px); }
+.planner-modal-panel { position: relative; z-index: 1; width: min(650px, 100%); max-height: 90vh; overflow-y: auto; padding: 22px; border: 1px solid #e3e6ef; border-radius: 18px; background: #fff; box-shadow: 0 24px 70px rgba(26, 32, 59, .2); }
+.planner-modal-panel.small { width: min(520px, 100%); }
+.modal-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 18px; }
+.modal-head h3 { margin: 8px 0 0; color: #1f2a40; }
+.modal-close { width: 34px; height: 34px; border: 0; border-radius: 9px; background: #f3f4f8; color: #657086; font-size: 22px; cursor: pointer; }
+.planner-form { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }
+.planner-form label { display: grid; gap: 7px; }
+.planner-form label > span { color: #59657a; font-size: 11px; font-weight: 800; }
+.planner-form input, .planner-form select, .planner-form textarea { width: 100%; box-sizing: border-box; border: 1px solid #dfe3ec; border-radius: 10px; background: #fff; color: #263148; padding: 11px 12px; font: inherit; font-size: 12px; outline: none; }
+.planner-form input:focus, .planner-form select:focus, .planner-form textarea:focus { border-color: #747cff; box-shadow: 0 0 0 3px rgba(94, 104, 255, .09); }
+.full-field { grid-column: 1 / -1; }
+.modal-note { grid-column: 1 / -1; padding: 10px 12px; border-radius: 10px; background: #f5f5ff; color: #69728a; font-size: 10px; line-height: 1.5; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 4px; }
+.delete-reminder-form { margin-top: 10px; padding-top: 12px; border-top: 1px solid #edf0f5; }
+.delete-reminder-form button { border: 0; background: transparent; color: #df4f60; font: inherit; font-size: 11px; font-weight: 800; cursor: pointer; }
+
+/* =====================================================
+   DEADLINE TOAST
+===================================================== */
+.deadline-toast { position: fixed; right: 24px; bottom: 24px; z-index: 2500; width: min(390px, calc(100vw - 32px)); display: grid; grid-template-columns: 42px 1fr 28px; align-items: center; gap: 11px; padding: 14px; border: 1px solid #ffd0aa; border-radius: 14px; background: #fff; box-shadow: 0 18px 48px rgba(36, 44, 75, .2); }
+.deadline-toast[hidden] { display: none; }
+.toast-icon { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 12px; background: #fff3e8; font-size: 20px; }
+.deadline-toast strong { color: #2b354a; font-size: 12px; }
+.deadline-toast p { margin: 4px 0 0; color: #737d91; font-size: 10.5px; line-height: 1.45; }
+.deadline-toast button { border: 0; background: transparent; color: #838da0; font-size: 20px; cursor: pointer; }
+
+@media (max-width: 1100px) {
+  .planner-main-grid, .planner-bottom-grid { grid-template-columns: 1fr; }
+  .planner-hero-art { width: 300px; min-width: 260px; transform: scale(.9); transform-origin: right center; }
+}
+
+@media (max-width: 760px) {
+  .planner-hero { min-height: auto; padding: 22px; }
+  .planner-hero-art { display: none; }
+  .planner-main-grid { grid-template-columns: 1fr; }
+  .schedule-item { grid-template-columns: 62px minmax(0,1fr) 30px; }
+  .schedule-duration { grid-column: 2; width: max-content; }
+  .task-actions { grid-column: 2 / -1; }
+  .quick-stats { grid-template-columns: 1fr 1fr; }
+  .deadline-item { grid-template-columns: 38px minmax(0,1fr) auto; }
+  .deadline-bell, .deadline-more { grid-row: 2; }
+  .planner-form { grid-template-columns: 1fr; }
+  .full-field, .modal-note { grid-column: 1; }
+}
+
+@media (max-width: 520px) {
+  .planner-hero-actions { flex-direction: column; }
+  .planner-hero-actions .planner-btn { width: 100%; }
+  .quick-stats { grid-template-columns: 1fr; }
+  .planner-schedule-card, .deadline-card, .quick-stats-card, .agent-tip-card { padding: 15px; }
+}
