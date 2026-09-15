@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "AI Study Agent",
+    "slug": "ai-study-agent",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "android": {
+      "package": "com.nguyencongthanh.aistudyagent"
+    }
+  }
+}
