@@ -1,180 +1,70 @@
 {% extends "base.html" %}
-
 {% block page_title %}Môn học{% endblock %}
-{% block page_desc %}Quản lý môn học và tiến độ{% endblock %}
-
-{% block page_styles %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/subjects.css') }}">
-{% endblock %}
+{% block page_desc %}Quản lý môn học, theo dõi tiến độ và đặt mục tiêu{% endblock %}
+{% block page_styles %}<link rel="stylesheet" href="{{ url_for('static', filename='css/subjects.css') }}">{% endblock %}
 
 {% block content %}
-
-
-<section class="grid form-grid">
-
-  <!-- FORM THÊM MÔN HỌC -->
-  <form method="post" class="card form subject-form">
-    <h3>Thêm môn học</h3>
-
-    <label>
-      Tên môn
-
-      <input
-        type="text"
-        name="name"
-        required
-        placeholder="Ví dụ: Trí tuệ nhân tạo"
-      >
-    </label>
-
-    <label>
-      Mã môn
-
-      <input
-        type="text"
-        name="code"
-        maxlength="30"
-        placeholder="Ví dụ: 0104123039"
-      >
-    </label>
-
-    <label>
-      Mô tả
-
-      <textarea
-        name="description"
-        rows="4"
-        placeholder="Nhập mô tả ngắn về môn học"
-      ></textarea>
-    </label>
-
-    <div class="subject-form-grid">
-
-      <label>
-        Số tín chỉ
-
-        <input
-          type="number"
-          name="credits"
-          min="1"
-          max="20"
-          value="3"
-          placeholder="Ví dụ: 3"
-        >
-      </label>
-
-      <label>
-        Mục tiêu điểm số
-
-        <input
-          type="number"
-          name="target_score"
-          min="0"
-          max="10"
-          step="0.1"
-          placeholder="Ví dụ: 8.0"
-        >
-      </label>
-
-    </div>
-
-    <button class="btn primary" type="submit">
-      Thêm môn học
-    </button>
-  </form>
-
-  <!-- DANH SÁCH MÔN HỌC -->
-  <div class="subject-grid">
-
-    {% for s in subjects %}
-
-    <article class="card subject-card">
-
-      <div class="subject-card-top">
-
-        <div class="subject-icon">
-          📘
-        </div>
-
-        <div class="subject-title-area">
-          <h3>{{ s.name }}</h3>
-
-          {% if s.code %}
-          <span class="subject-code">
-            {{ s.code }}
-          </span>
-          {% endif %}
-        </div>
-
-      </div>
-
-      <p class="subject-description">
-        {{ s.description or 'Chưa có mô tả' }}
-      </p>
-
-      <div class="subject-meta">
-
-        {% if s.credits %}
-        <span>
-          🎓 {{ s.credits }} tín chỉ
-        </span>
-        {% endif %}
-
-        {% if s.target_score %}
-        <span>
-          🎯 Mục tiêu {{ s.target_score }}
-        </span>
-        {% endif %}
-
-      </div>
-
-      <div class="subject-progress-head">
-        <span>Tiến độ tự động</span>
-        <b>{{ s.progress or 0 }}%</b>
-      </div>
-
-      <div class="subject-progress-bar">
-        <i style="width: {{ s.progress or 0 }}%"></i>
-      </div>
-
-      <div class="subject-actions">
-
-        <a
-          class="btn secondary small"
-          href="{{ url_for('subjects') }}"
-        >
-          Chi tiết
-        </a>
-
-        <form
-          method="post"
-          action="{{ url_for('delete_subject', subject_id=s.id) }}"
-          data-confirm-title="Xóa môn học?"
-          data-confirm-message="Môn “{{ s.name }}” sẽ bị xóa. Bạn có chắc muốn tiếp tục?"
-          data-confirm-label="Xóa môn"
-        >
-          <button
-            class="btn danger small"
-            type="submit"
-          >
-            Xóa
-          </button>
-        </form>
-
-      </div>
-
-    </article>
-
-    {% else %}
-
-    <div class="card subject-empty">
-      <span>📚</span>
-      <p>Chưa có môn học.</p>
-    </div>
-
-    {% endfor %}
-
-  </div>
-
+<section class="mock-page-head">
+  <div><h2>Môn học của bạn 📚</h2><p>Quản lý các môn học, theo dõi tiến độ và đặt mục tiêu học tập dễ dàng hơn.</p></div>
+  <div class="quote-card compact">❝ <span>"Học hôm nay, để có phiên bản tốt hơn<br>của chính mình ngày mai."</span></div>
 </section>
+
+<section class="toolbar-row">
+  <div class="segmented-filter" id="subjectFilters">
+    <button class="active" type="button" data-filter="all">Tất cả ({{ subjects|length }})</button>
+    <button type="button" data-filter="active">Đang học</button>
+    <button type="button" data-filter="planned">Sắp học</button>
+    <button type="button" data-filter="done">Đã hoàn thành</button>
+  </div>
+  <div class="toolbar-actions">
+    <label class="page-search"><span>⌕</span><input id="subjectSearch" type="search" placeholder="Tìm kiếm môn học..."></label>
+    <button class="soft-primary add-subject-open" type="button">＋ <span>Thêm môn học</span></button>
+  </div>
+</section>
+
+<section class="subject-card-grid" id="subjectCardGrid">
+  {% for s in subjects %}
+  {% set p = s.progress or 0 %}
+  <article class="soft-card subject-card-new" data-subject-card data-searchable="{{ s.name|e }} {{ s.code|e }}" data-status="{{ 'done' if p >= 100 else 'active' }}">
+    <div class="subject-top-row">
+      <span class="course-icon course-{{ (loop.index0 % 6) + 1 }}">{{ ['▦','</>','▱','⌘','▥','◔'][loop.index0 % 6] }}</span>
+      <div class="course-title"><h3>{{ s.name }}</h3><span>{{ s.code or 'MÔN HỌC' }}</span></div>
+      <span class="status-chip {{ 'done' if p >= 100 else 'active' }}">● {{ 'Hoàn thành' if p >= 100 else 'Đang học' }}</span>
+    </div>
+    <div class="course-meta">
+      <span><small>Mã môn</small><b>♢ {{ s.code or '—' }}</b></span>
+      <span><small>Tín chỉ</small><b>▱ {{ s.credits or 0 }}</b></span>
+      <span><small>Mục tiêu điểm</small><b>◎ {% if s.target_score %}≥ {{ '%.1f'|format(s.target_score) }}{% else %}—{% endif %}</b></span>
+    </div>
+    <p class="course-desc">{{ s.description or 'Chưa có mô tả cho môn học này.' }}</p>
+    <div class="subject-progress-head"><span>Tiến độ học tập</span><b>{{ p }}%</b></div>
+    <div class="progress-track"><i style="width: {{ p }}%"></i></div>
+    <div class="course-actions">
+      <a class="ghost-action" href="{{ url_for('study_plan') }}">▤ &nbsp; Chi tiết</a>
+      <a class="ghost-action" href="{{ url_for('documents') }}">▱ &nbsp; Tài liệu</a>
+      <a class="ghost-action accent" href="{{ url_for('documents') }}">☁ &nbsp; Tải lên</a>
+      <form method="post" action="{{ url_for('delete_subject', subject_id=s.id) }}" data-confirm-title="Xóa môn học?" data-confirm-message="Môn “{{ s.name }}” sẽ bị xóa. Bạn có chắc muốn tiếp tục?" data-confirm-label="Xóa môn">
+        <button class="ghost-action danger compact-delete" type="submit" title="Xóa môn">×</button>
+      </form>
+    </div>
+  </article>
+  {% else %}
+  <div class="soft-card empty-soft">Chưa có môn học. Bấm “Thêm môn học” để tạo môn đầu tiên.</div>
+  {% endfor %}
+</section>
+
+<div class="mock-modal" id="addSubjectModal" aria-hidden="true">
+  <div class="mock-modal-backdrop" data-close-subject-modal></div>
+  <div class="mock-modal-panel">
+    <div class="mock-modal-head"><div><span class="modal-kicker">📚 Môn học mới</span><h3>Thêm môn học</h3></div><button type="button" data-close-subject-modal>×</button></div>
+    <form method="post" class="mock-form subject-form">
+      <label class="full"><span>Tên môn</span><input type="text" name="name" required placeholder="Ví dụ: Trí tuệ nhân tạo"></label>
+      <label><span>Mã môn</span><input type="text" name="code" maxlength="30" placeholder="Ví dụ: 0104123039"></label>
+      <label><span>Số tín chỉ</span><input type="number" name="credits" min="1" max="20" value="3"></label>
+      <label><span>Mục tiêu điểm</span><input type="number" name="target_score" min="0" max="10" step="0.1" placeholder="Ví dụ: 8.0"></label>
+      <label class="full"><span>Mô tả</span><textarea name="description" rows="4" placeholder="Nhập mô tả ngắn về môn học"></textarea></label>
+      <div class="modal-actions full"><button type="button" class="ghost-action" data-close-subject-modal>Hủy</button><button class="soft-primary" type="submit">＋ Thêm môn học</button></div>
+    </form>
+  </div>
+</div>
 {% endblock %}

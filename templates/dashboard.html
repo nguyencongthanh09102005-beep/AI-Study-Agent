@@ -1,170 +1,88 @@
 {% extends "base.html" %}
-
-{% block page_title %}Dashboard{% endblock %}
-{% block page_desc %}Theo dõi tiến độ học tập của bạn{% endblock %}
-
+{% block page_title %}Tổng quan{% endblock %}
+{% block page_desc %}Theo dõi hành trình học tập thông minh{% endblock %}
 {% block page_styles %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/weekly-progress.css') }}">
 {% endblock %}
 
 {% block content %}
-
-
-<section class="hero card">
+<section class="mock-page-head dashboard-head">
   <div>
-    <span class="pill">AI Study Agent</span>
-
-    <h2>
-      Xin chào, {{ session.get('user_name') }} 👋
-    </h2>
-
-    <p>Hôm nay bạn muốn học gì?</p>
+    <h2>Chào mừng trở lại, {{ session.get('user_name','Nguyễn Hoàng') }}! 👋</h2>
+    <p>Hôm nay là một ngày tuyệt vời để học thêm điều mới!</p>
   </div>
+  <div class="head-actions">
+    <a class="soft-primary" href="{{ url_for('chat') }}">✦ <span>Hỏi AI ngay</span> <b>›</b></a>
+    <div class="quote-card">❝ <span>"Học không phải để hơn người khác,<br>mà để trở thành phiên bản tốt hơn của chính mình."</span></div>
+  </div>
+</section>
 
-  <a
-    class="btn primary"
-    href="{{ url_for('chat') }}"
-  >
-    Hỏi AI ngay
+<section class="metric-grid">
+  <a class="metric-card" href="{{ url_for('subjects') }}" data-searchable="môn học">
+    <span class="metric-icon blue">▱</span><span class="metric-copy"><small>Môn học</small><strong>{{ subjects|length }}</strong><em>Đang theo học</em></span><b class="metric-go">›</b>
+  </a>
+  <a class="metric-card" href="{{ url_for('documents') }}" data-searchable="tài liệu">
+    <span class="metric-icon purple">▤</span><span class="metric-copy"><small>Tài liệu</small><strong>{{ documents|length }}</strong><em>Đã lưu trữ</em></span><b class="metric-go">›</b>
+  </a>
+  <a class="metric-card" href="{{ url_for('quiz') }}" data-searchable="quiz">
+    <span class="metric-icon green">?</span><span class="metric-copy"><small>Quiz đã làm</small><strong>{{ quiz_count }}</strong><em>Bài luyện tập</em></span><b class="metric-go">›</b>
+  </a>
+  <a class="metric-card" href="{{ url_for('study_plan') }}" data-searchable="tiến độ">
+    <span class="metric-icon orange">▥</span><span class="metric-copy"><small>Tiến độ TB</small><strong>{{ avg_progress }}%</strong><em>Tất cả môn học</em></span><b class="metric-go">›</b>
   </a>
 </section>
 
+<section class="dashboard-main-grid">
+  <article class="soft-card weekly-card">
+    <div class="card-title-row">
+      <div><h3>▥ &nbsp; Tiến độ học tập trong tuần</h3><p>Bạn đã học {{ weekly_total_hours }} giờ từ các buổi đã hoàn thành.</p></div>
+      <div class="weekly-score"><strong>{{ avg_progress }}%</strong><span class="{{ weekly_growth_class }}">↑ {{ weekly_growth_text }}</span></div>
+    </div>
+    <div class="progress-track large"><i style="width: {{ avg_progress }}%"></i></div>
+    <div class="weekly-chart-wrap"><canvas id="weeklyStudyChart"></canvas></div>
+  </article>
 
-<section class="stats">
-
-  <div class="card stat">
-    <span>Môn học</span>
-    <strong>{{ subjects|length }}</strong>
-    <small>Đang theo học</small>
-  </div>
-
-  <div class="card stat">
-    <span>Tài liệu</span>
-    <strong>{{ documents|length }}</strong>
-    <small>Đã tải lên</small>
-  </div>
-
-  <div class="card stat">
-    <span>Quiz</span>
-    <strong>{{ quiz_count }}</strong>
-    <small>Bài đã làm</small>
-  </div>
-
-  <div class="card stat">
-    <span>Tiến độ TB</span>
-    <strong>{{ avg_progress }}%</strong>
-    <small>Toàn bộ môn</small>
-  </div>
-
-</section>
-
-
-<section class="grid two">
-
-  <!-- =====================================================
-       BIỂU ĐỒ DỮ LIỆU THẬT
-  ====================================================== -->
-  <div class="card weekly-progress-card">
-
-    <div class="weekly-progress-head">
-
-      <div>
-        <h3>Tiến độ học tập tuần này</h3>
-
-        <p>
-          {{ weekly_total_hours }} giờ từ các buổi học đã hoàn thành
-        </p>
+  <article class="soft-card today-card">
+    <div class="card-title-row"><h3>▦ &nbsp; Lịch học hôm nay</h3><a href="{{ url_for('study_plan') }}">Xem tất cả →</a></div>
+    <div class="today-list">
+      {% for r in reminders[:4] %}
+      <div class="today-row" data-searchable="{{ r.title|e }}">
+        <span class="timeline-dot dot-{{ loop.index }}"></span>
+        <span class="today-time">{{ r.due_text or 'Hôm nay' }}</span>
+        <span class="today-copy"><strong>{{ r.title }}</strong><small>{{ r.status_text or 'Nhắc việc học tập' }}</small></span>
+        <span class="duration-pill">{{ '✓' if r.done else 'Sắp tới' }}</span>
       </div>
-
-      <span
-        class="weekly-growth-badge {{ weekly_growth_class }}"
-      >
-        {{ weekly_growth_text }}
-      </span>
-
-    </div>
-
-    <div class="weekly-chart-wrap">
-      <canvas id="weeklyStudyChart"></canvas>
-    </div>
-
-  </div>
-
-
-  <!-- =====================================================
-       NHẮC VIỆC / DEADLINE THẬT
-  ====================================================== -->
-  <div class="card dashboard-reminder-card">
-
-    <div class="section-head">
-
-      <h3>Deadline & nhắc việc gần nhất</h3>
-
-      <a href="{{ url_for('study_plan') }}">
-        Xem tất cả
-      </a>
-
-    </div>
-
-    <div class="list">
-
-      {% for r in reminders %}
-
-      <div class="list-item dashboard-reminder-item">
-
-        <div class="dashboard-reminder-copy">
-
-          <b>{{ r.title }}</b>
-
-          <small>
-            {{ r.due_text }}
-          </small>
-
-          {% if r.status_text %}
-          <span
-            class="dashboard-reminder-status {{ r.status_class }}"
-          >
-            {{ r.status_text }}
-          </span>
-          {% endif %}
-
-        </div>
-
-        <span
-          class="dashboard-reminder-check {% if r.done %}is-done{% endif %}"
-          title="{{ 'Đã hoàn thành' if r.done else 'Chưa hoàn thành' }}"
-        >
-          {{ '✓' if r.done else '○' }}
-        </span>
-
-      </div>
-
       {% else %}
-
-      <p class="muted">
-        Chưa có deadline hoặc nhắc việc.
-      </p>
-
+      <div class="empty-soft">Chưa có lịch hôm nay. <a href="{{ url_for('study_plan') }}">Tạo kế hoạch →</a></div>
       {% endfor %}
-
     </div>
-
-  </div>
-
+  </article>
 </section>
 
+<section class="dashboard-bottom-grid">
+  <article class="soft-card recent-card">
+    <div class="card-title-row"><h3>◷ &nbsp; Hoạt động gần đây</h3><a href="{{ url_for('documents') }}">Xem tất cả →</a></div>
+    <div class="activity-list">
+      {% for d in documents[:4] %}
+      <div class="activity-row" data-searchable="{{ d.original_name|e }}"><span class="mini-activity purple">▤</span><span>Đã thêm tài liệu <b>“{{ d.original_name }}”</b></span><small>{{ d.created_at }}</small></div>
+      {% else %}
+      <div class="activity-row"><span class="mini-activity green">✦</span><span>Bắt đầu bằng cách tải tài liệu đầu tiên.</span><small>Ngay bây giờ</small></div>
+      {% endfor %}
+    </div>
+  </article>
 
-<script>
-  window.weeklyStudyData =
-    {{ weekly_study_hours | tojson }};
-</script>
+  <article class="soft-card quick-card">
+    <div class="card-title-row"><h3>ϟ &nbsp; Thao tác nhanh</h3></div>
+    <div class="quick-grid">
+      <a href="{{ url_for('documents') }}"><span class="mini-activity purple">▤</span><b>Tải tài liệu lên</b><small>PDF, TXT, MD...</small><em>›</em></a>
+      <a href="{{ url_for('quiz') }}"><span class="mini-activity green">?</span><b>Tạo quiz từ tài liệu</b><small>AI tạo câu hỏi tự động</small><em>›</em></a>
+      <a href="{{ url_for('study_plan') }}"><span class="mini-activity orange">▦</span><b>Lập kế hoạch học</b><small>Tạo thời khóa biểu</small><em>›</em></a>
+      <a href="{{ url_for('chat') }}"><span class="mini-activity blue">?</span><b>Hỏi AI bất kỳ điều gì</b><small>Giải đáp, tóm tắt, gợi ý</small><em>›</em></a>
+    </div>
+  </article>
+</section>
 
-<script
-  src="https://cdn.jsdelivr.net/npm/chart.js"
-></script>
-
-<script
-  src="{{ url_for('static', filename='js/weekly-progress.js') }}"
-></script>
-
+<script>window.weeklyStudyData = {{ weekly_study_hours | tojson }};</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{ url_for('static', filename='js/weekly-progress.js') }}"></script>
 {% endblock %}

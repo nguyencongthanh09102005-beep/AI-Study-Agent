@@ -7,96 +7,79 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
   {% block page_styles %}{% endblock %}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/polish.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/mockup.css') }}">
 </head>
-<body>
+<body class="study-ui page-{{ page or 'default' }}">
 <div class="app-shell">
   <aside class="sidebar">
-    <div class="brand">
-      <div class="brand-logo">🎓</div>
-      <div><strong>Study Agent</strong><small>Trợ lý học tập AI</small></div>
-    </div>
-    <nav>
-      <a class="{{ 'active' if page=='dashboard' else '' }}" href="{{ url_for('dashboard') }}">🏠 Dashboard</a>
-      <a class="{{ 'active' if page=='subjects' else '' }}" href="{{ url_for('subjects') }}">📚 Môn học</a>
-      <a class="{{ 'active' if page=='documents' else '' }}" href="{{ url_for('documents') }}">📄 Tài liệu</a>
-      <a class="{{ 'active' if page=='chat' else '' }}" href="{{ url_for('chat') }}">🤖 AI Chat</a>
-      <a class="{{ 'active' if page=='quiz' else '' }}" href="{{ url_for('quiz') }}">✅ Quiz</a>
-      <a class="{{ 'active' if page=='study_plan' else '' }}" href="{{ url_for('study_plan') }}">🗓 Kế hoạch học</a>
+    <a class="brand" href="{{ url_for('dashboard') }}">
+      <span class="brand-logo">
+        <img src="{{ url_for('static', filename='images/ai-robot.svg') }}" alt="">
+      </span>
+      <span class="brand-copy">
+        <strong>AI Study Agent</strong>
+        <small>Học thông minh hơn ✦</small>
+      </span>
+    </a>
+
+    <nav class="side-nav" aria-label="Điều hướng chính">
+      <a class="{{ 'active' if page=='dashboard' else '' }}" href="{{ url_for('dashboard') }}"><span>⌂</span><b>Tổng quan</b></a>
+      <a class="{{ 'active' if page=='subjects' else '' }}" href="{{ url_for('subjects') }}"><span>▱</span><b>Môn học</b></a>
+      <a class="{{ 'active' if page=='documents' else '' }}" href="{{ url_for('documents') }}"><span>▤</span><b>Tài liệu</b></a>
+      <a class="{{ 'active' if page=='quiz' else '' }}" href="{{ url_for('quiz') }}"><span>?</span><b>Quiz</b></a>
+      <a class="{{ 'active' if page=='study_plan' else '' }}" href="{{ url_for('study_plan') }}"><span>▦</span><b>Kế hoạch học</b></a>
+      <a class="{{ 'active' if page=='chat' else '' }}" href="{{ url_for('chat') }}"><span>◯</span><b>Chat AI</b></a>
     </nav>
-    <div class="user-mini">
-      <div class="avatar">{{ session.get('user_name','U')[0] }}</div>
-      <div><strong>{{ session.get('user_name','Người dùng') }}</strong><small>Sinh viên</small></div>
+
+    <div class="pro-card">
+      <span class="pro-crown">♛</span>
+      <div><strong>Nâng cấp Pro</strong><small>Mở khóa nhiều tính năng<br>AI mạnh mẽ hơn</small></div>
+      <span class="pro-arrow">›</span>
     </div>
   </aside>
-  <main>
+
+  <main class="app-main">
     <header class="topbar">
-      <div>
+      <label class="global-search">
+        <span>⌕</span>
+        <input id="globalSearch" type="search" placeholder="Tìm kiếm môn học, tài liệu, câu hỏi..." autocomplete="off">
+      </label>
+      <div class="topbar-actions">
+        <button class="icon-button" type="button" aria-label="Thông báo">♧<i></i></button>
+        <div class="user-chip">
+          <span class="user-avatar">{{ session.get('user_name','N')[0]|upper }}</span>
+          <span class="user-copy"><strong>{{ session.get('user_name','Nguyễn Hoàng') }}</strong><small>Sinh viên</small></span>
+          <a class="logout-mini" href="{{ url_for('logout') }}" title="Đăng xuất">↗</a>
+        </div>
+      </div>
+    </header>
+
+    <section class="page-content">
+      <div class="sr-only">
         <h1>{% block page_title %}{% endblock %}</h1>
         <p>{% block page_desc %}{% endblock %}</p>
       </div>
-      <a class="btn ghost" href="{{ url_for('logout') }}">Đăng xuất</a>
-    </header>
-    {% block content %}{% endblock %}
+      {% block content %}{% endblock %}
+    </section>
   </main>
 </div>
 
-<!-- =====================================================
-     MODAL XÁC NHẬN DÙNG CHUNG
-===================================================== -->
-<div
-  class="app-confirm-modal"
-  id="appConfirmModal"
-  aria-hidden="true"
->
-  <div
-    class="app-confirm-backdrop"
-    data-confirm-close
-  ></div>
-
-  <div
-    class="app-confirm-dialog"
-    role="dialog"
-    aria-modal="true"
-    aria-labelledby="appConfirmTitle"
-    aria-describedby="appConfirmMessage"
-  >
+<div class="app-confirm-modal" id="appConfirmModal" aria-hidden="true">
+  <div class="app-confirm-backdrop" data-confirm-close></div>
+  <div class="app-confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="appConfirmTitle" aria-describedby="appConfirmMessage">
     <div class="app-confirm-icon">🗑️</div>
-
-    <h3 id="appConfirmTitle">
-      Xác nhận xóa
-    </h3>
-
-    <p id="appConfirmMessage">
-      Bạn có chắc muốn xóa mục này?
-    </p>
-
+    <h3 id="appConfirmTitle">Xác nhận xóa</h3>
+    <p id="appConfirmMessage">Bạn có chắc muốn xóa mục này?</p>
     <div class="app-confirm-actions">
-      <button
-        type="button"
-        class="app-confirm-cancel"
-        data-confirm-close
-      >
-        Hủy
-      </button>
-
-      <form
-        method="post"
-        id="appConfirmForm"
-      >
-        <button
-          type="submit"
-          class="app-confirm-delete"
-          id="appConfirmDeleteButton"
-        >
-          Xóa
-        </button>
-      </form>
+      <button type="button" class="app-confirm-cancel" data-confirm-close>Hủy</button>
+      <form method="post" id="appConfirmForm"><button type="submit" class="app-confirm-delete" id="appConfirmDeleteButton">Xóa</button></form>
     </div>
   </div>
 </div>
 
 <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 <script src="{{ url_for('static', filename='js/confirm-modal.js') }}"></script>
+<script src="{{ url_for('static', filename='js/mockup.js') }}"></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

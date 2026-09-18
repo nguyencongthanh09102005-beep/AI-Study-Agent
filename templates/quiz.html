@@ -1,221 +1,78 @@
 {% extends "base.html" %}
-
 {% block page_title %}Quiz{% endblock %}
-{% block page_desc %}Tạo câu hỏi ôn tập từ tài liệu{% endblock %}
-
-{% block page_styles %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/quiz.css') }}">
-{% endblock %}
+{% block page_desc %}Luyện tập hiệu quả với quiz được cá nhân hóa bởi AI{% endblock %}
+{% block page_styles %}<link rel="stylesheet" href="{{ url_for('static', filename='css/quiz.css') }}">{% endblock %}
 
 {% block content %}
+<section class="mock-page-head">
+  <div><h2>Quiz thông minh 🎯</h2><p>Luyện tập hiệu quả hơn với các bài quiz được cá nhân hóa bởi AI.</p></div>
+  <div class="quote-card compact">❝ <span>"Luyện tập hôm nay,<br>kiến thức vững vàng ngày mai!"</span></div>
+</section>
 
-
-<!-- =====================================================
-     TẠO QUIZ MỚI
-===================================================== -->
-<form method="post" class="card quiz-create-card">
-
-  <div class="quiz-create-left">
-    <div class="quiz-create-icon">📝</div>
-
-    <div>
-      <h3>Tạo quiz mới</h3>
-      <p>AI tạo câu hỏi ôn tập dựa trên tài liệu bạn đã tải lên.</p>
-    </div>
-  </div>
-
-  <div class="quiz-create-actions">
-    <select name="document_id" required>
-      <option value="">Chọn tài liệu</option>
-
-      {% for d in documents %}
-      <option value="{{ d.id }}">{{ d.original_name }}</option>
-      {% endfor %}
-    </select>
-
-    <select
-      name="question_count"
-      aria-label="Chọn số câu hỏi"
-      title="Số câu hỏi"
-    >
-      <option value="10" selected>10 câu</option>
-      <option value="20">20 câu</option>
-      <option value="30">30 câu</option>
-    </select>
-
-    <button class="btn primary quiz-create-btn" type="submit">
-      ✨ Tạo quiz
-    </button>
-  </div>
-
+<form method="post" class="quiz-action-grid" id="quizCreateForm">
+  <label class="quiz-action-card primary-action">
+    <span class="mini-activity white">▤</span>
+    <span><b>Tạo quiz từ tài liệu</b><small>Biến tài liệu thành quiz bằng AI</small></span>
+    <select name="document_id" required><option value="">Chọn tài liệu</option>{% for d in documents %}<option value="{{ d.id }}">{{ d.original_name }}</option>{% endfor %}</select>
+  </label>
+  <label class="quiz-action-card"><span class="mini-activity purple">ϟ</span><span><b>Làm quiz nhanh</b><small>Ngẫu nhiên theo môn học</small></span><select name="question_count"><option value="10">10 câu</option><option value="20">20 câu</option><option value="30">30 câu</option></select></label>
+  <div class="quiz-action-card"><span class="mini-activity blue">▱</span><span><b>Chọn theo môn học</b><small>Từ các tài liệu đã tải</small></span><em>›</em></div>
+  <button class="quiz-action-card create-submit" type="submit"><span class="mini-activity purple">⚙</span><span><b>Tạo quiz ngay</b><small>AI sẽ sinh câu hỏi tự động</small></span><em>›</em></button>
 </form>
 
-<!-- =====================================================
-     DANH SÁCH QUIZ
-===================================================== -->
-<section class="quiz-grid">
+<section class="quiz-stats-grid">
+  <div class="soft-card"><span class="metric-icon orange">♕</span><span><small>Số quiz đã tạo</small><strong>{{ quizzes|length }}</strong><em>Kho luyện tập</em></span></div>
+  <div class="soft-card"><span class="metric-icon blue">◷</span><span><small>Tài liệu nguồn</small><strong>{{ documents|length }}</strong><em>Sẵn sàng tạo quiz</em></span></div>
+  <div class="soft-card"><span class="metric-icon purple">▥</span><span><small>Hoàn thành quiz</small><strong>{{ quizzes|length }}</strong><em>Tiếp tục duy trì</em></span></div>
+  <div class="soft-card"><span class="metric-icon orange">♨</span><span><small>Chuỗi ngày học</small><strong>7 ngày</strong><em>Tiếp tục cố gắng nhé!</em></span></div>
+</section>
 
-  {% for quiz in quizzes %}
-
-  <article
-    class="card quiz-card {% if not loop.first %}collapsed{% endif %}"
-    data-quiz-id="{{ quiz.id }}"
-  >
-
-    <!-- HEADER -->
-    <div class="quiz-card-head">
-
-      <button type="button" class="quiz-toggle">
-        <div class="quiz-head-left">
-          <div class="quiz-title-row">
-            <span class="quiz-file-icon">📄</span>
-
-            <div>
-              <h3>{{ quiz.title }}</h3>
-              <div class="quiz-date">📅 {{ quiz.created_at }}</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="quiz-head-right">
-          <span class="quiz-count">{{ quiz.questions|length }} câu hỏi</span>
-          <span class="quiz-toggle-icon">▾</span>
-        </div>
+<section class="quiz-work-layout">
+  <aside class="soft-card quiz-library">
+    <div class="card-title-row"><h3>▣ &nbsp; Danh sách quiz của bạn</h3><span>{{ quizzes|length }} bài</span></div>
+    <div class="quiz-mini-tabs"><button class="active" type="button">Tất cả</button><button type="button">Gần đây</button><button type="button">Đã làm</button></div>
+    <div class="quiz-picker-list">
+      {% for quiz in quizzes %}
+      <button type="button" class="quiz-picker {% if loop.first %}active{% endif %}" data-quiz-target="quiz-work-{{ quiz.id }}">
+        <span class="mini-activity {{ ['blue','purple','green','orange'][loop.index0 % 4] }}">?</span>
+        <span><b>{{ quiz.title }}</b><small>{{ quiz.questions|length }} câu hỏi · {{ quiz.created_at }}</small></span><em>›</em>
       </button>
-
-      <button
-        type="button"
-        class="quiz-delete-btn"
-        data-delete-url="{{ url_for('delete_quiz', quiz_id=quiz.id) }}"
-        data-quiz-title="{{ quiz.title }}"
-        title="Xóa quiz"
-        aria-label="Xóa quiz"
-      >
-        🗑️
-      </button>
-
+      {% else %}
+      <div class="empty-soft">Chưa có quiz. Chọn tài liệu phía trên để tạo bài đầu tiên.</div>
+      {% endfor %}
     </div>
+  </aside>
 
-    <!-- BODY -->
-    <div class="quiz-body">
-
-      <div class="quiz-progress-area">
-        <div class="quiz-progress-info">
-          <span>Tiến độ làm bài</span>
-          <strong class="quiz-progress-text">
-            0 / {{ quiz.questions|length }} câu
-          </strong>
-        </div>
-
-        <div class="quiz-progress-bar">
-          <span style="width: 0%"></span>
-        </div>
+  <section class="quiz-workspaces">
+    {% for quiz in quizzes %}
+    <article class="soft-card quiz-card {% if loop.first %}active-workspace{% endif %}" id="quiz-work-{{ quiz.id }}" data-quiz-id="{{ quiz.id }}">
+      <div class="quiz-work-head">
+        <div><span class="mini-activity blue">?</span><span><h3>{{ quiz.title }}</h3><small>Câu hỏi luyện tập bằng AI</small></span></div>
+        <button type="button" class="quiz-delete-btn" data-delete-url="{{ url_for('delete_quiz', quiz_id=quiz.id) }}" data-quiz-title="{{ quiz.title }}" title="Xóa quiz">×</button>
       </div>
-
-      <div class="quiz-result">
-        <div class="quiz-result-icon">🎯</div>
-
-        <div>
-          <strong class="quiz-result-title">Kết quả</strong>
-          <p class="quiz-result-text">Bạn chưa nộp bài.</p>
-        </div>
-      </div>
-
+      <div class="quiz-progress-area"><div class="quiz-progress-info"><span>Tiến độ làm bài</span><strong class="quiz-progress-text">0 / {{ quiz.questions|length }} câu</strong></div><div class="quiz-progress-bar"><span style="width:0%"></span></div></div>
+      <div class="quiz-result"><div class="quiz-result-icon">🎯</div><div><strong class="quiz-result-title">Kết quả</strong><p class="quiz-result-text">Bạn chưa nộp bài.</p></div></div>
       <div class="quiz-question-list">
-
         {% for q in quiz.questions %}
         {% set question_index = loop.index %}
         {% set option_letters = ['A','B','C','D'] %}
-
-        <div
-          class="quiz-question-card"
-          data-answer="{{ q.answer }}"
-        >
-
-          <div class="question-header">
-            <span class="question-number">{{ question_index }}</span>
-
-            <b class="question-title">{{ q.question }}</b>
-
-            <button
-              type="button"
-              class="question-bookmark"
-              title="Đánh dấu câu hỏi"
-            >
-              ♡
-            </button>
-          </div>
-
+        <div class="quiz-question-card" data-answer="{{ q.answer }}">
+          <div class="question-header"><span class="question-number">{{ question_index }}</span><b class="question-title">{{ q.question }}</b><button type="button" class="question-bookmark" title="Đánh dấu">♡</button></div>
           <div class="question-options">
-
             {% for option in q.options %}
             {% set option_index = loop.index0 %}
-
-            <label class="quiz-option">
-              <input
-                type="radio"
-                name="q{{ quiz.id }}_{{ question_index }}"
-                value="{{ option_index }}"
-              >
-
-              <span class="option-radio"></span>
-              <span class="option-letter">{{ option_letters[option_index] }}.</span>
-              <span class="option-text">{{ option }}</span>
-              <span class="option-result-icon"></span>
-            </label>
-
+            <label class="quiz-option"><input type="radio" name="q{{ quiz.id }}_{{ question_index }}" value="{{ option_index }}"><span class="option-radio"></span><span class="option-letter">{{ option_letters[option_index] }}</span><span class="option-text">{{ option }}</span><span class="option-result-icon"></span></label>
             {% endfor %}
-
           </div>
-
         </div>
         {% endfor %}
-
       </div>
-
-      <div class="quiz-actions">
-        <button type="button" class="quiz-reset-btn">↻ Làm lại</button>
-        <button type="button" class="quiz-submit-btn">✓ Nộp bài</button>
-      </div>
-
-    </div>
-
-  </article>
-
-  {% else %}
-
-  <div class="card quiz-empty">
-    <div class="quiz-empty-icon">🧠</div>
-    <h3>Chưa có quiz</h3>
-    <p>Hãy tải tài liệu rồi tạo quiz đầu tiên.</p>
-  </div>
-
-  {% endfor %}
-
+      <div class="quiz-actions"><button type="button" class="quiz-prev-btn">← Câu trước</button><div class="quiz-step-actions"><button type="button" class="quiz-reset-btn">↻ Làm lại</button><button type="button" class="quiz-next-btn">Câu tiếp theo →</button><button type="button" class="quiz-submit-btn">✓ Nộp bài</button></div></div>
+    </article>
+    {% endfor %}
+  </section>
 </section>
 
-<!-- =====================================================
-     MODAL XÓA QUIZ
-===================================================== -->
-<div class="quiz-modal-overlay" id="deleteQuizModal">
-  <div class="quiz-modal" role="dialog" aria-modal="true" aria-labelledby="deleteQuizTitle">
-    <div class="quiz-modal-icon">🗑️</div>
-
-    <h3 id="deleteQuizTitle">Xóa quiz?</h3>
-    <p id="deleteQuizText">Bạn có chắc muốn xóa quiz này không?</p>
-
-    <div class="quiz-modal-actions">
-      <button type="button" class="quiz-modal-cancel" id="cancelDeleteQuiz">
-        Hủy
-      </button>
-
-      <form method="post" id="deleteQuizForm">
-        <button type="submit" class="quiz-modal-delete">Xóa quiz</button>
-      </form>
-    </div>
-  </div>
-</div>
-
+<div class="quiz-modal-overlay" id="deleteQuizModal"><div class="quiz-modal" role="dialog" aria-modal="true" aria-labelledby="deleteQuizTitle"><div class="quiz-modal-icon">🗑️</div><h3 id="deleteQuizTitle">Xóa quiz?</h3><p id="deleteQuizText">Bạn có chắc muốn xóa quiz này không?</p><div class="quiz-modal-actions"><button type="button" class="quiz-modal-cancel" id="cancelDeleteQuiz">Hủy</button><form method="post" id="deleteQuizForm"><button type="submit" class="quiz-modal-delete">Xóa quiz</button></form></div></div></div>
 <script src="{{ url_for('static', filename='js/quiz.js') }}"></script>
-
 {% endblock %}

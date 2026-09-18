@@ -1,67 +1,74 @@
 {% extends "base.html" %}
 {% block page_title %}Tài liệu{% endblock %}
-{% block page_desc %}Tải lên PDF/TXT/Markdown và dùng làm dữ liệu cho AI{% endblock %}
+{% block page_desc %}Lưu trữ, quản lý và khai thác tài liệu với sức mạnh AI{% endblock %}
+{% block page_styles %}<link rel="stylesheet" href="{{ url_for('static', filename='css/documents.css') }}">{% endblock %}
 
-{% block page_styles %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/documents.css') }}">
-{% endblock %}
 {% block content %}
+<section class="mock-page-head">
+  <div><h2><span class="title-folder">▰</span> Tài liệu học tập</h2><p>Lưu trữ, quản lý và khai thác tài liệu với sức mạnh AI</p></div>
+  <div class="quote-card compact">❝ <span>"Một tài liệu tốt hôm nay<br>là nền tảng cho thành công ngày mai."</span></div>
+</section>
 
-<form method="post" enctype="multipart/form-data" class="card upload-box">
-  <div class="upload-icon">☁️</div>
-  <h2>Tải tài liệu học tập</h2>
-  <p>Hỗ trợ PDF, TXT và Markdown, tối đa 20 MB.</p>
-  <div class="upload-controls">
-    <input type="file" name="file" accept=".pdf,.txt,.md" required>
-    <select name="subject_id">
-      <option value="">Không gắn môn học</option>
-      {% for s in subjects %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
-    </select>
-    <button class="btn primary" type="submit">Tải lên</button>
-  </div>
-</form>
-
-<section class="card">
-  <div class="section-head">
-    <h3>Danh sách tài liệu</h3>
-    <span>{{ documents|length }} tài liệu</span>
-  </div>
-
-  <div class="list">
-    {% for d in documents %}
-    <div class="list-item document-item">
-      <div class="document-copy">
-        <b>📄 {{ d.original_name }}</b>
-        <small>{{ d.subject_name or 'Chưa phân loại' }} · {{ d.created_at }}</small>
-      </div>
-
-      <div class="row-actions document-actions">
-        <span class="pill">{{ 'Đã đọc nội dung' if d.extracted_text else 'Chưa trích xuất được' }}</span>
-
-        <form method="post" action="{{ url_for('update_document_subject', doc_id=d.id) }}" class="document-subject-form">
-          <select name="subject_id" aria-label="Môn học của tài liệu">
-            <option value="">Chưa phân loại</option>
-            {% for s in subjects %}
-              <option value="{{ s.id }}" {% if d.subject_id == s.id %}selected{% endif %}>{{ s.name }}</option>
-            {% endfor %}
-          </select>
-          <button class="btn secondary small" type="submit">Lưu môn</button>
-        </form>
-
-        <form
-          method="post"
-          action="{{ url_for('delete_document', doc_id=d.id) }}"
-          data-confirm-title="Xóa tài liệu?"
-          data-confirm-message="Tài liệu “{{ d.original_name }}” và các quiz được tạo từ tài liệu này sẽ bị xóa."
-          data-confirm-label="Xóa tài liệu"
-        >
-          <button class="btn danger small" type="submit">Xóa</button>
-        </form>
-      </div>
+<section class="document-top-grid">
+  <form method="post" enctype="multipart/form-data" class="soft-card upload-dropzone" id="uploadForm">
+    <label class="dropzone-inner">
+      <input id="documentFileInput" type="file" name="file" accept=".pdf,.txt,.md" required>
+      <span class="upload-cloud">↑</span>
+      <span><strong>Tải tài liệu lên</strong><small>Kéo thả file vào đây hoặc nhấn để chọn file</small><em>Hỗ trợ PDF, TXT, Markdown (tối đa 20MB)</em></span>
+    </label>
+    <div class="upload-inline-controls">
+      <select name="subject_id"><option value="">Tất cả môn học</option>{% for s in subjects %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}</select>
+      <span id="selectedFileName">Chưa chọn file</span>
+      <button class="soft-primary" type="submit">↑ Tải lên</button>
     </div>
-    {% else %}
-    <p class="muted">Chưa có tài liệu. Hãy tải tệp đầu tiên.</p>
-    {% endfor %}
+  </form>
+
+  <article class="soft-card storage-card">
+    <div class="storage-head"><h3>◉ &nbsp; Dung lượng lưu trữ</h3><a href="#">Nâng cấp →</a></div>
+    <div class="storage-number"><strong>{{ documents|length }}</strong><span> tài liệu đã lưu</span><em>{{ [documents|length * 4, 92]|min }}%</em></div>
+    <div class="progress-track storage"><i style="width: {{ [documents|length * 4, 92]|min }}%"></i></div>
+    <div class="storage-legend"><span><i class="legend-dot blue"></i>Tài liệu chính</span><span><i class="legend-dot purple"></i>AI Quiz</span><span><i class="legend-dot gray"></i>Khác</span></div>
+  </article>
+</section>
+
+<section class="toolbar-row document-toolbar">
+  <label class="page-search"><span>⌕</span><input id="documentSearch" type="search" placeholder="Tìm kiếm tài liệu..."></label>
+  <div class="segmented-filter" id="documentTypeFilters">
+    <button class="active" type="button" data-doc-filter="all">Tất cả</button>
+    <button type="button" data-doc-filter="pdf">▣ PDF</button>
+    <button type="button" data-doc-filter="txt">▤ TXT</button>
+    <button type="button" data-doc-filter="md">▧ MD</button>
   </div>
+  <span class="toolbar-spacer"></span>
+  <span class="select-look">♢ &nbsp; Tất cả môn học⌄</span>
+  <span class="select-look">↕ &nbsp; Mới nhất⌄</span>
+</section>
+
+<div class="document-section-head"><h3>▤ &nbsp; Tất cả tài liệu ({{ documents|length }})</h3><div><button class="view-mode active" type="button">▦</button><button class="view-mode" type="button">☷</button></div></div>
+
+<section class="document-card-grid" id="documentCardGrid">
+  {% for d in documents %}
+  {% set ext = d.original_name.rsplit('.', 1)[-1]|lower if '.' in d.original_name else 'txt' %}
+  <article class="soft-card document-card-new" data-document-card data-type="{{ ext }}" data-searchable="{{ d.original_name|e }} {{ d.subject_name or '' }}">
+    <div class="doc-card-top">
+      <span class="file-icon {{ ext }}">{{ ext|upper }}</span>
+      <div class="doc-title"><h3>{{ d.original_name }}</h3><span class="subject-tag">{{ d.subject_name or 'Tổng hợp' }}</span></div>
+      <button class="doc-more" type="button">⋮</button>
+    </div>
+    <div class="doc-meta"><span>▦ {{ d.created_at }}</span><span>▤ {{ 'Đã đọc' if d.extracted_text else 'Chưa trích xuất' }}</span></div>
+    <form method="post" action="{{ url_for('update_document_subject', doc_id=d.id) }}" class="document-subject-form compact-form">
+      <select name="subject_id" aria-label="Môn học của tài liệu"><option value="">Chưa phân loại</option>{% for s in subjects %}<option value="{{ s.id }}" {% if d.subject_id == s.id %}selected{% endif %}>{{ s.name }}</option>{% endfor %}</select>
+      <button type="submit" title="Lưu môn">✓</button>
+    </form>
+    <div class="doc-actions">
+      <a href="{{ url_for('chat') }}">◉ Xem</a>
+      <a href="{{ url_for('chat') }}">✦ Tóm tắt AI</a>
+      <a href="{{ url_for('quiz') }}">? Tạo quiz</a>
+      <form method="post" action="{{ url_for('delete_document', doc_id=d.id) }}" data-confirm-title="Xóa tài liệu?" data-confirm-message="Tài liệu “{{ d.original_name }}” và các quiz được tạo từ tài liệu này sẽ bị xóa." data-confirm-label="Xóa tài liệu"><button type="submit" title="Xóa">×</button></form>
+    </div>
+  </article>
+  {% else %}
+  <div class="soft-card empty-soft">Chưa có tài liệu. Hãy tải file đầu tiên.</div>
+  {% endfor %}
 </section>
 {% endblock %}
