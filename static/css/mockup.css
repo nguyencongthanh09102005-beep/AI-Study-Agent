@@ -167,3 +167,43 @@ html {
     transition-duration: .01ms !important;
   }
 }
+
+
+/* =====================================================
+   PLANNER GRID OVERRIDES V2
+   Loaded last so the interactive calendar keeps its layout.
+===================================================== */
+.page-study_plan .week-strip-top {
+  grid-template-columns: auto auto auto minmax(150px, auto) auto 1fr auto;
+}
+
+.page-study_plan .date-jump strong {
+  margin-left: 0;
+}
+
+@media (max-width: 980px) {
+  .page-study_plan .week-strip-top {
+    grid-template-columns: auto auto auto minmax(140px, 1fr) auto;
+  }
+
+  .page-study_plan .week-strip-top > span {
+    display: none;
+  }
+
+  .page-study_plan .segmented-filter {
+    grid-column: 1 / -1;
+    justify-self: end;
+  }
+}
+
+@media (max-width: 760px) {
+  .page-study_plan .week-days.month-grid .week-day:nth-child(n+5) {
+    display: grid;
+  }
+
+  .page-study_plan .week-days.month-grid {
+    grid-template-columns: repeat(7, minmax(42px, 1fr));
+    overflow-x: auto;
+    padding-bottom: 5px;
+  }
+}
