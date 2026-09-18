@@ -91,3 +91,79 @@ button{cursor:pointer}
 @media (max-width:640px){
   .mock-page-head{flex-direction:column}.mock-page-head h2{font-size:27px}.quote-card{min-width:0;width:100%}.head-actions{width:100%;flex-wrap:wrap}.metric-grid,.quiz-action-grid,.quiz-stats-grid,.ai-quick-actions,.subject-card-grid,.document-card-grid,.quick-grid,.side-stat-grid{grid-template-columns:1fr}.toolbar-row{align-items:stretch;flex-direction:column}.toolbar-actions{margin-left:0;flex-direction:column;align-items:stretch}.page-search{width:100%}.week-days{grid-template-columns:repeat(4,1fr)}.week-day:nth-child(n+5){display:none}.task-compact-list>div{grid-template-columns:24px 1fr}.task-compact-list>div span:nth-of-type(2),.task-compact-list>div em{display:none}.auth-shell-new{padding:10px}.auth-brandbar .auth-top-switch{display:none}.auth-form-card{padding:15px}.social-row{grid-template-columns:1fr}.topbar-actions .icon-button{display:none}.global-search{width:62vw}
 }
+
+/* =====================================================
+   SMOOTH TRANSITIONS V2
+===================================================== */
+@view-transition {
+  navigation: auto;
+}
+
+::view-transition-old(root) {
+  animation: page-out .18s ease both;
+}
+
+::view-transition-new(root) {
+  animation: page-in .28s cubic-bezier(.2,.8,.2,1) both;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+.page-content {
+  animation: page-content-enter .34s cubic-bezier(.2,.8,.2,1) both;
+}
+
+.soft-card,
+.metric-card,
+.quiz-action-card,
+.chat-main-panel,
+.chat-history-panel,
+.week-strip-card,
+.schedule-item-new,
+.side-nav a,
+.ghost-action,
+.soft-primary {
+  transition:
+    transform .22s cubic-bezier(.2,.8,.2,1),
+    box-shadow .22s ease,
+    border-color .22s ease,
+    background .22s ease,
+    opacity .18s ease;
+}
+
+.soft-card:hover,
+.metric-card:hover {
+  transform: translateY(-2px);
+}
+
+@keyframes page-content-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(5px) scale(.998); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes page-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .page-content,
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
+  }
+
+  *,
+  *::before,
+  *::after {
+    transition-duration: .01ms !important;
+  }
+}
