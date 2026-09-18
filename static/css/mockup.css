@@ -246,3 +246,317 @@ html {
     min-height: 610px !important;
   }
 }
+
+
+/* =====================================================
+   SCROLL MODEL + READABILITY V4
+   Study Plan: cuộn cả trang từ trên xuống.
+   Chat: giữ khung, chỉ vùng tin nhắn cuộn.
+   Quiz: cuộn trang, thư viện quiz bên trái bám theo viewport.
+   Đồng thời tăng độ rõ của font/field ở các trang chính.
+===================================================== */
+
+/* ---------- Typography / readability ---------- */
+body.study-ui {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.page-chat,
+.page-quiz,
+.page-study_plan {
+  color: #14204f;
+}
+
+.page-chat .page-content,
+.page-quiz .page-content,
+.page-study_plan .page-content {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.page-chat button,
+.page-chat input,
+.page-chat select,
+.page-chat textarea,
+.page-quiz button,
+.page-quiz input,
+.page-quiz select,
+.page-quiz textarea,
+.page-study_plan button,
+.page-study_plan input,
+.page-study_plan select,
+.page-study_plan textarea {
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.page-chat input,
+.page-chat select,
+.page-chat textarea,
+.page-quiz input,
+.page-quiz select,
+.page-quiz textarea,
+.page-study_plan input,
+.page-study_plan select,
+.page-study_plan textarea {
+  color: #25345d !important;
+}
+
+.page-chat input::placeholder,
+.page-chat textarea::placeholder,
+.page-quiz input::placeholder,
+.page-quiz textarea::placeholder,
+.page-study_plan input::placeholder,
+.page-study_plan textarea::placeholder {
+  color: #8995b1 !important;
+  opacity: 1;
+}
+
+.page-study_plan .planner-form label > span,
+.page-study_plan .mock-form label span {
+  color: #42527b !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+}
+
+.page-study_plan .planner-form input,
+.page-study_plan .planner-form select,
+.page-study_plan .planner-form textarea {
+  min-height: 44px;
+  padding: 11px 13px !important;
+  font-size: 13px !important;
+  background: #f8faff !important;
+  border-color: #d7dfef !important;
+}
+
+.page-study_plan .planner-form textarea {
+  min-height: 88px;
+}
+
+.page-study_plan .modal-note {
+  color: #596a91 !important;
+  font-size: 11px !important;
+  line-height: 1.55 !important;
+}
+
+.page-quiz .quiz-action-card b,
+.page-chat .chat-side-head strong {
+  font-size: 13px;
+}
+
+.page-quiz .quiz-action-card small,
+.page-chat .chat-side-head small,
+.page-chat .chat-ai-info span {
+  font-size: 11px;
+  color: #6f7fa3;
+}
+
+.page-quiz .quiz-action-card select {
+  min-height: 34px;
+  font-size: 11px;
+}
+
+.page-quiz .quiz-picker b {
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.page-quiz .quiz-picker small {
+  font-size: 9.5px;
+  line-height: 1.4;
+}
+
+.page-study_plan .schedule-copy strong {
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+
+.page-study_plan .schedule-copy small,
+.page-study_plan .schedule-range,
+.page-study_plan .schedule-time {
+  font-size: 9.5px;
+  line-height: 1.45;
+}
+
+/* ---------- Study Plan: một trang dài, cuộn tự nhiên A → B → C → D ---------- */
+.page-study_plan {
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.page-study_plan .app-main,
+.page-study_plan .page-content {
+  overflow: visible !important;
+  height: auto !important;
+  max-height: none !important;
+}
+
+.page-study_plan .planner-layout-new {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 22px !important;
+  align-items: start !important;
+}
+
+.page-study_plan .day-schedule-card,
+.page-study_plan .planner-side-stack,
+.page-study_plan .goal-card,
+.page-study_plan .encouragement {
+  width: 100%;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+.page-study_plan .planner-side-stack {
+  display: grid !important;
+  gap: 20px !important;
+}
+
+.page-study_plan .side-stat-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.page-study_plan .week-strip-card,
+.page-study_plan .day-schedule-card,
+.page-study_plan .side-stat-grid,
+.page-study_plan .goal-card,
+.page-study_plan .encouragement {
+  scroll-margin-top: 98px;
+}
+
+/* ---------- Chat: cố định trong viewport, chỉ message cuộn ---------- */
+body.page-chat {
+  height: 100vh;
+  overflow: hidden !important;
+}
+
+.page-chat .app-shell {
+  min-height: 0 !important;
+  height: 100vh !important;
+}
+
+.page-chat .app-main {
+  height: 100vh !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+.page-chat .topbar {
+  flex: 0 0 78px;
+}
+
+.page-chat .page-content {
+  height: calc(100vh - 78px) !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  padding-top: 16px !important;
+  padding-bottom: 16px !important;
+}
+
+.page-chat .chat-shell-new {
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  align-items: stretch;
+}
+
+.page-chat .chat-history-panel,
+.page-chat .chat-main-panel {
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: none !important;
+}
+
+.page-chat .chat-history-panel {
+  overflow: hidden !important;
+}
+
+.page-chat .chat-history-list {
+  min-height: 0;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+}
+
+.page-chat .chat-main-panel {
+  overflow: hidden !important;
+}
+
+.page-chat .chat-messages {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  height: auto !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+}
+
+.page-chat .chat-composer {
+  flex: 0 0 auto;
+}
+
+/* ---------- Quiz: page scroll tự nhiên + danh sách quiz sticky ---------- */
+.page-quiz {
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.page-quiz .app-main,
+.page-quiz .page-content,
+.page-quiz .quiz-workspaces,
+.page-quiz .quiz-card {
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+.page-quiz .quiz-work-layout {
+  align-items: start;
+}
+
+.page-quiz .quiz-library {
+  position: sticky;
+  top: 96px;
+  align-self: start;
+  max-height: calc(100vh - 118px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.page-quiz .quiz-question-list {
+  overflow: visible !important;
+  max-height: none !important;
+}
+
+/* ---------- Mobile / màn hình hẹp ---------- */
+@media (max-width: 900px) {
+  .page-study_plan .side-stat-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .page-quiz .quiz-library {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+
+  body.page-chat {
+    height: auto;
+    min-height: 100vh;
+    overflow-y: auto !important;
+  }
+
+  .page-chat .app-shell,
+  .page-chat .app-main,
+  .page-chat .page-content {
+    height: auto !important;
+    min-height: 100vh !important;
+    overflow: visible !important;
+  }
+
+  .page-chat .chat-shell-new,
+  .page-chat .chat-main-panel {
+    min-height: 680px !important;
+  }
+}
