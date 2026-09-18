@@ -1,117 +1,59 @@
 {% extends "base.html" %}
-
-{% block page_title %}AI Chat{% endblock %}
-{% block page_desc %}Mỗi môn học có một không gian AI riêng{% endblock %}
-
-{% block page_styles %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/chat.css') }}">
-{% endblock %}
+{% block page_title %}Chat AI{% endblock %}
+{% block page_desc %}Trợ lý học tập AI theo từng môn{% endblock %}
+{% block page_styles %}<link rel="stylesheet" href="{{ url_for('static', filename='css/chat.css') }}">{% endblock %}
 
 {% block content %}
-
-
-<section class="ai-chat-layout">
-
-  <!-- DANH SÁCH CHAT THEO MÔN -->
-  <aside class="chat-history-panel">
-
-    <div class="subject-chat-heading">
-      <span class="subject-chat-heading-icon">📚</span>
-      <div>
-        <strong>Chat theo môn học</strong>
-        <small>Tự tạo khi thêm môn</small>
-      </div>
-    </div>
-
-    <div class="chat-history-title">
-      Môn học của bạn
-    </div>
-
-    <div class="chat-history-list"></div>
-
-  </aside>
-
-
-  <!-- KHUNG CHAT CHÍNH -->
-  <section class="chat-main-panel">
-
-    <header class="chat-header">
-
-      <div class="chat-ai-info">
-
-        <div class="chat-ai-avatar">
-          🤖
-        </div>
-
-        <div>
-          <strong id="chatSubjectName">AI Study Agent</strong>
-
-          <span id="chatContextStatus">
-            <i></i>
-            Chọn một môn học để bắt đầu
-          </span>
-        </div>
-
-      </div>
-
-      <a
-        class="chat-documents-link"
-        href="{{ url_for('documents') }}"
-        title="Quản lý tài liệu"
-      >
-        📄 Tài liệu
-      </a>
-
-    </header>
-
-
-    <div
-      class="chat-messages"
-      id="chatMessages"
-    ></div>
-
-
-    <div class="chat-composer">
-
-      <div class="composer-inner">
-
-        <a
-          href="{{ url_for('documents') }}"
-          class="composer-action"
-          title="Tải tài liệu cho môn học"
-        >
-          📎
-        </a>
-
-        <textarea
-          id="chatInput"
-          rows="1"
-          placeholder="Chọn một môn học để bắt đầu..."
-        ></textarea>
-
-        <button
-          class="chat-send-button"
-          id="chatSendButton"
-          type="button"
-          title="Gửi"
-        >
-          ➤
-        </button>
-
-      </div>
-
-      <p class="chat-note">
-        Có tài liệu: AI ưu tiên nội dung của đúng môn đang chọn. Không đủ tài liệu: AI trả lời bằng kiến thức chung.
-      </p>
-
-    </div>
-
-  </section>
-
+<section class="mock-page-head">
+  <div><h2>Trợ lý học tập AI 🤖</h2><p>Hỏi bất cứ điều gì, từ tóm tắt tài liệu, giải thích khái niệm đến tạo quiz và lập kế hoạch học tập.</p></div>
+  <div class="quote-card compact">❝ <span>Kiến thức trở nên mạnh mẽ hơn<br>khi được chia sẻ và giải thích đơn giản.</span></div>
 </section>
 
-<script
-  src="{{ url_for('static', filename='js/chat.js') }}"
-></script>
+<section class="ai-quick-actions">
+  <button type="button" data-chat-prompt="Hãy tóm tắt tài liệu của môn này giúp mình."><span class="mini-activity purple">▤</span><b>Tóm tắt tài liệu</b><small>Tóm tắt PDF, bài giảng...</small><em>›</em></button>
+  <button type="button" data-chat-prompt="Giải thích khái niệm này theo cách dễ hiểu, kèm ví dụ."><span class="mini-activity orange">💡</span><b>Giải thích khái niệm</b><small>Hiểu sâu, dễ dàng hơn</small><em>›</em></button>
+  <button type="button" data-chat-prompt="Tạo cho mình một bộ câu hỏi quiz luyện tập."><span class="mini-activity green">?</span><b>Tạo quiz luyện tập</b><small>Sinh câu hỏi từ nội dung</small><em>›</em></button>
+  <button type="button" data-chat-prompt="Lập kế hoạch ôn tập cho mình theo mục tiêu hiện tại."><span class="mini-activity orange">▦</span><b>Lập kế hoạch ôn tập</b><small>Kế hoạch học cá nhân hóa</small><em>›</em></button>
+</section>
 
+<section class="chat-shell-new">
+  <aside class="soft-card chat-history-panel">
+    <div class="chat-side-head"><div><strong>Cuộc trò chuyện</strong><small>Hôm nay</small></div><a href="{{ url_for('subjects') }}" title="Thêm môn">＋</a></div>
+    <div class="chat-history-list"></div>
+  </aside>
+
+  <section class="soft-card chat-main-panel">
+    <header class="chat-header">
+      <div class="chat-ai-info">
+        <div class="chat-ai-avatar"><img src="{{ url_for('static', filename='images/ai-robot.svg') }}" alt=""></div>
+        <div><strong id="chatSubjectName">AI Study Agent</strong><span id="chatContextStatus"><i></i>Chọn một môn học để bắt đầu</span></div>
+      </div>
+      <a class="chat-documents-link" href="{{ url_for('documents') }}">▤ Tài liệu</a>
+    </header>
+
+    <div class="chat-welcome-strip">
+      <img src="{{ url_for('static', filename='images/ai-robot.svg') }}" alt="">
+      <div><strong>Xin chào! 👋</strong><p>Mình là Trợ lý học tập AI, sẵn sàng hỗ trợ bạn trong việc học tập. Bạn có thể yêu cầu tóm tắt, giải thích, tạo quiz hoặc lập kế hoạch.</p></div>
+    </div>
+
+    <div class="chat-messages" id="chatMessages"></div>
+
+    <div class="chat-suggest-row">
+      <a href="{{ url_for('documents') }}">↑ Tải tài liệu lên</a>
+      <button type="button" data-chat-prompt="Tóm tắt nội dung chính giúp mình.">▤ Tóm tắt nội dung</button>
+      <button type="button" data-chat-prompt="Tạo quiz từ nội dung đang học.">? Tạo quiz</button>
+      <button type="button" data-chat-prompt="Giải thích thêm phần này bằng ví dụ.">💡 Giải thích thêm</button>
+    </div>
+
+    <div class="chat-composer">
+      <div class="composer-inner">
+        <a href="{{ url_for('documents') }}" class="composer-action" title="Tải tài liệu">⌕</a>
+        <textarea id="chatInput" rows="1" placeholder="Nhập tin nhắn của bạn..."></textarea>
+        <button class="chat-send-button" id="chatSendButton" type="button" title="Gửi">➤</button>
+      </div>
+    </div>
+  </section>
+</section>
+
+<script src="{{ url_for('static', filename='js/chat.js') }}"></script>
 {% endblock %}
