@@ -172,3 +172,204 @@
   .quick-stats { grid-template-columns: 1fr; }
   .planner-schedule-card, .deadline-card, .quick-stats-card, .agent-tip-card { padding: 15px; }
 }
+
+
+/* =====================================================
+   PLANNER INTERACTION V2
+===================================================== */
+.week-strip-top {
+  align-items: center;
+}
+
+.date-jump {
+  display: inline-grid;
+  gap: 2px;
+  min-width: 170px;
+  padding: 7px 12px;
+  border: 0;
+  border-radius: 13px;
+  background: transparent;
+  color: #152052;
+  text-align: left;
+  cursor: pointer;
+  transition: background .2s ease, transform .2s ease;
+}
+
+.date-jump:hover {
+  background: rgba(255,255,255,.58);
+  transform: translateY(-1px);
+}
+
+.date-jump strong {
+  font-size: 12px;
+}
+
+.date-jump small {
+  color: #8a98ba;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.planner-date-picker {
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid rgba(219,226,242,.95);
+  border-radius: 12px;
+  outline: 0;
+  background: linear-gradient(145deg,#f7f9ff,#eaf0fb);
+  color: #52628e;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  box-shadow: 3px 3px 10px rgba(104,126,169,.1), -3px -3px 10px rgba(255,255,255,.7);
+  cursor: pointer;
+  transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+}
+
+.planner-date-picker:hover,
+.planner-date-picker:focus {
+  border-color: #8791ff;
+  box-shadow: 0 0 0 3px rgba(92,104,255,.08);
+  transform: translateY(-1px);
+}
+
+.week-day {
+  transition: transform .2s ease, box-shadow .2s ease, background .2s ease, color .2s ease;
+}
+
+.week-day:hover {
+  transform: translateY(-3px);
+}
+
+.week-day.today:not(.active) {
+  box-shadow: inset 0 0 0 1px rgba(89,106,255,.32);
+}
+
+.week-days.month-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+  align-items: stretch;
+}
+
+.month-weekday {
+  padding: 2px 0 5px;
+  color: #8794b6;
+  font-size: 9px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.month-blank {
+  min-height: 58px;
+}
+
+.week-days.month-grid .month-day {
+  min-height: 64px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 3px;
+  padding: 8px;
+}
+
+.week-days.month-grid .month-day b {
+  font-size: 14px;
+}
+
+.week-days.month-grid .month-day small {
+  font-size: 8px;
+}
+
+.schedule-view-label {
+  display: block;
+  margin-top: 5px;
+  color: #8b98b9;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.schedule-item-new {
+  transition:
+    transform .22s cubic-bezier(.2,.8,.2,1),
+    opacity .2s ease,
+    box-shadow .2s ease,
+    border-color .2s ease;
+}
+
+.schedule-item-new:hover {
+  transform: translateY(-2px);
+}
+
+.schedule-item-new[hidden],
+.schedule-filter-empty[hidden] {
+  display: none !important;
+}
+
+.schedule-filter-empty {
+  margin-top: 10px;
+}
+
+.task-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.task-actions .move-task-btn {
+  color: #5668ff;
+  background: #edf1ff;
+}
+
+.task-actions .move-task-btn:hover {
+  background: #dfe6ff;
+  transform: translateY(-1px);
+}
+
+.task-actions .edit-only {
+  display: none;
+}
+
+.planner-edit-mode .task-actions .edit-only {
+  display: flex;
+}
+
+.segmented-filter button {
+  transition: color .18s ease, background .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+
+.segmented-filter button:hover {
+  transform: translateY(-1px);
+}
+
+@media (max-width: 900px) {
+  .week-strip-top {
+    flex-wrap: wrap;
+  }
+
+  .week-strip-top > span {
+    display: none;
+  }
+
+  .date-jump {
+    min-width: 140px;
+  }
+}
+
+@media (max-width: 680px) {
+  .planner-date-picker {
+    width: 100%;
+  }
+
+  .date-jump {
+    flex: 1;
+  }
+
+  .week-days.month-grid {
+    gap: 5px;
+  }
+
+  .week-days.month-grid .month-day {
+    min-height: 52px;
+  }
+}
