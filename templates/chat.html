@@ -4,12 +4,6 @@
 {% block page_styles %}<link rel="stylesheet" href="{{ url_for('static', filename='css/chat.css') }}">{% endblock %}
 
 {% block content %}
-<section class="mock-page-head">
-  <div><h2>Trợ lý học tập AI 🤖</h2><p>Hỏi bất cứ điều gì, từ tóm tắt tài liệu, giải thích khái niệm đến tạo quiz và lập kế hoạch học tập.</p></div>
-  <div class="quote-card compact">❝ <span>Kiến thức trở nên mạnh mẽ hơn<br>khi được chia sẻ và giải thích đơn giản.</span></div>
-</section>
-
-
 <section class="chat-shell-new">
   <aside class="soft-card chat-history-panel">
     <div class="chat-side-head"><div><strong>Cuộc trò chuyện</strong><small>Hôm nay</small></div><a href="{{ url_for('subjects') }}" title="Thêm môn">＋</a></div>
