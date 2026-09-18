@@ -135,3 +135,320 @@ document.addEventListener("DOMContentLoaded", () => {
     if (toast) toast.hidden = true;
   });
 });
+
+
+/* =====================================================
+   INTERACTIVE CALENDAR V2
+   - Tuần / Tháng / Danh sách
+   - Chọn trực tiếp ngày-tháng-năm
+   - Chuyển lịch nhiệm vụ
+===================================================== */
+document.addEventListener("DOMContentLoaded", () => {
+  const weekDays = document.getElementById("weekDays");
+  const rangeLabel = document.getElementById("weekRangeLabel");
+  const datePicker = document.getElementById("plannerDatePicker");
+  const dateJumpButton = document.getElementById("dateJumpButton");
+  const todayButton = document.getElementById("goToday");
+  const prevButton = document.getElementById("prevPeriod");
+  const nextButton = document.getElementById("nextPeriod");
+  const viewTabs = document.getElementById("plannerViewTabs");
+  const scheduleTitle = document.getElementById("scheduleTitle");
+  const scheduleViewLabel = document.getElementById("scheduleViewLabel");
+  const emptyState = document.getElementById("scheduleFilterEmpty");
+  const scheduleItems = [...document.querySelectorAll(".schedule-item-new[data-task-date]")];
+
+  if (!weekDays || !datePicker) return;
+
+  const pad = (n) => String(n).padStart(2, "0");
+  const toIso = (date) =>
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+
+  const fromIso = (value) => {
+    const parts = String(value || "").split("-").map(Number);
+    if (parts.length !== 3 || parts.some(Number.isNaN)) return new Date();
+    return new Date(parts[0], parts[1] - 1, parts[2]);
+  };
+
+  const cloneDate = (date) =>
+    new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+  const startOfWeek = (date) => {
+    const d = cloneDate(date);
+    const weekday = d.getDay();
+    const offset = weekday === 0 ? -6 : 1 - weekday;
+    d.setDate(d.getDate() + offset);
+    return d;
+  };
+
+  const addDays = (date, amount) => {
+    const d = cloneDate(date);
+    d.setDate(d.getDate() + amount);
+    return d;
+  };
+
+  const formatShort = (date) =>
+    `${pad(date.getDate())}/${pad(date.getMonth() + 1)}`;
+
+  const formatFull = (date) =>
+    `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}`;
+
+  const weekdayName = (date) =>
+    ["Chủ nhật", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"][date.getDay()];
+
+  const monthName = (date) =>
+    `Tháng ${date.getMonth() + 1}, ${date.getFullYear()}`;
+
+  const countsByDate = scheduleItems.reduce((acc, item) => {
+    const key = item.dataset.taskDate;
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+
+  let selectedDate = fromIso(datePicker.value);
+  let currentView = "week";
+
+  function animateSurface() {
+    const surfaces = [
+      weekDays,
+      document.querySelector(".day-schedule-card")
+    ].filter(Boolean);
+
+    surfaces.forEach((surface) => {
+      if (typeof surface.animate !== "function") return;
+      surface.animate(
+        [
+          { opacity: 0.45, transform: "translateY(5px)" },
+          { opacity: 1, transform: "translateY(0)" }
+        ],
+        { duration: 220, easing: "cubic-bezier(.2,.8,.2,1)" }
+      );
+    });
+  }
+
+  function updateHeader() {
+    if (currentView === "list") {
+      rangeLabel.textContent = "Tất cả nhiệm vụ";
+      if (scheduleTitle) scheduleTitle.innerHTML = "◷ &nbsp; Danh sách nhiệm vụ";
+      if (scheduleViewLabel) {
+        scheduleViewLabel.textContent = `${scheduleItems.length} nhiệm vụ trong kế hoạch`;
+      }
+      return;
+    }
+
+    if (currentView === "month") {
+      rangeLabel.textContent = monthName(selectedDate);
+    } else {
+      const start = startOfWeek(selectedDate);
+      const end = addDays(start, 6);
+      rangeLabel.textContent =
+        `${formatShort(start)} – ${formatShort(end)} · ${end.getFullYear()}`;
+    }
+
+    if (scheduleTitle) {
+      scheduleTitle.innerHTML =
+        `◷ &nbsp; Lịch học ngày ${formatFull(selectedDate)}`;
+    }
+    if (scheduleViewLabel) {
+      const count = countsByDate[toIso(selectedDate)] || 0;
+      scheduleViewLabel.textContent =
+        `${weekdayName(selectedDate)} · ${count} nhiệm vụ`;
+    }
+  }
+
+  function filterTasks() {
+    let visibleCount = 0;
+    const selectedKey = toIso(selectedDate);
+
+    scheduleItems.forEach((item) => {
+      const visible =
+        currentView === "list" || item.dataset.taskDate === selectedKey;
+      item.hidden = !visible;
+      if (visible) visibleCount += 1;
+    });
+
+    if (emptyState) {
+      emptyState.hidden = visibleCount !== 0 || currentView === "list";
+    }
+  }
+
+  function createDayButton(date, options = {}) {
+    const key = toIso(date);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "week-day";
+    button.dataset.date = key;
+
+    if (options.monthCell) button.classList.add("month-day");
+    if (key === toIso(selectedDate)) button.classList.add("active");
+    if (key === toIso(new Date())) button.classList.add("today");
+
+    const count = countsByDate[key] || 0;
+    const dayLabel = options.monthCell
+      ? String(date.getDate())
+      : ["CN", "T2", "T3", "T4", "T5", "T6", "T7"][date.getDay()];
+
+    button.innerHTML = options.monthCell
+      ? `<b>${dayLabel}</b><small>${count ? `${count} task` : "Trống"}</small>`
+      : `<b>${dayLabel}</b><span class="week-date">${formatShort(date)}</span><small>${count} task</small>`;
+
+    return button;
+  }
+
+  function renderWeek() {
+    weekDays.hidden = false;
+    weekDays.classList.remove("month-grid");
+    weekDays.innerHTML = "";
+    const start = startOfWeek(selectedDate);
+    for (let i = 0; i < 7; i += 1) {
+      weekDays.appendChild(createDayButton(addDays(start, i)));
+    }
+  }
+
+  function renderMonth() {
+    weekDays.hidden = false;
+    weekDays.classList.add("month-grid");
+    weekDays.innerHTML = "";
+
+    ["T2", "T3", "T4", "T5", "T6", "T7", "CN"].forEach((label) => {
+      const head = document.createElement("span");
+      head.className = "month-weekday";
+      head.textContent = label;
+      weekDays.appendChild(head);
+    });
+
+    const first = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+    const last = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+    const leading = first.getDay() === 0 ? 6 : first.getDay() - 1;
+
+    for (let i = 0; i < leading; i += 1) {
+      const blank = document.createElement("span");
+      blank.className = "month-blank";
+      weekDays.appendChild(blank);
+    }
+
+    for (let day = 1; day <= last.getDate(); day += 1) {
+      const date = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), day);
+      weekDays.appendChild(createDayButton(date, { monthCell: true }));
+    }
+  }
+
+  function renderView({ animate = true } = {}) {
+    datePicker.value = toIso(selectedDate);
+
+    if (currentView === "week") renderWeek();
+    if (currentView === "month") renderMonth();
+    if (currentView === "list") {
+      weekDays.hidden = true;
+      weekDays.classList.remove("month-grid");
+    }
+
+    updateHeader();
+    filterTasks();
+
+    viewTabs?.querySelectorAll("[data-view]").forEach((button) => {
+      const active = button.dataset.view === currentView;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-selected", active ? "true" : "false");
+    });
+
+    if (animate) animateSurface();
+  }
+
+  weekDays.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-date]");
+    if (!button) return;
+    selectedDate = fromIso(button.dataset.date);
+    renderView();
+  });
+
+  viewTabs?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-view]");
+    if (!button) return;
+    currentView = button.dataset.view;
+    renderView();
+  });
+
+  todayButton?.addEventListener("click", () => {
+    selectedDate = cloneDate(new Date());
+    renderView();
+  });
+
+  prevButton?.addEventListener("click", () => {
+    if (currentView === "month") {
+      selectedDate = new Date(
+        selectedDate.getFullYear(),
+        selectedDate.getMonth() - 1,
+        Math.min(selectedDate.getDate(), 28)
+      );
+    } else if (currentView === "week") {
+      selectedDate = addDays(selectedDate, -7);
+    }
+    renderView();
+  });
+
+  nextButton?.addEventListener("click", () => {
+    if (currentView === "month") {
+      selectedDate = new Date(
+        selectedDate.getFullYear(),
+        selectedDate.getMonth() + 1,
+        Math.min(selectedDate.getDate(), 28)
+      );
+    } else if (currentView === "week") {
+      selectedDate = addDays(selectedDate, 7);
+    }
+    renderView();
+  });
+
+  datePicker.addEventListener("change", () => {
+    selectedDate = fromIso(datePicker.value);
+    if (currentView === "list") currentView = "week";
+    renderView();
+  });
+
+  dateJumpButton?.addEventListener("click", () => {
+    if (typeof datePicker.showPicker === "function") {
+      datePicker.showPicker();
+    } else {
+      datePicker.focus();
+      datePicker.click();
+    }
+  });
+
+  // Chuyển lịch nhanh: dùng lại modal chỉnh task nhưng đưa người dùng
+  // thẳng tới trường ngày/giờ để đổi lịch, không cần sửa nội dung nhiệm vụ.
+  document.querySelectorAll(".move-task-btn").forEach((button) => {
+    button.addEventListener("click", () => {
+      const modal = document.getElementById("taskModal");
+      const form = document.getElementById("taskForm");
+      const modalTitle = document.getElementById("taskModalTitle");
+      const title = document.getElementById("taskTitle");
+      const subject = document.getElementById("taskSubject");
+      const studyAt = document.getElementById("taskStudyAt");
+      const duration = document.getElementById("taskDuration");
+      const note = document.getElementById("taskNote");
+
+      if (!modal || !form || !studyAt) return;
+
+      modalTitle.textContent = "Chuyển lịch nhiệm vụ";
+      form.action = `/study-plan/tasks/${button.dataset.id}/update`;
+      title.value = button.dataset.title || "";
+      subject.value = button.dataset.subjectId || "";
+      studyAt.value = button.dataset.studyAt || "";
+      duration.value = button.dataset.duration || "45";
+      note.value = button.dataset.note || "";
+
+      modal.classList.add("show");
+      modal.setAttribute("aria-hidden", "false");
+      document.body.style.overflow = "hidden";
+
+      setTimeout(() => {
+        studyAt.focus();
+        if (typeof studyAt.showPicker === "function") {
+          try { studyAt.showPicker(); } catch (error) {}
+        }
+      }, 100);
+    });
+  });
+
+  renderView({ animate: false });
+});
