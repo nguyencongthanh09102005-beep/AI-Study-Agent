@@ -373,3 +373,29 @@
     min-height: 52px;
   }
 }
+
+
+/* =====================================================
+   RAISE AI PLANNER MODAL V3
+===================================================== */
+#aiPlannerModal .planner-modal-panel {
+  transform: translateY(-34px);
+  transition: transform .22s cubic-bezier(.2,.8,.2,1), opacity .2s ease;
+}
+
+@media (max-height: 760px) {
+  #aiPlannerModal .planner-modal-panel {
+    transform: translateY(-16px);
+  }
+}
+
+@media (max-width: 680px) {
+  #aiPlannerModal {
+    align-items: flex-start;
+    padding-top: 16px;
+  }
+
+  #aiPlannerModal .planner-modal-panel {
+    transform: none;
+  }
+}
