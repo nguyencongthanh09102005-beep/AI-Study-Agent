@@ -207,3 +207,42 @@ html {
     padding-bottom: 5px;
   }
 }
+
+
+/* =====================================================
+   COMPACT CHAT + QUIZ V3
+   Remove decorative headers and use the freed vertical space.
+===================================================== */
+.page-chat .page-content,
+.page-quiz .page-content {
+  padding-top: 18px !important;
+}
+
+.page-chat .chat-shell-new {
+  min-height: calc(100vh - 116px);
+}
+
+.page-chat .chat-history-panel,
+.page-chat .chat-main-panel {
+  min-height: calc(100vh - 116px) !important;
+}
+
+.page-chat .chat-messages {
+  max-height: calc(100vh - 395px) !important;
+}
+
+.page-quiz .quiz-action-grid {
+  margin-top: 0;
+}
+
+.page-quiz .quiz-work-layout {
+  margin-top: 4px;
+}
+
+@media (max-height: 800px) {
+  .page-chat .chat-shell-new,
+  .page-chat .chat-history-panel,
+  .page-chat .chat-main-panel {
+    min-height: 610px !important;
+  }
+}
