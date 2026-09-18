@@ -91,6 +91,27 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   });
 
+  document.querySelectorAll(".quiz-card").forEach(function (card) {
+    var questions = Array.from(card.querySelectorAll(".quiz-question-card"));
+    var prev = card.querySelector(".quiz-prev-btn");
+    var next = card.querySelector(".quiz-next-btn");
+    var submit = card.querySelector(".quiz-submit-btn");
+    var current = 0;
+    function renderStep() {
+      questions.forEach(function (q, index) { q.style.display = index === current ? "" : "none"; });
+      if (prev) prev.disabled = current === 0;
+      if (next) next.style.display = current >= questions.length - 1 ? "none" : "";
+      if (submit) submit.style.display = current >= questions.length - 1 ? "" : "none";
+      var label = card.querySelector(".quiz-progress-info span");
+      if (label && questions.length) label.textContent = "Câu " + (current + 1) + " / " + questions.length;
+    }
+    if (prev) prev.addEventListener("click", function () { if (current > 0) { current -= 1; renderStep(); } });
+    if (next) next.addEventListener("click", function () { if (current < questions.length - 1) { current += 1; renderStep(); } });
+    var reset = card.querySelector(".quiz-reset-btn");
+    if (reset) reset.addEventListener("click", function () { current = 0; setTimeout(renderStep, 0); });
+    renderStep();
+  });
+
   document.querySelectorAll("[data-chat-prompt]").forEach(function (button) {
     button.addEventListener("click", function () {
       var input = document.getElementById("chatInput");
