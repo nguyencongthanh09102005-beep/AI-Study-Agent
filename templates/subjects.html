@@ -40,7 +40,7 @@
     <div class="subject-progress-head"><span>Tiến độ học tập</span><b>{{ p }}%</b></div>
     <div class="progress-track"><i style="width: {{ p }}%"></i></div>
     <div class="course-actions">
-      <a class="ghost-action" href="{{ url_for('study_plan') }}">▤ &nbsp; Chi tiết</a>
+      <a class="ghost-action" href="{{ url_for('subject_detail', subject_id=s.id) }}">▤ &nbsp; Chi tiết</a>
       <a class="ghost-action" href="{{ url_for('documents') }}">▱ &nbsp; Tài liệu</a>
       <a class="ghost-action accent" href="{{ url_for('documents') }}">☁ &nbsp; Tải lên</a>
       <form method="post" action="{{ url_for('delete_subject', subject_id=s.id) }}" data-confirm-title="Xóa môn học?" data-confirm-message="Môn “{{ s.name }}” sẽ bị xóa. Bạn có chắc muốn tiếp tục?" data-confirm-label="Xóa môn">
