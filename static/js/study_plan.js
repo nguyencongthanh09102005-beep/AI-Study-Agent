@@ -22,6 +22,15 @@ document.addEventListener("DOMContentLoaded", () => {
   const reminderDueAt = document.getElementById("reminderDueAt");
   const deleteReminderForm = document.getElementById("deleteReminderForm");
 
+  // Đưa modal ra trực tiếp dưới <body> như một "portal".
+  // Nhờ vậy position: fixed luôn tính theo viewport thật của trình duyệt,
+  // không bị lệch khi zoom 80% / 100% / 125% hoặc khi ancestor có transform.
+  [aiPlannerModal, taskModal, reminderModal].forEach((modal) => {
+    if (modal && modal.parentElement !== body) {
+      body.appendChild(modal);
+    }
+  });
+
   function openModal(modal) {
     if (!modal) return;
     modal.classList.add("show");
