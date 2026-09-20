@@ -151,6 +151,59 @@ def init_db():
         FOREIGN KEY(user_id) REFERENCES users(id),
         FOREIGN KEY(quiz_id) REFERENCES quizzes(id) ON DELETE CASCADE
     );
+
+    -- =================================================
+    -- STUDY AGENT V2: KIẾN THỨC CHUNG + DỮ LIỆU CÁ NHÂN
+    -- =================================================
+    CREATE TABLE IF NOT EXISTS shared_subjects(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        subject_key TEXT UNIQUE NOT NULL,
+        code TEXT DEFAULT '',
+        name TEXT NOT NULL,
+        description TEXT DEFAULT '',
+        syllabus_text TEXT DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS shared_knowledge(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        shared_subject_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        content TEXT NOT NULL,
+        source_type TEXT DEFAULT 'note',
+        created_by_user_id INTEGER,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY(shared_subject_id) REFERENCES shared_subjects(id) ON DELETE CASCADE,
+        FOREIGN KEY(created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS learning_profiles(
+        user_id INTEGER PRIMARY KEY,
+        learning_style TEXT DEFAULT 'balanced',
+        preferred_study_time TEXT DEFAULT '19:00',
+        daily_minutes INTEGER DEFAULT 45,
+        goals TEXT DEFAULT '',
+        notes TEXT DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS learning_weaknesses(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        subject_id INTEGER NOT NULL,
+        topic_key TEXT NOT NULL,
+        topic TEXT NOT NULL,
+        miss_count INTEGER DEFAULT 0,
+        correct_count INTEGER DEFAULT 0,
+        last_seen_at TEXT NOT NULL,
+        FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY(subject_id) REFERENCES subjects(id) ON DELETE CASCADE,
+        UNIQUE(user_id, subject_id, topic_key)
+    );
     """)
 
     conn.commit()
@@ -180,6 +233,24 @@ def init_db():
         conn.execute(
             "ALTER TABLE subjects ADD COLUMN target_score REAL DEFAULT 0"
         )
+
+    if "shared_subject_id" not in subject_columns:
+        conn.execute(
+            "ALTER TABLE subjects ADD COLUMN shared_subject_id INTEGER"
+        )
+
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_subjects_shared_subject "
+        "ON subjects(shared_subject_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_shared_knowledge_subject "
+        "ON shared_knowledge(shared_subject_id, id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_learning_weaknesses_user_subject "
+        "ON learning_weaknesses(user_id, subject_id, miss_count)"
+    )
 
     conn.commit()
 
@@ -739,6 +810,357 @@ def ensure_subject_chats(user_id, conn):
     conn.commit()
 
 
+
+# =====================================================
+# STUDY AGENT V2 - KIẾN THỨC CHUNG + CÁ NHÂN HÓA
+# =====================================================
+def _normalize_subject_key(code, name):
+    """Khóa ổn định để nhiều sinh viên cùng môn dùng chung tri thức."""
+    code_value = re.sub(r"\s+", "", (code or "").strip().lower())
+    if code_value:
+        return f"code:{code_value}"
+
+    name_value = re.sub(
+        r"[^\wÀ-ỹ]+",
+        "-",
+        (name or "").strip().lower(),
+        flags=re.UNICODE
+    ).strip("-")
+    return f"name:{name_value or 'unknown'}"
+
+
+def ensure_shared_subject_for_user_subject(conn, user_id, subject_id):
+    """
+    Liên kết môn cá nhân với một shared_subject.
+    Các user có cùng mã môn (ưu tiên) hoặc cùng tên môn sẽ dùng chung kho tri thức.
+    """
+    subject = conn.execute(
+        """
+        SELECT id, user_id, name, code, description, shared_subject_id
+        FROM subjects
+        WHERE id=? AND user_id=?
+        """,
+        (subject_id, user_id)
+    ).fetchone()
+
+    if not subject:
+        return None
+
+    if subject["shared_subject_id"]:
+        shared = conn.execute(
+            "SELECT * FROM shared_subjects WHERE id=?",
+            (subject["shared_subject_id"],)
+        ).fetchone()
+        if shared:
+            return shared
+
+    subject_key = _normalize_subject_key(subject["code"], subject["name"])
+    shared = conn.execute(
+        "SELECT * FROM shared_subjects WHERE subject_key=?",
+        (subject_key,)
+    ).fetchone()
+
+    if not shared:
+        created_at = now()
+        cur = conn.execute(
+            """
+            INSERT INTO shared_subjects(
+                subject_key,code,name,description,syllabus_text,created_at,updated_at
+            ) VALUES(?,?,?,?,?,?,?)
+            """,
+            (
+                subject_key,
+                subject["code"] or "",
+                subject["name"],
+                subject["description"] or "",
+                "",
+                created_at,
+                created_at
+            )
+        )
+        shared_id = cur.lastrowid
+        shared = conn.execute(
+            "SELECT * FROM shared_subjects WHERE id=?",
+            (shared_id,)
+        ).fetchone()
+
+    conn.execute(
+        """
+        UPDATE subjects
+        SET shared_subject_id=?
+        WHERE id=? AND user_id=?
+        """,
+        (shared["id"], subject_id, user_id)
+    )
+    conn.commit()
+    return shared
+
+
+def ensure_learning_profile(conn, user_id):
+    profile = conn.execute(
+        "SELECT * FROM learning_profiles WHERE user_id=?",
+        (user_id,)
+    ).fetchone()
+
+    if profile:
+        return profile
+
+    created_at = now()
+    conn.execute(
+        """
+        INSERT INTO learning_profiles(
+            user_id,learning_style,preferred_study_time,daily_minutes,
+            goals,notes,created_at,updated_at
+        ) VALUES(?,?,?,?,?,?,?,?)
+        """,
+        (
+            user_id,
+            "balanced",
+            "19:00",
+            45,
+            "",
+            "",
+            created_at,
+            created_at
+        )
+    )
+    conn.commit()
+    return conn.execute(
+        "SELECT * FROM learning_profiles WHERE user_id=?",
+        (user_id,)
+    ).fetchone()
+
+
+def get_shared_subject_context(user_id, subject_id, query="", max_chars=5500):
+    """Ngữ cảnh dùng chung của môn: đề cương + ghi chú/tài liệu chung."""
+    conn = db()
+    shared = ensure_shared_subject_for_user_subject(
+        conn,
+        user_id,
+        subject_id
+    )
+
+    if not shared:
+        conn.close()
+        return "", []
+
+    parts = []
+    source_labels = []
+    total = 0
+
+    syllabus_text = (shared["syllabus_text"] or "").strip()
+    if syllabus_text:
+        clipped = syllabus_text[:max_chars]
+        parts.append(f"ĐỀ CƯƠNG MÔN HỌC:\n{clipped}")
+        source_labels.append("Đề cương môn học")
+        total += len(clipped)
+
+    rows = conn.execute(
+        """
+        SELECT title, content, source_type
+        FROM shared_knowledge
+        WHERE shared_subject_id=?
+        ORDER BY id DESC
+        LIMIT 12
+        """,
+        (shared["id"],)
+    ).fetchall()
+    conn.close()
+
+    query_terms = {
+        token.lower()
+        for token in re.findall(r"[\wÀ-ỹ]+", query or "", flags=re.UNICODE)
+        if len(token) >= 2
+    }
+
+    scored = []
+    for row in rows:
+        content = (row["content"] or "").strip()
+        if not content:
+            continue
+        lowered = content.lower()
+        score = sum(lowered.count(term) for term in query_terms)
+        scored.append((score, row["title"], row["source_type"], content))
+
+    scored.sort(key=lambda item: item[0], reverse=True)
+
+    for _, title, source_type, content in scored[:6]:
+        remaining = max_chars - total
+        if remaining <= 0:
+            break
+        clipped = content[:remaining]
+        parts.append(
+            f"KIẾN THỨC CHUNG - {title} ({source_type or 'note'}):\n{clipped}"
+        )
+        source_labels.append(title)
+        total += len(clipped)
+
+    return "\n\n".join(parts), source_labels
+
+
+def get_personal_learning_context(user_id, subject_id, max_weaknesses=5):
+    """Tóm tắt dữ liệu riêng của sinh viên để Agent cá nhân hóa câu trả lời."""
+    conn = db()
+    profile = ensure_learning_profile(conn, user_id)
+
+    subject = conn.execute(
+        """
+        SELECT name,code,target_score,progress
+        FROM subjects
+        WHERE id=? AND user_id=?
+        """,
+        (subject_id, user_id)
+    ).fetchone()
+
+    weaknesses = conn.execute(
+        """
+        SELECT topic,miss_count,correct_count,last_seen_at
+        FROM learning_weaknesses
+        WHERE user_id=? AND subject_id=?
+        ORDER BY (miss_count - correct_count * 0.5) DESC, last_seen_at DESC
+        LIMIT ?
+        """,
+        (user_id, subject_id, max_weaknesses)
+    ).fetchall()
+
+    quiz_summary = conn.execute(
+        """
+        SELECT
+            COUNT(DISTINCT qa.quiz_id) AS quiz_count,
+            ROUND(AVG(qa.score), 1) AS avg_score
+        FROM quiz_attempts qa
+        JOIN quizzes q ON q.id=qa.quiz_id
+        WHERE qa.user_id=? AND q.user_id=? AND q.subject_id=?
+        """,
+        (user_id, user_id, subject_id)
+    ).fetchone()
+
+    upcoming_tasks = conn.execute(
+        """
+        SELECT title,study_at,duration,done
+        FROM study_tasks
+        WHERE user_id=? AND subject_id=? AND done=0
+        ORDER BY study_at ASC
+        LIMIT 4
+        """,
+        (user_id, subject_id)
+    ).fetchall()
+    conn.close()
+
+    lines = []
+    if subject:
+        lines.append(
+            f"Môn: {subject['name']} ({subject['code'] or 'chưa có mã'}); "
+            f"mục tiêu điểm: {subject['target_score'] or 0}; "
+            f"tiến độ hiện tại: {subject['progress'] or 0}%."
+        )
+
+    lines.append(
+        "Hồ sơ học tập: "
+        f"phong cách={profile['learning_style'] or 'balanced'}, "
+        f"giờ ưu tiên={profile['preferred_study_time'] or '19:00'}, "
+        f"thời lượng/buổi={profile['daily_minutes'] or 45} phút."
+    )
+
+    if (profile["goals"] or "").strip():
+        lines.append(f"Mục tiêu cá nhân: {profile['goals'].strip()}")
+
+    if quiz_summary and int(quiz_summary["quiz_count"] or 0) > 0:
+        lines.append(
+            f"Quiz đã làm: {int(quiz_summary['quiz_count'] or 0)}; "
+            f"điểm trung bình các lần làm: {quiz_summary['avg_score'] or 0}%."
+        )
+
+    if weaknesses:
+        weak_text = "; ".join(
+            f"{row['topic']} (sai {row['miss_count']}, đúng {row['correct_count']})"
+            for row in weaknesses
+        )
+        lines.append(f"Phần kiến thức cần chú ý: {weak_text}")
+
+    if upcoming_tasks:
+        task_text = "; ".join(
+            f"{row['title']} lúc {row['study_at']} ({row['duration']} phút)"
+            for row in upcoming_tasks
+        )
+        lines.append(f"Nhiệm vụ sắp tới: {task_text}")
+
+    return "\n".join(lines)
+
+
+def _quiz_topic_key(question_text):
+    normalized = re.sub(
+        r"[^\wÀ-ỹ]+",
+        " ",
+        (question_text or "").strip().lower(),
+        flags=re.UNICODE
+    )
+    return re.sub(r"\s+", " ", normalized).strip()[:180]
+
+
+def record_quiz_learning_signal(
+    conn,
+    user_id,
+    subject_id,
+    question_text,
+    is_correct
+):
+    """Ghi nhận câu sai/đúng để Agent biết phần sinh viên đang yếu."""
+    if not subject_id:
+        return
+
+    topic = re.sub(r"\s+", " ", (question_text or "").strip())[:220]
+    topic_key = _quiz_topic_key(topic)
+    if not topic_key:
+        return
+
+    row = conn.execute(
+        """
+        SELECT id,miss_count,correct_count
+        FROM learning_weaknesses
+        WHERE user_id=? AND subject_id=? AND topic_key=?
+        """,
+        (user_id, subject_id, topic_key)
+    ).fetchone()
+
+    if row:
+        conn.execute(
+            """
+            UPDATE learning_weaknesses
+            SET miss_count=?,
+                correct_count=?,
+                topic=?,
+                last_seen_at=?
+            WHERE id=?
+            """,
+            (
+                int(row["miss_count"] or 0) + (0 if is_correct else 1),
+                int(row["correct_count"] or 0) + (1 if is_correct else 0),
+                topic,
+                now(),
+                row["id"]
+            )
+        )
+    else:
+        conn.execute(
+            """
+            INSERT INTO learning_weaknesses(
+                user_id,subject_id,topic_key,topic,
+                miss_count,correct_count,last_seen_at
+            ) VALUES(?,?,?,?,?,?,?)
+            """,
+            (
+                user_id,
+                subject_id,
+                topic_key,
+                topic,
+                0 if is_correct else 1,
+                1 if is_correct else 0,
+                now()
+            )
+        )
+
+
 def login_required(fn):
     @wraps(fn)
     def wrapper(*args, **kwargs):
@@ -1004,7 +1426,10 @@ def gemini_subject_answer(
     question,
     context,
     source_names,
-    conversation_history=""
+    conversation_history="",
+    shared_context="",
+    personal_context="",
+    shared_source_names=None
 ):
     """
     Trả lời theo môn học:
@@ -1013,30 +1438,47 @@ def gemini_subject_answer(
     - Không có tài liệu: dùng kiến thức chung, không gắn nguồn file.
     """
     source_names = source_names or []
+    shared_source_names = shared_source_names or []
     sources_text = ", ".join(source_names) if source_names else "Không có"
+    shared_sources_text = (
+        ", ".join(shared_source_names)
+        if shared_source_names
+        else "Không có"
+    )
 
     prompt = f"""
 Bạn là AI Study Agent đang hỗ trợ môn học: {subject_name}.
 
 MỤC TIÊU:
 Trả lời câu hỏi của sinh viên bằng tiếng Việt, rõ ràng, dễ học và chính xác.
+Nếu có HỒ SƠ HỌC TẬP CÁ NHÂN, hãy điều chỉnh cách giải thích theo mục tiêu,
+tiến độ và những phần sinh viên thường sai. Không nhắc lại dữ liệu cá nhân
+một cách máy móc nếu không cần thiết.
 
 QUY TẮC NGUỒN RẤT QUAN TRỌNG:
-1. Nếu NGỮ CẢNH TÀI LIỆU bên dưới thực sự chứa đủ thông tin để hỗ trợ câu trả lời,
-   hãy đặt mode = "document" và chỉ liệt kê những file thực sự dùng trong sources.
-2. Nếu tài liệu không có, không liên quan hoặc không đủ để trả lời,
-   hãy đặt mode = "general" và trả lời bằng kiến thức chung của mô hình.
-3. Khi mode = "general", sources phải là mảng rỗng.
-4. Không được giả vờ rằng thông tin nằm trong tài liệu nếu tài liệu không hỗ trợ.
-5. Nếu vừa dùng tài liệu vừa cần bổ sung một phần nhỏ bằng kiến thức chung,
-   vẫn có thể dùng mode = "document", nhưng phải phân biệt rõ phần nào là bổ sung nếu điều đó quan trọng.
-6. Không sao chép nguyên văn dài từ tài liệu.
+1. Nếu NGỮ CẢNH TÀI LIỆU CÁ NHÂN thực sự hỗ trợ câu trả lời,
+   đặt mode = "document" và chỉ liệt kê file cá nhân thực sự dùng.
+2. Nếu KIẾN THỨC CHUNG THEO MÔN hoặc đề cương hỗ trợ câu trả lời,
+   đặt mode = "shared" và chỉ liệt kê nguồn dùng chung thực sự dùng.
+3. Nếu không có nguồn phù hợp, đặt mode = "general" và dùng kiến thức chung của mô hình.
+4. Khi mode = "general", sources phải là mảng rỗng.
+5. Không được giả vờ thông tin nằm trong tài liệu/đề cương nếu nguồn không hỗ trợ.
+6. Không sao chép nguyên văn dài từ nguồn.
 
-CÁC FILE ĐƯỢC CUNG CẤP TRONG NGỮ CẢNH:
+CÁC FILE CÁ NHÂN ĐƯỢC CUNG CẤP:
 {sources_text}
 
-NGỮ CẢNH TÀI LIỆU:
-{context[:9000] if context else "Không có tài liệu của môn học này trong ngữ cảnh."}
+CÁC NGUỒN DÙNG CHUNG ĐƯỢC CUNG CẤP:
+{shared_sources_text}
+
+NGỮ CẢNH TÀI LIỆU CÁ NHÂN:
+{context[:9000] if context else "Không có tài liệu cá nhân của môn học này trong ngữ cảnh."}
+
+KIẾN THỨC CHUNG THEO MÔN:
+{shared_context[:5500] if shared_context else "Chưa có kiến thức dùng chung cho môn này."}
+
+HỒ SƠ HỌC TẬP CÁ NHÂN:
+{personal_context[:3500] if personal_context else "Chưa có dữ liệu cá nhân hóa."}
 
 LỊCH SỬ TRÒ CHUYỆN GẦN ĐÂY:
 {conversation_history[:3500] if conversation_history else "Chưa có nội dung trước đó."}
@@ -1046,7 +1488,7 @@ CÂU HỎI HIỆN TẠI:
 
 CHỈ trả về JSON hợp lệ, không markdown, theo đúng cấu trúc:
 {{
-  "mode": "document" hoặc "general",
+  "mode": "document", "shared" hoặc "general",
   "sources": ["ten_file_1.pdf"],
   "answer": "Nội dung trả lời"
 }}
@@ -1065,10 +1507,18 @@ CHỈ trả về JSON hợp lệ, không markdown, theo đúng cấu trúc:
             mode = str(data.get("mode") or "general").strip().lower()
             requested_sources = data.get("sources") or []
 
-            allowed = {name: name for name in source_names}
+            personal_allowed = {name: name for name in source_names}
+            shared_allowed = {name: name for name in shared_source_names}
             used_sources = []
 
             if isinstance(requested_sources, list):
+                allowed = (
+                    personal_allowed
+                    if mode == "document"
+                    else shared_allowed
+                    if mode == "shared"
+                    else {}
+                )
                 for item in requested_sources:
                     name = str(item or "").strip()
                     if name in allowed and name not in used_sources:
@@ -1085,6 +1535,15 @@ CHỈ trả về JSON hợp lệ, không markdown, theo đúng cấu trúc:
                     source_line = f"Dựa trên các tài liệu {joined}:"
 
                 return source_line + "\n\n" + answer, used_sources, "document"
+
+            if mode == "shared" and used_sources:
+                if len(used_sources) == 1:
+                    source_line = f'Dựa trên kiến thức chung "{used_sources[0]}":'
+                else:
+                    joined = ", ".join(f'"{name}"' for name in used_sources)
+                    source_line = f"Dựa trên các nguồn kiến thức chung {joined}:"
+
+                return source_line + "\n\n" + answer, used_sources, "shared"
 
             # Không có nguồn hợp lệ -> coi là kiến thức chung để tránh gắn nguồn sai.
             return answer, [], "general"
@@ -2072,6 +2531,216 @@ def subjects():
         subjects=rows
     )
 
+@app.route("/subjects/<int:subject_id>", methods=["GET", "POST"])
+@login_required
+def subject_detail(subject_id):
+    uid = session["user_id"]
+    conn = db()
+
+    subject = conn.execute(
+        """
+        SELECT *
+        FROM subjects
+        WHERE id=? AND user_id=?
+        """,
+        (subject_id, uid)
+    ).fetchone()
+
+    if not subject:
+        conn.close()
+        return redirect(url_for("subjects"))
+
+    shared = ensure_shared_subject_for_user_subject(
+        conn,
+        uid,
+        subject_id
+    )
+    profile = ensure_learning_profile(conn, uid)
+
+    if request.method == "POST":
+        action_type = request.form.get("action_type", "").strip()
+
+        if action_type == "profile":
+            learning_style = (
+                request.form.get("learning_style", "balanced").strip()[:40]
+                or "balanced"
+            )
+            preferred_study_time = (
+                request.form.get("preferred_study_time", "19:00").strip()
+                or "19:00"
+            )
+            if not re.fullmatch(
+                r"(?:[01]\d|2[0-3]):[0-5]\d",
+                preferred_study_time
+            ):
+                preferred_study_time = "19:00"
+
+            daily_minutes = _safe_int(
+                request.form.get("daily_minutes"),
+                45,
+                15,
+                240
+            )
+            goals = request.form.get("goals", "").strip()[:1200]
+            notes = request.form.get("notes", "").strip()[:1200]
+
+            conn.execute(
+                """
+                UPDATE learning_profiles
+                SET learning_style=?,
+                    preferred_study_time=?,
+                    daily_minutes=?,
+                    goals=?,
+                    notes=?,
+                    updated_at=?
+                WHERE user_id=?
+                """,
+                (
+                    learning_style,
+                    preferred_study_time,
+                    daily_minutes,
+                    goals,
+                    notes,
+                    now(),
+                    uid
+                )
+            )
+
+        elif action_type == "syllabus" and shared:
+            syllabus_text = request.form.get(
+                "syllabus_text",
+                ""
+            ).strip()[:50000]
+            conn.execute(
+                """
+                UPDATE shared_subjects
+                SET syllabus_text=?, updated_at=?
+                WHERE id=?
+                """,
+                (syllabus_text, now(), shared["id"])
+            )
+
+        elif action_type == "shared_note" and shared:
+            title = (
+                request.form.get("title", "").strip()[:180]
+                or "Kiến thức chung"
+            )
+            content_value = request.form.get(
+                "content",
+                ""
+            ).strip()[:50000]
+
+            if content_value:
+                conn.execute(
+                    """
+                    INSERT INTO shared_knowledge(
+                        shared_subject_id,title,content,source_type,
+                        created_by_user_id,created_at,updated_at
+                    ) VALUES(?,?,?,?,?,?,?)
+                    """,
+                    (
+                        shared["id"],
+                        title,
+                        content_value,
+                        "note",
+                        uid,
+                        now(),
+                        now()
+                    )
+                )
+
+        conn.commit()
+        conn.close()
+        return redirect(
+            url_for("subject_detail", subject_id=subject_id)
+        )
+
+    recalculate_subject_progress(uid, subject_id, conn)
+    subject = conn.execute(
+        "SELECT * FROM subjects WHERE id=? AND user_id=?",
+        (subject_id, uid)
+    ).fetchone()
+
+    shared = ensure_shared_subject_for_user_subject(
+        conn,
+        uid,
+        subject_id
+    )
+    profile = ensure_learning_profile(conn, uid)
+
+    shared_items = conn.execute(
+        """
+        SELECT id,title,content,source_type,created_at
+        FROM shared_knowledge
+        WHERE shared_subject_id=?
+        ORDER BY id DESC
+        LIMIT 12
+        """,
+        (shared["id"],)
+    ).fetchall()
+
+    weaknesses = conn.execute(
+        """
+        SELECT topic,miss_count,correct_count,last_seen_at
+        FROM learning_weaknesses
+        WHERE user_id=? AND subject_id=?
+        ORDER BY (miss_count - correct_count * 0.5) DESC, last_seen_at DESC
+        LIMIT 8
+        """,
+        (uid, subject_id)
+    ).fetchall()
+
+    docs = conn.execute(
+        """
+        SELECT id,original_name,created_at
+        FROM documents
+        WHERE user_id=? AND subject_id=?
+        ORDER BY id DESC
+        LIMIT 8
+        """,
+        (uid, subject_id)
+    ).fetchall()
+
+    quiz_stats = conn.execute(
+        """
+        SELECT
+            COUNT(*) AS attempts,
+            ROUND(AVG(qa.score), 1) AS avg_score,
+            ROUND(MAX(qa.score), 1) AS best_score
+        FROM quiz_attempts qa
+        JOIN quizzes q ON q.id=qa.quiz_id
+        WHERE qa.user_id=? AND q.user_id=? AND q.subject_id=?
+        """,
+        (uid, uid, subject_id)
+    ).fetchone()
+
+    upcoming_tasks = conn.execute(
+        """
+        SELECT id,title,study_at,duration
+        FROM study_tasks
+        WHERE user_id=? AND subject_id=? AND done=0
+        ORDER BY study_at ASC
+        LIMIT 5
+        """,
+        (uid, subject_id)
+    ).fetchall()
+
+    conn.close()
+
+    return render_template(
+        "subject_detail.html",
+        page="subjects",
+        subject=subject,
+        shared_subject=shared,
+        shared_items=shared_items,
+        profile=profile,
+        weaknesses=weaknesses,
+        documents=docs,
+        quiz_stats=quiz_stats,
+        upcoming_tasks=upcoming_tasks
+    )
+
+
 @app.route("/subjects/<int:subject_id>/delete", methods=["POST"])
 @login_required
 def delete_subject(subject_id):
@@ -2290,6 +2959,238 @@ def delete_document(doc_id):
     conn.close()
     return redirect(url_for("documents"))
 
+# =====================================================
+# STUDY AGENT V2 - API DÙNG CHUNG CHO WEB / MOBILE
+# =====================================================
+@app.route("/api/learning-profile", methods=["GET", "POST", "PUT"])
+@login_required
+def api_learning_profile():
+    uid = session["user_id"]
+    conn = db()
+    profile = ensure_learning_profile(conn, uid)
+
+    if request.method == "GET":
+        data = dict(profile)
+        conn.close()
+        return jsonify(data)
+
+    payload = request.get_json(silent=True) or {}
+    learning_style = str(
+        payload.get("learning_style", profile["learning_style"] or "balanced")
+    ).strip()[:40] or "balanced"
+
+    preferred_study_time = str(
+        payload.get(
+            "preferred_study_time",
+            profile["preferred_study_time"] or "19:00"
+        )
+    ).strip()
+
+    if not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", preferred_study_time):
+        preferred_study_time = profile["preferred_study_time"] or "19:00"
+
+    daily_minutes = _safe_int(
+        payload.get("daily_minutes"),
+        int(profile["daily_minutes"] or 45),
+        15,
+        240
+    )
+    goals = str(payload.get("goals", profile["goals"] or "")).strip()[:1200]
+    notes = str(payload.get("notes", profile["notes"] or "")).strip()[:1200]
+
+    conn.execute(
+        """
+        UPDATE learning_profiles
+        SET learning_style=?,
+            preferred_study_time=?,
+            daily_minutes=?,
+            goals=?,
+            notes=?,
+            updated_at=?
+        WHERE user_id=?
+        """,
+        (
+            learning_style,
+            preferred_study_time,
+            daily_minutes,
+            goals,
+            notes,
+            now(),
+            uid
+        )
+    )
+    conn.commit()
+    updated = conn.execute(
+        "SELECT * FROM learning_profiles WHERE user_id=?",
+        (uid,)
+    ).fetchone()
+    result = dict(updated)
+    conn.close()
+    return jsonify(result)
+
+
+@app.route(
+    "/api/subjects/<int:subject_id>/shared-knowledge",
+    methods=["GET", "POST"]
+)
+@login_required
+def api_subject_shared_knowledge(subject_id):
+    uid = session["user_id"]
+    conn = db()
+
+    subject = conn.execute(
+        "SELECT id,name,code FROM subjects WHERE id=? AND user_id=?",
+        (subject_id, uid)
+    ).fetchone()
+    if not subject:
+        conn.close()
+        return jsonify({"error": "Không tìm thấy môn học."}), 404
+
+    shared = ensure_shared_subject_for_user_subject(conn, uid, subject_id)
+    if not shared:
+        conn.close()
+        return jsonify({"error": "Không tạo được kho kiến thức chung."}), 500
+
+    if request.method == "POST":
+        payload = request.get_json(silent=True) or {}
+        source_type = str(payload.get("source_type") or "note").strip().lower()[:30]
+        title = str(payload.get("title") or "").strip()[:180]
+        content = str(payload.get("content") or "").strip()
+
+        if not content:
+            conn.close()
+            return jsonify({"error": "Nội dung kiến thức đang trống."}), 400
+
+        if source_type == "syllabus":
+            conn.execute(
+                """
+                UPDATE shared_subjects
+                SET syllabus_text=?, updated_at=?
+                WHERE id=?
+                """,
+                (content[:50000], now(), shared["id"])
+            )
+        else:
+            if not title:
+                title = "Kiến thức chung"
+            conn.execute(
+                """
+                INSERT INTO shared_knowledge(
+                    shared_subject_id,title,content,source_type,
+                    created_by_user_id,created_at,updated_at
+                ) VALUES(?,?,?,?,?,?,?)
+                """,
+                (
+                    shared["id"],
+                    title,
+                    content[:50000],
+                    source_type or "note",
+                    uid,
+                    now(),
+                    now()
+                )
+            )
+
+        conn.commit()
+        shared = conn.execute(
+            "SELECT * FROM shared_subjects WHERE id=?",
+            (shared["id"],)
+        ).fetchone()
+
+    knowledge_rows = conn.execute(
+        """
+        SELECT id,title,content,source_type,created_at,updated_at
+        FROM shared_knowledge
+        WHERE shared_subject_id=?
+        ORDER BY id DESC
+        LIMIT 50
+        """,
+        (shared["id"],)
+    ).fetchall()
+
+    result = {
+        "subject": {
+            "id": subject["id"],
+            "name": subject["name"],
+            "code": subject["code"]
+        },
+        "shared_subject": {
+            "id": shared["id"],
+            "name": shared["name"],
+            "code": shared["code"],
+            "syllabus_text": shared["syllabus_text"]
+        },
+        "knowledge": [dict(row) for row in knowledge_rows]
+    }
+    conn.close()
+    return jsonify(result)
+
+
+@app.route(
+    "/api/subjects/<int:subject_id>/learning-insights",
+    methods=["GET"]
+)
+@login_required
+def api_subject_learning_insights(subject_id):
+    uid = session["user_id"]
+    conn = db()
+    subject = conn.execute(
+        """
+        SELECT id,name,code,target_score,progress
+        FROM subjects
+        WHERE id=? AND user_id=?
+        """,
+        (subject_id, uid)
+    ).fetchone()
+
+    if not subject:
+        conn.close()
+        return jsonify({"error": "Không tìm thấy môn học."}), 404
+
+    profile = ensure_learning_profile(conn, uid)
+    weaknesses = conn.execute(
+        """
+        SELECT id,topic,miss_count,correct_count,last_seen_at
+        FROM learning_weaknesses
+        WHERE user_id=? AND subject_id=?
+        ORDER BY (miss_count - correct_count * 0.5) DESC, last_seen_at DESC
+        LIMIT 12
+        """,
+        (uid, subject_id)
+    ).fetchall()
+
+    quiz_stats = conn.execute(
+        """
+        SELECT
+            COUNT(*) AS attempts,
+            ROUND(AVG(qa.score), 1) AS avg_score,
+            ROUND(MAX(qa.score), 1) AS best_score
+        FROM quiz_attempts qa
+        JOIN quizzes q ON q.id=qa.quiz_id
+        WHERE qa.user_id=? AND q.user_id=? AND q.subject_id=?
+        """,
+        (uid, uid, subject_id)
+    ).fetchone()
+    conn.close()
+
+    return jsonify({
+        "subject": dict(subject),
+        "profile": {
+            "learning_style": profile["learning_style"],
+            "preferred_study_time": profile["preferred_study_time"],
+            "daily_minutes": profile["daily_minutes"],
+            "goals": profile["goals"],
+            "notes": profile["notes"]
+        },
+        "quiz": {
+            "attempts": int(quiz_stats["attempts"] or 0),
+            "avg_score": float(quiz_stats["avg_score"] or 0),
+            "best_score": float(quiz_stats["best_score"] or 0)
+        },
+        "weaknesses": [dict(row) for row in weaknesses]
+    })
+
+
 @app.route("/chat")
 @login_required
 def chat():
@@ -2458,13 +3359,25 @@ def api_chat():
         subject_id,
         question
     )
+    shared_context, shared_sources = get_shared_subject_context(
+        uid,
+        subject_id,
+        question
+    )
+    personal_context = get_personal_learning_context(
+        uid,
+        subject_id
+    )
 
     answer, used_sources, source_mode = gemini_subject_answer(
         subject_name,
         question,
         context,
         candidate_sources,
-        conversation_history
+        conversation_history,
+        shared_context,
+        personal_context,
+        shared_sources
     )
 
     conn = db()
@@ -2512,6 +3425,8 @@ def api_chat():
         "subject_name": subject_name,
         "source_mode": source_mode,
         "sources": used_sources,
+        "shared_sources": shared_sources,
+        "personalized": bool(personal_context),
         "updated_at": updated_at
     })
 
@@ -2787,8 +3702,18 @@ def submit_quiz():
         except (KeyError, TypeError, ValueError):
             continue
 
-        if selected_answer == correct_answer:
+        is_correct = selected_answer == correct_answer
+
+        if is_correct:
             correct_count += 1
+
+        record_quiz_learning_signal(
+            conn,
+            uid,
+            quiz_row["subject_id"],
+            str(question.get("question") or ""),
+            is_correct
+        )
 
     score = round(
         (correct_count / total_questions) * 100,

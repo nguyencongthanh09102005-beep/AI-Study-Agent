@@ -560,3 +560,196 @@ body.page-chat {
     min-height: 680px !important;
   }
 }
+
+
+/* =====================================================
+   PERFORMANCE + FIXED MODALS V5
+   - Không giữ transform trên .page-content: fixed modal bám đúng viewport.
+   - Bỏ blur GPU nặng ở sidebar/topbar/backdrop.
+   - Chuyển trang chỉ fade nhẹ để giảm cảm giác lag.
+===================================================== */
+@view-transition {
+  navigation: none;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none !important;
+}
+
+.page-content {
+  animation: page-fade-v5 .16s ease-out both !important;
+  transform: none !important;
+}
+
+@keyframes page-fade-v5 {
+  from { opacity: .82; }
+  to { opacity: 1; }
+}
+
+.sidebar {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background: rgba(240,245,255,.97) !important;
+}
+
+.topbar {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background: rgba(240,245,255,.96) !important;
+}
+
+.mock-modal-backdrop,
+.planner-modal-backdrop,
+.app-confirm-backdrop {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Hộp xác nhận xóa: đặt cao hơn thay vì rơi xuống nửa dưới màn hình. */
+.app-confirm-modal {
+  align-items: flex-start !important;
+  justify-content: center !important;
+  padding: clamp(42px, 10vh, 82px) 22px 22px !important;
+  overflow-y: auto !important;
+}
+
+.app-confirm-dialog,
+.app-confirm-modal.show .app-confirm-dialog {
+  transform: none !important;
+}
+
+/* Giảm repaint ở các card dài khi cuộn. */
+.soft-card,
+.metric-card,
+.quiz-action-card,
+.quiz-question-card,
+.schedule-item-new {
+  backface-visibility: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-content { animation: none !important; }
+}
+
+
+/* =====================================================
+   MODAL CENTER OVERRIDES V6
+   Đặt cuối file để thắng các override cũ.
+===================================================== */
+@media (min-height: 761px) {
+  .planner-modal {
+    align-items: center !important;
+    justify-content: center !important;
+    padding-top: 20px !important;
+    padding-bottom: 20px !important;
+  }
+
+  .planner-modal-panel,
+  #aiPlannerModal .planner-modal-panel {
+    margin: 0 auto !important;
+    transform: none !important;
+  }
+}
+
+@media (min-height: 621px) {
+  .app-confirm-modal {
+    align-items: center !important;
+    justify-content: center !important;
+    padding-top: 20px !important;
+    padding-bottom: 20px !important;
+  }
+
+  .app-confirm-dialog,
+  .app-confirm-modal.show .app-confirm-dialog {
+    margin: 0 auto !important;
+    transform: none !important;
+  }
+}
+
+
+/* =====================================================
+   VIEWPORT MODAL CENTER V7
+   Zoom-safe: luôn căn giữa viewport thật.
+===================================================== */
+.planner-modal {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  margin: 0 !important;
+  padding: 16px !important;
+  overflow: hidden !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.planner-modal.show {
+  display: flex !important;
+}
+
+.planner-modal-panel,
+#aiPlannerModal .planner-modal-panel,
+.planner-modal-panel.small {
+  position: relative !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  margin: 0 !important;
+  transform: none !important;
+  width: min(650px, calc(100vw - 32px)) !important;
+  max-height: calc(100dvh - 32px) !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+}
+
+.planner-modal-panel.small {
+  width: min(520px, calc(100vw - 32px)) !important;
+}
+
+/* Xóa quiz / hộp xác nhận chung */
+.app-confirm-modal {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  margin: 0 !important;
+  padding: 16px !important;
+  display: grid !important;
+  place-items: center !important;
+  overflow: hidden !important;
+}
+
+.app-confirm-dialog,
+.app-confirm-modal.show .app-confirm-dialog {
+  position: relative !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  margin: 0 !important;
+  transform: none !important;
+  width: min(430px, calc(100vw - 32px)) !important;
+  max-height: calc(100dvh - 32px) !important;
+  overflow-y: auto !important;
+}
+
+/* Không đổi sang canh trên theo chiều cao nữa; panel tự cuộn khi thiếu chỗ. */
+@media (max-height: 760px) {
+  .planner-modal,
+  .app-confirm-modal {
+    align-items: center !important;
+    justify-content: center !important;
+    place-items: center !important;
+    padding: 12px !important;
+  }
+
+  .planner-modal-panel,
+  #aiPlannerModal .planner-modal-panel,
+  .planner-modal-panel.small,
+  .app-confirm-dialog,
+  .app-confirm-modal.show .app-confirm-dialog {
+    max-height: calc(100dvh - 24px) !important;
+  }
+}
