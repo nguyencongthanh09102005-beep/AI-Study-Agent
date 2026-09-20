@@ -1428,7 +1428,8 @@ def gemini_subject_answer(
     source_names,
     conversation_history="",
     shared_context="",
-    personal_context=""
+    personal_context="",
+    shared_source_names=None
 ):
     """
     Trả lời theo môn học:
@@ -1437,7 +1438,13 @@ def gemini_subject_answer(
     - Không có tài liệu: dùng kiến thức chung, không gắn nguồn file.
     """
     source_names = source_names or []
+    shared_source_names = shared_source_names or []
     sources_text = ", ".join(source_names) if source_names else "Không có"
+    shared_sources_text = (
+        ", ".join(shared_source_names)
+        if shared_source_names
+        else "Không có"
+    )
 
     prompt = f"""
 Bạn là AI Study Agent đang hỗ trợ môn học: {subject_name}.
@@ -1449,18 +1456,20 @@ tiến độ và những phần sinh viên thường sai. Không nhắc lại d�
 một cách máy móc nếu không cần thiết.
 
 QUY TẮC NGUỒN RẤT QUAN TRỌNG:
-1. Nếu NGỮ CẢNH TÀI LIỆU bên dưới thực sự chứa đủ thông tin để hỗ trợ câu trả lời,
-   hãy đặt mode = "document" và chỉ liệt kê những file thực sự dùng trong sources.
-2. Nếu tài liệu không có, không liên quan hoặc không đủ để trả lời,
-   hãy đặt mode = "general" và trả lời bằng kiến thức chung của mô hình.
-3. Khi mode = "general", sources phải là mảng rỗng.
-4. Không được giả vờ rằng thông tin nằm trong tài liệu nếu tài liệu không hỗ trợ.
-5. Nếu vừa dùng tài liệu vừa cần bổ sung một phần nhỏ bằng kiến thức chung,
-   vẫn có thể dùng mode = "document", nhưng phải phân biệt rõ phần nào là bổ sung nếu điều đó quan trọng.
-6. Không sao chép nguyên văn dài từ tài liệu.
+1. Nếu NGỮ CẢNH TÀI LIỆU CÁ NHÂN thực sự hỗ trợ câu trả lời,
+   đặt mode = "document" và chỉ liệt kê file cá nhân thực sự dùng.
+2. Nếu KIẾN THỨC CHUNG THEO MÔN hoặc đề cương hỗ trợ câu trả lời,
+   đặt mode = "shared" và chỉ liệt kê nguồn dùng chung thực sự dùng.
+3. Nếu không có nguồn phù hợp, đặt mode = "general" và dùng kiến thức chung của mô hình.
+4. Khi mode = "general", sources phải là mảng rỗng.
+5. Không được giả vờ thông tin nằm trong tài liệu/đề cương nếu nguồn không hỗ trợ.
+6. Không sao chép nguyên văn dài từ nguồn.
 
-CÁC FILE ĐƯỢC CUNG CẤP TRONG NGỮ CẢNH:
+CÁC FILE CÁ NHÂN ĐƯỢC CUNG CẤP:
 {sources_text}
+
+CÁC NGUỒN DÙNG CHUNG ĐƯỢC CUNG CẤP:
+{shared_sources_text}
 
 NGỮ CẢNH TÀI LIỆU CÁ NHÂN:
 {context[:9000] if context else "Không có tài liệu cá nhân của môn học này trong ngữ cảnh."}
@@ -1479,7 +1488,7 @@ CÂU HỎI HIỆN TẠI:
 
 CHỈ trả về JSON hợp lệ, không markdown, theo đúng cấu trúc:
 {{
-  "mode": "document" hoặc "general",
+  "mode": "document", "shared" hoặc "general",
   "sources": ["ten_file_1.pdf"],
   "answer": "Nội dung trả lời"
 }}
@@ -1498,10 +1507,18 @@ CHỈ trả về JSON hợp lệ, không markdown, theo đúng cấu trúc:
             mode = str(data.get("mode") or "general").strip().lower()
             requested_sources = data.get("sources") or []
 
-            allowed = {name: name for name in source_names}
+            personal_allowed = {name: name for name in source_names}
+            shared_allowed = {name: name for name in shared_source_names}
             used_sources = []
 
             if isinstance(requested_sources, list):
+                allowed = (
+                    personal_allowed
+                    if mode == "document"
+                    else shared_allowed
+                    if mode == "shared"
+                    else {}
+                )
                 for item in requested_sources:
                     name = str(item or "").strip()
                     if name in allowed and name not in used_sources:
@@ -1518,6 +1535,15 @@ CHỈ trả về JSON hợp lệ, không markdown, theo đúng cấu trúc:
                     source_line = f"Dựa trên các tài liệu {joined}:"
 
                 return source_line + "\n\n" + answer, used_sources, "document"
+
+            if mode == "shared" and used_sources:
+                if len(used_sources) == 1:
+                    source_line = f'Dựa trên kiến thức chung "{used_sources[0]}":'
+                else:
+                    joined = ", ".join(f'"{name}"' for name in used_sources)
+                    source_line = f"Dựa trên các nguồn kiến thức chung {joined}:"
+
+                return source_line + "\n\n" + answer, used_sources, "shared"
 
             # Không có nguồn hợp lệ -> coi là kiến thức chung để tránh gắn nguồn sai.
             return answer, [], "general"
@@ -3140,7 +3166,8 @@ def api_chat():
         candidate_sources,
         conversation_history,
         shared_context,
-        personal_context
+        personal_context,
+        shared_sources
     )
 
     conn = db()
