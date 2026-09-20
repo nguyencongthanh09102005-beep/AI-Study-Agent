@@ -653,3 +653,35 @@ main{padding:0 30px 40px;min-width:0}.topbar{height:88px;display:flex;align-item
 .app-confirm-modal.show .app-confirm-dialog {
   transform: none !important;
 }
+
+
+/* =====================================================
+   CENTER CONFIRM MODAL V6
+===================================================== */
+.app-confirm-modal {
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 20px !important;
+  overflow-y: auto !important;
+}
+
+.app-confirm-dialog,
+.app-confirm-modal.show .app-confirm-dialog {
+  margin: 0 auto !important;
+  transform: none !important;
+  max-height: calc(100dvh - 40px) !important;
+  overflow-y: auto !important;
+}
+
+@media (max-height: 620px) {
+  .app-confirm-modal {
+    align-items: flex-start !important;
+    padding-top: 16px !important;
+    padding-bottom: 16px !important;
+  }
+
+  .app-confirm-dialog,
+  .app-confirm-modal.show .app-confirm-dialog {
+    max-height: calc(100dvh - 32px) !important;
+  }
+}
