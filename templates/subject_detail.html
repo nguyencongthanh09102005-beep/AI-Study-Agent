@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+{% block title %}{{ subject.name }} · AI Study Agent{% endblock %}
+{% block page_title %}{{ subject.name }}{% endblock %}
+{% block page_desc %}Kiến thức chung và hồ sơ học tập cá nhân{% endblock %}
+{% block page_styles %}<link rel="stylesheet" href="{{ url_for('static', filename='css/subject_detail.css') }}">{% endblock %}
+
+{% block content %}
+<section class="agent-subject-head soft-card">
+  <div class="agent-subject-copy">
+    <a class="back-link" href="{{ url_for('subjects') }}">← Môn học</a>
+    <div class="subject-kicker">{{ subject.code or 'MÔN HỌC' }} · {{ subject.credits or 0 }} tín chỉ</div>
+    <h2>{{ subject.name }}</h2>
+    <p>{{ subject.description or 'Chưa có mô tả cho môn học này.' }}</p>
+    <div class="subject-progress-row">
+      <span>Tiến độ học tập</span>
+      <strong>{{ subject.progress or 0 }}%</strong>
+    </div>
+    <div class="progress-track"><i style="width: {{ subject.progress or 0 }}%"></i></div>
+  </div>
+
+  <div class="agent-subject-actions">
+    <a class="soft-primary" href="{{ url_for('chat') }}?subject_id={{ subject.id }}">🤖 Hỏi Study Agent</a>
+    <a class="ghost-action" href="{{ url_for('documents') }}">▤ Tài liệu</a>
+    <a class="ghost-action" href="{{ url_for('study_plan') }}">▦ Kế hoạch học</a>
+  </div>
+</section>
+
+<section class="agent-summary-grid">
+  <article class="soft-card agent-summary-card">
+    <span class="summary-icon blue">▤</span>
+    <div>
+      <small>Kiến thức chung</small>
+      <strong>{{ shared_items|length }} mục</strong>
+      <p>Đề cương và kiến thức có thể dùng lại cho sinh viên cùng môn.</p>
+    </div>
+  </article>
+
+  <article class="soft-card agent-summary-card">
+    <span class="summary-icon green">◎</span>
+    <div>
+      <small>Mục tiêu của bạn</small>
+      <strong>{% if subject.target_score %}{{ '%.1f'|format(subject.target_score) }} điểm{% else %}Chưa đặt{% endif %}</strong>
+      <p>Study Agent dùng mục tiêu này để điều chỉnh gợi ý học tập.</p>
+    </div>
+  </article>
+
+  <article class="soft-card agent-summary-card">
+    <span class="summary-icon purple">?</span>
+    <div>
+      <small>Quiz cá nhân</small>
+      <strong>{{ quiz_stats.attempts or 0 }} lượt</strong>
+      <p>Điểm TB {{ quiz_stats.avg_score or 0 }}% · cao nhất {{ quiz_stats.best_score or 0 }}%.</p>
+    </div>
+  </article>
+
+  <article class="soft-card agent-summary-card">
+    <span class="summary-icon orange">⚑</span>
+    <div>
+      <small>Phần cần ôn thêm</small>
+      <strong>{{ weaknesses|length }} mục</strong>
+      <p>Tự cập nhật từ những câu bạn làm sai trong quiz.</p>
+    </div>
+  </article>
+</section>
+
+<section class="agent-two-column">
+  <article class="soft-card agent-panel">
+    <div class="panel-head">
+      <div>
+        <span class="panel-kicker">DÙNG CHUNG THEO MÔN</span>
+        <h3>📚 Đề cương & kiến thức chung</h3>
+      </div>
+      <span class="shared-badge">Shared</span>
+    </div>
+
+    <p class="panel-desc">Phần này đại diện cho kiến thức có thể tái sử dụng giữa các sinh viên học cùng mã môn.</p>
+
+    <form method="post" class="agent-form">
+      <input type="hidden" name="action_type" value="syllabus">
+      <label>
+        <span>Đề cương / nội dung trọng tâm</span>
+        <textarea name="syllabus_text" rows="8" placeholder="Dán đề cương môn học, chuẩn đầu ra, nội dung các chương...">{{ shared_subject.syllabus_text or '' }}</textarea>
+      </label>
+      <button class="soft-primary compact-primary" type="submit">Lưu đề cương chung</button>
+    </form>
+
+    <div class="shared-note-divider"><span>Thêm kiến thức chung</span></div>
+
+    <form method="post" class="agent-form">
+      <input type="hidden" name="action_type" value="shared_note">
+      <label>
+        <span>Tiêu đề</span>
+        <input name="title" type="text" placeholder="Ví dụ: Nội dung trọng tâm Chương 2">
+      </label>
+      <label>
+        <span>Nội dung</span>
+        <textarea name="content" rows="5" placeholder="Ghi chú, kiến thức chuẩn, nội dung giảng viên nhấn mạnh..."></textarea>
+      </label>
+      <button class="ghost-action agent-save-note" type="submit">＋ Thêm vào kho chung</button>
+    </form>
+
+    <div class="shared-list">
+      {% for item in shared_items %}
+      <div class="shared-item">
+        <span class="shared-item-icon">▤</span>
+        <div><strong>{{ item.title }}</strong><small>{{ item.source_type }} · {{ item.created_at[:10] }}</small><p>{{ item.content[:180] }}{% if item.content|length > 180 %}…{% endif %}</p></div>
+      </div>
+      {% else %}
+      <div class="empty-agent">Chưa có kiến thức chung. Bạn có thể bắt đầu bằng đề cương môn học.</div>
+      {% endfor %}
+    </div>
+  </article>
+
+  <article class="soft-card agent-panel personal-panel">
+    <div class="panel-head">
+      <div>
+        <span class="panel-kicker">RIÊNG CỦA BẠN</span>
+        <h3>✨ Hồ sơ học tập cá nhân</h3>
+      </div>
+      <span class="personal-badge">Private</span>
+    </div>
+
+    <p class="panel-desc">Chỉ dùng để cá nhân hóa Study Agent cho tài khoản của bạn.</p>
+
+    <form method="post" class="agent-form personal-form">
+      <input type="hidden" name="action_type" value="profile">
+      <div class="form-grid-2">
+        <label>
+          <span>Phong cách học</span>
+          <select name="learning_style">
+            <option value="balanced" {% if profile.learning_style == 'balanced' %}selected{% endif %}>Cân bằng</option>
+            <option value="visual" {% if profile.learning_style == 'visual' %}selected{% endif %}>Ưu tiên ví dụ / trực quan</option>
+            <option value="concise" {% if profile.learning_style == 'concise' %}selected{% endif %}>Ngắn gọn, trọng tâm</option>
+            <option value="deep" {% if profile.learning_style == 'deep' %}selected{% endif %}>Giải thích sâu</option>
+          </select>
+        </label>
+        <label>
+          <span>Giờ học ưu tiên</span>
+          <input type="time" name="preferred_study_time" value="{{ profile.preferred_study_time or '19:00' }}">
+        </label>
+        <label>
+          <span>Thời lượng mỗi buổi</span>
+          <input type="number" name="daily_minutes" min="15" max="240" value="{{ profile.daily_minutes or 45 }}">
+        </label>
+        <label>
+          <span>Mục tiêu điểm môn</span>
+          <input type="text" value="{% if subject.target_score %}{{ '%.1f'|format(subject.target_score) }}{% else %}Chưa đặt{% endif %}" disabled>
+        </label>
+      </div>
+      <label>
+        <span>Mục tiêu học tập cá nhân</span>
+        <textarea name="goals" rows="4" placeholder="Ví dụ: Nắm chắc chương 1–5 trước cuối tháng...">{{ profile.goals or '' }}</textarea>
+      </label>
+      <label>
+        <span>Ghi chú để Study Agent hiểu bạn hơn</span>
+        <textarea name="notes" rows="4" placeholder="Ví dụ: Mình dễ nhớ qua ví dụ thực tế, hay quên công thức...">{{ profile.notes or '' }}</textarea>
+      </label>
+      <button class="soft-primary compact-primary" type="submit">Lưu hồ sơ cá nhân</button>
+    </form>
+
+    <div class="weakness-section">
+      <div class="mini-section-head"><h4>🎯 Phần cần ôn thêm</h4><span>Tự học từ quiz</span></div>
+      {% for w in weaknesses %}
+      <div class="weakness-item">
+        <span class="weak-dot"></span>
+        <div><strong>{{ w.topic }}</strong><small>Sai {{ w.miss_count }} lần · Đúng {{ w.correct_count }} lần</small></div>
+      </div>
+      {% else %}
+      <div class="empty-agent">Chưa có dữ liệu điểm yếu. Làm quiz để Study Agent bắt đầu học từ kết quả của bạn.</div>
+      {% endfor %}
+    </div>
+  </article>
+</section>
+
+<section class="agent-bottom-grid">
+  <article class="soft-card agent-panel compact-panel">
+    <div class="mini-section-head"><h4>📄 Tài liệu cá nhân của môn</h4><a href="{{ url_for('documents') }}">Quản lý →</a></div>
+    {% for doc in documents %}
+    <div class="simple-row"><span>▤</span><b>{{ doc.original_name }}</b><small>{{ doc.created_at[:10] }}</small></div>
+    {% else %}
+    <div class="empty-agent">Chưa có tài liệu cá nhân cho môn này.</div>
+    {% endfor %}
+  </article>
+
+  <article class="soft-card agent-panel compact-panel">
+    <div class="mini-section-head"><h4>🗓 Nhiệm vụ sắp tới</h4><a href="{{ url_for('study_plan') }}">Xem kế hoạch →</a></div>
+    {% for task in upcoming_tasks %}
+    <div class="simple-row"><span>◷</span><b>{{ task.title }}</b><small>{{ task.study_at[:16]|replace('T',' ') }} · {{ task.duration }} phút</small></div>
+    {% else %}
+    <div class="empty-agent">Chưa có nhiệm vụ sắp tới.</div>
+    {% endfor %}
+  </article>
+</section>
+{% endblock %}
