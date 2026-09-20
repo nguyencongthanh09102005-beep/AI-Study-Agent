@@ -469,3 +469,57 @@
     max-height: calc(100dvh - 24px) !important;
   }
 }
+
+
+/* =====================================================
+   CENTER PLANNER MODALS V6
+   Desktop: căn giữa đúng viewport.
+   Màn hình thấp: tự nhích lên để không mất nút bên dưới.
+===================================================== */
+.planner-modal {
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 20px !important;
+  overflow-y: auto !important;
+}
+
+.planner-modal-panel,
+#aiPlannerModal .planner-modal-panel {
+  margin: 0 auto !important;
+  transform: none !important;
+  max-height: calc(100dvh - 40px) !important;
+  overflow-y: auto !important;
+}
+
+/* Popup Tạo kế hoạch: vừa giữa, vừa gọn ở zoom 100%. */
+#aiPlannerModal .planner-modal-panel {
+  width: min(650px, calc(100vw - 40px)) !important;
+}
+
+/* Khi chiều cao màn hình ngắn, ưu tiên nhìn đủ form hơn là ép giữa. */
+@media (max-height: 760px) {
+  .planner-modal {
+    align-items: flex-start !important;
+    padding-top: 14px !important;
+    padding-bottom: 14px !important;
+  }
+
+  .planner-modal-panel,
+  #aiPlannerModal .planner-modal-panel {
+    max-height: calc(100dvh - 28px) !important;
+  }
+}
+
+@media (max-width: 680px) {
+  .planner-modal {
+    align-items: flex-start !important;
+    padding: 12px !important;
+  }
+
+  .planner-modal-panel,
+  #aiPlannerModal .planner-modal-panel,
+  .planner-modal-panel.small {
+    width: min(100%, calc(100vw - 24px)) !important;
+    max-height: calc(100dvh - 24px) !important;
+  }
+}
