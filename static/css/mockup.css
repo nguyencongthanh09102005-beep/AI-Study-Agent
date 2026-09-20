@@ -631,3 +631,38 @@ body.page-chat {
 @media (prefers-reduced-motion: reduce) {
   .page-content { animation: none !important; }
 }
+
+
+/* =====================================================
+   MODAL CENTER OVERRIDES V6
+   Đặt cuối file để thắng các override cũ.
+===================================================== */
+@media (min-height: 761px) {
+  .planner-modal {
+    align-items: center !important;
+    justify-content: center !important;
+    padding-top: 20px !important;
+    padding-bottom: 20px !important;
+  }
+
+  .planner-modal-panel,
+  #aiPlannerModal .planner-modal-panel {
+    margin: 0 auto !important;
+    transform: none !important;
+  }
+}
+
+@media (min-height: 621px) {
+  .app-confirm-modal {
+    align-items: center !important;
+    justify-content: center !important;
+    padding-top: 20px !important;
+    padding-bottom: 20px !important;
+  }
+
+  .app-confirm-dialog,
+  .app-confirm-modal.show .app-confirm-dialog {
+    margin: 0 auto !important;
+    transform: none !important;
+  }
+}
