@@ -151,6 +151,59 @@ def init_db():
         FOREIGN KEY(user_id) REFERENCES users(id),
         FOREIGN KEY(quiz_id) REFERENCES quizzes(id) ON DELETE CASCADE
     );
+
+    -- =================================================
+    -- STUDY AGENT V2: KIẾN THỨC CHUNG + DỮ LIỆU CÁ NHÂN
+    -- =================================================
+    CREATE TABLE IF NOT EXISTS shared_subjects(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        subject_key TEXT UNIQUE NOT NULL,
+        code TEXT DEFAULT '',
+        name TEXT NOT NULL,
+        description TEXT DEFAULT '',
+        syllabus_text TEXT DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS shared_knowledge(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        shared_subject_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        content TEXT NOT NULL,
+        source_type TEXT DEFAULT 'note',
+        created_by_user_id INTEGER,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY(shared_subject_id) REFERENCES shared_subjects(id) ON DELETE CASCADE,
+        FOREIGN KEY(created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS learning_profiles(
+        user_id INTEGER PRIMARY KEY,
+        learning_style TEXT DEFAULT 'balanced',
+        preferred_study_time TEXT DEFAULT '19:00',
+        daily_minutes INTEGER DEFAULT 45,
+        goals TEXT DEFAULT '',
+        notes TEXT DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS learning_weaknesses(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        subject_id INTEGER NOT NULL,
+        topic_key TEXT NOT NULL,
+        topic TEXT NOT NULL,
+        miss_count INTEGER DEFAULT 0,
+        correct_count INTEGER DEFAULT 0,
+        last_seen_at TEXT NOT NULL,
+        FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY(subject_id) REFERENCES subjects(id) ON DELETE CASCADE,
+        UNIQUE(user_id, subject_id, topic_key)
+    );
     """)
 
     conn.commit()
@@ -180,6 +233,24 @@ def init_db():
         conn.execute(
             "ALTER TABLE subjects ADD COLUMN target_score REAL DEFAULT 0"
         )
+
+    if "shared_subject_id" not in subject_columns:
+        conn.execute(
+            "ALTER TABLE subjects ADD COLUMN shared_subject_id INTEGER"
+        )
+
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_subjects_shared_subject "
+        "ON subjects(shared_subject_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_shared_knowledge_subject "
+        "ON shared_knowledge(shared_subject_id, id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_learning_weaknesses_user_subject "
+        "ON learning_weaknesses(user_id, subject_id, miss_count)"
+    )
 
     conn.commit()
 
