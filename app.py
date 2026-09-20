@@ -2531,6 +2531,216 @@ def subjects():
         subjects=rows
     )
 
+@app.route("/subjects/<int:subject_id>", methods=["GET", "POST"])
+@login_required
+def subject_detail(subject_id):
+    uid = session["user_id"]
+    conn = db()
+
+    subject = conn.execute(
+        """
+        SELECT *
+        FROM subjects
+        WHERE id=? AND user_id=?
+        """,
+        (subject_id, uid)
+    ).fetchone()
+
+    if not subject:
+        conn.close()
+        return redirect(url_for("subjects"))
+
+    shared = ensure_shared_subject_for_user_subject(
+        conn,
+        uid,
+        subject_id
+    )
+    profile = ensure_learning_profile(conn, uid)
+
+    if request.method == "POST":
+        action_type = request.form.get("action_type", "").strip()
+
+        if action_type == "profile":
+            learning_style = (
+                request.form.get("learning_style", "balanced").strip()[:40]
+                or "balanced"
+            )
+            preferred_study_time = (
+                request.form.get("preferred_study_time", "19:00").strip()
+                or "19:00"
+            )
+            if not re.fullmatch(
+                r"(?:[01]\d|2[0-3]):[0-5]\d",
+                preferred_study_time
+            ):
+                preferred_study_time = "19:00"
+
+            daily_minutes = _safe_int(
+                request.form.get("daily_minutes"),
+                45,
+                15,
+                240
+            )
+            goals = request.form.get("goals", "").strip()[:1200]
+            notes = request.form.get("notes", "").strip()[:1200]
+
+            conn.execute(
+                """
+                UPDATE learning_profiles
+                SET learning_style=?,
+                    preferred_study_time=?,
+                    daily_minutes=?,
+                    goals=?,
+                    notes=?,
+                    updated_at=?
+                WHERE user_id=?
+                """,
+                (
+                    learning_style,
+                    preferred_study_time,
+                    daily_minutes,
+                    goals,
+                    notes,
+                    now(),
+                    uid
+                )
+            )
+
+        elif action_type == "syllabus" and shared:
+            syllabus_text = request.form.get(
+                "syllabus_text",
+                ""
+            ).strip()[:50000]
+            conn.execute(
+                """
+                UPDATE shared_subjects
+                SET syllabus_text=?, updated_at=?
+                WHERE id=?
+                """,
+                (syllabus_text, now(), shared["id"])
+            )
+
+        elif action_type == "shared_note" and shared:
+            title = (
+                request.form.get("title", "").strip()[:180]
+                or "Kiến thức chung"
+            )
+            content_value = request.form.get(
+                "content",
+                ""
+            ).strip()[:50000]
+
+            if content_value:
+                conn.execute(
+                    """
+                    INSERT INTO shared_knowledge(
+                        shared_subject_id,title,content,source_type,
+                        created_by_user_id,created_at,updated_at
+                    ) VALUES(?,?,?,?,?,?,?)
+                    """,
+                    (
+                        shared["id"],
+                        title,
+                        content_value,
+                        "note",
+                        uid,
+                        now(),
+                        now()
+                    )
+                )
+
+        conn.commit()
+        conn.close()
+        return redirect(
+            url_for("subject_detail", subject_id=subject_id)
+        )
+
+    recalculate_subject_progress(uid, subject_id, conn)
+    subject = conn.execute(
+        "SELECT * FROM subjects WHERE id=? AND user_id=?",
+        (subject_id, uid)
+    ).fetchone()
+
+    shared = ensure_shared_subject_for_user_subject(
+        conn,
+        uid,
+        subject_id
+    )
+    profile = ensure_learning_profile(conn, uid)
+
+    shared_items = conn.execute(
+        """
+        SELECT id,title,content,source_type,created_at
+        FROM shared_knowledge
+        WHERE shared_subject_id=?
+        ORDER BY id DESC
+        LIMIT 12
+        """,
+        (shared["id"],)
+    ).fetchall()
+
+    weaknesses = conn.execute(
+        """
+        SELECT topic,miss_count,correct_count,last_seen_at
+        FROM learning_weaknesses
+        WHERE user_id=? AND subject_id=?
+        ORDER BY (miss_count - correct_count * 0.5) DESC, last_seen_at DESC
+        LIMIT 8
+        """,
+        (uid, subject_id)
+    ).fetchall()
+
+    docs = conn.execute(
+        """
+        SELECT id,original_name,created_at
+        FROM documents
+        WHERE user_id=? AND subject_id=?
+        ORDER BY id DESC
+        LIMIT 8
+        """,
+        (uid, subject_id)
+    ).fetchall()
+
+    quiz_stats = conn.execute(
+        """
+        SELECT
+            COUNT(*) AS attempts,
+            ROUND(AVG(qa.score), 1) AS avg_score,
+            ROUND(MAX(qa.score), 1) AS best_score
+        FROM quiz_attempts qa
+        JOIN quizzes q ON q.id=qa.quiz_id
+        WHERE qa.user_id=? AND q.user_id=? AND q.subject_id=?
+        """,
+        (uid, uid, subject_id)
+    ).fetchone()
+
+    upcoming_tasks = conn.execute(
+        """
+        SELECT id,title,study_at,duration
+        FROM study_tasks
+        WHERE user_id=? AND subject_id=? AND done=0
+        ORDER BY study_at ASC
+        LIMIT 5
+        """,
+        (uid, subject_id)
+    ).fetchall()
+
+    conn.close()
+
+    return render_template(
+        "subject_detail.html",
+        page="subjects",
+        subject=subject,
+        shared_subject=shared,
+        shared_items=shared_items,
+        profile=profile,
+        weaknesses=weaknesses,
+        documents=docs,
+        quiz_stats=quiz_stats,
+        upcoming_tasks=upcoming_tasks
+    )
+
+
 @app.route("/subjects/<int:subject_id>/delete", methods=["POST"])
 @login_required
 def delete_subject(subject_id):
