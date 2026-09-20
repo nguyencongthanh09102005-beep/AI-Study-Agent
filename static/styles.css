@@ -632,3 +632,24 @@ main{padding:0 30px 40px;min-width:0}.topbar{height:88px;display:flex;align-item
     grid-template-columns: 1fr;
   }
 }
+
+
+/* =====================================================
+   CONFIRM MODAL VIEWPORT FIX V5
+===================================================== */
+.app-confirm-backdrop {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background: rgba(18,25,46,.38) !important;
+}
+
+.app-confirm-modal {
+  align-items: flex-start !important;
+  justify-content: center !important;
+  padding-top: clamp(42px, 10vh, 82px) !important;
+}
+
+.app-confirm-dialog,
+.app-confirm-modal.show .app-confirm-dialog {
+  transform: none !important;
+}
