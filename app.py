@@ -3221,7 +3221,7 @@ def api_subject_learning_insights(subject_id):
     profile = ensure_learning_profile(conn, uid)
     weaknesses = conn.execute(
         """
-        SELECT id,topic,miss_count,correct_count,last_seen_at
+        SELECT id,topic,chapter,miss_count,correct_count,last_seen_at
         FROM learning_weaknesses
         WHERE user_id=? AND subject_id=?
           AND miss_count > 0
