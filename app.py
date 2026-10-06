@@ -4718,6 +4718,14 @@ def study_plan():
         overdue_tasks += 1 if item["is_overdue"] else 0
         tasks.append(item)
 
+    # "Danh sách nhiệm vụ hôm nay" chỉ hiển thị đúng các task của ngày hiện tại.
+    # Lịch tổng phía trên vẫn giữ toàn bộ task của tất cả môn.
+    today_tasks = [
+        item
+        for item in tasks
+        if item["is_today"]
+    ]
+
     reminders = []
     urgent_count = 0
     deadline_week = 0
@@ -4811,6 +4819,7 @@ def study_plan():
         page="study_plan",
         subjects=subjects,
         tasks=tasks,
+        today_tasks=today_tasks,
         reminders=reminders,
         priority_count=priority_count,
         deadline_week=deadline_week,
