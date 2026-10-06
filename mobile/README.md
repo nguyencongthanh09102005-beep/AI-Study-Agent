@@ -1,10 +1,31 @@
 # AI Study Agent Mobile
 
-Đây là frontend mobile theo định hướng giảng viên: Study Agent đóng vai trò trợ lý học tập đồng hành cùng sinh viên, kết hợp tri thức dùng chung của môn học với dữ liệu học tập riêng của từng user.
+Frontend mobile React Native/Expo dùng **chung backend Flask và cùng dữ liệu học tập với website**.
 
-## Chạy trên Android Emulator
+## Chạy backend Flask trên Windows
 
-Yêu cầu: Node.js >= 22.13, Android Studio + Android Emulator.
+Trong file `.env`:
+
+```env
+FLASK_HOST=0.0.0.0
+FLASK_PORT=5000
+```
+
+Sau đó chạy:
+
+```bash
+python app.py
+```
+
+Android Emulator truy cập máy Windows qua `10.0.2.2`, nên `src/api.js` mặc định dùng:
+
+```text
+http://10.0.2.2:5000
+```
+
+## Chạy mobile
+
+Yêu cầu Node.js + Android Studio/Android Emulator.
 
 ```bash
 cd mobile
@@ -12,25 +33,20 @@ npm install
 npx expo start
 ```
 
-Sau đó mở Android Emulator và bấm `a` trong terminal Expo.
+Mở Android Emulator rồi bấm `a` trong terminal Expo.
 
-## Kết nối Flask backend local
+## Phần đã nối dữ liệu thật
 
-Android Emulator không dùng `127.0.0.1` để truy cập máy Windows. File `src/api.js` đang dùng:
+- Đăng nhập bằng tài khoản Flask/SQLite.
+- Dashboard: môn học, tiến độ, điểm yếu và lịch học.
+- Danh sách môn học + weakness.
+- Study Agent Chat dùng đúng tài liệu/shared knowledge/personal context của website.
+- Quiz theo môn và Quiz ôn điểm yếu.
+- Nộp Quiz cập nhật `learning_weaknesses` và tiến độ.
+- Study Plan đọc dữ liệu thật từ backend.
+- Mobile và web dùng cùng database SQLite.
 
-```text
-http://10.0.2.2:5000
-```
+## Lưu ý
 
-Backend Flask cần chạy ở port 5000 và các endpoint `/api/mobile/*` sẽ được bổ sung ở bước backend tiếp theo.
-
-## Các màn hình đã dựng
-
-- Login
-- Trang chủ trợ lý
-- Môn học: tri thức chung + hồ sơ cá nhân
-- Study Agent
-- Quiz thông minh
-- Lộ trình học cá nhân hóa
-
-Hiện UI mobile đã dựng trước để chốt trải nghiệm. Bước tiếp theo là nối dữ liệu thật từ Flask API và bổ sung shared knowledge + personal learning memory.
+- Nếu chạy trên điện thoại thật, đổi `API_BASE_URL` trong `src/api.js` thành IP LAN của máy chạy Flask, ví dụ `http://192.168.1.10:5000`.
+- Khi deploy thật, dùng domain HTTPS thay cho địa chỉ local.
