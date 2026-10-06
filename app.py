@@ -4293,6 +4293,16 @@ def study_plan():
 
     total_tasks = len(tasks)
     completion = round((completed_tasks / total_tasks) * 100) if total_tasks else 0
+    planned_minutes = sum(int(item["duration"] or 0) for item in tasks)
+    completed_minutes = sum(
+        int(item["duration"] or 0)
+        for item in tasks
+        if item["done"]
+    )
+    time_completion = (
+        round((completed_minutes / planned_minutes) * 100)
+        if planned_minutes else 0
+    )
     priority_count = sum(1 for s in subjects if int(s["progress"] or 0) < 50)
 
     if urgent_count:
@@ -4325,6 +4335,9 @@ def study_plan():
         deadline_week=deadline_week,
         reminder_today=reminder_today,
         completion=completion,
+        planned_minutes=planned_minutes,
+        completed_minutes=completed_minutes,
+        time_completion=time_completion,
         agent_tip=agent_tip,
         urgent_count=urgent_count,
         today_input=today.isoformat(),
