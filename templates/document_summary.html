@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Tóm tắt · {{ document.original_name }}{% endblock %}
+{% block page_title %}Tóm tắt tài liệu{% endblock %}
+{% block page_desc %}Tóm tắt nội dung học tập từ tài liệu đã tải lên{% endblock %}
+
+{% block content %}
+<section class="soft-card" style="padding:22px;max-width:980px;margin:0 auto;">
+  <div style="display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap;margin-bottom:18px;">
+    <div style="min-width:0;">
+      <a href="{{ url_for('documents') }}" style="text-decoration:none;color:#6673d9;font-size:12px;">← Tài liệu</a>
+      <h2 style="margin:10px 0 6px;font-size:22px;word-break:break-word;">{{ document.original_name }}</h2>
+      <p style="margin:0;color:#7b8497;font-size:12px;">{{ document.subject_name or 'Chưa phân loại' }} · {{ document.created_at }}</p>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <a class="ghost-action" href="{{ url_for('uploaded_file', filename=document.stored_name) }}" target="_blank" rel="noopener">◉ Xem file</a>
+      <a class="soft-primary" href="{{ url_for('quiz', document_id=document.id) }}">? Tạo quiz</a>
+    </div>
+  </div>
+
+  {% if used_ai %}
+  <div style="margin-bottom:14px;padding:10px 12px;border-radius:12px;background:#eef8f2;color:#317354;font-size:11px;">
+    ✦ Tóm tắt được tạo bởi Study Agent từ nội dung trích xuất của tài liệu.
+  </div>
+  {% else %}
+  <div style="margin-bottom:14px;padding:10px 12px;border-radius:12px;background:#fff7e8;color:#8a651f;font-size:11px;">
+    Gemini hiện chưa phản hồi ổn định. Hệ thống đang hiển thị bản tóm lược cục bộ từ chính tài liệu để bạn vẫn có thể tiếp tục học.
+  </div>
+  {% endif %}
+
+  <article style="white-space:pre-wrap;line-height:1.75;color:#344057;font-size:14px;background:#f7f9fd;border-radius:16px;padding:20px;">{{ summary }}</article>
+
+  {% if ai_error and not used_ai %}
+  <details style="margin-top:14px;color:#7b8497;font-size:11px;">
+    <summary>Chi tiết kỹ thuật</summary>
+    <p style="white-space:pre-wrap;">{{ ai_error }}</p>
+  </details>
+  {% endif %}
+</section>
+{% endblock %}
