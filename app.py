@@ -2016,8 +2016,16 @@ def _safe_int(value, default, minimum, maximum):
     return max(minimum, min(maximum, number))
 
 
-def _fallback_study_plan(subject_name, goal, deadline_dt, daily_minutes, preferred_time):
-    """Tạo kế hoạch cục bộ khi Gemini chưa cấu hình hoặc API gặp lỗi."""
+def _fallback_study_plan(
+    subject_name,
+    goal,
+    deadline_dt,
+    daily_minutes,
+    preferred_time,
+    priority_topics=None
+):
+    """Tạo kế hoạch cục bộ có ưu tiên điểm yếu khi Gemini/API gặp lỗi."""
+    priority_topics = priority_topics or []
     today = datetime.now().date()
     end_date = max(today, deadline_dt.date())
     span_days = max(0, (end_date - today).days)
@@ -2029,16 +2037,39 @@ def _fallback_study_plan(subject_name, goal, deadline_dt, daily_minutes, preferr
     else:
         session_count = min(8, max(4, (span_days + 1) // 2))
 
-    templates = [
+    priority_templates = []
+    for item in priority_topics[:3]:
+        if isinstance(item, dict):
+            topic = str(item.get("topic") or "").strip()
+            chapter = str(item.get("chapter") or "").strip()
+            miss_count = _safe_int(item.get("miss_count"), 0, 0, 999)
+        else:
+            topic = str(item or "").strip()
+            chapter = ""
+            miss_count = 0
+
+        if not topic:
+            continue
+
+        detail = f"{chapter} · " if chapter else ""
+        detail += f"Đây là phần đã sai {miss_count} lần. " if miss_count else ""
+        detail += "Ôn lại khái niệm, ví dụ và ghi chú nguyên nhân từng chỗ chưa vững."
+
+        priority_templates.append(
+            (f"Ôn điểm yếu: {topic}"[:160], detail[:500])
+        )
+
+    general_templates = [
         ("Xác định nội dung cần hoàn thành", "Xem mục tiêu và chia phần kiến thức cần học."),
         ("Đọc tài liệu và ghi chú ý chính", "Tập trung vào khái niệm, ví dụ và phần chưa hiểu."),
-        ("Ôn phần kiến thức chưa vững", "Đọc lại ghi chú và đánh dấu nội dung cần hỏi thêm."),
         ("Hỏi AI phần chưa hiểu", "Dùng AI Chat để giải thích các ý còn mơ hồ."),
-        ("Làm quiz kiểm tra", "Làm quiz để kiểm tra mức độ ghi nhớ."),
-        ("Xem lại câu sai", "Ôn nguyên nhân sai và ghi lại kiến thức cần nhớ."),
+        ("Làm quiz kiểm tra", "Làm quiz để kiểm tra mức độ ghi nhớ, ưu tiên các phần vừa ôn."),
+        ("Xem lại câu sai", "Ôn nguyên nhân sai và cập nhật lại phần kiến thức cần nhớ."),
         ("Ôn tập tổng hợp", "Kết nối các phần kiến thức và làm lại nội dung khó."),
         ("Tổng kết trước deadline", "Rà soát mục tiêu và hoàn thiện phần còn thiếu."),
     ]
+
+    templates = priority_templates + general_templates
 
     tasks = []
     for i in range(session_count):
@@ -2068,7 +2099,8 @@ def build_study_plan(
     preferred_time,
     context="",
     shared_context="",
-    personal_context=""
+    personal_context="",
+    priority_topics=None
 ):
     """Tạo kế hoạch học có cá nhân hóa; nếu Gemini lỗi sẽ dùng kế hoạch cục bộ."""
     fallback = _fallback_study_plan(
@@ -2077,6 +2109,7 @@ def build_study_plan(
         deadline_dt,
         daily_minutes,
         preferred_time,
+        priority_topics=priority_topics,
     )
 
     today = datetime.now().date().isoformat()
@@ -3899,6 +3932,8 @@ def study_plan():
         (uid,)
     ).fetchall()
 
+    profile = ensure_learning_profile(conn, uid)
+
     task_rows = conn.execute(
         """
         SELECT t.*, s.name AS subject_name
@@ -4036,6 +4071,7 @@ def study_plan():
         agent_tip=agent_tip,
         urgent_count=urgent_count,
         today_input=today.isoformat(),
+        profile=profile,
     )
 
 
@@ -4087,6 +4123,18 @@ def generate_study_plan_route():
             )
     context = "\n\n".join(context_parts)
 
+    weakness_rows = conn.execute(
+        """
+        SELECT topic,chapter,miss_count,correct_count
+        FROM learning_weaknesses
+        WHERE user_id=? AND subject_id=? AND miss_count > 0
+        ORDER BY (miss_count - correct_count * 0.5) DESC, last_seen_at DESC
+        LIMIT 5
+        """,
+        (uid, subject_id)
+    ).fetchall()
+    priority_topics = [dict(row) for row in weakness_rows]
+
     # Study Agent dùng cả kiến thức chung và dữ liệu học tập riêng để
     # tạo lộ trình phù hợp với đúng sinh viên này.
     shared_context, _ = get_shared_subject_context(
@@ -4110,6 +4158,7 @@ def generate_study_plan_route():
         context,
         shared_context,
         personal_context,
+        priority_topics,
     )
 
     # Tránh nhân đôi khi người dùng bấm tạo lại kế hoạch cho cùng môn.
