@@ -1748,6 +1748,39 @@ def build_quiz(text, question_count=10, focus_topics=None):
             if 35 <= len(s.strip()) <= 500
         ]
 
+        focus_pairs = []
+        for item in focus_topics[:8]:
+            if isinstance(item, dict):
+                topic = str(item.get("topic") or "").strip()
+                chapter = str(item.get("chapter") or "").strip()
+            else:
+                topic = str(item or "").strip()
+                chapter = ""
+
+            tokens = [
+                token.casefold()
+                for token in re.findall(r"[\wÀ-ỹ]+", topic, flags=re.UNICODE)
+                if len(token) >= 3
+            ]
+            if topic and tokens:
+                focus_pairs.append((topic, chapter, tokens))
+
+        def fallback_priority(sentence):
+            lowered = sentence.casefold()
+            return max(
+                (
+                    sum(lowered.count(token) for token in tokens)
+                    for _, _, tokens in focus_pairs
+                ),
+                default=0
+            )
+
+        if focus_pairs:
+            sentences.sort(
+                key=lambda sentence: fallback_priority(sentence),
+                reverse=True
+            )
+
         questions = []
         used_questions = set()
 
@@ -1785,10 +1818,20 @@ def build_quiz(text, question_count=10, focus_topics=None):
 
             used_questions.add(normalized)
 
+            matched_topic = ""
+            matched_chapter = ""
+            lowered_sentence = sentence.casefold()
+
+            for focus_topic, focus_chapter, tokens in focus_pairs:
+                if any(token in lowered_sentence for token in tokens):
+                    matched_topic = focus_topic
+                    matched_chapter = focus_chapter
+                    break
+
             questions.append({
                 "question": question_text,
-                "topic": answer,
-                "chapter": "Nội dung tài liệu",
+                "topic": matched_topic or answer,
+                "chapter": matched_chapter or "Nội dung tài liệu",
                 "options": [
                     answer,
                     "Dữ liệu",
