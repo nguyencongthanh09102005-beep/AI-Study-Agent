@@ -1416,6 +1416,13 @@ def gemini_generate(prompt):
     primary_retries = max(0, min(primary_retries, 4))
 
     transient_statuses = {408, 429, 500, 502, 503, 504}
+
+    try:
+        request_timeout = int(os.getenv("GEMINI_REQUEST_TIMEOUT", "25"))
+    except ValueError:
+        request_timeout = 25
+    request_timeout = max(10, min(request_timeout, 60))
+
     last_error = ""
 
     for model_index, model in enumerate(models):
@@ -1443,7 +1450,7 @@ def gemini_generate(prompt):
                             }
                         ]
                     },
-                    timeout=45,
+                    timeout=request_timeout,
                 )
 
                 if res.ok:
@@ -1510,13 +1517,9 @@ def gemini_generate(prompt):
                 break
 
             except requests.Timeout:
+                # Timeout thường do đường truyền/model bị treo; chuyển model
+                # ngay để tránh người dùng phải chờ quá lâu khi demo.
                 last_error = f"{model}: timeout khi gọi Gemini."
-
-                if model_index == 0 and attempt < max_attempts - 1:
-                    delay = min(4.0, (2 ** attempt)) + random.uniform(0.1, 0.5)
-                    time.sleep(delay)
-                    continue
-
                 break
 
             except requests.RequestException as exc:
@@ -4000,7 +4003,7 @@ def quiz():
         LEFT JOIN learning_weaknesses lw
           ON lw.subject_id=s.id
          AND lw.user_id=s.user_id
-         AND lw.miss_count > correct_count
+         AND lw.miss_count > lw.correct_count
         WHERE s.user_id=?
         GROUP BY s.id
         ORDER BY s.name ASC
