@@ -50,8 +50,10 @@
 
     <div class="task-list-head"><h3>▤ &nbsp; Danh sách nhiệm vụ hôm nay</h3><button type="button" class="ghost-action" id="toggleEditPlan">Chỉnh sửa →</button></div>
     <div class="task-compact-list">
-      {% for task in tasks[:4] %}
+      {% for task in today_tasks %}
       <div><span class="task-square {{ 'checked' if task.done else '' }}">{{ '✓' if task.done else '' }}</span><b>{{ task.title }}</b><span>◷ {{ task.time_text }}</span><em>{{ task.subject_name or 'Tự học' }}</em></div>
+      {% else %}
+      <div class="empty-soft">Hôm nay chưa có nhiệm vụ học nào.</div>
       {% endfor %}
     </div>
   </article>
