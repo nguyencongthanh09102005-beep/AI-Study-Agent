@@ -4,6 +4,7 @@ export const API_BASE_URL = 'http://10.0.2.2:5000';
 
 async function request(path, options = {}) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
       ...(options.headers || {}),
@@ -33,11 +34,18 @@ export const api = {
       body: JSON.stringify({ email, password }),
     }),
 
+  logout: () =>
+    request('/api/mobile/logout', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
+
   subjects: () => request('/api/mobile/subjects'),
 
   dashboard: () => request('/api/mobile/dashboard'),
 
-  subjectDetail: (subjectId) => request(`/api/mobile/subjects/${subjectId}`),
+  subjectDetail: (subjectId) =>
+    request(`/api/mobile/subjects/${subjectId}`),
 
   chat: (subjectId, message) =>
     request('/api/mobile/chat', {
@@ -45,13 +53,28 @@ export const api = {
       body: JSON.stringify({ subject_id: subjectId, message }),
     }),
 
-  quizGenerate: (documentId, count = 10) =>
+  quizGenerate: (subjectId, count = 10, mode = 'subject') =>
     request('/api/mobile/quiz/generate', {
       method: 'POST',
-      body: JSON.stringify({ document_id: documentId, count }),
+      body: JSON.stringify({
+        subject_id: subjectId,
+        count,
+        mode,
+      }),
     }),
 
-  studyPlan: (payload) =>
+  quizSubmit: (quizId, answers) =>
+    request('/api/mobile/quiz/submit', {
+      method: 'POST',
+      body: JSON.stringify({
+        quiz_id: quizId,
+        answers,
+      }),
+    }),
+
+  studyPlan: () => request('/api/mobile/study-plan'),
+
+  generateStudyPlan: (payload) =>
     request('/api/mobile/study-plan', {
       method: 'POST',
       body: JSON.stringify(payload),
