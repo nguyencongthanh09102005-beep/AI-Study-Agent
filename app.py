@@ -2060,8 +2060,17 @@ def _fallback_study_plan(subject_name, goal, deadline_dt, daily_minutes, preferr
     return tasks
 
 
-def build_study_plan(subject_name, goal, deadline_dt, daily_minutes, preferred_time, context=""):
-    """Ưu tiên Gemini; nếu API lỗi sẽ dùng kế hoạch cục bộ."""
+def build_study_plan(
+    subject_name,
+    goal,
+    deadline_dt,
+    daily_minutes,
+    preferred_time,
+    context="",
+    shared_context="",
+    personal_context=""
+):
+    """Tạo kế hoạch học có cá nhân hóa; nếu Gemini lỗi sẽ dùng kế hoạch cục bộ."""
     fallback = _fallback_study_plan(
         subject_name,
         goal,
@@ -2084,15 +2093,27 @@ Hãy tạo một lịch học thực tế cho:
 - Thời lượng tối đa mỗi buổi: {daily_minutes} phút
 - Giờ học ưu tiên: {preferred_time}
 
-NGỮ CẢNH TÀI LIỆU:
-{context[:3500] if context else "Không có tài liệu cho môn học này."}
+TÀI LIỆU CÁ NHÂN:
+{context[:3500] if context else "Không có tài liệu cá nhân cho môn học này."}
+
+ĐỀ CƯƠNG / KIẾN THỨC DÙNG CHUNG:
+{shared_context[:3500] if shared_context else "Chưa có đề cương hoặc kiến thức dùng chung."}
+
+HỒ SƠ HỌC TẬP CÁ NHÂN:
+{personal_context[:3500] if personal_context else "Chưa có dữ liệu cá nhân hóa."}
 
 Yêu cầu:
 - Không cố định 7 ngày; số buổi phải phù hợp với thời gian còn lại.
 - Tối đa 8 buổi.
 - Mọi ngày học phải nằm từ {today} đến {deadline_date}.
 - Mỗi buổi phải có công việc rõ ràng, ngắn gọn và thực tế.
-- Ưu tiên nội dung có trong tài liệu nếu có.
+- Dùng đề cương/kiến thức chung để xác định phạm vi môn học; không bịa nội dung ngoài nguồn được cung cấp.
+- Nếu hồ sơ có "Phần kiến thức cần chú ý", phải ưu tiên các chủ đề đó trong những buổi đầu.
+- Chủ đề có số lần sai nhiều hơn phải được ưu tiên cao hơn.
+- Dùng điểm Quiz trung bình, tiến độ hiện tại và mục tiêu điểm để điều chỉnh mức độ ôn tập.
+- Tôn trọng phong cách học, giờ học ưu tiên và thời lượng học trong hồ sơ nếu phù hợp với thông tin người dùng vừa nhập.
+- Nếu có điểm yếu, phải có ít nhất một buổi ôn điểm yếu và một buổi Quiz/xem lại câu sai trước deadline.
+- Nếu không có điểm yếu, tạo kế hoạch cân bằng theo tài liệu và mục tiêu.
 - Có thể kết hợp đọc tài liệu, ghi chú, hỏi AI Chat, làm Quiz, xem lại câu sai và ôn tổng hợp khi phù hợp.
 - Không tạo công việc ngoài phạm vi học tập.
 - Chỉ trả về một JSON array, không markdown và không giải thích thêm.
@@ -4066,6 +4087,20 @@ def generate_study_plan_route():
             )
     context = "\n\n".join(context_parts)
 
+    # Study Agent dùng cả kiến thức chung và dữ liệu học tập riêng để
+    # tạo lộ trình phù hợp với đúng sinh viên này.
+    shared_context, _ = get_shared_subject_context(
+        uid,
+        subject_id,
+        goal,
+        max_chars=4500
+    )
+    personal_context = get_personal_learning_context(
+        uid,
+        subject_id,
+        max_weaknesses=8
+    )
+
     generated = build_study_plan(
         subject["name"],
         goal,
@@ -4073,6 +4108,8 @@ def generate_study_plan_route():
         daily_minutes,
         preferred_time,
         context,
+        shared_context,
+        personal_context,
     )
 
     # Tránh nhân đôi khi người dùng bấm tạo lại kế hoạch cho cùng môn.
