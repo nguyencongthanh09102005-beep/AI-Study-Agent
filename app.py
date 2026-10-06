@@ -4948,8 +4948,6 @@ def generate_study_plan_route():
 
 @app.route("/study-plan/tasks/create", methods=["POST"])
 @login_required
-@app.route("/study-plan/tasks/create", methods=["POST"])
-@login_required
 def create_study_task():
     uid = session["user_id"]
     title = request.form.get("title", "").strip() or "Buổi học"
@@ -5768,7 +5766,6 @@ def api_mobile_study_plan():
     })
 
 
-@app.route("/uploads/<path:filename>")
 @app.route("/uploads/<path:filename>")
 @login_required
 def uploaded_file(filename):
