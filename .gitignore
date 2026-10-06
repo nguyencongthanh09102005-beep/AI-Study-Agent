@@ -223,3 +223,7 @@ __pycache__/
 *.pyc
 uploads/
 data/*.db
+
+# React Native / Expo local artifacts
+mobile/node_modules/
+mobile/.expo/

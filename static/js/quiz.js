@@ -51,6 +51,50 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // =====================================================
+  // BỘ LỌC DANH SÁCH QUIZ
+  // =====================================================
+  const filterButtons = document.querySelectorAll("[data-quiz-filter]");
+  const pickerButtons = Array.from(document.querySelectorAll(".quiz-picker"));
+
+  function applyQuizFilter(mode) {
+    let firstVisible = null;
+
+    pickerButtons.forEach(button => {
+      const attempted = button.dataset.attempted === "true";
+      const recentRank = Number(button.dataset.recentRank || 999);
+      const visible =
+        mode === "done" ? attempted :
+        mode === "recent" ? recentRank <= 5 :
+        true;
+
+      button.hidden = !visible;
+      if (visible && !firstVisible) firstVisible = button;
+    });
+
+    const activePicker = pickerButtons.find(
+      button => !button.hidden && button.classList.contains("active")
+    );
+
+    if (!activePicker && firstVisible) {
+      firstVisible.click();
+    }
+
+    if (!firstVisible) {
+      document.querySelectorAll(".quiz-card").forEach(card => {
+        card.classList.remove("active-workspace");
+      });
+    }
+  }
+
+  filterButtons.forEach(button => {
+    button.addEventListener("click", () => {
+      filterButtons.forEach(item => item.classList.remove("active"));
+      button.classList.add("active");
+      applyQuizFilter(button.dataset.quizFilter || "all");
+    });
+  });
+
+  // =====================================================
   // TỪNG QUIZ
   // =====================================================
 
@@ -184,6 +228,13 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         submitted = true;
+
+        const picker = document.querySelector(
+          `.quiz-picker[data-quiz-target="${quizCard.id}"]`
+        );
+        if (picker) {
+          picker.dataset.attempted = "true";
+        }
 
         // Chấm và khóa đáp án trên giao diện
         questions.forEach(question => {

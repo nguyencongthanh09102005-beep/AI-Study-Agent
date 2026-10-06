@@ -84,7 +84,19 @@
       <button class="soft-primary compact-primary" type="submit">Lưu đề cương chung</button>
     </form>
 
-    <div class="shared-note-divider"><span>Thêm kiến thức chung</span></div>
+    <div class="shared-note-divider"><span>Tải tài liệu dùng chung</span></div>
+
+    <form method="post" enctype="multipart/form-data" class="agent-form">
+      <input type="hidden" name="action_type" value="shared_file">
+      <label>
+        <span>Đề cương / slide / tài liệu chung</span>
+        <input name="shared_file" type="file" accept=".pdf,.txt,.md" required>
+      </label>
+      <p class="panel-desc">File được trích xuất thành kiến thức dùng chung cho những sinh viên cùng môn; file tạm không được giữ lại sau khi xử lý.</p>
+      <button class="ghost-action agent-save-note" type="submit">↑ Thêm tài liệu vào kho chung</button>
+    </form>
+
+    <div class="shared-note-divider"><span>Thêm ghi chú chung</span></div>
 
     <form method="post" class="agent-form">
       <input type="hidden" name="action_type" value="shared_note">

@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Compile Flask backend
+        run: python -m py_compile app.py
+
+      - name: Initialize SQLite schema
+        run: python -c "import app; app.init_db(); print('DB init OK')"
+
+      - name: Check JavaScript syntax
+        run: |
+          node --check static/js/quiz.js
+          node --check static/js/mockup.js
+          node --check static/js/study_plan.js
+          node --check static/js/chat.js

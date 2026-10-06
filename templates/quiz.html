@@ -4,27 +4,66 @@
 {% block page_styles %}<link rel="stylesheet" href="{{ url_for('static', filename='css/quiz.css') }}">{% endblock %}
 
 {% block content %}
-<form method="post" class="quiz-action-grid" id="quizCreateForm">
-  <label class="quiz-action-card primary-action">
+<section class="quiz-action-grid" id="quizCreateModes">
+  <form method="post" class="quiz-action-card primary-action quiz-create-mode">
+    <input type="hidden" name="quiz_mode" value="document">
     <span class="mini-activity white">▤</span>
-    <span><b>Tạo quiz từ tài liệu</b><small>Biến tài liệu thành quiz bằng AI</small></span>
-    <select name="document_id" required><option value="">Chọn tài liệu</option>{% for d in documents %}<option value="{{ d.id }}">{{ d.original_name }}</option>{% endfor %}</select>
-  </label>
-  <label class="quiz-action-card"><span class="mini-activity purple">ϟ</span><span><b>Làm quiz nhanh</b><small>Ngẫu nhiên theo môn học</small></span><select name="question_count"><option value="10">10 câu</option><option value="20">20 câu</option><option value="30">30 câu</option></select></label>
-  <div class="quiz-action-card"><span class="mini-activity blue">▱</span><span><b>Chọn theo môn học</b><small>Từ các tài liệu đã tải</small></span><em>›</em></div>
-  <button class="quiz-action-card create-submit" type="submit"><span class="mini-activity purple">⚙</span><span><b>Tạo quiz ngay</b><small>AI sẽ sinh câu hỏi tự động</small></span><em>›</em></button>
-</form>
+    <span><b>Tạo từ tài liệu</b><small>AI tạo câu hỏi từ một file bạn đã tải lên</small></span>
+    <select name="document_id" required>
+      <option value="">Chọn tài liệu</option>
+      {% for d in documents %}
+      <option value="{{ d.id }}" {% if selected_document_id == d.id %}selected{% endif %}>{{ d.original_name }}{% if d.subject_name %} · {{ d.subject_name }}{% endif %}</option>
+      {% endfor %}
+    </select>
+    <select name="question_count" aria-label="Số câu hỏi">
+      <option value="10">10 câu</option><option value="20">20 câu</option><option value="30">30 câu</option>
+    </select>
+    <button type="submit">Tạo quiz →</button>
+  </form>
+
+  <form method="post" class="quiz-action-card quiz-create-mode">
+    <input type="hidden" name="quiz_mode" value="subject">
+    <span class="mini-activity blue">▱</span>
+    <span><b>Tạo theo môn học</b><small>Kết hợp tài liệu cá nhân + kiến thức chung của môn</small></span>
+    <select name="subject_id" required>
+      <option value="">Chọn môn học</option>
+      {% for s in subjects %}
+      <option value="{{ s.id }}">{{ s.name }}</option>
+      {% endfor %}
+    </select>
+    <select name="question_count" aria-label="Số câu hỏi">
+      <option value="10">10 câu</option><option value="20">20 câu</option><option value="30">30 câu</option>
+    </select>
+    <button type="submit">Tạo quiz →</button>
+  </form>
+
+  <form method="post" class="quiz-action-card quiz-create-mode weak-review-card">
+    <input type="hidden" name="quiz_mode" value="weakness">
+    <span class="mini-activity purple">◎</span>
+    <span><b>Ôn tập điểm yếu</b><small>Tập trung vào chủ đề bạn thường làm sai</small></span>
+    <select name="subject_id" required>
+      <option value="">Chọn môn có điểm yếu</option>
+      {% for s in subjects if s.weakness_count %}
+      <option value="{{ s.id }}">{{ s.name }} · {{ s.weakness_count }} chủ đề cần ôn</option>
+      {% endfor %}
+    </select>
+    <select name="question_count" aria-label="Số câu hỏi">
+      <option value="10">10 câu</option><option value="20">20 câu</option><option value="30">30 câu</option>
+    </select>
+    <button type="submit">Ôn ngay →</button>
+  </form>
+</section>
 
 
 <section class="quiz-work-layout">
   <aside class="soft-card quiz-library">
     <div class="card-title-row"><h3>▣ &nbsp; Danh sách quiz của bạn</h3><span>{{ quizzes|length }} bài</span></div>
-    <div class="quiz-mini-tabs"><button class="active" type="button">Tất cả</button><button type="button">Gần đây</button><button type="button">Đã làm</button></div>
+    <div class="quiz-mini-tabs"><button class="active" type="button" data-quiz-filter="all">Tất cả</button><button type="button" data-quiz-filter="recent">Gần đây</button><button type="button" data-quiz-filter="done">Đã làm</button></div>
     <div class="quiz-picker-list">
       {% for quiz in quizzes %}
-      <button type="button" class="quiz-picker {% if loop.first %}active{% endif %}" data-quiz-target="quiz-work-{{ quiz.id }}">
+      <button type="button" class="quiz-picker {% if loop.first %}active{% endif %}" data-quiz-target="quiz-work-{{ quiz.id }}" data-attempted="{{ 'true' if quiz.attempted else 'false' }}" data-recent-rank="{{ loop.index }}">
         <span class="mini-activity {{ ['blue','purple','green','orange'][loop.index0 % 4] }}">?</span>
-        <span><b>{{ quiz.title }}</b><small>{{ quiz.questions|length }} câu hỏi · {{ quiz.created_at }}</small></span><em>›</em>
+        <span><b>{{ quiz.title }}</b><small>{{ quiz.questions|length }} câu hỏi{% if quiz.attempted %} · Đã làm{% if quiz.best_score is not none %} · Cao nhất {{ quiz.best_score|round(0)|int }}%{% endif %}{% else %} · Chưa làm{% endif %}</small></span><em>›</em>
       </button>
       {% else %}
       <div class="empty-soft">Chưa có quiz. Chọn tài liệu phía trên để tạo bài đầu tiên.</div>

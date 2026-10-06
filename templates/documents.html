@@ -24,10 +24,10 @@
   </form>
 
   <article class="soft-card storage-card">
-    <div class="storage-head"><h3>◉ &nbsp; Dung lượng lưu trữ</h3><a href="#">Nâng cấp →</a></div>
-    <div class="storage-number"><strong>{{ documents|length }}</strong><span> tài liệu đã lưu</span><em>{{ [documents|length * 4, 92]|min }}%</em></div>
-    <div class="progress-track storage"><i style="width: {{ [documents|length * 4, 92]|min }}%"></i></div>
-    <div class="storage-legend"><span><i class="legend-dot blue"></i>Tài liệu chính</span><span><i class="legend-dot purple"></i>AI Quiz</span><span><i class="legend-dot gray"></i>Khác</span></div>
+    <div class="storage-head"><h3>◉ &nbsp; Trạng thái tài liệu</h3></div>
+    <div class="storage-number"><strong>{{ documents|length }}</strong><span> tài liệu đã lưu</span><em>{{ storage_mb }} MB</em></div>
+    <div class="progress-track storage"><i style="width: {{ extraction_percent }}%"></i></div>
+    <div class="storage-legend"><span><i class="legend-dot blue"></i>{{ extracted_count }}/{{ documents|length }} đã trích xuất nội dung</span><span><i class="legend-dot gray"></i>{{ extraction_percent }}% sẵn sàng cho AI</span></div>
   </article>
 </section>
 
@@ -40,11 +40,10 @@
     <button type="button" data-doc-filter="md">▧ MD</button>
   </div>
   <span class="toolbar-spacer"></span>
-  <span class="select-look">♢ &nbsp; Tất cả môn học⌄</span>
-  <span class="select-look">↕ &nbsp; Mới nhất⌄</span>
+  <span class="select-look">Sắp xếp: mới nhất</span>
 </section>
 
-<div class="document-section-head"><h3>▤ &nbsp; Tất cả tài liệu ({{ documents|length }})</h3><div><button class="view-mode active" type="button">▦</button><button class="view-mode" type="button">☷</button></div></div>
+<div class="document-section-head"><h3>▤ &nbsp; Tất cả tài liệu ({{ documents|length }})</h3></div>
 
 <section class="document-card-grid" id="documentCardGrid">
   {% for d in documents %}
@@ -61,9 +60,9 @@
       <button type="submit" title="Lưu môn">✓</button>
     </form>
     <div class="doc-actions">
-      <a href="{{ url_for('chat') }}">◉ Xem</a>
-      <a href="{{ url_for('chat') }}">✦ Tóm tắt AI</a>
-      <a href="{{ url_for('quiz') }}">? Tạo quiz</a>
+      <a href="{{ url_for('uploaded_file', filename=d.stored_name) }}" target="_blank" rel="noopener">◉ Xem file</a>
+      <a href="{{ url_for('document_summary', doc_id=d.id) }}">✦ Tóm tắt AI</a>
+      <a href="{{ url_for('quiz', document_id=d.id) }}">? Tạo quiz</a>
       <form method="post" action="{{ url_for('delete_document', doc_id=d.id) }}" data-confirm-title="Xóa tài liệu?" data-confirm-message="Tài liệu “{{ d.original_name }}” và các quiz được tạo từ tài liệu này sẽ bị xóa." data-confirm-label="Xóa tài liệu"><button type="submit" title="Xóa">×</button></form>
     </div>
   </article>

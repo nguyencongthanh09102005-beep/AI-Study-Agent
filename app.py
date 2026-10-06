@@ -2,6 +2,8 @@ import os
 import sqlite3
 import json
 import re
+import time
+import random
 from datetime import datetime, timedelta
 from functools import wraps
 from pathlib import Path
@@ -1030,7 +1032,7 @@ def get_personal_learning_context(user_id, subject_id, max_weaknesses=5):
         SELECT topic,chapter,miss_count,correct_count,last_seen_at
         FROM learning_weaknesses
         WHERE user_id=? AND subject_id=?
-          AND miss_count > 0
+          AND miss_count > correct_count
         ORDER BY (miss_count - correct_count * 0.5) DESC, last_seen_at DESC
         LIMIT ?
         """,
@@ -1206,7 +1208,13 @@ def login_required(fn):
     @wraps(fn)
     def wrapper(*args, **kwargs):
         if "user_id" not in session:
-            return redirect(url_for("login"))
+            return redirect(
+            url_for(
+                "login",
+                tab="signup",
+                error="Vui lòng nhập đủ thông tin, mật khẩu tối thiểu 6 ký tự và xác nhận trùng khớp."
+            )
+        )
         return fn(*args, **kwargs)
     return wrapper
 
@@ -1374,7 +1382,15 @@ def local_ai_answer(question, context, source_names=None):
     )
 
 def gemini_generate(prompt):
-    """Gửi một prompt tới Gemini và trả về (text, error)."""
+    """
+    Gửi prompt tới Gemini với retry + model failover.
+
+    Thứ tự mặc định:
+    1) GEMINI_MODEL (mặc định gemini-3.8-flash)
+    2) GEMINI_FALLBACK_MODELS (mặc định 3.7 Flash, 3.5 Flash-Lite)
+
+    Chỉ retry các lỗi tạm thời: 408, 429 và 5xx.
+    """
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
 
     if not api_key:
@@ -1383,84 +1399,154 @@ def gemini_generate(prompt):
     if requests is None:
         return None, "Thiếu thư viện requests."
 
-    model = os.getenv("GEMINI_MODEL", "gemini-3.8-flash").strip() or "gemini-3.8-flash"
-
-    url = (
-        "https://generativelanguage.googleapis.com/v1beta/"
-        f"models/{model}:generateContent"
+    primary_model = (
+        os.getenv("GEMINI_MODEL", "gemini-3.8-flash").strip()
+        or "gemini-3.8-flash"
     )
 
-    try:
-        res = requests.post(
-            url,
-            headers={
-                "Content-Type": "application/json",
-                "x-goog-api-key": api_key,
-            },
-            json={
-                "contents": [
-                    {
-                        "role": "user",
-                        "parts": [
-                            {"text": prompt}
-                        ],
-                    }
-                ]
-            },
-            timeout=45,
-        )
+    fallback_raw = os.getenv(
+        "GEMINI_FALLBACK_MODELS",
+        "gemini-3.7-flash,gemini-3.5-flash-lite"
+    )
 
-        if res.status_code == 429:
-            return None, (
-                "Gemini đang vượt giới hạn sử dụng (HTTP 429). "
-                "Hãy đợi một lúc rồi thử lại hoặc kiểm tra quota."
+    models = [primary_model]
+    for item in fallback_raw.split(","):
+        model = item.strip()
+        if model and model not in models:
+            models.append(model)
+
+    try:
+        primary_retries = int(os.getenv("GEMINI_PRIMARY_RETRIES", "2"))
+    except ValueError:
+        primary_retries = 2
+    primary_retries = max(0, min(primary_retries, 4))
+
+    transient_statuses = {408, 429, 500, 502, 503, 504}
+
+    try:
+        request_timeout = int(os.getenv("GEMINI_REQUEST_TIMEOUT", "25"))
+    except ValueError:
+        request_timeout = 25
+    request_timeout = max(10, min(request_timeout, 60))
+
+    last_error = ""
+
+    for model_index, model in enumerate(models):
+        # Model chính được retry thêm; model dự phòng thử 1 lần/model
+        max_attempts = 1 + primary_retries if model_index == 0 else 1
+
+        for attempt in range(max_attempts):
+            url = (
+                "https://generativelanguage.googleapis.com/v1beta/"
+                f"models/{model}:generateContent"
             )
 
-        if not res.ok:
-            detail = ""
             try:
-                error_data = res.json()
-                detail = (
-                    error_data.get("error", {}).get("message", "")
-                    if isinstance(error_data, dict)
-                    else ""
+                res = requests.post(
+                    url,
+                    headers={
+                        "Content-Type": "application/json",
+                        "x-goog-api-key": api_key,
+                    },
+                    json={
+                        "contents": [
+                            {
+                                "role": "user",
+                                "parts": [{"text": prompt}],
+                            }
+                        ]
+                    },
+                    timeout=request_timeout,
                 )
-            except ValueError:
-                detail = res.text[:300]
 
-            message = f"Gemini API lỗi HTTP {res.status_code}"
-            if detail:
-                message += f": {detail}"
-            return None, message
+                if res.ok:
+                    data = res.json()
+                    candidates = data.get("candidates") or []
 
-        data = res.json()
-        candidates = data.get("candidates") or []
+                    if not candidates:
+                        last_error = f"{model}: Gemini không trả về candidate nào."
+                        break
 
-        if not candidates:
-            return None, "Gemini không trả về candidate nào."
+                    content = candidates[0].get("content") or {}
+                    parts = content.get("parts") or []
 
-        content = candidates[0].get("content") or {}
-        parts = content.get("parts") or []
+                    answer_parts = [
+                        str(part.get("text", "")).strip()
+                        for part in parts
+                        if isinstance(part, dict) and part.get("text")
+                    ]
 
-        answer_parts = [
-            str(part.get("text", "")).strip()
-            for part in parts
-            if isinstance(part, dict) and part.get("text")
-        ]
+                    answer = "\n".join(
+                        part for part in answer_parts if part
+                    ).strip()
 
-        answer = "\n".join(part for part in answer_parts if part).strip()
+                    if answer:
+                        if model != primary_model:
+                            print(f"Gemini failover thành công: {model}")
+                        return answer, None
 
-        if not answer:
-            return None, "Gemini trả về phản hồi rỗng."
+                    last_error = f"{model}: Gemini trả về phản hồi rỗng."
+                    break
 
-        return answer, None
+                detail = ""
+                try:
+                    error_data = res.json()
+                    detail = (
+                        error_data.get("error", {}).get("message", "")
+                        if isinstance(error_data, dict)
+                        else ""
+                    )
+                except ValueError:
+                    detail = res.text[:240]
 
-    except requests.RequestException as exc:
-        return None, f"Lỗi kết nối Gemini: {exc}"
+                status = int(res.status_code)
+                last_error = (
+                    f"{model}: HTTP {status}"
+                    + (f" - {detail}" if detail else "")
+                )
 
-    except (ValueError, TypeError, KeyError, IndexError) as exc:
-        return None, f"Không đọc được phản hồi Gemini: {exc}"
+                if status not in transient_statuses:
+                    # 400/401/403... không retry vì thường là cấu hình/key.
+                    return None, last_error
 
+                # Retry model chính với exponential backoff + jitter.
+                if model_index == 0 and attempt < max_attempts - 1:
+                    delay = min(4.0, (2 ** attempt)) + random.uniform(0.1, 0.5)
+                    print(
+                        f"Gemini {model} tạm lỗi HTTP {status}; "
+                        f"retry sau {delay:.1f}s"
+                    )
+                    time.sleep(delay)
+                    continue
+
+                # Hết retry model hiện tại -> thử model kế tiếp.
+                break
+
+            except requests.Timeout:
+                # Timeout thường do đường truyền/model bị treo; chuyển model
+                # ngay để tránh người dùng phải chờ quá lâu khi demo.
+                last_error = f"{model}: timeout khi gọi Gemini."
+                break
+
+            except requests.RequestException as exc:
+                last_error = f"{model}: lỗi kết nối Gemini - {exc}"
+
+                if model_index == 0 and attempt < max_attempts - 1:
+                    delay = min(4.0, (2 ** attempt)) + random.uniform(0.1, 0.5)
+                    time.sleep(delay)
+                    continue
+
+                break
+
+            except (ValueError, TypeError, KeyError, IndexError) as exc:
+                last_error = f"{model}: không đọc được phản hồi Gemini - {exc}"
+                break
+
+    return None, (
+        "AI đang bận hoặc kết nối chưa ổn định. "
+        "Hệ thống đã thử model chính và model dự phòng."
+        + (f" Chi tiết: {last_error}" if last_error else "")
+    )
 
 def gemini_subject_answer(
     subject_name,
@@ -1595,24 +1681,51 @@ CHỈ trả về JSON hợp lệ, không markdown, theo đúng cấu trúc:
             cleaned = raw.strip()
             return cleaned, [], "general"
 
-    if not os.getenv("GEMINI_API_KEY", "").strip() or requests is None:
-        fallback = local_ai_answer(question, context, source_names)
-        return fallback, source_names if context else [], "document" if context else "general"
+    # Nếu Gemini/model dự phòng đều lỗi, vẫn cố gắng trả lời từ
+    # tài liệu cá nhân hoặc kiến thức chung đã có trong hệ thống.
+    fallback_context_parts = []
+    fallback_sources = []
+    fallback_mode = "general"
+
+    if context:
+        fallback_context_parts.append(context)
+        fallback_sources.extend(source_names)
+        fallback_mode = "document"
+
+    if shared_context:
+        fallback_context_parts.append(shared_context)
+        for name in shared_source_names:
+            if name not in fallback_sources:
+                fallback_sources.append(name)
+        if fallback_mode == "general":
+            fallback_mode = "shared"
+
+    fallback_context = "\n\n".join(fallback_context_parts)
+    fallback = local_ai_answer(
+        question,
+        fallback_context,
+        fallback_sources
+    )
+
+    if error:
+        print("Gemini Chat fallback:", error)
 
     return (
-        "Không thể kết nối Gemini lúc này. " + (error or "Bạn thử lại sau nhé."),
-        [],
-        "general"
+        fallback,
+        fallback_sources if fallback_context else [],
+        fallback_mode
     )
 
 
-def build_quiz(text, question_count=10):
+def build_quiz(text, question_count=10, focus_topics=None):
     """
     Tạo quiz 10 / 20 / 30 câu bằng Gemini.
 
+    focus_topics (nếu có) dùng để ưu tiên các chủ đề sinh viên đang yếu.
     Để tránh Gemini trả thiếu câu khi yêu cầu quá dài,
     hệ thống tạo theo từng nhóm tối đa 10 câu rồi ghép lại.
     """
+    focus_topics = focus_topics or []
 
     # =====================================================
     # CHỈ CHO PHÉP 10 / 20 / 30
@@ -1640,6 +1753,39 @@ def build_quiz(text, question_count=10):
             )
             if 35 <= len(s.strip()) <= 500
         ]
+
+        focus_pairs = []
+        for item in focus_topics[:8]:
+            if isinstance(item, dict):
+                topic = str(item.get("topic") or "").strip()
+                chapter = str(item.get("chapter") or "").strip()
+            else:
+                topic = str(item or "").strip()
+                chapter = ""
+
+            tokens = [
+                token.casefold()
+                for token in re.findall(r"[\wÀ-ỹ]+", topic, flags=re.UNICODE)
+                if len(token) >= 3
+            ]
+            if topic and tokens:
+                focus_pairs.append((topic, chapter, tokens))
+
+        def fallback_priority(sentence):
+            lowered = sentence.casefold()
+            return max(
+                (
+                    sum(lowered.count(token) for token in tokens)
+                    for _, _, tokens in focus_pairs
+                ),
+                default=0
+            )
+
+        if focus_pairs:
+            sentences.sort(
+                key=lambda sentence: fallback_priority(sentence),
+                reverse=True
+            )
 
         questions = []
         used_questions = set()
@@ -1678,10 +1824,20 @@ def build_quiz(text, question_count=10):
 
             used_questions.add(normalized)
 
+            matched_topic = ""
+            matched_chapter = ""
+            lowered_sentence = sentence.casefold()
+
+            for focus_topic, focus_chapter, tokens in focus_pairs:
+                if any(token in lowered_sentence for token in tokens):
+                    matched_topic = focus_topic
+                    matched_chapter = focus_chapter
+                    break
+
             questions.append({
                 "question": question_text,
-                "topic": answer,
-                "chapter": "Nội dung tài liệu",
+                "topic": matched_topic or answer,
+                "chapter": matched_chapter or "Nội dung tài liệu",
                 "options": [
                     answer,
                     "Dữ liệu",
@@ -1816,12 +1972,37 @@ def build_quiz(text, question_count=10):
                 + "\\n".join(avoid_lines)
             )
 
+        focus_lines = []
+        for item in focus_topics[:8]:
+            if isinstance(item, dict):
+                topic = str(item.get("topic") or "").strip()
+                chapter = str(item.get("chapter") or "").strip()
+                miss_count = item.get("miss_count")
+                if topic:
+                    label = f"{chapter} - {topic}" if chapter else topic
+                    if miss_count is not None:
+                        label += f" (đã sai {miss_count} lần)"
+                    focus_lines.append(f"- {label}")
+            else:
+                topic = str(item or "").strip()
+                if topic:
+                    focus_lines.append(f"- {topic}")
+
+        focus_text = (
+            "\nCÁC CHỦ ĐỀ CẦN ƯU TIÊN ÔN TẬP:\n"
+            + "\n".join(focus_lines)
+            + "\nHãy dành phần lớn câu hỏi cho các chủ đề này nếu tài liệu có nội dung liên quan.\n"
+            if focus_lines
+            else ""
+        )
+
         prompt = f"""
 Bạn là AI Study Agent.
 
 Nhiệm vụ:
 Tạo đúng {batch_size} câu hỏi trắc nghiệm bằng tiếng Việt
 cho NHÓM {batch_number}, dựa CHỈ trên nội dung tài liệu.
+{focus_text}
 
 TÀI LIỆU:
 {document_content}
@@ -2232,8 +2413,13 @@ def index():
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    error = ""
+    error = request.args.get("error", "").strip()[:300]
+    auth_tab = request.args.get("tab", "login").strip().lower()
+    if auth_tab not in {"login", "signup"}:
+        auth_tab = "login"
+
     if request.method == "POST":
+        auth_tab = "login"
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
         conn = db()
@@ -2244,16 +2430,33 @@ def login():
             session["user_name"] = user["name"]
             return redirect(url_for("dashboard"))
         error = "Email hoặc mật khẩu không đúng."
-    return render_template("login.html", error=error)
+
+    return render_template(
+        "login.html",
+        error=error,
+        auth_tab=auth_tab
+    )
 
 @app.route("/register", methods=["POST"])
 def register():
     name = request.form.get("name", "").strip()
     email = request.form.get("email", "").strip().lower()
     password = request.form.get("password", "")
+    confirm_password = request.form.get("confirm_password", "")
 
-    if not name or not email or len(password) < 6:
-        return redirect(url_for("login"))
+    if (
+        not name
+        or not email
+        or len(password) < 6
+        or password != confirm_password
+    ):
+        return redirect(
+            url_for(
+                "login",
+                tab="signup",
+                error="Vui lòng nhập đủ thông tin, mật khẩu tối thiểu 6 ký tự và xác nhận trùng khớp."
+            )
+        )
 
     conn = db()
     try:
@@ -2267,7 +2470,13 @@ def register():
         return redirect(url_for("dashboard"))
     except sqlite3.IntegrityError:
         conn.rollback()
-        return redirect(url_for("login"))
+        return redirect(
+            url_for(
+                "login",
+                tab="signup",
+                error="Email này đã được đăng ký."
+            )
+        )
     finally:
         conn.close()
 
@@ -2745,6 +2954,49 @@ def subject_detail(subject_id):
                 (syllabus_text, now(), shared["id"])
             )
 
+        elif action_type == "shared_file" and shared:
+            shared_file = request.files.get("shared_file")
+
+            if (
+                shared_file
+                and shared_file.filename
+                and allowed_file(shared_file.filename)
+            ):
+                original = secure_filename(shared_file.filename)
+                ext = original.rsplit(".", 1)[-1].lower()
+                temp_name = (
+                    f"shared_{uid}_{datetime.now().strftime('%Y%m%d%H%M%S%f')}_{original}"
+                )
+                temp_path = UPLOAD_DIR / temp_name
+
+                try:
+                    shared_file.save(temp_path)
+                    content_value = extract_text(temp_path).strip()
+                finally:
+                    try:
+                        temp_path.unlink(missing_ok=True)
+                    except OSError:
+                        pass
+
+                if content_value:
+                    conn.execute(
+                        """
+                        INSERT INTO shared_knowledge(
+                            shared_subject_id,title,content,source_type,
+                            created_by_user_id,created_at,updated_at
+                        ) VALUES(?,?,?,?,?,?,?)
+                        """,
+                        (
+                            shared["id"],
+                            original,
+                            content_value[:50000],
+                            f"file:{ext}",
+                            uid,
+                            now(),
+                            now()
+                        )
+                    )
+
         elif action_type == "shared_note" and shared:
             title = (
                 request.form.get("title", "").strip()[:180]
@@ -2809,7 +3061,7 @@ def subject_detail(subject_id):
         SELECT topic,chapter,miss_count,correct_count,last_seen_at
         FROM learning_weaknesses
         WHERE user_id=? AND subject_id=?
-          AND miss_count > 0
+          AND miss_count > correct_count
         ORDER BY (miss_count - correct_count * 0.5) DESC, last_seen_at DESC
         LIMIT 8
         """,
@@ -2973,12 +3225,104 @@ def documents():
         (uid,)
     ).fetchall()
 
+    extracted_count = sum(
+        1 for row in docs
+        if (row["extracted_text"] or "").strip()
+    )
+    total_bytes = 0
+    for row in docs:
+        try:
+            path = UPLOAD_DIR / row["stored_name"]
+            if path.exists():
+                total_bytes += path.stat().st_size
+        except OSError:
+            pass
+
+    extraction_percent = (
+        round((extracted_count / len(docs)) * 100)
+        if docs else 0
+    )
+    storage_mb = round(total_bytes / (1024 * 1024), 2)
+
     conn.close()
     return render_template(
         "documents.html",
         page="documents",
         documents=docs,
-        subjects=subs
+        subjects=subs,
+        extracted_count=extracted_count,
+        extraction_percent=extraction_percent,
+        storage_mb=storage_mb
+    )
+
+
+@app.route("/documents/<int:doc_id>/summary")
+@login_required
+def document_summary(doc_id):
+    uid = session["user_id"]
+    conn = db()
+    row = conn.execute(
+        """
+        SELECT d.*, s.name AS subject_name
+        FROM documents d
+        LEFT JOIN subjects s
+          ON s.id=d.subject_id AND s.user_id=d.user_id
+        WHERE d.id=? AND d.user_id=?
+        """,
+        (doc_id, uid)
+    ).fetchone()
+    conn.close()
+
+    if not row:
+        return redirect(url_for("documents"))
+
+    source_text = (row["extracted_text"] or "").strip()
+    if not source_text:
+        summary = (
+            "Không trích xuất được nội dung chữ từ tài liệu này. "
+            "Nếu đây là PDF scan/ảnh, hệ thống hiện chưa OCR."
+        )
+        used_ai = False
+        ai_error = ""
+    else:
+        prompt = f"""
+Bạn là AI Study Agent.
+Hãy tóm tắt tài liệu học tập dưới đây bằng tiếng Việt để sinh viên ôn nhanh.
+
+Yêu cầu:
+- Chỉ dùng thông tin có trong tài liệu.
+- Giữ đúng thuật ngữ của tài liệu.
+- Chia thành: Ý chính, Khái niệm quan trọng, Nội dung cần nhớ.
+- Ngắn gọn nhưng đủ ý; không bịa thêm kiến thức ngoài tài liệu.
+- Nếu tài liệu có chương/mục rõ ràng, giữ cấu trúc đó khi hợp lý.
+
+TÀI LIỆU:
+{source_text[:14000]}
+""".strip()
+
+        generated, ai_error = gemini_generate(prompt)
+        if generated:
+            summary = generated.strip()
+            used_ai = True
+        else:
+            # Fallback cục bộ để nút "Tóm tắt" vẫn có ích khi API tạm lỗi.
+            chunks = [
+                part.strip()
+                for part in re.split(r"\n{2,}|(?<=[.!?])\s+", source_text)
+                if len(part.strip()) >= 25
+            ]
+            summary = "\n\n".join(chunks[:12])[:3500]
+            if not summary:
+                summary = source_text[:3500]
+            used_ai = False
+
+    return render_template(
+        "document_summary.html",
+        page="documents",
+        document=row,
+        summary=summary,
+        used_ai=used_ai,
+        ai_error=ai_error or ""
     )
 
 
@@ -3279,7 +3623,7 @@ def api_subject_learning_insights(subject_id):
         SELECT id,topic,chapter,miss_count,correct_count,last_seen_at
         FROM learning_weaknesses
         WHERE user_id=? AND subject_id=?
-          AND miss_count > 0
+          AND miss_count > correct_count
         ORDER BY (miss_count - correct_count * 0.5) DESC, last_seen_at DESC
         LIMIT 12
         """,
@@ -3565,125 +3909,219 @@ def quiz():
     conn = db()
 
     # =====================================================
-    # TẠO QUIZ MỚI
+    # TẠO QUIZ MỚI: TÀI LIỆU / MÔN HỌC / ÔN ĐIỂM YẾU
     # =====================================================
     if request.method == "POST":
-        doc_id = request.form.get("document_id")
+        mode = (request.form.get("quiz_mode") or "document").strip().lower()
 
         try:
-            question_count = int(
-                request.form.get("question_count", 10)
-            )
+            question_count = int(request.form.get("question_count", 10))
         except (TypeError, ValueError):
             question_count = 10
 
         if question_count not in (10, 20, 30):
             question_count = 10
 
-        doc = conn.execute(
-            """
-            SELECT *
-            FROM documents
-            WHERE id=? AND user_id=?
-            """,
-            (doc_id, uid)
-        ).fetchone()
+        questions = []
+        subject_id = None
+        document_id = None
+        title = "Quiz luyện tập"
 
-        if doc:
-            questions = build_quiz(
-                doc["extracted_text"] or "",
-                question_count
+        if mode == "document":
+            doc_id = request.form.get("document_id")
+            doc = conn.execute(
+                """
+                SELECT *
+                FROM documents
+                WHERE id=? AND user_id=?
+                """,
+                (doc_id, uid)
+            ).fetchone()
+
+            if doc:
+                questions = build_quiz(
+                    doc["extracted_text"] or "",
+                    question_count
+                )
+                subject_id = doc["subject_id"]
+                document_id = doc["id"]
+                title = f"Quiz từ {doc['original_name']}"
+
+        elif mode in {"subject", "weakness"}:
+            subject_id = owned_subject_id(
+                conn,
+                uid,
+                request.form.get("subject_id")
             )
 
+            subject = None
+            if subject_id:
+                subject = conn.execute(
+                    """
+                    SELECT id,name
+                    FROM subjects
+                    WHERE id=? AND user_id=?
+                    """,
+                    (subject_id, uid)
+                ).fetchone()
+
+            if subject:
+                docs = conn.execute(
+                    """
+                    SELECT original_name,extracted_text
+                    FROM documents
+                    WHERE user_id=? AND subject_id=?
+                    ORDER BY id DESC
+                    LIMIT 8
+                    """,
+                    (uid, subject_id)
+                ).fetchall()
+
+                context_parts = []
+                for doc in docs:
+                    text_value = (doc["extracted_text"] or "").strip()
+                    if text_value:
+                        context_parts.append(
+                            f"TÀI LIỆU {doc['original_name']}:\n{text_value[:4500]}"
+                        )
+
+                shared_context, _ = get_shared_subject_context(
+                    uid,
+                    subject_id,
+                    "",
+                    max_chars=7000
+                )
+                if shared_context:
+                    context_parts.append(shared_context)
+
+                combined_context = "\n\n".join(context_parts)[:22000]
+
+                focus_topics = []
+                if mode == "weakness":
+                    weakness_rows = conn.execute(
+                        """
+                        SELECT topic,chapter,miss_count,correct_count
+                        FROM learning_weaknesses
+                        WHERE user_id=? AND subject_id=? AND miss_count > correct_count
+                        ORDER BY (miss_count - correct_count * 0.5) DESC,
+                                 last_seen_at DESC
+                        LIMIT 8
+                        """,
+                        (uid, subject_id)
+                    ).fetchall()
+                    focus_topics = [dict(row) for row in weakness_rows]
+
+                    # Nếu chưa có weakness thì không tạo quiz giả vờ cá nhân hóa.
+                    if not focus_topics:
+                        conn.close()
+                        return redirect(url_for("quiz"))
+
+                if combined_context:
+                    questions = build_quiz(
+                        combined_context,
+                        question_count,
+                        focus_topics=focus_topics
+                    )
+
+                    if mode == "weakness":
+                        title = f"Ôn điểm yếu · {subject['name']}"
+                    else:
+                        title = f"Quiz môn {subject['name']}"
+
+        if questions:
             conn.execute(
                 """
                 INSERT INTO quizzes(
-                    user_id,
-                    subject_id,
-                    document_id,
-                    title,
-                    payload,
-                    created_at
+                    user_id,subject_id,document_id,title,payload,created_at
                 )
                 VALUES(?,?,?,?,?,?)
                 """,
                 (
                     uid,
-                    doc["subject_id"],
-                    doc["id"],
-                    f"Quiz từ {doc['original_name']}",
-                    json.dumps(
-                        questions,
-                        ensure_ascii=False
-                    ),
+                    subject_id,
+                    document_id,
+                    title,
+                    json.dumps(questions, ensure_ascii=False),
                     now()
                 )
             )
-
             conn.commit()
 
         conn.close()
-
-        return redirect(
-            url_for("quiz")
-        )
-
+        return redirect(url_for("quiz"))
 
     # =====================================================
-    # LẤY TÀI LIỆU
+    # DỮ LIỆU TRANG QUIZ
     # =====================================================
     docs = conn.execute(
         """
-        SELECT *
-        FROM documents
-        WHERE user_id=?
-        ORDER BY id DESC
+        SELECT d.*, s.name AS subject_name
+        FROM documents d
+        LEFT JOIN subjects s
+          ON s.id=d.subject_id AND s.user_id=d.user_id
+        WHERE d.user_id=?
+        ORDER BY d.id DESC
         """,
         (uid,)
     ).fetchall()
 
+    subjects = conn.execute(
+        """
+        SELECT
+            s.*,
+            COUNT(DISTINCT lw.id) AS weakness_count
+        FROM subjects s
+        LEFT JOIN learning_weaknesses lw
+          ON lw.subject_id=s.id
+         AND lw.user_id=s.user_id
+         AND lw.miss_count > lw.correct_count
+        WHERE s.user_id=?
+        GROUP BY s.id
+        ORDER BY s.name ASC
+        """,
+        (uid,)
+    ).fetchall()
 
-    # =====================================================
-    # LẤY QUIZ
-    # =====================================================
     quizzes = conn.execute(
         """
-        SELECT *
-        FROM quizzes
-        WHERE user_id=?
-        ORDER BY id DESC
+        SELECT
+            q.*,
+            COUNT(qa.id) AS attempt_count,
+            MAX(qa.created_at) AS last_attempt_at,
+            MAX(qa.score) AS best_score
+        FROM quizzes q
+        LEFT JOIN quiz_attempts qa
+          ON qa.quiz_id=q.id
+         AND qa.user_id=q.user_id
+        WHERE q.user_id=?
+        GROUP BY q.id
+        ORDER BY q.id DESC
         """,
         (uid,)
     ).fetchall()
 
     conn.close()
 
-
-    # =====================================================
-    # CHUYỂN PAYLOAD JSON THÀNH DANH SÁCH CÂU HỎI
-    # =====================================================
     parsed = []
-
     for q in quizzes:
         item = dict(q)
-
         try:
-            item["questions"] = json.loads(
-                q["payload"]
-            )
+            item["questions"] = json.loads(q["payload"])
         except (json.JSONDecodeError, TypeError):
             item["questions"] = []
-
+        item["attempted"] = int(q["attempt_count"] or 0) > 0
         parsed.append(item)
 
+    selected_document_id = request.args.get("document_id", type=int)
 
     return render_template(
         "quiz.html",
         page="quiz",
         documents=docs,
-        quizzes=parsed
+        subjects=subjects,
+        quizzes=parsed,
+        selected_document_id=selected_document_id
     )
-
 
 # =====================================================
 # XÓA QUIZ
@@ -4037,6 +4475,16 @@ def study_plan():
 
     total_tasks = len(tasks)
     completion = round((completed_tasks / total_tasks) * 100) if total_tasks else 0
+    planned_minutes = sum(int(item["duration"] or 0) for item in tasks)
+    completed_minutes = sum(
+        int(item["duration"] or 0)
+        for item in tasks
+        if item["done"]
+    )
+    time_completion = (
+        round((completed_minutes / planned_minutes) * 100)
+        if planned_minutes else 0
+    )
     priority_count = sum(1 for s in subjects if int(s["progress"] or 0) < 50)
 
     if urgent_count:
@@ -4069,6 +4517,9 @@ def study_plan():
         deadline_week=deadline_week,
         reminder_today=reminder_today,
         completion=completion,
+        planned_minutes=planned_minutes,
+        completed_minutes=completed_minutes,
+        time_completion=time_completion,
         agent_tip=agent_tip,
         urgent_count=urgent_count,
         today_input=today.isoformat(),
@@ -4128,7 +4579,7 @@ def generate_study_plan_route():
         """
         SELECT topic,chapter,miss_count,correct_count
         FROM learning_weaknesses
-        WHERE user_id=? AND subject_id=? AND miss_count > 0
+        WHERE user_id=? AND subject_id=? AND miss_count > correct_count
         ORDER BY (miss_count - correct_count * 0.5) DESC, last_seen_at DESC
         LIMIT 5
         """,

@@ -59,7 +59,7 @@
   <aside class="planner-side-stack">
     <div class="side-stat-grid">
       <article class="soft-card ring-stat"><h3>◉ &nbsp; Tiến độ tuần này</h3><div class="ring" style="--p:{{ completion }}"><strong>{{ completion }}%</strong></div><div><span>Đã hoàn thành</span><b>{{ completion }}%</b><small>mục tiêu tuần</small></div></article>
-      <article class="soft-card time-stat"><h3>◷ &nbsp; Thời gian học</h3><strong>{{ ((tasks|sum(attribute='duration')) / 60)|round(1) }} giờ</strong><small>Mục tiêu: 25 giờ</small><div class="progress-track"><i style="width: {{ [((tasks|sum(attribute='duration')) / 15), 100]|min }}%"></i></div></article>
+      <article class="soft-card time-stat"><h3>◷ &nbsp; Thời gian học</h3><strong>{{ (completed_minutes / 60)|round(1) }} / {{ (planned_minutes / 60)|round(1) }} giờ</strong><small>Đã hoàn thành / đã lên lịch</small><div class="progress-track"><i style="width: {{ time_completion }}%"></i></div></article>
     </div>
 
     <article class="soft-card goal-card">
