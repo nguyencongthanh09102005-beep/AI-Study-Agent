@@ -413,8 +413,8 @@ export default function App() {
 
   const handleLogin = async (email, password) => {
     await api.login(email, password);
-    setLoggedIn(true);
     await refreshData();
+    setLoggedIn(true);
   };
 
   useEffect(() => {
