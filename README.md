@@ -60,6 +60,7 @@ GEMINI_API_KEY=YOUR_KEY
 GEMINI_MODEL=gemini-3.8-flash
 GEMINI_FALLBACK_MODELS=gemini-3.7-flash,gemini-3.5-flash-lite
 GEMINI_PRIMARY_RETRIES=2
+GEMINI_REQUEST_TIMEOUT=25
 ```
 
 Sau đó khởi động lại Flask.
