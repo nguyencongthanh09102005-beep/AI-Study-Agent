@@ -2772,6 +2772,49 @@ def subject_detail(subject_id):
                 (syllabus_text, now(), shared["id"])
             )
 
+        elif action_type == "shared_file" and shared:
+            shared_file = request.files.get("shared_file")
+
+            if (
+                shared_file
+                and shared_file.filename
+                and allowed_file(shared_file.filename)
+            ):
+                original = secure_filename(shared_file.filename)
+                ext = original.rsplit(".", 1)[-1].lower()
+                temp_name = (
+                    f"shared_{uid}_{datetime.now().strftime('%Y%m%d%H%M%S%f')}_{original}"
+                )
+                temp_path = UPLOAD_DIR / temp_name
+
+                try:
+                    shared_file.save(temp_path)
+                    content_value = extract_text(temp_path).strip()
+                finally:
+                    try:
+                        temp_path.unlink(missing_ok=True)
+                    except OSError:
+                        pass
+
+                if content_value:
+                    conn.execute(
+                        """
+                        INSERT INTO shared_knowledge(
+                            shared_subject_id,title,content,source_type,
+                            created_by_user_id,created_at,updated_at
+                        ) VALUES(?,?,?,?,?,?,?)
+                        """,
+                        (
+                            shared["id"],
+                            original,
+                            content_value[:50000],
+                            f"file:{ext}",
+                            uid,
+                            now(),
+                            now()
+                        )
+                    )
+
         elif action_type == "shared_note" and shared:
             title = (
                 request.form.get("title", "").strip()[:180]
@@ -3000,12 +3043,104 @@ def documents():
         (uid,)
     ).fetchall()
 
+    extracted_count = sum(
+        1 for row in docs
+        if (row["extracted_text"] or "").strip()
+    )
+    total_bytes = 0
+    for row in docs:
+        try:
+            path = UPLOAD_DIR / row["stored_name"]
+            if path.exists():
+                total_bytes += path.stat().st_size
+        except OSError:
+            pass
+
+    extraction_percent = (
+        round((extracted_count / len(docs)) * 100)
+        if docs else 0
+    )
+    storage_mb = round(total_bytes / (1024 * 1024), 2)
+
     conn.close()
     return render_template(
         "documents.html",
         page="documents",
         documents=docs,
-        subjects=subs
+        subjects=subs,
+        extracted_count=extracted_count,
+        extraction_percent=extraction_percent,
+        storage_mb=storage_mb
+    )
+
+
+@app.route("/documents/<int:doc_id>/summary")
+@login_required
+def document_summary(doc_id):
+    uid = session["user_id"]
+    conn = db()
+    row = conn.execute(
+        """
+        SELECT d.*, s.name AS subject_name
+        FROM documents d
+        LEFT JOIN subjects s
+          ON s.id=d.subject_id AND s.user_id=d.user_id
+        WHERE d.id=? AND d.user_id=?
+        """,
+        (doc_id, uid)
+    ).fetchone()
+    conn.close()
+
+    if not row:
+        return redirect(url_for("documents"))
+
+    source_text = (row["extracted_text"] or "").strip()
+    if not source_text:
+        summary = (
+            "Không trích xuất được nội dung chữ từ tài liệu này. "
+            "Nếu đây là PDF scan/ảnh, hệ thống hiện chưa OCR."
+        )
+        used_ai = False
+        ai_error = ""
+    else:
+        prompt = f"""
+Bạn là AI Study Agent.
+Hãy tóm tắt tài liệu học tập dưới đây bằng tiếng Việt để sinh viên ôn nhanh.
+
+Yêu cầu:
+- Chỉ dùng thông tin có trong tài liệu.
+- Giữ đúng thuật ngữ của tài liệu.
+- Chia thành: Ý chính, Khái niệm quan trọng, Nội dung cần nhớ.
+- Ngắn gọn nhưng đủ ý; không bịa thêm kiến thức ngoài tài liệu.
+- Nếu tài liệu có chương/mục rõ ràng, giữ cấu trúc đó khi hợp lý.
+
+TÀI LIỆU:
+{source_text[:14000]}
+""".strip()
+
+        generated, ai_error = gemini_generate(prompt)
+        if generated:
+            summary = generated.strip()
+            used_ai = True
+        else:
+            # Fallback cục bộ để nút "Tóm tắt" vẫn có ích khi API tạm lỗi.
+            chunks = [
+                part.strip()
+                for part in re.split(r"\n{2,}|(?<=[.!?])\s+", source_text)
+                if len(part.strip()) >= 25
+            ]
+            summary = "\n\n".join(chunks[:12])[:3500]
+            if not summary:
+                summary = source_text[:3500]
+            used_ai = False
+
+    return render_template(
+        "document_summary.html",
+        page="documents",
+        document=row,
+        summary=summary,
+        used_ai=used_ai,
+        ai_error=ai_error or ""
     )
 
 
@@ -3795,12 +3930,15 @@ def quiz():
         item["attempted"] = int(q["attempt_count"] or 0) > 0
         parsed.append(item)
 
+    selected_document_id = request.args.get("document_id", type=int)
+
     return render_template(
         "quiz.html",
         page="quiz",
         documents=docs,
         subjects=subjects,
-        quizzes=parsed
+        quizzes=parsed,
+        selected_document_id=selected_document_id
     )
 
 # =====================================================
