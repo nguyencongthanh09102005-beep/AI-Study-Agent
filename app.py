@@ -197,6 +197,7 @@ def init_db():
         subject_id INTEGER NOT NULL,
         topic_key TEXT NOT NULL,
         topic TEXT NOT NULL,
+        chapter TEXT DEFAULT '',
         miss_count INTEGER DEFAULT 0,
         correct_count INTEGER DEFAULT 0,
         last_seen_at TEXT NOT NULL,
@@ -251,6 +252,18 @@ def init_db():
         "CREATE INDEX IF NOT EXISTS idx_learning_weaknesses_user_subject "
         "ON learning_weaknesses(user_id, subject_id, miss_count)"
     )
+
+    weakness_columns = {
+        row["name"]
+        for row in conn.execute(
+            "PRAGMA table_info(learning_weaknesses)"
+        ).fetchall()
+    }
+
+    if "chapter" not in weakness_columns:
+        conn.execute(
+            "ALTER TABLE learning_weaknesses ADD COLUMN chapter TEXT DEFAULT ''"
+        )
 
     conn.commit()
 
@@ -1014,7 +1027,7 @@ def get_personal_learning_context(user_id, subject_id, max_weaknesses=5):
 
     weaknesses = conn.execute(
         """
-        SELECT topic,miss_count,correct_count,last_seen_at
+        SELECT topic,chapter,miss_count,correct_count,last_seen_at
         FROM learning_weaknesses
         WHERE user_id=? AND subject_id=?
         ORDER BY (miss_count - correct_count * 0.5) DESC, last_seen_at DESC
@@ -1073,7 +1086,12 @@ def get_personal_learning_context(user_id, subject_id, max_weaknesses=5):
 
     if weaknesses:
         weak_text = "; ".join(
-            f"{row['topic']} (sai {row['miss_count']}, đúng {row['correct_count']})"
+            (
+                f"{row['chapter']} - {row['topic']} "
+                f"(sai {row['miss_count']}, đúng {row['correct_count']})"
+                if (row["chapter"] or "").strip()
+                else f"{row['topic']} (sai {row['miss_count']}, đúng {row['correct_count']})"
+            )
             for row in weaknesses
         )
         lines.append(f"Phần kiến thức cần chú ý: {weak_text}")
@@ -1102,15 +1120,32 @@ def record_quiz_learning_signal(
     conn,
     user_id,
     subject_id,
-    question_text,
-    is_correct
+    topic,
+    chapter,
+    is_correct,
+    question_text=""
 ):
-    """Ghi nhận câu sai/đúng để Agent biết phần sinh viên đang yếu."""
+    """Ghi nhận tín hiệu học theo chủ đề/chương thay vì lưu nguyên câu hỏi."""
     if not subject_id:
         return
 
-    topic = re.sub(r"\s+", " ", (question_text or "").strip())[:220]
-    topic_key = _quiz_topic_key(topic)
+    topic = re.sub(
+        r"\s+",
+        " ",
+        (topic or question_text or "").strip()
+    )[:220]
+    chapter = re.sub(
+        r"\s+",
+        " ",
+        (chapter or "").strip()
+    )[:120]
+
+    if not topic:
+        return
+
+    topic_key = _quiz_topic_key(
+        f"{chapter} {topic}" if chapter else topic
+    )
     if not topic_key:
         return
 
@@ -1130,6 +1165,7 @@ def record_quiz_learning_signal(
             SET miss_count=?,
                 correct_count=?,
                 topic=?,
+                chapter=?,
                 last_seen_at=?
             WHERE id=?
             """,
@@ -1137,6 +1173,7 @@ def record_quiz_learning_signal(
                 int(row["miss_count"] or 0) + (0 if is_correct else 1),
                 int(row["correct_count"] or 0) + (1 if is_correct else 0),
                 topic,
+                chapter,
                 now(),
                 row["id"]
             )
@@ -1145,15 +1182,16 @@ def record_quiz_learning_signal(
         conn.execute(
             """
             INSERT INTO learning_weaknesses(
-                user_id,subject_id,topic_key,topic,
+                user_id,subject_id,topic_key,topic,chapter,
                 miss_count,correct_count,last_seen_at
-            ) VALUES(?,?,?,?,?,?,?)
+            ) VALUES(?,?,?,?,?,?,?,?)
             """,
             (
                 user_id,
                 subject_id,
                 topic_key,
                 topic,
+                chapter,
                 0 if is_correct else 1,
                 1 if is_correct else 0,
                 now()
@@ -1639,6 +1677,8 @@ def build_quiz(text, question_count=10):
 
             questions.append({
                 "question": question_text,
+                "topic": answer,
+                "chapter": "Nội dung tài liệu",
                 "options": [
                     answer,
                     "Dữ liệu",
@@ -1652,6 +1692,8 @@ def build_quiz(text, question_count=10):
             questions = [
                 {
                     "question": "AI Study Agent có mục tiêu chính là gì?",
+                    "topic": "Mục tiêu của AI Study Agent",
+                    "chapter": "Nội dung tài liệu",
                     "options": [
                         "Hỗ trợ sinh viên học tập",
                         "Bán sản phẩm",
@@ -1689,6 +1731,17 @@ def build_quiz(text, question_count=10):
             "answer"
         )
 
+        topic = re.sub(
+            r"\s+",
+            " ",
+            str(item.get("topic") or "").strip()
+        )[:160]
+        chapter = re.sub(
+            r"\s+",
+            " ",
+            str(item.get("chapter") or "").strip()
+        )[:120]
+
         if not question:
             return None
 
@@ -1723,8 +1776,16 @@ def build_quiz(text, question_count=10):
         if answer not in (0, 1, 2, 3):
             return None
 
+        if not topic:
+            topic = re.sub(r"\s+", " ", question).strip()[:160]
+
+        if not chapter:
+            chapter = "Nội dung tài liệu"
+
         return {
             "question": question,
+            "topic": topic,
+            "chapter": chapter,
             "options": options,
             "answer": answer
         }
@@ -1772,6 +1833,10 @@ YÊU CẦU BẮT BUỘC:
 - Không tạo câu hỏi vô nghĩa kiểu xóa một từ ngẫu nhiên.
 - Không hỏi thông tin không có trong tài liệu.
 - Ưu tiên phủ nhiều phần kiến thức khác nhau trong tài liệu.
+- Mỗi câu phải có "topic": tên chủ đề/khái niệm ngắn gọn mà câu hỏi đang kiểm tra.
+- Mỗi câu phải có "chapter": tên chương/phần tương ứng nếu xác định được từ tài liệu.
+- Nếu tài liệu không ghi rõ chương/phần, chapter dùng "Nội dung tài liệu".
+- Không dùng nguyên câu hỏi làm topic.
 - answer là vị trí đáp án đúng: 0=A, 1=B, 2=C, 3=D.
 
 CHỈ trả về JSON array.
@@ -1783,6 +1848,8 @@ Cấu trúc:
 [
   {{
     "question": "Nội dung câu hỏi",
+    "topic": "Tên chủ đề ngắn gọn",
+    "chapter": "Tên chương/phần",
     "options": [
       "Đáp án A",
       "Đáp án B",
@@ -2681,7 +2748,7 @@ def subject_detail(subject_id):
 
     weaknesses = conn.execute(
         """
-        SELECT topic,miss_count,correct_count,last_seen_at
+        SELECT topic,chapter,miss_count,correct_count,last_seen_at
         FROM learning_weaknesses
         WHERE user_id=? AND subject_id=?
         ORDER BY (miss_count - correct_count * 0.5) DESC, last_seen_at DESC
@@ -3711,8 +3778,10 @@ def submit_quiz():
             conn,
             uid,
             quiz_row["subject_id"],
-            str(question.get("question") or ""),
-            is_correct
+            str(question.get("topic") or ""),
+            str(question.get("chapter") or ""),
+            is_correct,
+            str(question.get("question") or "")
         )
 
     score = round(
