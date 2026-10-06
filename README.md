@@ -8,8 +8,11 @@ Hệ thống trợ lý học tập full-stack sử dụng Flask + SQLite + Gemin
 - Quản lý môn học: mã môn, tín chỉ, mục tiêu điểm và tiến độ tự động.
 - Upload PDF/TXT/Markdown; gắn hoặc đổi môn học cho tài liệu.
 - AI Chat dựa trên tài liệu; lịch sử từng cuộc trò chuyện được lưu trong SQLite.
-- Tạo Quiz bằng Gemini từ tài liệu, chấm bài và lưu lịch sử các lần làm.
-- AI Study Plan theo môn, mục tiêu, deadline, thời lượng và giờ học ưu tiên.
+- Tạo Quiz bằng Gemini từ tài liệu, theo môn học hoặc ôn riêng các chủ đề đang yếu.
+- Quiz lưu topic/chapter cho từng câu, cập nhật điểm yếu theo số lần đúng/sai và tự gỡ khỏi danh sách yếu khi đã trả lời đúng đủ lần.
+- AI Study Plan dùng đề cương dùng chung, tài liệu cá nhân, lịch sử Quiz, điểm yếu, mục tiêu điểm và Learning Profile để ưu tiên lộ trình.
+- Shared Knowledge theo môn hỗ trợ nhập đề cương, ghi chú hoặc upload PDF/TXT/Markdown để nhiều sinh viên cùng mã môn tái sử dụng.
+- Tài liệu có xem file thật, tóm tắt AI và fallback cục bộ nếu API tạm thời không phản hồi.
 - Deadline & nhắc việc tích hợp trong Kế hoạch học.
 - Dashboard lấy dữ liệu thật từ SQLite; biểu đồ tuần chỉ tính thời lượng của các task đã bấm Hoàn thành.
 - Tiến độ môn học tự động: 60% mức hoàn thành Study Plan + 40% điểm Quiz trung bình (lấy điểm cao nhất của mỗi Quiz). Nếu chỉ có một nguồn dữ liệu thì dùng nguồn đó.
