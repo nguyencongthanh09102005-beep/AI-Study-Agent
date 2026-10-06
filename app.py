@@ -1383,7 +1383,7 @@ def gemini_generate(prompt):
     if requests is None:
         return None, "Thiếu thư viện requests."
 
-    model = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite").strip() or "gemini-3.5-flash-lite"
+    model = os.getenv("GEMINI_MODEL", "gemini-3.8-flash").strip() or "gemini-3.8-flash"
 
     url = (
         "https://generativelanguage.googleapis.com/v1beta/"

@@ -54,7 +54,7 @@ Mở `.env` và điền:
 
 ```env
 GEMINI_API_KEY=YOUR_KEY
-GEMINI_MODEL=gemini-3.5-flash-lite
+GEMINI_MODEL=gemini-3.8-flash
 ```
 
 Sau đó khởi động lại Flask.
