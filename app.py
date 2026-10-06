@@ -2450,7 +2450,13 @@ def register():
         or len(password) < 6
         or password != confirm_password
     ):
-        return redirect(url_for("login"))
+        return redirect(
+            url_for(
+                "login",
+                tab="signup",
+                error="Vui lòng nhập đủ thông tin, mật khẩu tối thiểu 6 ký tự và xác nhận trùng khớp."
+            )
+        )
 
     conn = db()
     try:
