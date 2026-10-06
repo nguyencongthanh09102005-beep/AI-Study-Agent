@@ -38,9 +38,9 @@
       </section>
 
       <section class="auth-form-card">
-        <div class="auth-tabs"><button class="active" type="button" data-auth-tab="login">↪ &nbsp; Đăng nhập</button><button type="button" data-auth-tab="signup">♙ &nbsp; Tạo tài khoản</button></div>
+        <div class="auth-tabs"><button class="{{ 'active' if auth_tab != 'signup' else '' }}" type="button" data-auth-tab="login">↪ &nbsp; Đăng nhập</button><button class="{{ 'active' if auth_tab == 'signup' else '' }}" type="button" data-auth-tab="signup">♙ &nbsp; Tạo tài khoản</button></div>
 
-        <div class="auth-pane active" data-auth-pane="login">
+        <div class="auth-pane {{ 'active' if auth_tab != 'signup' else '' }}" data-auth-pane="login">
           <h2>Chào mừng trở lại!</h2><p>Đăng nhập để tiếp tục hành trình học tập thông minh.</p>
           {% if error %}<div class="message error-message"><strong>Đăng nhập thất bại</strong><span>{{ error }}</span></div>{% endif %}
           <form method="post" action="{{ url_for('login') }}" class="auth-form-new">
@@ -51,8 +51,9 @@
           <div class="auth-bottom-switch">Chưa có tài khoản? <button type="button" data-auth-tab="signup">Tạo tài khoản ngay →</button></div>
         </div>
 
-        <div class="auth-pane" data-auth-pane="signup">
+        <div class="auth-pane {{ 'active' if auth_tab == 'signup' else '' }}" data-auth-pane="signup">
           <h2>Tạo tài khoản mới</h2><p>Bắt đầu hành trình học thông minh cùng AI Study Agent.</p>
+          {% if error and auth_tab == 'signup' %}<div class="message error-message"><strong>Chưa tạo được tài khoản</strong><span>{{ error }}</span></div>{% endif %}
           <form method="post" action="{{ url_for('register') }}" class="auth-form-new">
             <label><span>Họ và tên</span><div><i>♙</i><input type="text" name="name" placeholder="Nhập họ và tên" autocomplete="name" required></div></label>
             <label><span>Email</span><div><i>✉</i><input type="email" name="email" placeholder="Nhập email của bạn" autocomplete="email" required></div></label>
