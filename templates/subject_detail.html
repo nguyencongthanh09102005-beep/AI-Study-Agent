@@ -163,7 +163,10 @@
       {% for w in weaknesses %}
       <div class="weakness-item">
         <span class="weak-dot"></span>
-        <div><strong>{{ w.topic }}</strong><small>Sai {{ w.miss_count }} lần · Đúng {{ w.correct_count }} lần</small></div>
+        <div>
+          <strong>{{ w.topic }}</strong>
+          <small>{% if w.chapter %}{{ w.chapter }} · {% endif %}Sai {{ w.miss_count }} lần · Đúng {{ w.correct_count }} lần</small>
+        </div>
       </div>
       {% else %}
       <div class="empty-agent">Chưa có dữ liệu điểm yếu. Làm quiz để Study Agent bắt đầu học từ kết quả của bạn.</div>
