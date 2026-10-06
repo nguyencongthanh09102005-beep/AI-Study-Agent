@@ -1208,7 +1208,13 @@ def login_required(fn):
     @wraps(fn)
     def wrapper(*args, **kwargs):
         if "user_id" not in session:
-            return redirect(url_for("login"))
+            return redirect(
+            url_for(
+                "login",
+                tab="signup",
+                error="Vui lòng nhập đủ thông tin, mật khẩu tối thiểu 6 ký tự và xác nhận trùng khớp."
+            )
+        )
         return fn(*args, **kwargs)
     return wrapper
 
@@ -2407,8 +2413,13 @@ def index():
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    error = ""
+    error = request.args.get("error", "").strip()[:300]
+    auth_tab = request.args.get("tab", "login").strip().lower()
+    if auth_tab not in {"login", "signup"}:
+        auth_tab = "login"
+
     if request.method == "POST":
+        auth_tab = "login"
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
         conn = db()
@@ -2419,7 +2430,12 @@ def login():
             session["user_name"] = user["name"]
             return redirect(url_for("dashboard"))
         error = "Email hoặc mật khẩu không đúng."
-    return render_template("login.html", error=error)
+
+    return render_template(
+        "login.html",
+        error=error,
+        auth_tab=auth_tab
+    )
 
 @app.route("/register", methods=["POST"])
 def register():
@@ -2448,7 +2464,13 @@ def register():
         return redirect(url_for("dashboard"))
     except sqlite3.IntegrityError:
         conn.rollback()
-        return redirect(url_for("login"))
+        return redirect(
+            url_for(
+                "login",
+                tab="signup",
+                error="Email này đã được đăng ký."
+            )
+        )
     finally:
         conn.close()
 
