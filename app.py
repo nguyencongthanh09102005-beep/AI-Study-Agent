@@ -2278,8 +2278,14 @@ def register():
     name = request.form.get("name", "").strip()
     email = request.form.get("email", "").strip().lower()
     password = request.form.get("password", "")
+    confirm_password = request.form.get("confirm_password", "")
 
-    if not name or not email or len(password) < 6:
+    if (
+        not name
+        or not email
+        or len(password) < 6
+        or password != confirm_password
+    ):
         return redirect(url_for("login"))
 
     conn = db()
