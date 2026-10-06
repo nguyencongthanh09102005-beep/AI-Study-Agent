@@ -12,7 +12,7 @@
     <select name="document_id" required>
       <option value="">Chọn tài liệu</option>
       {% for d in documents %}
-      <option value="{{ d.id }}">{{ d.original_name }}{% if d.subject_name %} · {{ d.subject_name }}{% endif %}</option>
+      <option value="{{ d.id }}" {% if selected_document_id == d.id %}selected{% endif %}>{{ d.original_name }}{% if d.subject_name %} · {{ d.subject_name }}{% endif %}</option>
       {% endfor %}
     </select>
     <select name="question_count" aria-label="Số câu hỏi">
