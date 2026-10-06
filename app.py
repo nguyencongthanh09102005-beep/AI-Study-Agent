@@ -1032,7 +1032,7 @@ def get_personal_learning_context(user_id, subject_id, max_weaknesses=5):
         SELECT topic,chapter,miss_count,correct_count,last_seen_at
         FROM learning_weaknesses
         WHERE user_id=? AND subject_id=?
-          AND miss_count > 0
+          AND miss_count > correct_count
         ORDER BY (miss_count - correct_count * 0.5) DESC, last_seen_at DESC
         LIMIT ?
         """,
@@ -2987,7 +2987,7 @@ def subject_detail(subject_id):
         SELECT topic,chapter,miss_count,correct_count,last_seen_at
         FROM learning_weaknesses
         WHERE user_id=? AND subject_id=?
-          AND miss_count > 0
+          AND miss_count > correct_count
         ORDER BY (miss_count - correct_count * 0.5) DESC, last_seen_at DESC
         LIMIT 8
         """,
@@ -3549,7 +3549,7 @@ def api_subject_learning_insights(subject_id):
         SELECT id,topic,chapter,miss_count,correct_count,last_seen_at
         FROM learning_weaknesses
         WHERE user_id=? AND subject_id=?
-          AND miss_count > 0
+          AND miss_count > correct_count
         ORDER BY (miss_count - correct_count * 0.5) DESC, last_seen_at DESC
         LIMIT 12
         """,
@@ -3928,7 +3928,7 @@ def quiz():
                         """
                         SELECT topic,chapter,miss_count,correct_count
                         FROM learning_weaknesses
-                        WHERE user_id=? AND subject_id=? AND miss_count > 0
+                        WHERE user_id=? AND subject_id=? AND miss_count > correct_count
                         ORDER BY (miss_count - correct_count * 0.5) DESC,
                                  last_seen_at DESC
                         LIMIT 8
@@ -4000,7 +4000,7 @@ def quiz():
         LEFT JOIN learning_weaknesses lw
           ON lw.subject_id=s.id
          AND lw.user_id=s.user_id
-         AND lw.miss_count > 0
+         AND lw.miss_count > correct_count
         WHERE s.user_id=?
         GROUP BY s.id
         ORDER BY s.name ASC
@@ -4505,7 +4505,7 @@ def generate_study_plan_route():
         """
         SELECT topic,chapter,miss_count,correct_count
         FROM learning_weaknesses
-        WHERE user_id=? AND subject_id=? AND miss_count > 0
+        WHERE user_id=? AND subject_id=? AND miss_count > correct_count
         ORDER BY (miss_count - correct_count * 0.5) DESC, last_seen_at DESC
         LIMIT 5
         """,
