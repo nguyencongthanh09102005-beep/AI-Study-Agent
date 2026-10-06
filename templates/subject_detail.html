@@ -21,7 +21,7 @@
   <div class="agent-subject-actions">
     <a class="soft-primary" href="{{ url_for('chat') }}?subject_id={{ subject.id }}">🤖 Hỏi Study Agent</a>
     <a class="ghost-action" href="{{ url_for('documents') }}">▤ Tài liệu</a>
-    <a class="ghost-action" href="{{ url_for('study_plan') }}">▦ Kế hoạch học</a>
+    <a class="ghost-action" href="{{ url_for('study_plan', subject_id=subject.id) }}">▦ Kế hoạch học theo đề cương</a>
   </div>
 </section>
 
