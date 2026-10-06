@@ -4824,6 +4824,654 @@ def delete_plan_reminder(reminder_id):
     conn.close()
     return redirect(url_for("study_plan"))
 
+
+# =====================================================
+# MOBILE API - DÙNG CHUNG BACKEND FLASK HIỆN TẠI
+# =====================================================
+def _mobile_require_user():
+    uid = session.get("user_id")
+    if not uid:
+        return None, (jsonify({"error": "Phiên đăng nhập đã hết hạn."}), 401)
+    return uid, None
+
+
+@app.route("/api/mobile/login", methods=["POST"])
+def api_mobile_login():
+    payload = request.get_json(silent=True) or {}
+    email = str(payload.get("email") or "").strip().lower()
+    password = str(payload.get("password") or "")
+
+    if not email or not password:
+        return jsonify({"error": "Vui lòng nhập email và mật khẩu."}), 400
+
+    conn = db()
+    user = conn.execute(
+        "SELECT id,name,email,password_hash FROM users WHERE email=?",
+        (email,)
+    ).fetchone()
+    conn.close()
+
+    if not user or not check_password_hash(user["password_hash"], password):
+        return jsonify({"error": "Email hoặc mật khẩu không đúng."}), 401
+
+    session["user_id"] = user["id"]
+    session["user_name"] = user["name"]
+
+    return jsonify({
+        "success": True,
+        "user": {
+            "id": user["id"],
+            "name": user["name"],
+            "email": user["email"]
+        }
+    })
+
+
+@app.route("/api/mobile/logout", methods=["POST"])
+def api_mobile_logout():
+    session.clear()
+    return jsonify({"success": True})
+
+
+@app.route("/api/mobile/dashboard", methods=["GET"])
+def api_mobile_dashboard():
+    uid, error = _mobile_require_user()
+    if error:
+        return error
+
+    conn = db()
+    recalculate_all_subject_progress(uid, conn)
+
+    user = conn.execute(
+        "SELECT id,name,email FROM users WHERE id=?",
+        (uid,)
+    ).fetchone()
+
+    subject_rows = conn.execute(
+        """
+        SELECT id,name,code,progress,target_score
+        FROM subjects
+        WHERE user_id=?
+        ORDER BY progress ASC, name ASC
+        """,
+        (uid,)
+    ).fetchall()
+
+    subjects = []
+    for subject in subject_rows:
+        weakness = conn.execute(
+            """
+            SELECT topic,chapter,miss_count,correct_count
+            FROM learning_weaknesses
+            WHERE user_id=? AND subject_id=?
+              AND miss_count > correct_count
+            ORDER BY (miss_count - correct_count * 0.5) DESC, last_seen_at DESC
+            LIMIT 1
+            """,
+            (uid, subject["id"])
+        ).fetchone()
+
+        item = dict(subject)
+        item["weakness"] = dict(weakness) if weakness else None
+        subjects.append(item)
+
+    task_rows = conn.execute(
+        """
+        SELECT t.id,t.title,t.study_at,t.duration,t.done,
+               s.id AS subject_id,s.name AS subject_name
+        FROM study_tasks t
+        LEFT JOIN subjects s
+          ON s.id=t.subject_id AND s.user_id=t.user_id
+        WHERE t.user_id=? AND t.done=0
+        ORDER BY t.study_at ASC
+        LIMIT 8
+        """,
+        (uid,)
+    ).fetchall()
+
+    profile = ensure_learning_profile(conn, uid)
+    conn.close()
+
+    return jsonify({
+        "user": dict(user) if user else {},
+        "subjects": subjects,
+        "tasks": [dict(row) for row in task_rows],
+        "profile": {
+            "learning_style": profile["learning_style"],
+            "preferred_study_time": profile["preferred_study_time"],
+            "daily_minutes": profile["daily_minutes"],
+            "goals": profile["goals"],
+            "notes": profile["notes"]
+        }
+    })
+
+
+@app.route("/api/mobile/subjects", methods=["GET"])
+def api_mobile_subjects():
+    uid, error = _mobile_require_user()
+    if error:
+        return error
+
+    conn = db()
+    recalculate_all_subject_progress(uid, conn)
+    rows = conn.execute(
+        """
+        SELECT id,name,code,description,credits,target_score,progress
+        FROM subjects
+        WHERE user_id=?
+        ORDER BY name ASC
+        """,
+        (uid,)
+    ).fetchall()
+
+    result = []
+    for row in rows:
+        item = dict(row)
+        weaknesses = conn.execute(
+            """
+            SELECT topic,chapter,miss_count,correct_count
+            FROM learning_weaknesses
+            WHERE user_id=? AND subject_id=?
+              AND miss_count > correct_count
+            ORDER BY (miss_count - correct_count * 0.5) DESC,last_seen_at DESC
+            LIMIT 3
+            """,
+            (uid, row["id"])
+        ).fetchall()
+        item["weaknesses"] = [dict(value) for value in weaknesses]
+        result.append(item)
+
+    conn.close()
+    return jsonify(result)
+
+
+@app.route("/api/mobile/subjects/<int:subject_id>", methods=["GET"])
+def api_mobile_subject_detail(subject_id):
+    uid, error = _mobile_require_user()
+    if error:
+        return error
+
+    conn = db()
+    recalculate_subject_progress(uid, subject_id, conn)
+
+    subject = conn.execute(
+        """
+        SELECT id,name,code,description,credits,target_score,progress,shared_subject_id
+        FROM subjects
+        WHERE id=? AND user_id=?
+        """,
+        (subject_id, uid)
+    ).fetchone()
+
+    if not subject:
+        conn.close()
+        return jsonify({"error": "Không tìm thấy môn học."}), 404
+
+    shared = ensure_shared_subject_for_user_subject(conn, uid, subject_id)
+    profile = ensure_learning_profile(conn, uid)
+
+    weaknesses = conn.execute(
+        """
+        SELECT topic,chapter,miss_count,correct_count,last_seen_at
+        FROM learning_weaknesses
+        WHERE user_id=? AND subject_id=?
+          AND miss_count > correct_count
+        ORDER BY (miss_count - correct_count * 0.5) DESC,last_seen_at DESC
+        LIMIT 8
+        """,
+        (uid, subject_id)
+    ).fetchall()
+
+    shared_count = conn.execute(
+        "SELECT COUNT(*) AS c FROM shared_knowledge WHERE shared_subject_id=?",
+        (shared["id"],)
+    ).fetchone()["c"]
+
+    document_count = conn.execute(
+        "SELECT COUNT(*) AS c FROM documents WHERE user_id=? AND subject_id=?",
+        (uid, subject_id)
+    ).fetchone()["c"]
+
+    conn.close()
+
+    return jsonify({
+        "subject": dict(subject),
+        "shared": {
+            "id": shared["id"],
+            "name": shared["name"],
+            "code": shared["code"],
+            "syllabus_available": bool((shared["syllabus_text"] or "").strip()),
+            "knowledge_count": int(shared_count or 0)
+        },
+        "profile": {
+            "learning_style": profile["learning_style"],
+            "preferred_study_time": profile["preferred_study_time"],
+            "daily_minutes": profile["daily_minutes"],
+            "goals": profile["goals"],
+            "notes": profile["notes"]
+        },
+        "document_count": int(document_count or 0),
+        "weaknesses": [dict(row) for row in weaknesses]
+    })
+
+
+@app.route("/api/mobile/chat", methods=["POST"])
+def api_mobile_chat():
+    uid, error = _mobile_require_user()
+    if error:
+        return error
+
+    payload = request.get_json(silent=True) or {}
+    subject_id = payload.get("subject_id")
+    question = str(payload.get("message") or payload.get("question") or "").strip()
+
+    try:
+        subject_id = int(subject_id)
+    except (TypeError, ValueError):
+        return jsonify({"error": "Hãy chọn môn học trước khi hỏi."}), 400
+
+    if not question:
+        return jsonify({"error": "Câu hỏi trống."}), 400
+
+    conn = db()
+    ensure_subject_chats(uid, conn)
+
+    conversation = conn.execute(
+        """
+        SELECT c.id,c.subject_id,s.name AS subject_name
+        FROM chat_conversations c
+        JOIN subjects s
+          ON s.id=c.subject_id AND s.user_id=c.user_id
+        WHERE c.user_id=? AND c.subject_id=?
+        LIMIT 1
+        """,
+        (uid, subject_id)
+    ).fetchone()
+
+    if not conversation:
+        conn.close()
+        return jsonify({"error": "Không tìm thấy Chat của môn học."}), 404
+
+    history_rows = conn.execute(
+        """
+        SELECT role,content
+        FROM chat_messages
+        WHERE user_id=? AND conversation_id=?
+        ORDER BY id DESC
+        LIMIT 10
+        """,
+        (uid, conversation["id"])
+    ).fetchall()
+    history_rows = list(reversed(history_rows))
+    conversation_history = "\n".join(
+        f"{'Bạn' if row['role']=='user' else 'AI'}: {row['content']}"
+        for row in history_rows
+    )
+    conn.close()
+
+    context, candidate_sources = get_subject_context(
+        uid, subject_id, question
+    )
+    shared_context, shared_sources = get_shared_subject_context(
+        uid, subject_id, question
+    )
+    personal_context = get_personal_learning_context(
+        uid, subject_id
+    )
+
+    answer, used_sources, source_mode = gemini_subject_answer(
+        conversation["subject_name"],
+        question,
+        context,
+        candidate_sources,
+        conversation_history,
+        shared_context,
+        personal_context,
+        shared_sources
+    )
+
+    conn = db()
+    created_at = now()
+    conn.execute(
+        """
+        INSERT INTO chat_messages(user_id,conversation_id,role,content,created_at)
+        VALUES(?,?,?,?,?)
+        """,
+        (uid, conversation["id"], "user", question, created_at)
+    )
+    conn.execute(
+        """
+        INSERT INTO chat_messages(user_id,conversation_id,role,content,created_at)
+        VALUES(?,?,?,?,?)
+        """,
+        (uid, conversation["id"], "assistant", answer, now())
+    )
+    conn.execute(
+        "UPDATE chat_conversations SET updated_at=? WHERE id=? AND user_id=?",
+        (now(), conversation["id"], uid)
+    )
+    conn.commit()
+    conn.close()
+
+    return jsonify({
+        "answer": answer,
+        "subject_id": subject_id,
+        "subject_name": conversation["subject_name"],
+        "source_mode": source_mode,
+        "sources": used_sources
+    })
+
+
+@app.route("/api/mobile/quiz/generate", methods=["POST"])
+def api_mobile_quiz_generate():
+    uid, error = _mobile_require_user()
+    if error:
+        return error
+
+    payload = request.get_json(silent=True) or {}
+    mode = str(payload.get("mode") or "subject").strip().lower()
+    question_count = _safe_int(payload.get("count"), 10, 10, 30)
+    if question_count not in (10, 20, 30):
+        question_count = 10
+
+    conn = db()
+    subject_id = owned_subject_id(conn, uid, payload.get("subject_id"))
+    document_id = None
+    title = "Quiz luyện tập"
+    questions = []
+
+    if mode == "document":
+        try:
+            document_id = int(payload.get("document_id"))
+        except (TypeError, ValueError):
+            document_id = None
+
+        doc = conn.execute(
+            """
+            SELECT *
+            FROM documents
+            WHERE id=? AND user_id=?
+            """,
+            (document_id, uid)
+        ).fetchone() if document_id else None
+
+        if doc:
+            subject_id = doc["subject_id"]
+            questions = build_quiz(doc["extracted_text"] or "", question_count)
+            title = f"Quiz từ {doc['original_name']}"
+
+    elif subject_id:
+        subject = conn.execute(
+            "SELECT id,name FROM subjects WHERE id=? AND user_id=?",
+            (subject_id, uid)
+        ).fetchone()
+
+        docs = conn.execute(
+            """
+            SELECT original_name,extracted_text
+            FROM documents
+            WHERE user_id=? AND subject_id=?
+            ORDER BY id DESC
+            LIMIT 8
+            """,
+            (uid, subject_id)
+        ).fetchall()
+
+        context_parts = []
+        for doc in docs:
+            text_value = (doc["extracted_text"] or "").strip()
+            if text_value:
+                context_parts.append(
+                    f"TÀI LIỆU {doc['original_name']}:\n{text_value[:4500]}"
+                )
+
+        shared_context, _ = get_shared_subject_context(
+            uid, subject_id, "", max_chars=7000
+        )
+        if shared_context:
+            context_parts.append(shared_context)
+
+        focus_topics = []
+        if mode == "weakness":
+            weakness_rows = conn.execute(
+                """
+                SELECT topic,chapter,miss_count,correct_count
+                FROM learning_weaknesses
+                WHERE user_id=? AND subject_id=?
+                  AND miss_count > correct_count
+                ORDER BY (miss_count - correct_count * 0.5) DESC,last_seen_at DESC
+                LIMIT 8
+                """,
+                (uid, subject_id)
+            ).fetchall()
+            focus_topics = [dict(row) for row in weakness_rows]
+
+        combined_context = "\n\n".join(context_parts)[:22000]
+        if combined_context and subject and (mode != "weakness" or focus_topics):
+            questions = build_quiz(
+                combined_context,
+                question_count,
+                focus_topics=focus_topics
+            )
+            title = (
+                f"Ôn điểm yếu · {subject['name']}"
+                if mode == "weakness"
+                else f"Quiz môn {subject['name']}"
+            )
+
+    if not questions:
+        conn.close()
+        return jsonify({
+            "error": "Chưa đủ tài liệu hoặc dữ liệu điểm yếu để tạo Quiz."
+        }), 400
+
+    cursor = conn.execute(
+        """
+        INSERT INTO quizzes(user_id,subject_id,document_id,title,payload,created_at)
+        VALUES(?,?,?,?,?,?)
+        """,
+        (
+            uid,
+            subject_id,
+            document_id,
+            title,
+            json.dumps(questions, ensure_ascii=False),
+            now()
+        )
+    )
+    quiz_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+
+    return jsonify({
+        "quiz_id": quiz_id,
+        "title": title,
+        "questions": questions
+    })
+
+
+@app.route("/api/mobile/quiz/submit", methods=["POST"])
+def api_mobile_quiz_submit():
+    uid, error = _mobile_require_user()
+    if error:
+        return error
+
+    # submit_quiz dùng cùng session + JSON payload, nên tái sử dụng toàn bộ
+    # logic chấm bài và cập nhật learning_weaknesses của web.
+    return submit_quiz()
+
+
+@app.route("/api/mobile/study-plan", methods=["GET", "POST"])
+def api_mobile_study_plan():
+    uid, error = _mobile_require_user()
+    if error:
+        return error
+
+    conn = db()
+
+    if request.method == "GET":
+        profile = ensure_learning_profile(conn, uid)
+        rows = conn.execute(
+            """
+            SELECT t.id,t.subject_id,t.title,t.study_at,t.duration,t.note,t.done,t.source,
+                   s.name AS subject_name
+            FROM study_tasks t
+            LEFT JOIN subjects s
+              ON s.id=t.subject_id AND s.user_id=t.user_id
+            WHERE t.user_id=?
+            ORDER BY t.done ASC,t.study_at ASC
+            LIMIT 40
+            """,
+            (uid,)
+        ).fetchall()
+        conn.close()
+        return jsonify({
+            "profile": {
+                "learning_style": profile["learning_style"],
+                "preferred_study_time": profile["preferred_study_time"],
+                "daily_minutes": profile["daily_minutes"],
+                "goals": profile["goals"],
+                "notes": profile["notes"]
+            },
+            "tasks": [dict(row) for row in rows]
+        })
+
+    payload = request.get_json(silent=True) or {}
+    subject_id = owned_subject_id(conn, uid, payload.get("subject_id"))
+    goal = str(payload.get("goal") or "").strip()
+    deadline_raw = str(payload.get("deadline") or "").strip()
+
+    if not subject_id or not goal or not deadline_raw:
+        conn.close()
+        return jsonify({"error": "Thiếu môn học, mục tiêu hoặc deadline."}), 400
+
+    try:
+        deadline_dt = datetime.fromisoformat(deadline_raw)
+    except ValueError:
+        conn.close()
+        return jsonify({"error": "Deadline không hợp lệ."}), 400
+
+    if deadline_dt < datetime.now():
+        conn.close()
+        return jsonify({"error": "Deadline phải ở tương lai."}), 400
+
+    subject = conn.execute(
+        "SELECT * FROM subjects WHERE id=? AND user_id=?",
+        (subject_id, uid)
+    ).fetchone()
+    profile = ensure_learning_profile(conn, uid)
+
+    preferred_time = str(
+        payload.get("preferred_time")
+        or profile["preferred_study_time"]
+        or "19:00"
+    ).strip()
+    if not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", preferred_time):
+        preferred_time = "19:00"
+
+    daily_minutes = _safe_int(
+        payload.get("daily_minutes"),
+        int(profile["daily_minutes"] or 45),
+        15,
+        180
+    )
+
+    docs = conn.execute(
+        """
+        SELECT original_name,extracted_text
+        FROM documents
+        WHERE user_id=? AND subject_id=?
+        ORDER BY id DESC
+        LIMIT 4
+        """,
+        (uid, subject_id)
+    ).fetchall()
+    context = "\n\n".join(
+        f"TÀI LIỆU: {row['original_name']}\n{(row['extracted_text'] or '')[:1200]}"
+        for row in docs
+        if (row["extracted_text"] or "").strip()
+    )
+
+    weakness_rows = conn.execute(
+        """
+        SELECT topic,chapter,miss_count,correct_count
+        FROM learning_weaknesses
+        WHERE user_id=? AND subject_id=? AND miss_count > 0
+        ORDER BY (miss_count - correct_count * 0.5) DESC,last_seen_at DESC
+        LIMIT 5
+        """,
+        (uid, subject_id)
+    ).fetchall()
+    priority_topics = [dict(row) for row in weakness_rows]
+
+    shared_context, _ = get_shared_subject_context(
+        uid, subject_id, goal, max_chars=4500
+    )
+    personal_context = get_personal_learning_context(
+        uid, subject_id, max_weaknesses=8
+    )
+
+    generated = build_study_plan(
+        subject["name"],
+        goal,
+        deadline_dt,
+        daily_minutes,
+        preferred_time,
+        context,
+        shared_context,
+        personal_context,
+        priority_topics
+    )
+
+    conn.execute(
+        """
+        DELETE FROM study_tasks
+        WHERE user_id=? AND subject_id=? AND source='ai' AND done=0
+        """,
+        (uid, subject_id)
+    )
+
+    for task in generated:
+        conn.execute(
+            """
+            INSERT INTO study_tasks(
+                user_id,subject_id,title,study_at,duration,note,done,source,created_at
+            ) VALUES(?,?,?,?,?,?,?,?,?)
+            """,
+            (
+                uid,
+                subject_id,
+                task["title"],
+                f"{task['date']}T{task['time']}",
+                task["duration"],
+                task["note"],
+                0,
+                "ai",
+                now()
+            )
+        )
+
+    conn.commit()
+
+    rows = conn.execute(
+        """
+        SELECT id,subject_id,title,study_at,duration,note,done,source
+        FROM study_tasks
+        WHERE user_id=? AND subject_id=?
+        ORDER BY study_at ASC
+        """,
+        (uid, subject_id)
+    ).fetchall()
+    conn.close()
+
+    return jsonify({
+        "success": True,
+        "tasks": [dict(row) for row in rows]
+    })
+
+
+
+
 @app.route("/uploads/<path:filename>")
 @login_required
 def uploaded_file(filename):
@@ -4844,6 +5492,6 @@ if __name__ == "__main__":
     init_db()
     app.run(
         debug=os.getenv("FLASK_DEBUG", "1") == "1",
-        host="127.0.0.1",
-        port=5000
+        host=os.getenv("FLASK_HOST", "0.0.0.0"),
+        port=int(os.getenv("FLASK_PORT", "5000"))
     )
