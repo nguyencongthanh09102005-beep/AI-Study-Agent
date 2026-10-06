@@ -2,6 +2,8 @@ import os
 import sqlite3
 import json
 import re
+import time
+import random
 from datetime import datetime, timedelta
 from functools import wraps
 from pathlib import Path
@@ -1374,7 +1376,15 @@ def local_ai_answer(question, context, source_names=None):
     )
 
 def gemini_generate(prompt):
-    """Gửi một prompt tới Gemini và trả về (text, error)."""
+    """
+    Gửi prompt tới Gemini với retry + model failover.
+
+    Thứ tự mặc định:
+    1) GEMINI_MODEL (mặc định gemini-3.8-flash)
+    2) GEMINI_FALLBACK_MODELS (mặc định 3.7 Flash, 3.5 Flash-Lite)
+
+    Chỉ retry các lỗi tạm thời: 408, 429 và 5xx.
+    """
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
 
     if not api_key:
@@ -1383,84 +1393,151 @@ def gemini_generate(prompt):
     if requests is None:
         return None, "Thiếu thư viện requests."
 
-    model = os.getenv("GEMINI_MODEL", "gemini-3.8-flash").strip() or "gemini-3.8-flash"
-
-    url = (
-        "https://generativelanguage.googleapis.com/v1beta/"
-        f"models/{model}:generateContent"
+    primary_model = (
+        os.getenv("GEMINI_MODEL", "gemini-3.8-flash").strip()
+        or "gemini-3.8-flash"
     )
 
-    try:
-        res = requests.post(
-            url,
-            headers={
-                "Content-Type": "application/json",
-                "x-goog-api-key": api_key,
-            },
-            json={
-                "contents": [
-                    {
-                        "role": "user",
-                        "parts": [
-                            {"text": prompt}
-                        ],
-                    }
-                ]
-            },
-            timeout=45,
-        )
+    fallback_raw = os.getenv(
+        "GEMINI_FALLBACK_MODELS",
+        "gemini-3.7-flash,gemini-3.5-flash-lite"
+    )
 
-        if res.status_code == 429:
-            return None, (
-                "Gemini đang vượt giới hạn sử dụng (HTTP 429). "
-                "Hãy đợi một lúc rồi thử lại hoặc kiểm tra quota."
+    models = [primary_model]
+    for item in fallback_raw.split(","):
+        model = item.strip()
+        if model and model not in models:
+            models.append(model)
+
+    try:
+        primary_retries = int(os.getenv("GEMINI_PRIMARY_RETRIES", "2"))
+    except ValueError:
+        primary_retries = 2
+    primary_retries = max(0, min(primary_retries, 4))
+
+    transient_statuses = {408, 429, 500, 502, 503, 504}
+    last_error = ""
+
+    for model_index, model in enumerate(models):
+        # Model chính được retry thêm; model dự phòng thử 1 lần/model
+        max_attempts = 1 + primary_retries if model_index == 0 else 1
+
+        for attempt in range(max_attempts):
+            url = (
+                "https://generativelanguage.googleapis.com/v1beta/"
+                f"models/{model}:generateContent"
             )
 
-        if not res.ok:
-            detail = ""
             try:
-                error_data = res.json()
-                detail = (
-                    error_data.get("error", {}).get("message", "")
-                    if isinstance(error_data, dict)
-                    else ""
+                res = requests.post(
+                    url,
+                    headers={
+                        "Content-Type": "application/json",
+                        "x-goog-api-key": api_key,
+                    },
+                    json={
+                        "contents": [
+                            {
+                                "role": "user",
+                                "parts": [{"text": prompt}],
+                            }
+                        ]
+                    },
+                    timeout=45,
                 )
-            except ValueError:
-                detail = res.text[:300]
 
-            message = f"Gemini API lỗi HTTP {res.status_code}"
-            if detail:
-                message += f": {detail}"
-            return None, message
+                if res.ok:
+                    data = res.json()
+                    candidates = data.get("candidates") or []
 
-        data = res.json()
-        candidates = data.get("candidates") or []
+                    if not candidates:
+                        last_error = f"{model}: Gemini không trả về candidate nào."
+                        break
 
-        if not candidates:
-            return None, "Gemini không trả về candidate nào."
+                    content = candidates[0].get("content") or {}
+                    parts = content.get("parts") or []
 
-        content = candidates[0].get("content") or {}
-        parts = content.get("parts") or []
+                    answer_parts = [
+                        str(part.get("text", "")).strip()
+                        for part in parts
+                        if isinstance(part, dict) and part.get("text")
+                    ]
 
-        answer_parts = [
-            str(part.get("text", "")).strip()
-            for part in parts
-            if isinstance(part, dict) and part.get("text")
-        ]
+                    answer = "\n".join(
+                        part for part in answer_parts if part
+                    ).strip()
 
-        answer = "\n".join(part for part in answer_parts if part).strip()
+                    if answer:
+                        if model != primary_model:
+                            print(f"Gemini failover thành công: {model}")
+                        return answer, None
 
-        if not answer:
-            return None, "Gemini trả về phản hồi rỗng."
+                    last_error = f"{model}: Gemini trả về phản hồi rỗng."
+                    break
 
-        return answer, None
+                detail = ""
+                try:
+                    error_data = res.json()
+                    detail = (
+                        error_data.get("error", {}).get("message", "")
+                        if isinstance(error_data, dict)
+                        else ""
+                    )
+                except ValueError:
+                    detail = res.text[:240]
 
-    except requests.RequestException as exc:
-        return None, f"Lỗi kết nối Gemini: {exc}"
+                status = int(res.status_code)
+                last_error = (
+                    f"{model}: HTTP {status}"
+                    + (f" - {detail}" if detail else "")
+                )
 
-    except (ValueError, TypeError, KeyError, IndexError) as exc:
-        return None, f"Không đọc được phản hồi Gemini: {exc}"
+                if status not in transient_statuses:
+                    # 400/401/403... không retry vì thường là cấu hình/key.
+                    return None, last_error
 
+                # Retry model chính với exponential backoff + jitter.
+                if model_index == 0 and attempt < max_attempts - 1:
+                    delay = min(4.0, (2 ** attempt)) + random.uniform(0.1, 0.5)
+                    print(
+                        f"Gemini {model} tạm lỗi HTTP {status}; "
+                        f"retry sau {delay:.1f}s"
+                    )
+                    time.sleep(delay)
+                    continue
+
+                # Hết retry model hiện tại -> thử model kế tiếp.
+                break
+
+            except requests.Timeout:
+                last_error = f"{model}: timeout khi gọi Gemini."
+
+                if model_index == 0 and attempt < max_attempts - 1:
+                    delay = min(4.0, (2 ** attempt)) + random.uniform(0.1, 0.5)
+                    time.sleep(delay)
+                    continue
+
+                break
+
+            except requests.RequestException as exc:
+                last_error = f"{model}: lỗi kết nối Gemini - {exc}"
+
+                if model_index == 0 and attempt < max_attempts - 1:
+                    delay = min(4.0, (2 ** attempt)) + random.uniform(0.1, 0.5)
+                    time.sleep(delay)
+                    continue
+
+                break
+
+            except (ValueError, TypeError, KeyError, IndexError) as exc:
+                last_error = f"{model}: không đọc được phản hồi Gemini - {exc}"
+                break
+
+    return None, (
+        "AI đang bận hoặc kết nối chưa ổn định. "
+        "Hệ thống đã thử model chính và model dự phòng."
+        + (f" Chi tiết: {last_error}" if last_error else "")
+    )
 
 def gemini_subject_answer(
     subject_name,
@@ -1595,14 +1672,39 @@ CHỈ trả về JSON hợp lệ, không markdown, theo đúng cấu trúc:
             cleaned = raw.strip()
             return cleaned, [], "general"
 
-    if not os.getenv("GEMINI_API_KEY", "").strip() or requests is None:
-        fallback = local_ai_answer(question, context, source_names)
-        return fallback, source_names if context else [], "document" if context else "general"
+    # Nếu Gemini/model dự phòng đều lỗi, vẫn cố gắng trả lời từ
+    # tài liệu cá nhân hoặc kiến thức chung đã có trong hệ thống.
+    fallback_context_parts = []
+    fallback_sources = []
+    fallback_mode = "general"
+
+    if context:
+        fallback_context_parts.append(context)
+        fallback_sources.extend(source_names)
+        fallback_mode = "document"
+
+    if shared_context:
+        fallback_context_parts.append(shared_context)
+        for name in shared_source_names:
+            if name not in fallback_sources:
+                fallback_sources.append(name)
+        if fallback_mode == "general":
+            fallback_mode = "shared"
+
+    fallback_context = "\n\n".join(fallback_context_parts)
+    fallback = local_ai_answer(
+        question,
+        fallback_context,
+        fallback_sources
+    )
+
+    if error:
+        print("Gemini Chat fallback:", error)
 
     return (
-        "Không thể kết nối Gemini lúc này. " + (error or "Bạn thử lại sau nhé."),
-        [],
-        "general"
+        fallback,
+        fallback_sources if fallback_context else [],
+        fallback_mode
     )
 
 
