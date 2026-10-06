@@ -1581,6 +1581,11 @@ Trả lời câu hỏi của sinh viên bằng tiếng Việt, rõ ràng, dễ h
 Nếu có HỒ SƠ HỌC TẬP CÁ NHÂN, hãy điều chỉnh cách giải thích theo mục tiêu,
 tiến độ và những phần sinh viên thường sai. Không nhắc lại dữ liệu cá nhân
 một cách máy móc nếu không cần thiết.
+Nếu sinh viên hỏi "môn này cần học gì", "học theo thứ tự nào", "đang học tới đâu"
+hoặc câu hỏi tương tự về phạm vi/lộ trình, hãy xem ĐỀ CƯƠNG MÔN HỌC trong
+KIẾN THỨC CHUNG là nguồn ưu tiên số 1 và trình bày theo đúng thứ tự đề cương.
+Tài liệu cá nhân dùng để giải thích/bổ sung cho từng mục, không được tự mở rộng
+phạm vi môn học ngoài đề cương nếu đề cương đã có.
 
 QUY TẮC NGUỒN RẤT QUAN TRỌNG:
 1. Nếu NGỮ CẢNH TÀI LIỆU CÁ NHÂN thực sự hỗ trợ câu trả lời,
@@ -2197,16 +2202,202 @@ def _safe_int(value, default, minimum, maximum):
     return max(minimum, min(maximum, number))
 
 
+def _extract_syllabus_topics(syllabus_text, max_topics=24):
+    """Tách các mục học chính từ đề cương để lộ trình luôn bám đúng phạm vi môn."""
+    text_value = (syllabus_text or "").strip()
+    if not text_value:
+        return []
+
+    raw_lines = [
+        re.sub(r"\\s+", " ", line).strip()
+        for line in text_value.replace("\\r", "\\n").split("\\n")
+        if re.sub(r"\\s+", " ", line).strip()
+    ]
+
+    heading_pattern = re.compile(
+        r"^(?:chương|bài|phần|tuần|unit|module|chapter|lesson|topic)\\s*"
+        r"(?:[ivxlcdm]+|\\d+(?:\\.\\d+)*)?\\s*[:.\\-–—]?\\s*.+$",
+        re.IGNORECASE,
+    )
+    numbered_pattern = re.compile(
+        r"^(?:\\d+(?:\\.\\d+)*|[ivxlcdm]+)[.)\\-:]?\\s+.+$",
+        re.IGNORECASE,
+    )
+    bullet_pattern = re.compile(r"^[•●▪◦*+\\-–—]\\s+.+$")
+
+    selected = []
+    fallback_lines = []
+
+    for line in raw_lines:
+        cleaned = re.sub(r"^[•●▪◦*+\\-–—]\\s*", "", line).strip()
+        cleaned = re.sub(r"\\s+", " ", cleaned)
+        if len(cleaned) < 3 or len(cleaned) > 220:
+            continue
+
+        fallback_lines.append(cleaned)
+
+        if (
+            heading_pattern.match(line)
+            or numbered_pattern.match(line)
+            or bullet_pattern.match(line)
+        ):
+            selected.append(cleaned)
+
+    # Một số đề cương chỉ là danh sách dòng không đánh số/bullet.
+    if len(selected) < 2:
+        selected = fallback_lines
+
+    topics = []
+    seen = set()
+    for item in selected:
+        normalized = item.casefold()
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        topics.append(item)
+        if len(topics) >= max_topics:
+            break
+
+    return topics
+
+
+def get_course_learning_backbone(conn, user_id, subject_id, query=""):
+    """
+    Course Learning Backbone:
+    Đề cương là khung chính; shared knowledge và tài liệu cá nhân là nguồn bổ trợ.
+    Hàm này dùng chung cho Web và Mobile để tránh hai frontend sinh lộ trình khác nhau.
+    """
+    subject = conn.execute(
+        """
+        SELECT id,name,code,target_score,progress,shared_subject_id
+        FROM subjects
+        WHERE id=? AND user_id=?
+        """,
+        (subject_id, user_id)
+    ).fetchone()
+
+    if not subject:
+        return None
+
+    shared = ensure_shared_subject_for_user_subject(
+        conn,
+        user_id,
+        subject_id
+    )
+
+    syllabus_text = (
+        (shared["syllabus_text"] or "").strip()
+        if shared
+        else ""
+    )
+    syllabus_topics = _extract_syllabus_topics(syllabus_text)
+
+    document_rows = conn.execute(
+        """
+        SELECT original_name, extracted_text
+        FROM documents
+        WHERE user_id=? AND subject_id=?
+        ORDER BY id DESC
+        LIMIT 8
+        """,
+        (user_id, subject_id)
+    ).fetchall()
+
+    personal_parts = []
+    document_names = []
+    personal_total = 0
+    for row in document_rows:
+        text_value = (row["extracted_text"] or "").strip()
+        if not text_value:
+            continue
+        remaining = 8000 - personal_total
+        if remaining <= 0:
+            break
+        clipped = text_value[:min(1800, remaining)]
+        personal_parts.append(
+            f"TÀI LIỆU CÁ NHÂN - {row['original_name']}:\\n{clipped}"
+        )
+        document_names.append(row["original_name"])
+        personal_total += len(clipped)
+
+    shared_parts = []
+    shared_names = []
+    if shared:
+        knowledge_rows = conn.execute(
+            """
+            SELECT title,content,source_type
+            FROM shared_knowledge
+            WHERE shared_subject_id=?
+            ORDER BY id DESC
+            LIMIT 10
+            """,
+            (shared["id"],)
+        ).fetchall()
+
+        query_terms = {
+            token.casefold()
+            for token in re.findall(
+                r"[\\wÀ-ỹ]+",
+                query or "",
+                flags=re.UNICODE
+            )
+            if len(token) >= 3
+        }
+
+        scored_rows = []
+        for row in knowledge_rows:
+            content_value = (row["content"] or "").strip()
+            if not content_value:
+                continue
+            lowered = content_value.casefold()
+            score = sum(lowered.count(term) for term in query_terms)
+            scored_rows.append((score, row))
+
+        scored_rows.sort(key=lambda item: item[0], reverse=True)
+
+        shared_total = 0
+        for _, row in scored_rows:
+            remaining = 6500 - shared_total
+            if remaining <= 0:
+                break
+            content_value = (row["content"] or "").strip()
+            clipped = content_value[:min(1600, remaining)]
+            shared_parts.append(
+                f"KIẾN THỨC DÙNG CHUNG - {row['title']}:\\n{clipped}"
+            )
+            shared_names.append(row["title"])
+            shared_total += len(clipped)
+
+    return {
+        "subject": subject,
+        "syllabus_text": syllabus_text[:12000],
+        "syllabus_topics": syllabus_topics,
+        "personal_context": "\\n\\n".join(personal_parts),
+        "personal_document_names": document_names,
+        "shared_context": "\\n\\n".join(shared_parts),
+        "shared_source_names": shared_names,
+    }
+
+
 def _fallback_study_plan(
     subject_name,
     goal,
     deadline_dt,
     daily_minutes,
     preferred_time,
-    priority_topics=None
+    priority_topics=None,
+    syllabus_topics=None,
+    document_names=None,
 ):
-    """Tạo kế hoạch cục bộ có ưu tiên điểm yếu khi Gemini/API gặp lỗi."""
+    """
+    Kế hoạch cục bộ khi Gemini/API lỗi.
+    Nếu có đề cương, fallback vẫn đi theo đúng thứ tự các mục trong đề cương
+    thay vì tạo một roadmap chung chung.
+    """
     priority_topics = priority_topics or []
+    syllabus_topics = syllabus_topics or []
+    document_names = document_names or []
+
     today = datetime.now().date()
     end_date = max(today, deadline_dt.date())
     span_days = max(0, (end_date - today).days)
@@ -2218,8 +2409,8 @@ def _fallback_study_plan(
     else:
         session_count = min(8, max(4, (span_days + 1) // 2))
 
-    priority_templates = []
-    for item in priority_topics[:3]:
+    weak_units = []
+    for item in priority_topics[:4]:
         if isinstance(item, dict):
             topic = str(item.get("topic") or "").strip()
             chapter = str(item.get("chapter") or "").strip()
@@ -2232,26 +2423,50 @@ def _fallback_study_plan(
         if not topic:
             continue
 
-        detail = f"{chapter} · " if chapter else ""
-        detail += f"Đây là phần đã sai {miss_count} lần. " if miss_count else ""
-        detail += "Ôn lại khái niệm, ví dụ và ghi chú nguyên nhân từng chỗ chưa vững."
-
-        priority_templates.append(
-            (f"Ôn điểm yếu: {topic}"[:160], detail[:500])
+        label = f"{chapter} - {topic}" if chapter else topic
+        note = (
+            f"Ưu tiên vì đây là phần còn yếu"
+            + (f", đã sai {miss_count} lần" if miss_count else "")
+            + ". Ôn lại khái niệm, ví dụ và ghi chú nguyên nhân chưa vững."
         )
+        weak_units.append((label, note))
 
-    general_templates = [
-        ("Xác định nội dung cần hoàn thành", "Xem mục tiêu và chia phần kiến thức cần học."),
-        ("Đọc tài liệu và ghi chú ý chính", "Tập trung vào khái niệm, ví dụ và phần chưa hiểu."),
-        ("Ôn phần kiến thức chưa vững", "Đọc lại ghi chú và đánh dấu nội dung cần hỏi thêm."),
-        ("Hỏi AI phần chưa hiểu", "Dùng AI Chat để giải thích các ý còn mơ hồ."),
-        ("Làm quiz kiểm tra", "Làm quiz để kiểm tra mức độ ghi nhớ, ưu tiên các phần vừa ôn."),
-        ("Xem lại câu sai", "Ôn nguyên nhân sai và cập nhật lại phần kiến thức cần nhớ."),
-        ("Ôn tập tổng hợp", "Kết nối các phần kiến thức và làm lại nội dung khó."),
-        ("Tổng kết trước deadline", "Rà soát mục tiêu và hoàn thiện phần còn thiếu."),
-    ]
+    # Giữ thứ tự đề cương và tránh lặp lại chủ đề đã được đưa lên đầu do weakness.
+    weak_keys = {
+        re.sub(r"\\s+", " ", label).casefold()
+        for label, _ in weak_units
+    }
+    syllabus_units = []
+    for topic in syllabus_topics:
+        normalized = re.sub(r"\\s+", " ", topic).casefold()
+        if any(
+            normalized in weak_key or weak_key in normalized
+            for weak_key in weak_keys
+        ):
+            continue
+        syllabus_units.append(topic)
 
-    templates = priority_templates + general_templates
+    learning_slots = session_count - 1 if session_count >= 2 else 1
+    units = [label for label, _ in weak_units] + syllabus_units
+
+    if not units:
+        units = [goal or f"Nội dung trọng tâm môn {subject_name}"]
+
+    # Chia các mục đề cương theo thứ tự vào số buổi hiện có.
+    chunks = []
+    for index in range(learning_slots):
+        start = round(index * len(units) / learning_slots)
+        end = round((index + 1) * len(units) / learning_slots)
+        chunk = units[start:end]
+        if not chunk and units:
+            chunk = [units[min(index, len(units) - 1)]]
+        chunks.append(chunk)
+
+    docs_text = (
+        " Tài liệu tham khảo của bạn: " + ", ".join(document_names[:3]) + "."
+        if document_names
+        else ""
+    )
 
     tasks = []
     for i in range(session_count):
@@ -2260,16 +2475,47 @@ def _fallback_study_plan(
         else:
             offset = round(i * span_days / (session_count - 1))
         task_date = today + timedelta(days=offset)
-        title, note = templates[min(i, len(templates) - 1)]
-        if i == 0:
-            note = f"Mục tiêu: {goal}. " + note
+
+        if session_count >= 2 and i == session_count - 1:
+            title = "Kiểm tra và đánh giá cuối lộ trình"
+            note = (
+                "Làm Quiz theo các phần đã học, xem lại câu sai và xác định "
+                "nội dung cần ôn tiếp trước deadline."
+            )
+        else:
+            chunk = chunks[min(i, len(chunks) - 1)] if chunks else []
+            short_label = " · ".join(chunk[:2])[:120]
+            title = (
+                f"Học theo đề cương: {short_label}"
+                if syllabus_topics and short_label
+                else f"Học: {short_label or goal or subject_name}"
+            )[:160]
+
+            full_scope = "; ".join(chunk)[:320]
+            note = (
+                f"Mục tiêu: {goal}. "
+                if i == 0 and goal
+                else ""
+            )
+            note += (
+                f"Bám theo đề cương: {full_scope}. "
+                if syllabus_topics and full_scope
+                else f"Tập trung nội dung: {full_scope}. "
+            )
+            note += (
+                "Đọc tài liệu liên quan, ghi chú ý chính và dùng Study Agent "
+                "để hỏi ngay phần chưa hiểu."
+            )
+            note += docs_text
+
         tasks.append({
             "date": task_date.isoformat(),
             "time": preferred_time,
             "title": title,
             "duration": daily_minutes,
-            "note": note,
+            "note": note[:500],
         })
+
     return tasks
 
 
@@ -2280,11 +2526,21 @@ def build_study_plan(
     daily_minutes,
     preferred_time,
     context="",
+    syllabus_text="",
+    syllabus_topics=None,
     shared_context="",
     personal_context="",
-    priority_topics=None
+    priority_topics=None,
+    document_names=None,
 ):
-    """Tạo kế hoạch học có cá nhân hóa; nếu Gemini lỗi sẽ dùng kế hoạch cục bộ."""
+    """
+    Tạo lộ trình học theo Course Learning Backbone:
+    Đề cương -> tài liệu -> học -> kiểm tra/đánh giá.
+    """
+    syllabus_topics = syllabus_topics or _extract_syllabus_topics(syllabus_text)
+    priority_topics = priority_topics or []
+    document_names = document_names or []
+
     fallback = _fallback_study_plan(
         subject_name,
         goal,
@@ -2292,15 +2548,25 @@ def build_study_plan(
         daily_minutes,
         preferred_time,
         priority_topics=priority_topics,
+        syllabus_topics=syllabus_topics,
+        document_names=document_names,
     )
 
     today = datetime.now().date().isoformat()
     deadline_date = deadline_dt.date().isoformat()
+    topic_outline = "\\n".join(
+        f"{index + 1}. {topic}"
+        for index, topic in enumerate(syllabus_topics[:24])
+    )
 
     prompt = f"""
-Bạn là AI Study Planner cho sinh viên.
+Bạn là AI Study Planner trong hệ thống AI Study Agent.
 
-Hãy tạo một lịch học thực tế cho:
+NHIỆM VỤ:
+Biến đề cương của một môn thành lộ trình học có thể thực hiện được:
+ĐỀ CƯƠNG -> TÀI LIỆU -> HỌC -> KIỂM TRA/ĐÁNH GIÁ.
+
+THÔNG TIN NGƯỜI HỌC:
 - Môn học: {subject_name}
 - Mục tiêu: {goal}
 - Ngày hiện tại: {today}
@@ -2308,32 +2574,36 @@ Hãy tạo một lịch học thực tế cho:
 - Thời lượng tối đa mỗi buổi: {daily_minutes} phút
 - Giờ học ưu tiên: {preferred_time}
 
-TÀI LIỆU CÁ NHÂN:
-{context[:3500] if context else "Không có tài liệu cá nhân cho môn học này."}
+ĐỀ CƯƠNG GỐC - NGUỒN XÁC ĐỊNH PHẠM VI HỌC:
+{syllabus_text[:7000] if syllabus_text else "Chưa có đề cương."}
 
-ĐỀ CƯƠNG / KIẾN THỨC DÙNG CHUNG:
-{shared_context[:3500] if shared_context else "Chưa có đề cương hoặc kiến thức dùng chung."}
+CÁC MỤC HỌC ĐÃ NHẬN DIỆN TỪ ĐỀ CƯƠNG:
+{topic_outline if topic_outline else "Chưa nhận diện được mục học cụ thể."}
+
+TÀI LIỆU CÁ NHÂN - NGUỒN BỔ TRỢ CHO CÁC MỤC TRONG ĐỀ CƯƠNG:
+{context[:5500] if context else "Không có tài liệu cá nhân cho môn học này."}
+
+KIẾN THỨC DÙNG CHUNG - NGUỒN BỔ TRỢ:
+{shared_context[:4500] if shared_context else "Chưa có kiến thức dùng chung bổ sung."}
 
 HỒ SƠ HỌC TẬP CÁ NHÂN:
 {personal_context[:3500] if personal_context else "Chưa có dữ liệu cá nhân hóa."}
 
-Yêu cầu:
-- Không cố định 7 ngày; số buổi phải phù hợp với thời gian còn lại.
-- Tối đa 8 buổi.
-- Mọi ngày học phải nằm từ {today} đến {deadline_date}.
-- Mỗi buổi phải có công việc rõ ràng, ngắn gọn và thực tế.
-- Dùng đề cương/kiến thức chung để xác định phạm vi môn học; không bịa nội dung ngoài nguồn được cung cấp.
-- Nếu hồ sơ có "Phần kiến thức cần chú ý", phải ưu tiên các chủ đề đó trong những buổi đầu.
-- Chủ đề có số lần sai nhiều hơn phải được ưu tiên cao hơn.
-- Dùng điểm Quiz trung bình, tiến độ hiện tại và mục tiêu điểm để điều chỉnh mức độ ôn tập.
-- Tôn trọng phong cách học, giờ học ưu tiên và thời lượng học trong hồ sơ nếu phù hợp với thông tin người dùng vừa nhập.
-- Nếu có điểm yếu, phải có ít nhất một buổi ôn điểm yếu và một buổi Quiz/xem lại câu sai trước deadline.
-- Nếu không có điểm yếu, tạo kế hoạch cân bằng theo tài liệu và mục tiêu.
-- Có thể kết hợp đọc tài liệu, ghi chú, hỏi AI Chat, làm Quiz, xem lại câu sai và ôn tổng hợp khi phù hợp.
-- Không tạo công việc ngoài phạm vi học tập.
-- Chỉ trả về một JSON array, không markdown và không giải thích thêm.
-- Mỗi phần tử phải có đúng các trường:
-  {{"date":"YYYY-MM-DD","time":"HH:MM","title":"...","duration":45,"note":"..."}}
+NGUYÊN TẮC BẮT BUỘC:
+1. Nếu có đề cương, ĐỀ CƯƠNG là nguồn chính để xác định học những gì.
+2. Giữ thứ tự logic của các mục trong đề cương; không tự thêm chương/chủ đề ngoài phạm vi.
+3. Tài liệu cá nhân và kiến thức dùng chung chỉ dùng để bổ sung nội dung cho các mục đề cương.
+4. Mỗi buổi học phải nêu rõ đang học mục/chương nào của đề cương trong title hoặc note.
+5. Không cố định 7 ngày; số buổi phải phù hợp thời gian còn lại và tối đa 8 buổi.
+6. Mọi ngày học phải nằm từ {today} đến {deadline_date}.
+7. Nếu số mục đề cương nhiều hơn số buổi, gộp các mục liền kề hợp lý nhưng vẫn giữ thứ tự.
+8. Nếu hồ sơ có phần kiến thức cần chú ý/điểm yếu, ưu tiên ôn phần đó sớm nhưng không làm mất cấu trúc đề cương.
+9. Phải có ít nhất một hoạt động kiểm tra/Quiz hoặc xem lại câu sai trước deadline nếu có từ 2 buổi trở lên.
+10. Có thể dùng Study Agent để giải thích phần chưa hiểu trong từng buổi học.
+11. Không tạo công việc ngoài phạm vi học tập.
+12. Chỉ trả về một JSON array, không markdown, không giải thích thêm.
+13. Mỗi phần tử có đúng các trường:
+   {{"date":"YYYY-MM-DD","time":"HH:MM","title":"...","duration":45,"note":"..."}}
 """.strip()
 
     raw, error = gemini_generate(prompt)
@@ -2344,7 +2614,7 @@ Yêu cầu:
         return fallback
 
     try:
-        match = re.search(r"\[[\s\S]*\]", raw)
+        match = re.search(r"\\[[\\s\\S]*\\]", raw)
         if not match:
             return fallback
 
@@ -2372,12 +2642,11 @@ Yêu cầu:
                 continue
 
             time_value = str(item.get("time") or preferred_time).strip()
-            if not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", time_value):
+            if not re.fullmatch(r"(?:[01]\\d|2[0-3]):[0-5]\\d", time_value):
                 time_value = preferred_time
 
             title = str(item.get("title") or "Buổi học").strip()[:160]
             note = str(item.get("note") or "").strip()[:500]
-
             duration = _safe_int(
                 item.get("duration"),
                 daily_minutes,
@@ -2393,9 +2662,43 @@ Yêu cầu:
                 "note": note,
             })
 
-        return valid or fallback
+        if not valid:
+            return fallback
 
-    except (ValueError, TypeError, KeyError) as exc:
+        # Khi đã có đề cương, loại kế hoạch quá chung chung: ít nhất một nửa
+        # số buổi học (không tính buổi kiểm tra) phải nhắc tới từ khóa của đề cương.
+        if syllabus_topics:
+            topic_tokens = set()
+            stop_words = {
+                "chương", "phần", "bài", "tuần", "module", "unit", "chapter",
+                "lesson", "và", "các", "của", "trong", "theo", "với", "một"
+            }
+            for topic in syllabus_topics[:16]:
+                for token in re.findall(r"[\\wÀ-ỹ]+", topic, flags=re.UNICODE):
+                    token_value = token.casefold()
+                    if len(token_value) >= 4 and token_value not in stop_words:
+                        topic_tokens.add(token_value)
+
+            learning_tasks = [
+                task for task in valid
+                if not any(
+                    marker in (task["title"] + " " + task["note"]).casefold()
+                    for marker in ("quiz", "kiểm tra", "đánh giá", "câu sai")
+                )
+            ]
+            matched_tasks = 0
+            for task in learning_tasks:
+                task_text = (task["title"] + " " + task["note"]).casefold()
+                if any(token in task_text for token in topic_tokens):
+                    matched_tasks += 1
+
+            required_matches = max(1, (len(learning_tasks) + 1) // 2)
+            if learning_tasks and matched_tasks < required_matches:
+                return fallback
+
+        return valid
+
+    except (ValueError, TypeError, KeyError, json.JSONDecodeError) as exc:
         print("Study planner JSON fallback:", exc)
         return fallback
 
@@ -4557,23 +4860,15 @@ def generate_study_plan_route():
         conn.close()
         return redirect(url_for("study_plan"))
 
-    docs = conn.execute(
-        """
-        SELECT original_name, extracted_text
-        FROM documents
-        WHERE user_id=? AND subject_id=?
-        ORDER BY id DESC
-        LIMIT 4
-        """,
-        (uid, subject_id)
-    ).fetchall()
-    context_parts = []
-    for doc in docs:
-        if doc["extracted_text"]:
-            context_parts.append(
-                f"TÀI LIỆU: {doc['original_name']}\n{doc['extracted_text'][:1200]}"
-            )
-    context = "\n\n".join(context_parts)
+    backbone = get_course_learning_backbone(
+        conn,
+        uid,
+        subject_id,
+        query=goal
+    )
+    if not backbone:
+        conn.close()
+        return redirect(url_for("study_plan"))
 
     weakness_rows = conn.execute(
         """
@@ -4587,14 +4882,6 @@ def generate_study_plan_route():
     ).fetchall()
     priority_topics = [dict(row) for row in weakness_rows]
 
-    # Study Agent dùng cả kiến thức chung và dữ liệu học tập riêng để
-    # tạo lộ trình phù hợp với đúng sinh viên này.
-    shared_context, _ = get_shared_subject_context(
-        uid,
-        subject_id,
-        goal,
-        max_chars=4500
-    )
     personal_context = get_personal_learning_context(
         uid,
         subject_id,
@@ -4602,18 +4889,21 @@ def generate_study_plan_route():
     )
 
     generated = build_study_plan(
-        subject["name"],
-        goal,
-        deadline_dt,
-        daily_minutes,
-        preferred_time,
-        context,
-        shared_context,
-        personal_context,
-        priority_topics,
+        subject_name=subject["name"],
+        goal=goal,
+        deadline_dt=deadline_dt,
+        daily_minutes=daily_minutes,
+        preferred_time=preferred_time,
+        context=backbone["personal_context"],
+        syllabus_text=backbone["syllabus_text"],
+        syllabus_topics=backbone["syllabus_topics"],
+        shared_context=backbone["shared_context"],
+        personal_context=personal_context,
+        priority_topics=priority_topics,
+        document_names=backbone["personal_document_names"],
     )
 
-    # Tránh nhân đôi khi người dùng bấm tạo lại kế hoạch cho cùng môn.
+    # Tránh nhân đôi khi người dùng tạo lại kế hoạch cho cùng môn.
     conn.execute(
         "DELETE FROM study_tasks WHERE user_id=? AND subject_id=? AND source='ai' AND done=0",
         (uid, subject_id)
@@ -4653,9 +4943,11 @@ def generate_study_plan_route():
 
     conn.commit()
     conn.close()
-    return redirect(url_for("study_plan"))
+    return redirect(url_for("study_plan", subject_id=subject_id))
 
 
+@app.route("/study-plan/tasks/create", methods=["POST"])
+@login_required
 @app.route("/study-plan/tasks/create", methods=["POST"])
 @login_required
 def create_study_task():
@@ -5359,6 +5651,10 @@ def api_mobile_study_plan():
         "SELECT * FROM subjects WHERE id=? AND user_id=?",
         (subject_id, uid)
     ).fetchone()
+    if not subject:
+        conn.close()
+        return jsonify({"error": "Không tìm thấy môn học."}), 404
+
     profile = ensure_learning_profile(conn, uid)
 
     preferred_time = str(
@@ -5366,7 +5662,7 @@ def api_mobile_study_plan():
         or profile["preferred_study_time"]
         or "19:00"
     ).strip()
-    if not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", preferred_time):
+    if not re.fullmatch(r"(?:[01]\\d|2[0-3]):[0-5]\\d", preferred_time):
         preferred_time = "19:00"
 
     daily_minutes = _safe_int(
@@ -5376,27 +5672,21 @@ def api_mobile_study_plan():
         180
     )
 
-    docs = conn.execute(
-        """
-        SELECT original_name,extracted_text
-        FROM documents
-        WHERE user_id=? AND subject_id=?
-        ORDER BY id DESC
-        LIMIT 4
-        """,
-        (uid, subject_id)
-    ).fetchall()
-    context = "\n\n".join(
-        f"TÀI LIỆU: {row['original_name']}\n{(row['extracted_text'] or '')[:1200]}"
-        for row in docs
-        if (row["extracted_text"] or "").strip()
+    backbone = get_course_learning_backbone(
+        conn,
+        uid,
+        subject_id,
+        query=goal
     )
+    if not backbone:
+        conn.close()
+        return jsonify({"error": "Không đọc được cấu trúc môn học."}), 400
 
     weakness_rows = conn.execute(
         """
         SELECT topic,chapter,miss_count,correct_count
         FROM learning_weaknesses
-        WHERE user_id=? AND subject_id=? AND miss_count > 0
+        WHERE user_id=? AND subject_id=? AND miss_count > correct_count
         ORDER BY (miss_count - correct_count * 0.5) DESC,last_seen_at DESC
         LIMIT 5
         """,
@@ -5404,23 +5694,25 @@ def api_mobile_study_plan():
     ).fetchall()
     priority_topics = [dict(row) for row in weakness_rows]
 
-    shared_context, _ = get_shared_subject_context(
-        uid, subject_id, goal, max_chars=4500
-    )
     personal_context = get_personal_learning_context(
-        uid, subject_id, max_weaknesses=8
+        uid,
+        subject_id,
+        max_weaknesses=8
     )
 
     generated = build_study_plan(
-        subject["name"],
-        goal,
-        deadline_dt,
-        daily_minutes,
-        preferred_time,
-        context,
-        shared_context,
-        personal_context,
-        priority_topics
+        subject_name=subject["name"],
+        goal=goal,
+        deadline_dt=deadline_dt,
+        daily_minutes=daily_minutes,
+        preferred_time=preferred_time,
+        context=backbone["personal_context"],
+        syllabus_text=backbone["syllabus_text"],
+        syllabus_topics=backbone["syllabus_topics"],
+        shared_context=backbone["shared_context"],
+        personal_context=personal_context,
+        priority_topics=priority_topics,
+        document_names=backbone["personal_document_names"],
     )
 
     conn.execute(
@@ -5466,12 +5758,17 @@ def api_mobile_study_plan():
 
     return jsonify({
         "success": True,
+        "course_backbone": {
+            "has_syllabus": bool(backbone["syllabus_text"]),
+            "syllabus_topics": backbone["syllabus_topics"][:12],
+            "personal_documents": backbone["personal_document_names"],
+            "shared_sources": backbone["shared_source_names"],
+        },
         "tasks": [dict(row) for row in rows]
     })
 
 
-
-
+@app.route("/uploads/<path:filename>")
 @app.route("/uploads/<path:filename>")
 @login_required
 def uploaded_file(filename):
