@@ -1030,6 +1030,7 @@ def get_personal_learning_context(user_id, subject_id, max_weaknesses=5):
         SELECT topic,chapter,miss_count,correct_count,last_seen_at
         FROM learning_weaknesses
         WHERE user_id=? AND subject_id=?
+          AND miss_count > 0
         ORDER BY (miss_count - correct_count * 0.5) DESC, last_seen_at DESC
         LIMIT ?
         """,
@@ -1178,7 +1179,9 @@ def record_quiz_learning_signal(
                 row["id"]
             )
         )
-    else:
+    elif not is_correct:
+        # Chỉ tạo weakness mới khi sinh viên thực sự trả lời sai.
+        # Câu đúng ngay lần đầu không nên xuất hiện trong "Phần cần ôn thêm".
         conn.execute(
             """
             INSERT INTO learning_weaknesses(
@@ -2751,6 +2754,7 @@ def subject_detail(subject_id):
         SELECT topic,chapter,miss_count,correct_count,last_seen_at
         FROM learning_weaknesses
         WHERE user_id=? AND subject_id=?
+          AND miss_count > 0
         ORDER BY (miss_count - correct_count * 0.5) DESC, last_seen_at DESC
         LIMIT 8
         """,
@@ -3220,6 +3224,7 @@ def api_subject_learning_insights(subject_id):
         SELECT id,topic,miss_count,correct_count,last_seen_at
         FROM learning_weaknesses
         WHERE user_id=? AND subject_id=?
+          AND miss_count > 0
         ORDER BY (miss_count - correct_count * 0.5) DESC, last_seen_at DESC
         LIMIT 12
         """,
