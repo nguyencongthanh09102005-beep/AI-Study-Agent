@@ -2062,6 +2062,7 @@ def _fallback_study_plan(
     general_templates = [
         ("Xác định nội dung cần hoàn thành", "Xem mục tiêu và chia phần kiến thức cần học."),
         ("Đọc tài liệu và ghi chú ý chính", "Tập trung vào khái niệm, ví dụ và phần chưa hiểu."),
+        ("Ôn phần kiến thức chưa vững", "Đọc lại ghi chú và đánh dấu nội dung cần hỏi thêm."),
         ("Hỏi AI phần chưa hiểu", "Dùng AI Chat để giải thích các ý còn mơ hồ."),
         ("Làm quiz kiểm tra", "Làm quiz để kiểm tra mức độ ghi nhớ, ưu tiên các phần vừa ôn."),
         ("Xem lại câu sai", "Ôn nguyên nhân sai và cập nhật lại phần kiến thức cần nhớ."),
@@ -4083,7 +4084,7 @@ def generate_study_plan_route():
     goal = request.form.get("goal", "").strip()
     deadline_raw = request.form.get("deadline", "").strip()
     preferred_time = request.form.get("preferred_time", "19:00").strip() or "19:00"
-    daily_minutes = _safe_int(request.form.get("daily_minutes"), 45, 20, 180)
+    daily_minutes = _safe_int(request.form.get("daily_minutes"), 45, 15, 180)
 
     if not subject_id or not goal or not deadline_raw:
         return redirect(url_for("study_plan"))
