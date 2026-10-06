@@ -2209,28 +2209,28 @@ def _extract_syllabus_topics(syllabus_text, max_topics=24):
         return []
 
     raw_lines = [
-        re.sub(r"\\s+", " ", line).strip()
-        for line in text_value.replace("\\r", "\\n").split("\\n")
-        if re.sub(r"\\s+", " ", line).strip()
+        re.sub(r"\s+", " ", line).strip()
+        for line in text_value.replace("\r", "\n").split("\n")
+        if re.sub(r"\s+", " ", line).strip()
     ]
 
     heading_pattern = re.compile(
-        r"^(?:chương|bài|phần|tuần|unit|module|chapter|lesson|topic)\\s*"
-        r"(?:[ivxlcdm]+|\\d+(?:\\.\\d+)*)?\\s*[:.\\-–—]?\\s*.+$",
+        r"^(?:chương|bài|phần|tuần|unit|module|chapter|lesson|topic)\s*"
+        r"(?:[ivxlcdm]+|\d+(?:\.\d+)*)?\s*[:.\-–—]?\s*.+$",
         re.IGNORECASE,
     )
     numbered_pattern = re.compile(
-        r"^(?:\\d+(?:\\.\\d+)*|[ivxlcdm]+)[.)\\-:]?\\s+.+$",
+        r"^(?:\d+(?:\.\d+)*|[ivxlcdm]+)[.)\-:]?\s+.+$",
         re.IGNORECASE,
     )
-    bullet_pattern = re.compile(r"^[•●▪◦*+\\-–—]\\s+.+$")
+    bullet_pattern = re.compile(r"^[•●▪◦*+\-–—]\s+.+$")
 
     selected = []
     fallback_lines = []
 
     for line in raw_lines:
-        cleaned = re.sub(r"^[•●▪◦*+\\-–—]\\s*", "", line).strip()
-        cleaned = re.sub(r"\\s+", " ", cleaned)
+        cleaned = re.sub(r"^[•●▪◦*+\-–—]\s*", "", line).strip()
+        cleaned = re.sub(r"\s+", " ", cleaned)
         if len(cleaned) < 3 or len(cleaned) > 220:
             continue
 
@@ -2315,7 +2315,7 @@ def get_course_learning_backbone(conn, user_id, subject_id, query=""):
             break
         clipped = text_value[:min(1800, remaining)]
         personal_parts.append(
-            f"TÀI LIỆU CÁ NHÂN - {row['original_name']}:\\n{clipped}"
+            f"TÀI LIỆU CÁ NHÂN - {row['original_name']}:\n{clipped}"
         )
         document_names.append(row["original_name"])
         personal_total += len(clipped)
@@ -2337,7 +2337,7 @@ def get_course_learning_backbone(conn, user_id, subject_id, query=""):
         query_terms = {
             token.casefold()
             for token in re.findall(
-                r"[\\wÀ-ỹ]+",
+                r"[\wÀ-ỹ]+",
                 query or "",
                 flags=re.UNICODE
             )
@@ -2363,7 +2363,7 @@ def get_course_learning_backbone(conn, user_id, subject_id, query=""):
             content_value = (row["content"] or "").strip()
             clipped = content_value[:min(1600, remaining)]
             shared_parts.append(
-                f"KIẾN THỨC DÙNG CHUNG - {row['title']}:\\n{clipped}"
+                f"KIẾN THỨC DÙNG CHUNG - {row['title']}:\n{clipped}"
             )
             shared_names.append(row["title"])
             shared_total += len(clipped)
@@ -2372,9 +2372,9 @@ def get_course_learning_backbone(conn, user_id, subject_id, query=""):
         "subject": subject,
         "syllabus_text": syllabus_text[:12000],
         "syllabus_topics": syllabus_topics,
-        "personal_context": "\\n\\n".join(personal_parts),
+        "personal_context": "\n\n".join(personal_parts),
         "personal_document_names": document_names,
-        "shared_context": "\\n\\n".join(shared_parts),
+        "shared_context": "\n\n".join(shared_parts),
         "shared_source_names": shared_names,
     }
 
@@ -2425,20 +2425,19 @@ def _fallback_study_plan(
 
         label = f"{chapter} - {topic}" if chapter else topic
         note = (
-            f"Ưu tiên vì đây là phần còn yếu"
+            "Ưu tiên vì đây là phần còn yếu"
             + (f", đã sai {miss_count} lần" if miss_count else "")
             + ". Ôn lại khái niệm, ví dụ và ghi chú nguyên nhân chưa vững."
         )
         weak_units.append((label, note))
 
-    # Giữ thứ tự đề cương và tránh lặp lại chủ đề đã được đưa lên đầu do weakness.
     weak_keys = {
-        re.sub(r"\\s+", " ", label).casefold()
+        re.sub(r"\s+", " ", label).casefold()
         for label, _ in weak_units
     }
     syllabus_units = []
     for topic in syllabus_topics:
-        normalized = re.sub(r"\\s+", " ", topic).casefold()
+        normalized = re.sub(r"\s+", " ", topic).casefold()
         if any(
             normalized in weak_key or weak_key in normalized
             for weak_key in weak_keys
@@ -2452,7 +2451,6 @@ def _fallback_study_plan(
     if not units:
         units = [goal or f"Nội dung trọng tâm môn {subject_name}"]
 
-    # Chia các mục đề cương theo thứ tự vào số buổi hiện có.
     chunks = []
     for index in range(learning_slots):
         start = round(index * len(units) / learning_slots)
@@ -2554,7 +2552,7 @@ def build_study_plan(
 
     today = datetime.now().date().isoformat()
     deadline_date = deadline_dt.date().isoformat()
-    topic_outline = "\\n".join(
+    topic_outline = "\n".join(
         f"{index + 1}. {topic}"
         for index, topic in enumerate(syllabus_topics[:24])
     )
@@ -2614,7 +2612,7 @@ NGUYÊN TẮC BẮT BUỘC:
         return fallback
 
     try:
-        match = re.search(r"\\[[\\s\\S]*\\]", raw)
+        match = re.search(r"\[[\s\S]*\]", raw)
         if not match:
             return fallback
 
@@ -2642,7 +2640,7 @@ NGUYÊN TẮC BẮT BUỘC:
                 continue
 
             time_value = str(item.get("time") or preferred_time).strip()
-            if not re.fullmatch(r"(?:[01]\\d|2[0-3]):[0-5]\\d", time_value):
+            if not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", time_value):
                 time_value = preferred_time
 
             title = str(item.get("title") or "Buổi học").strip()[:160]
@@ -2665,8 +2663,6 @@ NGUYÊN TẮC BẮT BUỘC:
         if not valid:
             return fallback
 
-        # Khi đã có đề cương, loại kế hoạch quá chung chung: ít nhất một nửa
-        # số buổi học (không tính buổi kiểm tra) phải nhắc tới từ khóa của đề cương.
         if syllabus_topics:
             topic_tokens = set()
             stop_words = {
@@ -2674,7 +2670,7 @@ NGUYÊN TẮC BẮT BUỘC:
                 "lesson", "và", "các", "của", "trong", "theo", "với", "một"
             }
             for topic in syllabus_topics[:16]:
-                for token in re.findall(r"[\\wÀ-ỹ]+", topic, flags=re.UNICODE):
+                for token in re.findall(r"[\wÀ-ỹ]+", topic, flags=re.UNICODE):
                     token_value = token.casefold()
                     if len(token_value) >= 4 and token_value not in stop_words:
                         topic_tokens.add(token_value)
@@ -5660,7 +5656,7 @@ def api_mobile_study_plan():
         or profile["preferred_study_time"]
         or "19:00"
     ).strip()
-    if not re.fullmatch(r"(?:[01]\\d|2[0-3]):[0-5]\\d", preferred_time):
+    if not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", preferred_time):
         preferred_time = "19:00"
 
     daily_minutes = _safe_int(
