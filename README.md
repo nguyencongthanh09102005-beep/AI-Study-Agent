@@ -55,9 +55,13 @@ Mở `.env` và điền:
 ```env
 GEMINI_API_KEY=YOUR_KEY
 GEMINI_MODEL=gemini-3.8-flash
+GEMINI_FALLBACK_MODELS=gemini-3.7-flash,gemini-3.5-flash-lite
+GEMINI_PRIMARY_RETRIES=2
 ```
 
 Sau đó khởi động lại Flask.
+
+Khi model chính gặp lỗi tạm thời như HTTP 429/503 hoặc timeout, hệ thống tự retry theo exponential backoff rồi chuyển sang các model dự phòng. Chat còn có fallback cục bộ từ tài liệu/kiến thức chung nếu toàn bộ model đều tạm thời không phản hồi.
 
 ## Lưu ý khi nộp
 
