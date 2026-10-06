@@ -1606,13 +1606,15 @@ CHỈ trả về JSON hợp lệ, không markdown, theo đúng cấu trúc:
     )
 
 
-def build_quiz(text, question_count=10):
+def build_quiz(text, question_count=10, focus_topics=None):
     """
     Tạo quiz 10 / 20 / 30 câu bằng Gemini.
 
+    focus_topics (nếu có) dùng để ưu tiên các chủ đề sinh viên đang yếu.
     Để tránh Gemini trả thiếu câu khi yêu cầu quá dài,
     hệ thống tạo theo từng nhóm tối đa 10 câu rồi ghép lại.
     """
+    focus_topics = focus_topics or []
 
     # =====================================================
     # CHỈ CHO PHÉP 10 / 20 / 30
@@ -1816,12 +1818,37 @@ def build_quiz(text, question_count=10):
                 + "\\n".join(avoid_lines)
             )
 
+        focus_lines = []
+        for item in focus_topics[:8]:
+            if isinstance(item, dict):
+                topic = str(item.get("topic") or "").strip()
+                chapter = str(item.get("chapter") or "").strip()
+                miss_count = item.get("miss_count")
+                if topic:
+                    label = f"{chapter} - {topic}" if chapter else topic
+                    if miss_count is not None:
+                        label += f" (đã sai {miss_count} lần)"
+                    focus_lines.append(f"- {label}")
+            else:
+                topic = str(item or "").strip()
+                if topic:
+                    focus_lines.append(f"- {topic}")
+
+        focus_text = (
+            "\nCÁC CHỦ ĐỀ CẦN ƯU TIÊN ÔN TẬP:\n"
+            + "\n".join(focus_lines)
+            + "\nHãy dành phần lớn câu hỏi cho các chủ đề này nếu tài liệu có nội dung liên quan.\n"
+            if focus_lines
+            else ""
+        )
+
         prompt = f"""
 Bạn là AI Study Agent.
 
 Nhiệm vụ:
 Tạo đúng {batch_size} câu hỏi trắc nghiệm bằng tiếng Việt
 cho NHÓM {batch_number}, dựa CHỈ trên nội dung tài liệu.
+{focus_text}
 
 TÀI LIỆU:
 {document_content}
@@ -3565,125 +3592,216 @@ def quiz():
     conn = db()
 
     # =====================================================
-    # TẠO QUIZ MỚI
+    # TẠO QUIZ MỚI: TÀI LIỆU / MÔN HỌC / ÔN ĐIỂM YẾU
     # =====================================================
     if request.method == "POST":
-        doc_id = request.form.get("document_id")
+        mode = (request.form.get("quiz_mode") or "document").strip().lower()
 
         try:
-            question_count = int(
-                request.form.get("question_count", 10)
-            )
+            question_count = int(request.form.get("question_count", 10))
         except (TypeError, ValueError):
             question_count = 10
 
         if question_count not in (10, 20, 30):
             question_count = 10
 
-        doc = conn.execute(
-            """
-            SELECT *
-            FROM documents
-            WHERE id=? AND user_id=?
-            """,
-            (doc_id, uid)
-        ).fetchone()
+        questions = []
+        subject_id = None
+        document_id = None
+        title = "Quiz luyện tập"
 
-        if doc:
-            questions = build_quiz(
-                doc["extracted_text"] or "",
-                question_count
+        if mode == "document":
+            doc_id = request.form.get("document_id")
+            doc = conn.execute(
+                """
+                SELECT *
+                FROM documents
+                WHERE id=? AND user_id=?
+                """,
+                (doc_id, uid)
+            ).fetchone()
+
+            if doc:
+                questions = build_quiz(
+                    doc["extracted_text"] or "",
+                    question_count
+                )
+                subject_id = doc["subject_id"]
+                document_id = doc["id"]
+                title = f"Quiz từ {doc['original_name']}"
+
+        elif mode in {"subject", "weakness"}:
+            subject_id = owned_subject_id(
+                conn,
+                uid,
+                request.form.get("subject_id")
             )
 
+            subject = None
+            if subject_id:
+                subject = conn.execute(
+                    """
+                    SELECT id,name
+                    FROM subjects
+                    WHERE id=? AND user_id=?
+                    """,
+                    (subject_id, uid)
+                ).fetchone()
+
+            if subject:
+                docs = conn.execute(
+                    """
+                    SELECT original_name,extracted_text
+                    FROM documents
+                    WHERE user_id=? AND subject_id=?
+                    ORDER BY id DESC
+                    LIMIT 8
+                    """,
+                    (uid, subject_id)
+                ).fetchall()
+
+                context_parts = []
+                for doc in docs:
+                    text_value = (doc["extracted_text"] or "").strip()
+                    if text_value:
+                        context_parts.append(
+                            f"TÀI LIỆU {doc['original_name']}:\n{text_value[:4500]}"
+                        )
+
+                shared_context, _ = get_shared_subject_context(
+                    uid,
+                    subject_id,
+                    "",
+                    max_chars=7000
+                )
+                if shared_context:
+                    context_parts.append(shared_context)
+
+                combined_context = "\n\n".join(context_parts)[:22000]
+
+                focus_topics = []
+                if mode == "weakness":
+                    weakness_rows = conn.execute(
+                        """
+                        SELECT topic,chapter,miss_count,correct_count
+                        FROM learning_weaknesses
+                        WHERE user_id=? AND subject_id=? AND miss_count > 0
+                        ORDER BY (miss_count - correct_count * 0.5) DESC,
+                                 last_seen_at DESC
+                        LIMIT 8
+                        """,
+                        (uid, subject_id)
+                    ).fetchall()
+                    focus_topics = [dict(row) for row in weakness_rows]
+
+                    # Nếu chưa có weakness thì không tạo quiz giả vờ cá nhân hóa.
+                    if not focus_topics:
+                        conn.close()
+                        return redirect(url_for("quiz"))
+
+                if combined_context:
+                    questions = build_quiz(
+                        combined_context,
+                        question_count,
+                        focus_topics=focus_topics
+                    )
+
+                    if mode == "weakness":
+                        title = f"Ôn điểm yếu · {subject['name']}"
+                    else:
+                        title = f"Quiz môn {subject['name']}"
+
+        if questions:
             conn.execute(
                 """
                 INSERT INTO quizzes(
-                    user_id,
-                    subject_id,
-                    document_id,
-                    title,
-                    payload,
-                    created_at
+                    user_id,subject_id,document_id,title,payload,created_at
                 )
                 VALUES(?,?,?,?,?,?)
                 """,
                 (
                     uid,
-                    doc["subject_id"],
-                    doc["id"],
-                    f"Quiz từ {doc['original_name']}",
-                    json.dumps(
-                        questions,
-                        ensure_ascii=False
-                    ),
+                    subject_id,
+                    document_id,
+                    title,
+                    json.dumps(questions, ensure_ascii=False),
                     now()
                 )
             )
-
             conn.commit()
 
         conn.close()
-
-        return redirect(
-            url_for("quiz")
-        )
-
+        return redirect(url_for("quiz"))
 
     # =====================================================
-    # LẤY TÀI LIỆU
+    # DỮ LIỆU TRANG QUIZ
     # =====================================================
     docs = conn.execute(
         """
-        SELECT *
-        FROM documents
-        WHERE user_id=?
-        ORDER BY id DESC
+        SELECT d.*, s.name AS subject_name
+        FROM documents d
+        LEFT JOIN subjects s
+          ON s.id=d.subject_id AND s.user_id=d.user_id
+        WHERE d.user_id=?
+        ORDER BY d.id DESC
         """,
         (uid,)
     ).fetchall()
 
+    subjects = conn.execute(
+        """
+        SELECT
+            s.*,
+            COUNT(DISTINCT lw.id) AS weakness_count
+        FROM subjects s
+        LEFT JOIN learning_weaknesses lw
+          ON lw.subject_id=s.id
+         AND lw.user_id=s.user_id
+         AND lw.miss_count > 0
+        WHERE s.user_id=?
+        GROUP BY s.id
+        ORDER BY s.name ASC
+        """,
+        (uid,)
+    ).fetchall()
 
-    # =====================================================
-    # LẤY QUIZ
-    # =====================================================
     quizzes = conn.execute(
         """
-        SELECT *
-        FROM quizzes
-        WHERE user_id=?
-        ORDER BY id DESC
+        SELECT
+            q.*,
+            COUNT(qa.id) AS attempt_count,
+            MAX(qa.created_at) AS last_attempt_at,
+            MAX(qa.score) AS best_score
+        FROM quizzes q
+        LEFT JOIN quiz_attempts qa
+          ON qa.quiz_id=q.id
+         AND qa.user_id=q.user_id
+        WHERE q.user_id=?
+        GROUP BY q.id
+        ORDER BY q.id DESC
         """,
         (uid,)
     ).fetchall()
 
     conn.close()
 
-
-    # =====================================================
-    # CHUYỂN PAYLOAD JSON THÀNH DANH SÁCH CÂU HỎI
-    # =====================================================
     parsed = []
-
     for q in quizzes:
         item = dict(q)
-
         try:
-            item["questions"] = json.loads(
-                q["payload"]
-            )
+            item["questions"] = json.loads(q["payload"])
         except (json.JSONDecodeError, TypeError):
             item["questions"] = []
-
+        item["attempted"] = int(q["attempt_count"] or 0) > 0
         parsed.append(item)
-
 
     return render_template(
         "quiz.html",
         page="quiz",
         documents=docs,
+        subjects=subjects,
         quizzes=parsed
     )
-
 
 # =====================================================
 # XÓA QUIZ
