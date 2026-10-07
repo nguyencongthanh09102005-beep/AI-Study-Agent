@@ -4,7 +4,7 @@
 {% block page_styles %}<link rel="stylesheet" href="{{ url_for('static', filename='css/quiz.css') }}">{% endblock %}
 
 {% block content %}
-<section class="soft-card quiz-create-hub" id="quizCreateModes" data-initial-mode="{{ 'document' if selected_document_id else 'subject' }}">
+<section class="soft-card quiz-create-hub" id="quizCreateModes" data-initial-mode="{{ selected_quiz_mode or ('document' if selected_document_id else 'subject') }}">
   <div class="quiz-create-hub-head">
     <div class="quiz-create-title">
       <span class="quiz-create-main-icon">▤</span>
@@ -36,7 +36,7 @@
         <select name="subject_id" required>
           <option value="">Chọn môn học</option>
           {% for s in subjects %}
-          <option value="{{ s.id }}">{{ s.name }}</option>
+          <option value="{{ s.id }}" {% if selected_subject_id == s.id %}selected{% endif %}>{{ s.name }}</option>
           {% endfor %}
         </select>
       </label>
@@ -78,7 +78,7 @@
         <select name="subject_id" required>
           <option value="">Chọn môn có điểm yếu</option>
           {% for s in subjects if s.weakness_count %}
-          <option value="{{ s.id }}">{{ s.name }} · {{ s.weakness_count }} chủ đề cần ôn</option>
+          <option value="{{ s.id }}" {% if selected_subject_id == s.id %}selected{% endif %}>{{ s.name }} · {{ s.weakness_count }} chủ đề cần ôn</option>
           {% endfor %}
         </select>
       </label>
