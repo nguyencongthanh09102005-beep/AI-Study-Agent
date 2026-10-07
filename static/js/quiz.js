@@ -234,6 +234,39 @@ document.addEventListener("DOMContentLoaded", () => {
         );
         if (picker) {
           picker.dataset.attempted = "true";
+
+          const pickerMeta = picker.querySelector("small");
+          if (pickerMeta) {
+            const bestScore = Math.round(Number(data.best_score ?? data.score ?? 0));
+            pickerMeta.textContent =
+              `${questions.length} câu hỏi · Đã làm · Cao nhất ${bestScore}%`;
+          }
+        }
+
+        // Cập nhật ngay danh sách "Ôn tập điểm yếu" mà không cần reload trang.
+        const weaknessForm = document
+          .querySelector('.quiz-create-mode input[name="quiz_mode"][value="weakness"]')
+          ?.closest("form");
+        const weaknessSelect = weaknessForm?.querySelector('select[name="subject_id"]');
+
+        if (
+          weaknessSelect &&
+          Number(data.subject_id) > 0 &&
+          Number(data.weakness_count) > 0
+        ) {
+          const subjectId = String(data.subject_id);
+          let option = Array.from(weaknessSelect.options).find(
+            item => item.value === subjectId
+          );
+
+          if (!option) {
+            option = document.createElement("option");
+            option.value = subjectId;
+            weaknessSelect.appendChild(option);
+          }
+
+          option.textContent =
+            `${data.subject_name || "Môn học"} · ${data.weakness_count} chủ đề cần ôn`;
         }
 
         // Chấm và khóa đáp án trên giao diện
@@ -284,6 +317,13 @@ document.addEventListener("DOMContentLoaded", () => {
             resultText.textContent = `Bạn đạt ${score}%. Hãy xem lại những câu sai nhé. Kết quả đã được lưu.`;
           } else {
             resultText.textContent = `Bạn đạt ${score}%. Nên ôn lại tài liệu và thử lại. Kết quả đã được lưu.`;
+          }
+
+          if (data.learning_updated) {
+            const weaknessCount = Number(data.weakness_count || 0);
+            resultText.textContent += weaknessCount > 0
+              ? ` Study Agent đã cập nhật ${weaknessCount} chủ đề cần ôn.`
+              : " Study Agent đã cập nhật hồ sơ học tập từ kết quả này.";
           }
         }
 
@@ -336,6 +376,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (resultTitle) resultTitle.textContent = "Kết quả";
       if (resultText) resultText.textContent = "Bạn chưa nộp bài.";
+
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "✓ Nộp bài";
+      }
 
       updateProgress();
     });
