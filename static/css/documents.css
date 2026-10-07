@@ -239,3 +239,15 @@
     max-width: none;
   }
 }
+
+
+/* =====================================================
+   PHASE 2 - PERSONAL DOCUMENT PRIVACY
+===================================================== */
+.personal-document-notice{display:grid;grid-template-columns:42px minmax(0,1fr) auto;gap:12px;align-items:center;margin-bottom:16px;padding:13px 16px;border:1px solid #d8e9e2;border-radius:16px;background:linear-gradient(145deg,#f6fbf9,#edf7f4);box-shadow:0 8px 24px rgba(57,95,82,.06)}
+.personal-document-lock{width:42px;height:42px;display:grid;place-items:center;border-radius:13px;background:#dcf4eb;font-size:18px}
+.personal-document-notice strong{display:block;color:#255b4c;font-size:11px}
+.personal-document-notice p{margin:4px 0 0;color:#6d8a82;font-size:9px;line-height:1.5}
+.personal-document-badge,.private-list-label{display:inline-flex;align-items:center;padding:6px 9px;border-radius:999px;background:#dcf4eb;color:#168260;font-size:8.5px;font-weight:900;white-space:nowrap}
+.document-section-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+@media(max-width:650px){.personal-document-notice{grid-template-columns:40px 1fr}.personal-document-badge{grid-column:2;width:max-content}.private-list-label{display:none}}
