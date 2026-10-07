@@ -32,6 +32,31 @@
   </a>
 </section>
 
+{% if next_best_action %}
+<section class="soft-card proactive-agent-card proactive-{{ next_best_action.kind }}">
+  <div class="proactive-agent-main">
+    <span class="proactive-agent-avatar">🤖</span>
+    <div class="proactive-agent-copy">
+      <div class="proactive-agent-kicker">
+        <span>STUDY AGENT</span>
+        <b>{{ next_best_action.eyebrow }}</b>
+      </div>
+      <h3>{{ next_best_action.title }}</h3>
+      <p>{{ next_best_action.reason }}</p>
+      <div class="proactive-agent-meta">
+        {% for item in next_best_action.meta %}
+        <span>{{ item }}</span>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  <div class="proactive-agent-actions">
+    <a class="proactive-primary" href="{{ next_best_action.primary_url }}">{{ next_best_action.primary_label }} →</a>
+    <a class="proactive-secondary" href="{{ next_best_action.secondary_url }}">{{ next_best_action.secondary_label }}</a>
+  </div>
+</section>
+{% endif %}
+
 <section class="dashboard-main-grid">
   <article class="soft-card weekly-card">
     <div class="card-title-row">
