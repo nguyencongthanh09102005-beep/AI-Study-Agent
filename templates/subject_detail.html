@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ subject.name }} · AI Study Agent{% endblock %}
 {% block page_title %}{{ subject.name }}{% endblock %}
-{% block page_desc %}Kiến thức chung và hồ sơ học tập cá nhân{% endblock %}
+{% block page_desc %}Kiến thức chuẩn dùng chung và Personal Agent riêng cho từng sinh viên{% endblock %}
 {% block page_styles %}<link rel="stylesheet" href="{{ url_for('static', filename='css/subject_detail.css') }}">{% endblock %}
 
 {% block content %}
@@ -64,62 +64,73 @@
 </section>
 
 <section class="agent-two-column">
-  <article class="soft-card agent-panel">
+  <article class="soft-card agent-panel shared-readonly-panel">
     <div class="panel-head">
       <div>
-        <span class="panel-kicker">DÙNG CHUNG THEO MÔN</span>
-        <h3>📚 Đề cương & kiến thức chung</h3>
+        <span class="panel-kicker">SHARED KNOWLEDGE · DÙNG CHUNG THEO MÔN</span>
+        <h3>📚 Kiến thức chuẩn của môn</h3>
       </div>
-      <span class="shared-badge">Shared</span>
+      <span class="shared-badge">Shared · Read only</span>
     </div>
 
-    <p class="panel-desc">Phần này đại diện cho kiến thức có thể tái sử dụng giữa các sinh viên học cùng mã môn.</p>
+    <p class="panel-desc">
+      Study Agent dùng phần này làm nền kiến thức chung cho các sinh viên học cùng môn.
+      Ở giao diện sinh viên, nội dung này chỉ được sử dụng để học và không thể chỉnh sửa.
+    </p>
 
-    <form method="post" class="agent-form">
-      <input type="hidden" name="action_type" value="syllabus">
-      <label>
-        <span>Đề cương / nội dung trọng tâm</span>
-        <textarea name="syllabus_text" rows="8" placeholder="Dán đề cương môn học, chuẩn đầu ra, nội dung các chương...">{{ shared_subject.syllabus_text or '' }}</textarea>
-      </label>
-      <button class="soft-primary compact-primary" type="submit">Lưu đề cương chung</button>
-    </form>
-
-    <div class="shared-note-divider"><span>Tải tài liệu dùng chung</span></div>
-
-    <form method="post" enctype="multipart/form-data" class="agent-form">
-      <input type="hidden" name="action_type" value="shared_file">
-      <label>
-        <span>Đề cương / slide / tài liệu chung</span>
-        <input name="shared_file" type="file" accept=".pdf,.txt,.md" required>
-      </label>
-      <p class="panel-desc">File được trích xuất thành kiến thức dùng chung cho những sinh viên cùng môn; file tạm không được giữ lại sau khi xử lý.</p>
-      <button class="ghost-action agent-save-note" type="submit">↑ Thêm tài liệu vào kho chung</button>
-    </form>
-
-    <div class="shared-note-divider"><span>Thêm ghi chú chung</span></div>
-
-    <form method="post" class="agent-form">
-      <input type="hidden" name="action_type" value="shared_note">
-      <label>
-        <span>Tiêu đề</span>
-        <input name="title" type="text" placeholder="Ví dụ: Nội dung trọng tâm Chương 2">
-      </label>
-      <label>
-        <span>Nội dung</span>
-        <textarea name="content" rows="5" placeholder="Ghi chú, kiến thức chuẩn, nội dung giảng viên nhấn mạnh..."></textarea>
-      </label>
-      <button class="ghost-action agent-save-note" type="submit">＋ Thêm vào kho chung</button>
-    </form>
-
-    <div class="shared-list">
-      {% for item in shared_items %}
-      <div class="shared-item">
-        <span class="shared-item-icon">▤</span>
-        <div><strong>{{ item.title }}</strong><small>{{ item.source_type }} · {{ item.created_at[:10] }}</small><p>{{ item.content[:180] }}{% if item.content|length > 180 %}…{% endif %}</p></div>
+    <div class="shared-scope-note">
+      <span>◉</span>
+      <div>
+        <strong>{{ shared_subject.code or subject.code or subject.name }}</strong>
+        <small>
+          {% if shared_subject.code or subject.code %}
+          Các sinh viên có cùng mã môn dùng chung kho kiến thức này.
+          {% else %}
+          Môn chưa có mã; hệ thống đang ghép kho chung theo tên môn.
+          {% endif %}
+        </small>
       </div>
+    </div>
+
+    <div class="shared-readonly-section">
+      <div class="mini-section-head">
+        <h4>📑 Đề cương chuẩn</h4>
+        <span>Không thuộc dữ liệu cá nhân</span>
+      </div>
+      {% if shared_subject.syllabus_text %}
+      <div class="shared-syllabus-readonly">{{ shared_subject.syllabus_text }}</div>
       {% else %}
-      <div class="empty-agent">Chưa có kiến thức chung. Bạn có thể bắt đầu bằng đề cương môn học.</div>
-      {% endfor %}
+      <div class="empty-agent">
+        Chưa có đề cương chuẩn trong kho dùng chung. Sinh viên vẫn có thể học bằng tài liệu cá nhân;
+        phần quản lý nội dung chuẩn sẽ thuộc vai trò giảng viên/quản trị học thuật khi mở rộng hệ thống.
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="shared-readonly-section">
+      <div class="mini-section-head">
+        <h4>▤ Tài liệu & kiến thức chung đã xử lý</h4>
+        <span>{{ shared_items|length }} mục</span>
+      </div>
+      <div class="shared-list">
+        {% for item in shared_items %}
+        <div class="shared-item">
+          <span class="shared-item-icon">▤</span>
+          <div>
+            <strong>{{ item.title }}</strong>
+            <small>{{ item.source_type }} · {{ item.created_at[:10] }}</small>
+            <p>{{ item.content[:180] }}{% if item.content|length > 180 %}…{% endif %}</p>
+          </div>
+        </div>
+        {% else %}
+        <div class="empty-agent">Chưa có tài liệu chuẩn dùng chung cho môn này.</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="future-role-note">
+      <span>🔒</span>
+      <p><strong>Scope hiện tại:</strong> sinh viên chỉ đọc Shared Knowledge. Việc quản lý đề cương và bài giảng chuẩn được để cho vai trò giảng viên/thầy cô ở giai đoạn phát triển sau.</p>
     </div>
   </article>
 
@@ -132,7 +143,7 @@
       <span class="personal-badge">Private</span>
     </div>
 
-    <p class="panel-desc">Chỉ dùng để cá nhân hóa Study Agent cho tài khoản của bạn.</p>
+    <p class="panel-desc">Toàn bộ dữ liệu trong phần này chỉ thuộc tài khoản của bạn và được dùng để cá nhân hóa Study Agent.</p>
 
     <form method="post" class="agent-form personal-form">
       <input type="hidden" name="action_type" value="profile">
