@@ -1109,6 +1109,387 @@ def get_personal_learning_context(user_id, subject_id, max_weaknesses=5):
     return "\n".join(lines)
 
 
+def get_next_best_action(conn, user_id, subject_id=None):
+    """
+    Companion Agent / Next Best Action.
+    Dùng dữ liệu học hiện tại để chủ động đề xuất đúng 1 việc nên làm tiếp theo.
+    Không gọi Gemini mỗi lần mở trang để Dashboard phản hồi nhanh và ổn định.
+    """
+    now_dt = datetime.now()
+    now_iso = now_dt.isoformat(timespec="minutes")
+
+    subject = None
+    if subject_id:
+        subject = conn.execute(
+            """
+            SELECT id,name,code,target_score,progress
+            FROM subjects
+            WHERE id=? AND user_id=?
+            """,
+            (subject_id, user_id)
+        ).fetchone()
+        if not subject:
+            return None
+
+    weakness_params = [user_id]
+    weakness_subject_filter = ""
+    if subject_id:
+        weakness_subject_filter = " AND lw.subject_id=?"
+        weakness_params.append(subject_id)
+
+    weakness = conn.execute(
+        f"""
+        SELECT
+            lw.topic,lw.chapter,lw.miss_count,lw.correct_count,lw.last_seen_at,
+            s.id AS subject_id,s.name AS subject_name,s.progress
+        FROM learning_weaknesses lw
+        JOIN subjects s
+          ON s.id=lw.subject_id AND s.user_id=lw.user_id
+        WHERE lw.user_id=?
+          AND lw.miss_count > lw.correct_count
+          {weakness_subject_filter}
+        ORDER BY
+            (lw.miss_count - lw.correct_count * 0.5) DESC,
+            lw.last_seen_at DESC
+        LIMIT 1
+        """,
+        tuple(weakness_params)
+    ).fetchone()
+
+    task_params = [user_id]
+    task_subject_filter = ""
+    if subject_id:
+        task_subject_filter = " AND t.subject_id=?"
+        task_params.append(subject_id)
+
+    open_tasks = conn.execute(
+        f"""
+        SELECT
+            t.id,t.subject_id,t.title,t.study_at,t.duration,t.note,t.source,
+            s.name AS subject_name
+        FROM study_tasks t
+        LEFT JOIN subjects s
+          ON s.id=t.subject_id AND s.user_id=t.user_id
+        WHERE t.user_id=? AND t.done=0
+          {task_subject_filter}
+        ORDER BY t.study_at ASC,t.id ASC
+        LIMIT 30
+        """,
+        tuple(task_params)
+    ).fetchall()
+
+    overdue_task = None
+    today_task = None
+    upcoming_task = None
+
+    for row in open_tasks:
+        try:
+            task_dt = datetime.fromisoformat(row["study_at"])
+        except (TypeError, ValueError):
+            continue
+
+        if task_dt < now_dt and overdue_task is None:
+            overdue_task = row
+        elif task_dt.date() == now_dt.date() and today_task is None:
+            today_task = row
+        elif task_dt >= now_dt and upcoming_task is None:
+            upcoming_task = row
+
+    # Deadline toàn cục chỉ dùng ở Dashboard; reminder hiện chưa gắn subject_id.
+    urgent_reminder = None
+    if not subject_id:
+        reminder_rows = conn.execute(
+            """
+            SELECT id,title,due_at
+            FROM reminders
+            WHERE user_id=? AND done=0 AND due_at IS NOT NULL AND due_at<>''
+            ORDER BY due_at ASC,id ASC
+            LIMIT 12
+            """,
+            (user_id,)
+        ).fetchall()
+
+        for row in reminder_rows:
+            try:
+                due_dt = datetime.fromisoformat(row["due_at"])
+            except (TypeError, ValueError):
+                continue
+
+            if due_dt < now_dt or (due_dt - now_dt) <= timedelta(days=2):
+                urgent_reminder = row
+                break
+
+    quiz_params = [user_id, user_id]
+    quiz_subject_filter = ""
+    if subject_id:
+        quiz_subject_filter = " AND q.subject_id=?"
+        quiz_params.append(subject_id)
+
+    recent_quiz = conn.execute(
+        f"""
+        SELECT
+            qa.score,qa.correct_count,qa.total_questions,qa.created_at,
+            q.subject_id,s.name AS subject_name
+        FROM quiz_attempts qa
+        JOIN quizzes q
+          ON q.id=qa.quiz_id AND q.user_id=qa.user_id
+        LEFT JOIN subjects s
+          ON s.id=q.subject_id AND s.user_id=q.user_id
+        WHERE qa.user_id=? AND q.user_id=?
+          {quiz_subject_filter}
+        ORDER BY qa.id DESC
+        LIMIT 1
+        """,
+        tuple(quiz_params)
+    ).fetchone()
+
+    def task_action(row, eyebrow, reason_prefix):
+        try:
+            task_dt = datetime.fromisoformat(row["study_at"])
+            time_text = task_dt.strftime("%d/%m lúc %H:%M")
+        except (TypeError, ValueError):
+            time_text = "trong kế hoạch hiện tại"
+
+        subject_name = row["subject_name"] or "Kế hoạch học"
+        subject_value = row["subject_id"]
+        return {
+            "kind": "task",
+            "eyebrow": eyebrow,
+            "title": row["title"],
+            "reason": (
+                f"{reason_prefix} {subject_name}. "
+                f"Buổi này dự kiến {row['duration'] or 45} phút, {time_text}."
+            ),
+            "subject_id": subject_value,
+            "subject_name": subject_name,
+            "meta": [
+                f"{row['duration'] or 45} phút",
+                "Adaptive" if row["source"] == "adaptive" else "Theo kế hoạch"
+            ],
+            "primary_label": "Xem kế hoạch",
+            "primary_url": url_for("study_plan", subject_id=subject_value)
+                if subject_value else url_for("study_plan"),
+            "secondary_label": "Hỏi Study Agent",
+            "secondary_url": (
+                url_for("chat") + f"?subject_id={subject_value}"
+                if subject_value else url_for("chat")
+            )
+        }
+
+    # 1) Deadline rất gần/quá hạn cần xử lý trước ở Dashboard.
+    if urgent_reminder:
+        try:
+            due_dt = datetime.fromisoformat(urgent_reminder["due_at"])
+            if due_dt < now_dt:
+                due_text = "đã quá hạn"
+            else:
+                hours_left = max(
+                    0,
+                    round((due_dt - now_dt).total_seconds() / 3600)
+                )
+                due_text = (
+                    f"còn khoảng {hours_left} giờ"
+                    if hours_left < 48
+                    else "còn khoảng 2 ngày"
+                )
+        except (TypeError, ValueError):
+            due_text = "sắp đến hạn"
+
+        return {
+            "kind": "deadline",
+            "eyebrow": "Ưu tiên deadline",
+            "title": urgent_reminder["title"],
+            "reason": (
+                f"Deadline này {due_text}. Study Agent ưu tiên bạn kiểm tra "
+                "lại các buổi học liên quan trước khi tiếp tục nội dung mới."
+            ),
+            "subject_id": None,
+            "subject_name": "Toàn bộ kế hoạch",
+            "meta": ["Deadline gần", "Ưu tiên cao"],
+            "primary_label": "Mở kế hoạch học",
+            "primary_url": url_for("study_plan"),
+            "secondary_label": "Hỏi Study Agent",
+            "secondary_url": url_for("chat")
+        }
+
+    # 2) Điểm yếu từ Quiz là tín hiệu học tập mạnh nhất.
+    if weakness:
+        chapter = (weakness["chapter"] or "").strip()
+        topic = weakness["topic"]
+        weak_label = f"{chapter} · {topic}" if chapter else topic
+        gap = int(weakness["miss_count"] or 0) - int(
+            weakness["correct_count"] or 0
+        )
+        return {
+            "kind": "weakness",
+            "eyebrow": "Đề xuất từ kết quả Quiz",
+            "title": f"Ôn lại {weak_label}",
+            "reason": (
+                f"Bạn vẫn còn yếu ở chủ đề này trong {weakness['subject_name']}. "
+                f"Hiện số lần sai đang nhiều hơn số lần đúng {max(1, gap)} lần, "
+                "nên Agent ưu tiên củng cố trước khi học tiếp."
+            ),
+            "subject_id": weakness["subject_id"],
+            "subject_name": weakness["subject_name"],
+            "meta": [
+                f"Tiến độ {int(weakness['progress'] or 0)}%",
+                f"Sai {weakness['miss_count']} · Đúng {weakness['correct_count']}"
+            ],
+            "primary_label": "Ôn điểm yếu",
+            "primary_url": url_for(
+                "quiz",
+                mode="weakness",
+                subject_id=weakness["subject_id"]
+            ),
+            "secondary_label": "Xem môn học",
+            "secondary_url": url_for(
+                "subject_detail",
+                subject_id=weakness["subject_id"]
+            )
+        }
+
+    # 3) Có buổi học bị trễ.
+    if overdue_task:
+        return task_action(
+            overdue_task,
+            "Buổi học cần xử lý",
+            "Buổi học này đã qua thời gian dự kiến của"
+        )
+
+    # 4) Có task hôm nay.
+    if today_task:
+        return task_action(
+            today_task,
+            "Việc nên làm hôm nay",
+            "Đây là nhiệm vụ gần nhất hôm nay của"
+        )
+
+    # 5) Subject detail: nếu chưa có task thì chủ động yêu cầu tạo roadmap.
+    if subject_id and not open_tasks:
+        quiz_text = ""
+        if recent_quiz:
+            quiz_text = f" Quiz gần nhất đạt {round(float(recent_quiz['score'] or 0))}%."
+
+        return {
+            "kind": "plan",
+            "eyebrow": "Bước tiếp theo",
+            "title": "Tạo lộ trình học theo đề cương",
+            "reason": (
+                f"{subject['name']} hiện chưa có buổi học sắp tới.{quiz_text} "
+                "Agent đề xuất tạo roadmap để xác định rõ nội dung và nhịp học tiếp theo."
+            ),
+            "subject_id": subject_id,
+            "subject_name": subject["name"],
+            "meta": [
+                f"Tiến độ {int(subject['progress'] or 0)}%",
+                (
+                    f"Mục tiêu {subject['target_score']:g}"
+                    if subject["target_score"] else "Chưa đặt mục tiêu điểm"
+                )
+            ],
+            "primary_label": "Tạo kế hoạch",
+            "primary_url": url_for("study_plan", subject_id=subject_id),
+            "secondary_label": "Hỏi Study Agent",
+            "secondary_url": url_for("chat") + f"?subject_id={subject_id}"
+        }
+
+    # 6) Task kế tiếp trong tương lai.
+    if upcoming_task:
+        return task_action(
+            upcoming_task,
+            "Tiếp theo trong lộ trình",
+            "Đây là buổi học tiếp theo của"
+        )
+
+    # 7) Dashboard chưa có task/weakness: chọn môn tiến độ thấp nhất.
+    if not subject_id:
+        low_subject = conn.execute(
+            """
+            SELECT id,name,target_score,progress
+            FROM subjects
+            WHERE user_id=?
+            ORDER BY progress ASC,id DESC
+            LIMIT 1
+            """,
+            (user_id,)
+        ).fetchone()
+
+        if low_subject:
+            return {
+                "kind": "plan",
+                "eyebrow": "Agent đề xuất bước tiếp theo",
+                "title": f"Lập kế hoạch cho {low_subject['name']}",
+                "reason": (
+                    f"Môn này đang có tiến độ {int(low_subject['progress'] or 0)}% "
+                    "và hiện chưa có việc ưu tiên hơn. Tạo lộ trình sẽ giúp Agent "
+                    "theo sát việc học thay vì chờ bạn tự chọn nội dung."
+                ),
+                "subject_id": low_subject["id"],
+                "subject_name": low_subject["name"],
+                "meta": [
+                    f"Tiến độ {int(low_subject['progress'] or 0)}%",
+                    "Chưa có task ưu tiên"
+                ],
+                "primary_label": "Tạo kế hoạch",
+                "primary_url": url_for(
+                    "study_plan",
+                    subject_id=low_subject["id"]
+                ),
+                "secondary_label": "Xem môn học",
+                "secondary_url": url_for(
+                    "subject_detail",
+                    subject_id=low_subject["id"]
+                )
+            }
+
+        return {
+            "kind": "setup",
+            "eyebrow": "Bắt đầu với Study Agent",
+            "title": "Thêm môn học đầu tiên",
+            "reason": (
+                "Khi có môn học, Agent mới có thể theo dõi đề cương, Quiz, "
+                "điểm yếu, tiến độ và chủ động đề xuất bước học tiếp theo."
+            ),
+            "subject_id": None,
+            "subject_name": "Study Agent",
+            "meta": ["Chưa có môn học"],
+            "primary_label": "Thêm môn học",
+            "primary_url": url_for("subjects"),
+            "secondary_label": "Tài liệu của tôi",
+            "secondary_url": url_for("documents")
+        }
+
+    # 8) Subject detail đã ổn: khuyến nghị kiểm tra lại bằng Quiz.
+    score_text = (
+        f"Quiz gần nhất đạt {round(float(recent_quiz['score'] or 0))}%."
+        if recent_quiz else
+        "Chưa có kết quả Quiz gần đây."
+    )
+    return {
+        "kind": "check",
+        "eyebrow": "Đang đúng tiến độ",
+        "title": "Kiểm tra lại mức độ nắm bài",
+        "reason": (
+            f"{score_text} Hiện không có điểm yếu hoặc buổi học tồn đọng, "
+            "nên Agent đề xuất một Quiz ngắn trước khi chuyển sang nội dung tiếp theo."
+        ),
+        "subject_id": subject_id,
+        "subject_name": subject["name"],
+        "meta": [
+            f"Tiến độ {int(subject['progress'] or 0)}%",
+            "Không có weakness đang mở"
+        ],
+        "primary_label": "Tạo Quiz môn học",
+        "primary_url": url_for(
+            "quiz",
+            mode="subject",
+            subject_id=subject_id
+        ),
+        "secondary_label": "Hỏi Study Agent",
+        "secondary_url": url_for("chat") + f"?subject_id={subject_id}"
+    }
+
+
 def _quiz_topic_key(question_text):
     normalized = re.sub(
         r"[^\wÀ-ỹ]+",
@@ -3264,6 +3645,11 @@ def dashboard():
 
         reminders.append(item)
 
+    next_best_action = get_next_best_action(
+        conn,
+        uid
+    )
+
     conn.close()
 
     avg_progress = (
@@ -3289,7 +3675,8 @@ def dashboard():
         weekly_total_hours=weekly_total_hours,
         previous_week_hours=previous_week_hours,
         weekly_growth_text=weekly_growth_text,
-        weekly_growth_class=weekly_growth_class
+        weekly_growth_class=weekly_growth_class,
+        next_best_action=next_best_action
     )
 
 @app.route("/subjects", methods=["GET", "POST"])
@@ -3578,6 +3965,12 @@ def subject_detail(subject_id):
         (uid, subject_id)
     ).fetchall()
 
+    next_best_action = get_next_best_action(
+        conn,
+        uid,
+        subject_id=subject_id
+    )
+
     conn.close()
 
     return render_template(
@@ -3590,7 +3983,8 @@ def subject_detail(subject_id):
         weaknesses=weaknesses,
         documents=docs,
         quiz_stats=quiz_stats,
-        upcoming_tasks=upcoming_tasks
+        upcoming_tasks=upcoming_tasks,
+        next_best_action=next_best_action
     )
 
 
