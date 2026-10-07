@@ -22,3 +22,19 @@
 
 @media(max-width:1150px){.agent-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.agent-two-column{grid-template-columns:1fr}.agent-bottom-grid{grid-template-columns:1fr}}
 @media(max-width:720px){.agent-subject-head{align-items:flex-start;flex-direction:column}.agent-subject-actions{justify-content:flex-start}.agent-summary-grid{grid-template-columns:1fr}.form-grid-2{grid-template-columns:1fr}.agent-bottom-grid{grid-template-columns:1fr}}
+
+
+/* =====================================================
+   PHASE 2 - SHARED KNOWLEDGE IS READ-ONLY FOR STUDENTS
+===================================================== */
+.shared-readonly-panel{position:relative;overflow:hidden}
+.shared-readonly-panel:before{content:"";position:absolute;inset:0 0 auto 0;height:3px;background:linear-gradient(90deg,#5d8dff,#7a60f5);opacity:.78}
+.shared-scope-note{display:grid;grid-template-columns:34px 1fr;gap:10px;align-items:center;margin:0 0 16px;padding:11px 12px;border:1px solid #dfe7f7;border-radius:13px;background:#f4f7fd;color:#38517d}
+.shared-scope-note>span{width:34px;height:34px;display:grid;place-items:center;border-radius:10px;background:#dfe9ff;color:#4a6ff2}
+.shared-scope-note strong{display:block;font-size:10.5px;color:#304873}
+.shared-scope-note small{display:block;margin-top:3px;font-size:8.5px;line-height:1.45;color:#7b8bab}
+.shared-readonly-section{margin-top:15px;padding-top:15px;border-top:1px solid #e1e8f4}
+.shared-syllabus-readonly{max-height:260px;overflow:auto;padding:13px 14px;border:1px solid #dfe6f3;border-radius:13px;background:#f7f9fd;color:#475b82;font-size:10px;line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere;box-shadow:inset 2px 2px 7px rgba(102,122,160,.06)}
+.future-role-note{display:flex;gap:9px;align-items:flex-start;margin-top:16px;padding:11px 12px;border-radius:13px;background:#eef3fb;color:#7382a4}
+.future-role-note p{margin:0;font-size:9px;line-height:1.55}
+.future-role-note strong{color:#41567f}
