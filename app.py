@@ -3239,91 +3239,20 @@ def subject_detail(subject_id):
                 )
             )
 
-        elif action_type == "syllabus" and shared:
-            syllabus_text = request.form.get(
-                "syllabus_text",
-                ""
-            ).strip()[:50000]
-            conn.execute(
-                """
-                UPDATE shared_subjects
-                SET syllabus_text=?, updated_at=?
-                WHERE id=?
-                """,
-                (syllabus_text, now(), shared["id"])
+        elif action_type in {"syllabus", "shared_file", "shared_note"}:
+            # Shared Knowledge là dữ liệu học thuật dùng chung của môn.
+            # Ở scope sinh viên hiện tại, tài khoản sinh viên chỉ được đọc,
+            # không được ghi dữ liệu cá nhân vào kho dùng chung.
+            conn.close()
+            return (
+                "Kho kiến thức chung chỉ đọc đối với sinh viên. "
+                "Tài liệu sinh viên tải lên luôn được lưu ở phạm vi cá nhân.",
+                403
             )
 
-        elif action_type == "shared_file" and shared:
-            shared_file = request.files.get("shared_file")
-
-            if (
-                shared_file
-                and shared_file.filename
-                and allowed_file(shared_file.filename)
-            ):
-                original = secure_filename(shared_file.filename)
-                ext = original.rsplit(".", 1)[-1].lower()
-                temp_name = (
-                    f"shared_{uid}_{datetime.now().strftime('%Y%m%d%H%M%S%f')}_{original}"
-                )
-                temp_path = UPLOAD_DIR / temp_name
-
-                try:
-                    shared_file.save(temp_path)
-                    content_value = extract_text(temp_path).strip()
-                finally:
-                    try:
-                        temp_path.unlink(missing_ok=True)
-                    except OSError:
-                        pass
-
-                if content_value:
-                    conn.execute(
-                        """
-                        INSERT INTO shared_knowledge(
-                            shared_subject_id,title,content,source_type,
-                            created_by_user_id,created_at,updated_at
-                        ) VALUES(?,?,?,?,?,?,?)
-                        """,
-                        (
-                            shared["id"],
-                            original,
-                            content_value[:50000],
-                            f"file:{ext}",
-                            uid,
-                            now(),
-                            now()
-                        )
-                    )
-
-        elif action_type == "shared_note" and shared:
-            title = (
-                request.form.get("title", "").strip()[:180]
-                or "Kiến thức chung"
-            )
-            content_value = request.form.get(
-                "content",
-                ""
-            ).strip()[:50000]
-
-            if content_value:
-                conn.execute(
-                    """
-                    INSERT INTO shared_knowledge(
-                        shared_subject_id,title,content,source_type,
-                        created_by_user_id,created_at,updated_at
-                    ) VALUES(?,?,?,?,?,?,?)
-                    """,
-                    (
-                        shared["id"],
-                        title,
-                        content_value,
-                        "note",
-                        uid,
-                        now(),
-                        now()
-                    )
-                )
+        elif action_type:
+            conn.close()
+            return "Thao tác không hợp lệ.", 400
 
         conn.commit()
         conn.close()
@@ -3800,7 +3729,7 @@ def api_learning_profile():
 
 @app.route(
     "/api/subjects/<int:subject_id>/shared-knowledge",
-    methods=["GET", "POST"]
+    methods=["GET"]
 )
 @login_required
 def api_subject_shared_knowledge(subject_id):
@@ -3820,52 +3749,8 @@ def api_subject_shared_knowledge(subject_id):
         conn.close()
         return jsonify({"error": "Không tạo được kho kiến thức chung."}), 500
 
-    if request.method == "POST":
-        payload = request.get_json(silent=True) or {}
-        source_type = str(payload.get("source_type") or "note").strip().lower()[:30]
-        title = str(payload.get("title") or "").strip()[:180]
-        content = str(payload.get("content") or "").strip()
-
-        if not content:
-            conn.close()
-            return jsonify({"error": "Nội dung kiến thức đang trống."}), 400
-
-        if source_type == "syllabus":
-            conn.execute(
-                """
-                UPDATE shared_subjects
-                SET syllabus_text=?, updated_at=?
-                WHERE id=?
-                """,
-                (content[:50000], now(), shared["id"])
-            )
-        else:
-            if not title:
-                title = "Kiến thức chung"
-            conn.execute(
-                """
-                INSERT INTO shared_knowledge(
-                    shared_subject_id,title,content,source_type,
-                    created_by_user_id,created_at,updated_at
-                ) VALUES(?,?,?,?,?,?,?)
-                """,
-                (
-                    shared["id"],
-                    title,
-                    content[:50000],
-                    source_type or "note",
-                    uid,
-                    now(),
-                    now()
-                )
-            )
-
-        conn.commit()
-        shared = conn.execute(
-            "SELECT * FROM shared_subjects WHERE id=?",
-            (shared["id"],)
-        ).fetchone()
-
+    # Student API is read-only. Shared academic content is consumed here,
+    # while management is reserved for a future lecturer/admin role.
     knowledge_rows = conn.execute(
         """
         SELECT id,title,content,source_type,created_at,updated_at
@@ -3889,7 +3774,10 @@ def api_subject_shared_knowledge(subject_id):
             "code": shared["code"],
             "syllabus_text": shared["syllabus_text"]
         },
-        "knowledge": [dict(row) for row in knowledge_rows]
+        "knowledge": [dict(row) for row in knowledge_rows],
+        "read_only": True,
+        "scope": "shared_academic_knowledge",
+        "managed_by": "lecturer_or_academic_admin_future"
     }
     conn.close()
     return jsonify(result)
