@@ -523,3 +523,27 @@
     max-height: calc(100dvh - 24px) !important;
   }
 }
+
+
+/* =====================================================
+   PHASE 3 - ADAPTIVE LEARNING TASK
+===================================================== */
+.adaptive-task-badge,
+.adaptive-task-inline {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #eadfff;
+  color: #7254e7;
+  font-size: 8px;
+  font-style: normal;
+  font-weight: 900;
+  vertical-align: middle;
+}
+
+.adaptive-task-inline {
+  padding: 2px 6px;
+  font-size: 7.5px;
+}
