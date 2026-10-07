@@ -1204,6 +1204,177 @@ def record_quiz_learning_signal(
         )
 
 
+def get_active_weakness_rows(conn, user_id, subject_id, limit=12):
+    """Các chủ đề vẫn còn yếu: số lần sai đang lớn hơn số lần làm đúng."""
+    if not subject_id:
+        return []
+
+    return conn.execute(
+        """
+        SELECT id,topic_key,topic,chapter,miss_count,correct_count,last_seen_at
+        FROM learning_weaknesses
+        WHERE user_id=? AND subject_id=?
+          AND miss_count > correct_count
+        ORDER BY (miss_count - correct_count * 0.5) DESC,
+                 last_seen_at DESC
+        LIMIT ?
+        """,
+        (user_id, subject_id, limit)
+    ).fetchall()
+
+
+def sync_adaptive_review_task(conn, user_id, subject_id):
+    """
+    Đồng bộ một nhiệm vụ ôn thích nghi từ kết quả Quiz.
+    - Còn weakness: tạo/cập nhật 1 task source='adaptive'.
+    - Đã xử lý hết weakness: xóa task adaptive chưa hoàn thành.
+    """
+    if not subject_id:
+        return None
+
+    subject = conn.execute(
+        "SELECT id,name FROM subjects WHERE id=? AND user_id=?",
+        (subject_id, user_id)
+    ).fetchone()
+    if not subject:
+        return None
+
+    weaknesses = get_active_weakness_rows(
+        conn,
+        user_id,
+        subject_id,
+        limit=5
+    )
+
+    if not weaknesses:
+        conn.execute(
+            """
+            DELETE FROM study_tasks
+            WHERE user_id=? AND subject_id=?
+              AND source='adaptive' AND done=0
+            """,
+            (user_id, subject_id)
+        )
+        return None
+
+    profile = ensure_learning_profile(conn, user_id)
+    preferred_time = str(
+        profile["preferred_study_time"] or "19:00"
+    ).strip()
+    if not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", preferred_time):
+        preferred_time = "19:00"
+
+    duration = _safe_int(
+        profile["daily_minutes"],
+        45,
+        15,
+        120
+    )
+
+    now_dt = datetime.now()
+    review_dt = datetime.fromisoformat(
+        f"{now_dt.date().isoformat()}T{preferred_time}"
+    )
+    # Nếu giờ học hôm nay đã qua/gần sát, xếp sang ngày mai.
+    if review_dt <= now_dt + timedelta(minutes=20):
+        review_dt = review_dt + timedelta(days=1)
+
+    top = weaknesses[0]
+    top_label = (
+        f"{top['chapter']} · {top['topic']}"
+        if (top["chapter"] or "").strip()
+        else top["topic"]
+    )
+    title = f"Ôn điểm yếu: {top['topic']}"[:160]
+
+    weak_labels = []
+    for row in weaknesses[:3]:
+        label = (
+            f"{row['chapter']} - {row['topic']}"
+            if (row["chapter"] or "").strip()
+            else row["topic"]
+        )
+        weak_labels.append(label)
+
+    note = (
+        "Study Agent tự điều chỉnh sau Quiz. "
+        f"Ưu tiên: {'; '.join(weak_labels)}. "
+        "Ôn lại nội dung liên quan rồi làm Quiz Ôn điểm yếu để kiểm tra mức độ cải thiện."
+    )[:500]
+
+    existing_rows = conn.execute(
+        """
+        SELECT id
+        FROM study_tasks
+        WHERE user_id=? AND subject_id=?
+          AND source='adaptive' AND done=0
+        ORDER BY id DESC
+        """,
+        (user_id, subject_id)
+    ).fetchall()
+
+    study_at = review_dt.isoformat(timespec="minutes")
+
+    if existing_rows:
+        keep_id = existing_rows[0]["id"]
+        conn.execute(
+            """
+            UPDATE study_tasks
+            SET title=?, study_at=?, duration=?, note=?
+            WHERE id=? AND user_id=?
+            """,
+            (
+                title,
+                study_at,
+                duration,
+                note,
+                keep_id,
+                user_id
+            )
+        )
+
+        extra_ids = [row["id"] for row in existing_rows[1:]]
+        for task_id in extra_ids:
+            conn.execute(
+                "DELETE FROM study_tasks WHERE id=? AND user_id=?",
+                (task_id, user_id)
+            )
+        task_id = keep_id
+    else:
+        cursor = conn.execute(
+            """
+            INSERT INTO study_tasks(
+                user_id,subject_id,title,study_at,duration,
+                note,done,source,created_at
+            ) VALUES(?,?,?,?,?,?,?,?,?)
+            """,
+            (
+                user_id,
+                subject_id,
+                title,
+                study_at,
+                duration,
+                note,
+                0,
+                "adaptive",
+                now()
+            )
+        )
+        task_id = cursor.lastrowid
+
+    return {
+        "id": task_id,
+        "subject_id": subject_id,
+        "subject_name": subject["name"],
+        "title": title,
+        "study_at": study_at,
+        "duration": duration,
+        "top_weakness": top_label,
+        "weakness_count": len(weaknesses),
+        "source": "adaptive"
+    }
+
+
 def login_required(fn):
     @wraps(fn)
     def wrapper(*args, **kwargs):
@@ -3829,6 +4000,29 @@ def api_subject_learning_insights(subject_id):
         """,
         (uid, uid, subject_id)
     ).fetchone()
+
+    adaptive_task = conn.execute(
+        """
+        SELECT id,title,study_at,duration,note,source
+        FROM study_tasks
+        WHERE user_id=? AND subject_id=?
+          AND source='adaptive' AND done=0
+        ORDER BY study_at ASC,id DESC
+        LIMIT 1
+        """,
+        (uid, subject_id)
+    ).fetchone()
+
+    mastery_stats = conn.execute(
+        """
+        SELECT
+            SUM(CASE WHEN miss_count > correct_count THEN 1 ELSE 0 END) AS active_count,
+            SUM(CASE WHEN miss_count <= correct_count THEN 1 ELSE 0 END) AS mastered_count
+        FROM learning_weaknesses
+        WHERE user_id=? AND subject_id=?
+        """,
+        (uid, subject_id)
+    ).fetchone()
     conn.close()
 
     return jsonify({
@@ -3845,7 +4039,12 @@ def api_subject_learning_insights(subject_id):
             "avg_score": float(quiz_stats["avg_score"] or 0),
             "best_score": float(quiz_stats["best_score"] or 0)
         },
-        "weaknesses": [dict(row) for row in weaknesses]
+        "weaknesses": [dict(row) for row in weaknesses],
+        "adaptive_task": dict(adaptive_task) if adaptive_task else None,
+        "mastery": {
+            "active_count": int(mastery_stats["active_count"] or 0),
+            "mastered_count": int(mastery_stats["mastered_count"] or 0)
+        }
     })
 
 
@@ -4300,6 +4499,19 @@ def quiz():
         parsed.append(item)
 
     selected_document_id = request.args.get("document_id", type=int)
+    selected_subject_id = request.args.get("subject_id", type=int)
+    if selected_subject_id:
+        subject_check_conn = db()
+        selected_subject_id = owned_subject_id(
+            subject_check_conn,
+            uid,
+            selected_subject_id
+        )
+        subject_check_conn.close()
+
+    selected_quiz_mode = (request.args.get("mode") or "").strip().lower()
+    if selected_quiz_mode not in {"subject", "document", "weakness"}:
+        selected_quiz_mode = "document" if selected_document_id else "subject"
 
     return render_template(
         "quiz.html",
@@ -4307,7 +4519,9 @@ def quiz():
         documents=docs,
         subjects=subjects,
         quizzes=parsed,
-        selected_document_id=selected_document_id
+        selected_document_id=selected_document_id,
+        selected_subject_id=selected_subject_id,
+        selected_quiz_mode=selected_quiz_mode
     )
 
 # =====================================================
@@ -4425,6 +4639,20 @@ def submit_quiz():
     total_questions = len(questions)
     correct_count = 0
     normalized_answers = []
+    subject_id = quiz_row["subject_id"]
+
+    active_before = (
+        get_active_weakness_rows(conn, uid, subject_id, limit=100)
+        if subject_id
+        else []
+    )
+    active_before_map = {
+        row["topic_key"]: {
+            "topic": row["topic"],
+            "chapter": row["chapter"]
+        }
+        for row in active_before
+    }
 
     for index, question in enumerate(questions):
         selected_answer = (
@@ -4499,20 +4727,13 @@ def submit_quiz():
     )
 
     attempt_id = cursor.lastrowid
-    subject_id = quiz_row["subject_id"]
-
-    # Nộp quiz xong thì cập nhật tiến độ môn ngay.
-    # Quiz gắn với môn cũng phải trả lại trạng thái học mới để UI cập nhật tức thì.
-    if subject_id:
-        recalculate_subject_progress(
-            uid,
-            subject_id,
-            conn
-        )
 
     subject_name = ""
     weaknesses = []
     weakness_count = 0
+    resolved_topics = []
+    new_weakness_topics = []
+    adaptive_task = None
 
     if subject_id:
         subject_row = conn.execute(
@@ -4521,18 +4742,58 @@ def submit_quiz():
         ).fetchone()
         subject_name = subject_row["name"] if subject_row else ""
 
-        weakness_rows = conn.execute(
-            """
-            SELECT topic,chapter,miss_count,correct_count,last_seen_at
-            FROM learning_weaknesses
-            WHERE user_id=? AND subject_id=?
-              AND miss_count > correct_count
-            ORDER BY (miss_count - correct_count * 0.5) DESC,
-                     last_seen_at DESC
-            LIMIT 8
-            """,
-            (uid, subject_id)
-        ).fetchall()
+        active_after_rows = get_active_weakness_rows(
+            conn,
+            uid,
+            subject_id,
+            limit=100
+        )
+        active_after_map = {
+            row["topic_key"]: {
+                "topic": row["topic"],
+                "chapter": row["chapter"]
+            }
+            for row in active_after_rows
+        }
+
+        resolved_keys = [
+            key for key in active_before_map
+            if key not in active_after_map
+        ]
+        new_keys = [
+            key for key in active_after_map
+            if key not in active_before_map
+        ]
+
+        resolved_topics = [
+            active_before_map[key]["topic"]
+            for key in resolved_keys[:8]
+        ]
+        new_weakness_topics = [
+            active_after_map[key]["topic"]
+            for key in new_keys[:8]
+        ]
+
+        adaptive_task = sync_adaptive_review_task(
+            conn,
+            uid,
+            subject_id
+        )
+
+        # Task thích nghi cũng là một phần của lộ trình, nên tính lại tiến độ
+        # sau khi đồng bộ task để Dashboard/Kế hoạch phản ánh đúng trạng thái mới.
+        recalculate_subject_progress(
+            uid,
+            subject_id,
+            conn
+        )
+
+        weakness_rows = get_active_weakness_rows(
+            conn,
+            uid,
+            subject_id,
+            limit=8
+        )
         weaknesses = [dict(row) for row in weakness_rows]
         weakness_count = len(weaknesses)
 
@@ -4560,7 +4821,11 @@ def submit_quiz():
         "best_score": float(attempt_stats["best_score"] or score),
         "weakness_count": weakness_count,
         "weaknesses": weaknesses,
-        "learning_updated": bool(subject_id)
+        "new_weakness_topics": new_weakness_topics,
+        "resolved_topics": resolved_topics,
+        "adaptive_task": adaptive_task,
+        "learning_updated": bool(subject_id),
+        "adaptive_learning": bool(subject_id)
     })
 
 
@@ -4627,6 +4892,22 @@ def study_plan():
         """,
         (uid,)
     ).fetchall()
+
+    adaptive_weakness_rows = conn.execute(
+        """
+        SELECT lw.topic,lw.chapter,lw.miss_count,lw.correct_count,
+               s.id AS subject_id,s.name AS subject_name
+        FROM learning_weaknesses lw
+        JOIN subjects s
+          ON s.id=lw.subject_id AND s.user_id=lw.user_id
+        WHERE lw.user_id=? AND lw.miss_count > lw.correct_count
+        ORDER BY (lw.miss_count - lw.correct_count * 0.5) DESC,
+                 lw.last_seen_at DESC
+        LIMIT 5
+        """,
+        (uid,)
+    ).fetchall()
+    adaptive_weaknesses = [dict(row) for row in adaptive_weakness_rows]
     conn.close()
 
     today = datetime.now().date()
@@ -4737,6 +5018,17 @@ def study_plan():
             f"Có {overdue_tasks} buổi học đã qua thời gian nhưng chưa hoàn thành. "
             "Bạn có thể chỉnh lại lịch để kế hoạch sát thực tế hơn."
         )
+    elif adaptive_weaknesses:
+        top_weak = adaptive_weaknesses[0]
+        weak_label = (
+            f"{top_weak['chapter']} - {top_weak['topic']}"
+            if (top_weak["chapter"] or "").strip()
+            else top_weak["topic"]
+        )
+        agent_tip = (
+            f"Quiz gần đây cho thấy {top_weak['subject_name']} còn yếu ở “{weak_label}”. "
+            "Study Agent đã ưu tiên một buổi ôn thích nghi; sau khi ôn hãy làm Quiz điểm yếu để kiểm tra lại."
+        )
     elif tasks:
         agent_tip = (
             "Kế hoạch đang ổn. Sau mỗi buổi học, hãy đánh dấu hoàn thành và dùng Quiz "
@@ -4762,6 +5054,7 @@ def study_plan():
         completed_minutes=completed_minutes,
         time_completion=time_completion,
         agent_tip=agent_tip,
+        adaptive_weaknesses=adaptive_weaknesses,
         urgent_count=urgent_count,
         today_input=today.isoformat(),
         profile=profile,
