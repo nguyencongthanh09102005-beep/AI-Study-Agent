@@ -9,12 +9,21 @@
   <div class="quote-card compact">❝ <span>"Một tài liệu tốt hôm nay<br>là nền tảng cho thành công ngày mai."</span></div>
 </section>
 
+<div class="personal-document-notice">
+  <span class="personal-document-lock">🔒</span>
+  <div>
+    <strong>Tài liệu cá nhân</strong>
+    <p>Mọi file bạn tải lên chỉ thuộc tài khoản của bạn. Study Agent có thể sử dụng để học, tóm tắt và tạo quiz nhưng không tự động chia sẻ cho sinh viên khác.</p>
+  </div>
+  <span class="personal-document-badge">Private</span>
+</div>
+
 <section class="document-top-grid">
   <form method="post" enctype="multipart/form-data" class="soft-card upload-dropzone" id="uploadForm">
     <label class="dropzone-inner">
       <input id="documentFileInput" type="file" name="file" accept=".pdf,.txt,.md" required>
       <span class="upload-cloud">↑</span>
-      <span><strong>Tải tài liệu lên</strong><small>Kéo thả file vào đây hoặc nhấn để chọn file</small><em>Hỗ trợ PDF, TXT, Markdown (tối đa 20MB)</em></span>
+      <span><strong>Tải tài liệu cá nhân</strong><small>Kéo thả file vào đây hoặc nhấn để chọn file</small><em>Chỉ bạn và Personal Agent của bạn sử dụng · PDF, TXT, Markdown</em></span>
     </label>
     <div class="upload-inline-controls">
       <select name="subject_id"><option value="">Tất cả môn học</option>{% for s in subjects %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}</select>
@@ -43,7 +52,7 @@
   <span class="select-look">Sắp xếp: mới nhất</span>
 </section>
 
-<div class="document-section-head"><h3>▤ &nbsp; Tất cả tài liệu ({{ documents|length }})</h3></div>
+<div class="document-section-head"><h3>▤ &nbsp; Tài liệu của tôi ({{ documents|length }})</h3><span class="private-list-label">🔒 Chỉ tài khoản này</span></div>
 
 <section class="document-card-grid" id="documentCardGrid">
   {% for d in documents %}
