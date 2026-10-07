@@ -4611,13 +4611,51 @@ def submit_quiz():
     )
 
     attempt_id = cursor.lastrowid
+    subject_id = quiz_row["subject_id"]
 
-    # Nộp quiz xong thì cập nhật tiến độ môn ngay
-    recalculate_subject_progress(
-        uid,
-        quiz_row["subject_id"],
-        conn
-    )
+    # Nộp quiz xong thì cập nhật tiến độ môn ngay.
+    # Quiz gắn với môn cũng phải trả lại trạng thái học mới để UI cập nhật tức thì.
+    if subject_id:
+        recalculate_subject_progress(
+            uid,
+            subject_id,
+            conn
+        )
+
+    subject_name = ""
+    weaknesses = []
+    weakness_count = 0
+
+    if subject_id:
+        subject_row = conn.execute(
+            "SELECT name FROM subjects WHERE id=? AND user_id=?",
+            (subject_id, uid)
+        ).fetchone()
+        subject_name = subject_row["name"] if subject_row else ""
+
+        weakness_rows = conn.execute(
+            """
+            SELECT topic,chapter,miss_count,correct_count,last_seen_at
+            FROM learning_weaknesses
+            WHERE user_id=? AND subject_id=?
+              AND miss_count > correct_count
+            ORDER BY (miss_count - correct_count * 0.5) DESC,
+                     last_seen_at DESC
+            LIMIT 8
+            """,
+            (uid, subject_id)
+        ).fetchall()
+        weaknesses = [dict(row) for row in weakness_rows]
+        weakness_count = len(weaknesses)
+
+    attempt_stats = conn.execute(
+        """
+        SELECT COUNT(*) AS attempt_count, MAX(score) AS best_score
+        FROM quiz_attempts
+        WHERE user_id=? AND quiz_id=?
+        """,
+        (uid, quiz_id)
+    ).fetchone()
 
     conn.commit()
     conn.close()
@@ -4627,7 +4665,14 @@ def submit_quiz():
         "attempt_id": attempt_id,
         "score": score,
         "correct_count": correct_count,
-        "total_questions": total_questions
+        "total_questions": total_questions,
+        "subject_id": subject_id,
+        "subject_name": subject_name,
+        "attempt_count": int(attempt_stats["attempt_count"] or 0),
+        "best_score": float(attempt_stats["best_score"] or score),
+        "weakness_count": weakness_count,
+        "weaknesses": weaknesses,
+        "learning_updated": bool(subject_id)
     })
 
 
