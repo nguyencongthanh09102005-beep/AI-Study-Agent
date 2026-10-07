@@ -2167,7 +2167,11 @@ def build_quiz(text, question_count=10, focus_topics=None):
         focus_text = (
             "\nCÁC CHỦ ĐỀ CẦN ƯU TIÊN ÔN TẬP:\n"
             + "\n".join(focus_lines)
-            + "\nHãy dành phần lớn câu hỏi cho các chủ đề này nếu tài liệu có nội dung liên quan.\n"
+            + (
+                "\nHãy dành phần lớn câu hỏi cho các chủ đề này nếu tài liệu có nội dung liên quan.\n"
+                "Khi câu hỏi kiểm tra một chủ đề ưu tiên, trường topic PHẢI dùng nguyên văn "
+                "tên chủ đề trong danh sách trên; chapter cũng giữ nguyên nếu đã có.\n"
+            )
             if focus_lines
             else ""
         )
@@ -2362,6 +2366,78 @@ Cấu trúc:
             question_count
         )
 
+    # Với Quiz ôn điểm yếu, chuẩn hóa topic/chapter về đúng nhãn weakness cũ.
+    # Nhờ vậy lần làm đúng sau đó sẽ tăng correct_count của chính weakness đó,
+    # thay vì tạo một topic gần giống nhưng khác key.
+    if focus_topics:
+        stop_tokens = {
+            "chương", "phần", "bài", "nội", "dung", "tài", "liệu",
+            "các", "của", "và", "trong", "theo", "với", "một"
+        }
+
+        canonical_topics = []
+        for item in focus_topics[:12]:
+            if not isinstance(item, dict):
+                continue
+
+            topic_value = re.sub(
+                r"\s+",
+                " ",
+                str(item.get("topic") or "").strip()
+            )[:220]
+            chapter_value = re.sub(
+                r"\s+",
+                " ",
+                str(item.get("chapter") or "").strip()
+            )[:120]
+            if not topic_value:
+                continue
+
+            token_set = {
+                token.casefold()
+                for token in re.findall(
+                    r"[\wÀ-ỹ]+",
+                    f"{chapter_value} {topic_value}",
+                    flags=re.UNICODE
+                )
+                if len(token) >= 3 and token.casefold() not in stop_tokens
+            }
+
+            canonical_topics.append({
+                "topic": topic_value,
+                "chapter": chapter_value,
+                "tokens": token_set
+            })
+
+        for question in questions:
+            question_tokens = {
+                token.casefold()
+                for token in re.findall(
+                    r"[\wÀ-ỹ]+",
+                    (
+                        f"{question.get('chapter', '')} "
+                        f"{question.get('topic', '')} "
+                        f"{question.get('question', '')}"
+                    ),
+                    flags=re.UNICODE
+                )
+                if len(token) >= 3 and token.casefold() not in stop_tokens
+            }
+
+            best = None
+            best_score = 0
+            for candidate in canonical_topics:
+                overlap = len(question_tokens & candidate["tokens"])
+                if overlap > best_score:
+                    best = candidate
+                    best_score = overlap
+
+            if best and best_score > 0:
+                question["topic"] = best["topic"]
+                question["chapter"] = best["chapter"] or question.get(
+                    "chapter",
+                    "Nội dung tài liệu"
+                )
 
     return questions[:question_count]
 
