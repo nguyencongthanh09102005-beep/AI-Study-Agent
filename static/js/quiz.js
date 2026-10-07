@@ -283,24 +283,24 @@ document.addEventListener("DOMContentLoaded", () => {
           ?.closest("form");
         const weaknessSelect = weaknessForm?.querySelector('select[name="subject_id"]');
 
-        if (
-          weaknessSelect &&
-          Number(data.subject_id) > 0 &&
-          Number(data.weakness_count) > 0
-        ) {
+        if (weaknessSelect && Number(data.subject_id) > 0) {
           const subjectId = String(data.subject_id);
           let option = Array.from(weaknessSelect.options).find(
             item => item.value === subjectId
           );
 
-          if (!option) {
-            option = document.createElement("option");
-            option.value = subjectId;
-            weaknessSelect.appendChild(option);
-          }
+          if (Number(data.weakness_count) > 0) {
+            if (!option) {
+              option = document.createElement("option");
+              option.value = subjectId;
+              weaknessSelect.appendChild(option);
+            }
 
-          option.textContent =
-            `${data.subject_name || "Môn học"} · ${data.weakness_count} chủ đề cần ôn`;
+            option.textContent =
+              `${data.subject_name || "Môn học"} · ${data.weakness_count} chủ đề cần ôn`;
+          } else if (option) {
+            option.remove();
+          }
         }
 
         // Chấm và khóa đáp án trên giao diện
@@ -355,9 +355,27 @@ document.addEventListener("DOMContentLoaded", () => {
 
           if (data.learning_updated) {
             const weaknessCount = Number(data.weakness_count || 0);
-            resultText.textContent += weaknessCount > 0
-              ? ` Study Agent đã cập nhật ${weaknessCount} chủ đề cần ôn.`
-              : " Study Agent đã cập nhật hồ sơ học tập từ kết quả này.";
+            const resolvedTopics = Array.isArray(data.resolved_topics)
+              ? data.resolved_topics
+              : [];
+
+            if (resolvedTopics.length > 0) {
+              resultText.textContent +=
+                ` Bạn đã củng cố ${resolvedTopics.length} chủ đề từng yếu.`;
+            }
+
+            if (weaknessCount > 0) {
+              resultText.textContent +=
+                ` Study Agent còn ghi nhận ${weaknessCount} chủ đề cần ôn.`;
+            } else {
+              resultText.textContent +=
+                " Hiện không còn chủ đề yếu đang mở.";
+            }
+
+            if (data.adaptive_task) {
+              resultText.textContent +=
+                ` Kế hoạch học đã tự ưu tiên buổi ôn “${data.adaptive_task.title}”.`;
+            }
           }
         }
 
