@@ -182,7 +182,14 @@
     </form>
 
     <div class="weakness-section">
-      <div class="mini-section-head"><h4>🎯 Phần cần ôn thêm</h4><span>Tự học từ quiz</span></div>
+      <div class="mini-section-head">
+        <h4>🎯 Phần cần ôn thêm</h4>
+        {% if weaknesses %}
+        <a href="{{ url_for('quiz', mode='weakness', subject_id=subject.id) }}">Ôn điểm yếu →</a>
+        {% else %}
+        <span>Tự học từ quiz</span>
+        {% endif %}
+      </div>
       {% for w in weaknesses %}
       <div class="weakness-item">
         <span class="weak-dot"></span>
