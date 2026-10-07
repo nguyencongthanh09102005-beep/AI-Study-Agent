@@ -4,56 +4,95 @@
 {% block page_styles %}<link rel="stylesheet" href="{{ url_for('static', filename='css/quiz.css') }}">{% endblock %}
 
 {% block content %}
-<section class="quiz-action-grid" id="quizCreateModes">
-  <form method="post" class="quiz-action-card primary-action quiz-create-mode">
-    <input type="hidden" name="quiz_mode" value="document">
-    <span class="mini-activity white">▤</span>
-    <span><b>Tạo từ tài liệu</b><small>AI tạo câu hỏi từ một file bạn đã tải lên</small></span>
-    <select name="document_id" required>
-      <option value="">Chọn tài liệu</option>
-      {% for d in documents %}
-      <option value="{{ d.id }}" {% if selected_document_id == d.id %}selected{% endif %}>{{ d.original_name }}{% if d.subject_name %} · {{ d.subject_name }}{% endif %}</option>
-      {% endfor %}
-    </select>
-    <select name="question_count" aria-label="Số câu hỏi">
-      <option value="10">10 câu</option><option value="20">20 câu</option><option value="30">30 câu</option>
-    </select>
-    <button type="submit">Tạo quiz →</button>
-  </form>
+<section class="soft-card quiz-create-hub" id="quizCreateModes" data-initial-mode="{{ 'document' if selected_document_id else 'subject' }}">
+  <div class="quiz-create-hub-head">
+    <div class="quiz-create-title">
+      <span class="quiz-create-main-icon">▤</span>
+      <div>
+        <h2>Tạo Quiz</h2>
+        <p>Luyện tập theo môn, tài liệu hoặc ôn lại những phần Study Agent ghi nhận bạn còn yếu.</p>
+      </div>
+    </div>
+    <div class="quiz-create-tip">✦ <span>Quiz được tạo theo đúng ngữ cảnh học tập hiện tại của bạn.</span></div>
+  </div>
 
-  <form method="post" class="quiz-action-card quiz-create-mode">
-    <input type="hidden" name="quiz_mode" value="subject">
-    <span class="mini-activity blue">▱</span>
-    <span><b>Tạo theo môn học</b><small>Kết hợp tài liệu cá nhân + kiến thức chung của môn</small></span>
-    <select name="subject_id" required>
-      <option value="">Chọn môn học</option>
-      {% for s in subjects %}
-      <option value="{{ s.id }}">{{ s.name }}</option>
-      {% endfor %}
-    </select>
-    <select name="question_count" aria-label="Số câu hỏi">
-      <option value="10">10 câu</option><option value="20">20 câu</option><option value="30">30 câu</option>
-    </select>
-    <button type="submit">Tạo quiz →</button>
-  </form>
+  <div class="quiz-mode-tabs" role="tablist" aria-label="Chế độ tạo quiz">
+    <button type="button" class="quiz-mode-tab active" data-create-mode="subject" role="tab" aria-selected="true">
+      <span>▱</span> Theo môn học
+    </button>
+    <button type="button" class="quiz-mode-tab" data-create-mode="document" role="tab" aria-selected="false">
+      <span>▤</span> Từ tài liệu
+    </button>
+    <button type="button" class="quiz-mode-tab" data-create-mode="weakness" role="tab" aria-selected="false">
+      <span>◎</span> Ôn điểm yếu
+    </button>
+  </div>
 
-  <form method="post" class="quiz-action-card quiz-create-mode weak-review-card">
-    <input type="hidden" name="quiz_mode" value="weakness">
-    <span class="mini-activity purple">◎</span>
-    <span><b>Ôn tập điểm yếu</b><small>Tập trung vào chủ đề bạn thường làm sai</small></span>
-    <select name="subject_id" required>
-      <option value="">Chọn môn có điểm yếu</option>
-      {% for s in subjects if s.weakness_count %}
-      <option value="{{ s.id }}">{{ s.name }} · {{ s.weakness_count }} chủ đề cần ôn</option>
-      {% endfor %}
-    </select>
-    <select name="question_count" aria-label="Số câu hỏi">
-      <option value="10">10 câu</option><option value="20">20 câu</option><option value="30">30 câu</option>
-    </select>
-    <button type="submit">Ôn ngay →</button>
-  </form>
+  <div class="quiz-mode-panels">
+    <form method="post" class="quiz-create-mode quiz-mode-panel" data-create-panel="subject">
+      <input type="hidden" name="quiz_mode" value="subject">
+      <label class="quiz-create-field">
+        <span>Môn học</span>
+        <select name="subject_id" required>
+          <option value="">Chọn môn học</option>
+          {% for s in subjects %}
+          <option value="{{ s.id }}">{{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="quiz-create-field quiz-count-field">
+        <span>Số câu hỏi</span>
+        <select name="question_count" aria-label="Số câu hỏi">
+          <option value="10">10 câu</option><option value="20">20 câu</option><option value="30">30 câu</option>
+        </select>
+      </label>
+      <button type="submit" class="quiz-create-submit">✦ Tạo Quiz →</button>
+      <p class="quiz-mode-note">ⓘ Quiz dựa trên đề cương, tài liệu cá nhân và kiến thức chung của môn để kiểm tra đúng nội dung bạn đang học.</p>
+    </form>
+
+    <form method="post" class="quiz-create-mode quiz-mode-panel" data-create-panel="document" hidden>
+      <input type="hidden" name="quiz_mode" value="document">
+      <label class="quiz-create-field">
+        <span>Tài liệu</span>
+        <select name="document_id" required>
+          <option value="">Chọn tài liệu</option>
+          {% for d in documents %}
+          <option value="{{ d.id }}" {% if selected_document_id == d.id %}selected{% endif %}>{{ d.original_name }}{% if d.subject_name %} · {{ d.subject_name }}{% endif %}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="quiz-create-field quiz-count-field">
+        <span>Số câu hỏi</span>
+        <select name="question_count" aria-label="Số câu hỏi">
+          <option value="10">10 câu</option><option value="20">20 câu</option><option value="30">30 câu</option>
+        </select>
+      </label>
+      <button type="submit" class="quiz-create-submit">✦ Tạo Quiz →</button>
+      <p class="quiz-mode-note">ⓘ Quiz chỉ tập trung vào nội dung của tài liệu bạn đã chọn.</p>
+    </form>
+
+    <form method="post" class="quiz-create-mode quiz-mode-panel" data-create-panel="weakness" hidden>
+      <input type="hidden" name="quiz_mode" value="weakness">
+      <label class="quiz-create-field">
+        <span>Môn học cần ôn</span>
+        <select name="subject_id" required>
+          <option value="">Chọn môn có điểm yếu</option>
+          {% for s in subjects if s.weakness_count %}
+          <option value="{{ s.id }}">{{ s.name }} · {{ s.weakness_count }} chủ đề cần ôn</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="quiz-create-field quiz-count-field">
+        <span>Số câu hỏi</span>
+        <select name="question_count" aria-label="Số câu hỏi">
+          <option value="10">10 câu</option><option value="20">20 câu</option><option value="30">30 câu</option>
+        </select>
+      </label>
+      <button type="submit" class="quiz-create-submit">◎ Ôn ngay →</button>
+      <p class="quiz-mode-note">ⓘ Quiz ưu tiên các chủ đề bạn thường làm sai dựa trên lịch sử làm bài trước đó.</p>
+    </form>
+  </div>
 </section>
-
 
 <section class="quiz-work-layout">
   <aside class="soft-card quiz-library">
