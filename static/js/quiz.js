@@ -5,6 +5,40 @@ document.addEventListener("DOMContentLoaded", () => {
   const deleteQuizText = document.getElementById("deleteQuizText");
   const deleteQuizForm = document.getElementById("deleteQuizForm");
   const cancelDeleteQuiz = document.getElementById("cancelDeleteQuiz");
+  const createHub = document.getElementById("quizCreateModes");
+  const createModeTabs = Array.from(
+    createHub?.querySelectorAll("[data-create-mode]") || []
+  );
+  const createModePanels = Array.from(
+    createHub?.querySelectorAll("[data-create-panel]") || []
+  );
+
+  function activateCreateMode(mode) {
+    const validMode = createModePanels.some(
+      panel => panel.dataset.createPanel === mode
+    ) ? mode : "subject";
+
+    createModeTabs.forEach(tab => {
+      const active = tab.dataset.createMode === validMode;
+      tab.classList.toggle("active", active);
+      tab.setAttribute("aria-selected", active ? "true" : "false");
+    });
+
+    createModePanels.forEach(panel => {
+      panel.hidden = panel.dataset.createPanel !== validMode;
+    });
+  }
+
+  createModeTabs.forEach(tab => {
+    tab.addEventListener("click", () => {
+      activateCreateMode(tab.dataset.createMode || "subject");
+    });
+  });
+
+  if (createHub) {
+    activateCreateMode(createHub.dataset.initialMode || "subject");
+  }
+
 
   // =====================================================
   // MODAL XÓA QUIZ
