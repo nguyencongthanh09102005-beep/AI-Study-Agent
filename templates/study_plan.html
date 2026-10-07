@@ -37,7 +37,7 @@
       <div class="schedule-item-new {{ 'done' if task.done else '' }} {{ 'overdue' if task.is_overdue else '' }}" data-searchable="{{ task.title|e }}" data-task-id="{{ task.id }}" data-task-date="{{ task.study_at_input[:10] }}" data-task-datetime="{{ task.study_at_input }}">
         <span class="schedule-time">{{ task.time_text }}</span>
         <span class="schedule-color c{{ (loop.index0 % 4) + 1 }}"></span>
-        <span class="schedule-copy"><strong>{{ task.title }}</strong><small>{{ task.subject_name or 'Học tập' }}{% if task.note %} · {{ task.note }}{% endif %}</small></span>
+        <span class="schedule-copy"><strong>{{ task.title }}{% if task.source == 'adaptive' %} <em class="adaptive-task-badge">Adaptive</em>{% endif %}</strong><small>{{ task.subject_name or 'Học tập' }}{% if task.note %} · {{ task.note }}{% endif %}</small></span>
         <span class="schedule-range">{{ task.duration }} phút</span>
         <form method="post" action="{{ url_for('toggle_study_task', task_id=task.id) }}"><button type="submit" class="task-check {{ 'checked' if task.done else '' }}">{{ '✓' if task.done else '' }}</button></form>
         <div class="task-actions"><button type="button" class="icon-action move-task-btn" title="Chuyển lịch nhiệm vụ" data-id="{{ task.id }}" data-title="{{ task.title|e }}" data-subject-id="{{ task.subject_id or '' }}" data-study-at="{{ task.study_at_input }}" data-duration="{{ task.duration }}" data-note="{{ task.note|e }}">↪</button><button type="button" class="icon-action edit-task-btn edit-only" data-id="{{ task.id }}" data-title="{{ task.title|e }}" data-subject-id="{{ task.subject_id or '' }}" data-study-at="{{ task.study_at_input }}" data-duration="{{ task.duration }}" data-note="{{ task.note|e }}">✎</button><form class="edit-only" method="post" action="{{ url_for('delete_study_task', task_id=task.id) }}" data-confirm-title="Xóa buổi học?" data-confirm-message="Buổi học “{{ task.title }}” sẽ bị xóa." data-confirm-label="Xóa"><button type="submit" class="icon-action danger">×</button></form></div>
@@ -51,7 +51,7 @@
     <div class="task-list-head"><h3>▤ &nbsp; Danh sách nhiệm vụ hôm nay</h3><button type="button" class="ghost-action" id="toggleEditPlan">Chỉnh sửa →</button></div>
     <div class="task-compact-list">
       {% for task in today_tasks %}
-      <div><span class="task-square {{ 'checked' if task.done else '' }}">{{ '✓' if task.done else '' }}</span><b>{{ task.title }}</b><span>◷ {{ task.time_text }}</span><em>{{ task.subject_name or 'Tự học' }}</em></div>
+      <div><span class="task-square {{ 'checked' if task.done else '' }}">{{ '✓' if task.done else '' }}</span><b>{{ task.title }}{% if task.source == 'adaptive' %} <small class="adaptive-task-inline">Adaptive</small>{% endif %}</b><span>◷ {{ task.time_text }}</span><em>{{ task.subject_name or 'Tự học' }}</em></div>
       {% else %}
       <div class="empty-soft">Hôm nay chưa có nhiệm vụ học nào.</div>
       {% endfor %}
