@@ -82,9 +82,27 @@ document.addEventListener("DOMContentLoaded", () => {
     taskForm.action = "/study-plan/tasks/create";
     taskForm.reset();
     taskDuration.value = "45";
+
     const date = new Date();
     date.setMinutes(0, 0, 0);
     date.setHours(date.getHours() + 1);
+
+    // Khi đang xem một ngày khác trên lịch, tạo task mặc định đúng ngày đó.
+    // plannerDatePicker luôn được calendar đồng bộ với ngày đang chọn.
+    const selectedDateValue =
+      document.getElementById("plannerDatePicker")?.value || "";
+    const selectedParts = selectedDateValue.split("-").map(Number);
+    if (
+      selectedParts.length === 3 &&
+      selectedParts.every(Number.isFinite)
+    ) {
+      date.setFullYear(
+        selectedParts[0],
+        selectedParts[1] - 1,
+        selectedParts[2]
+      );
+    }
+
     taskStudyAt.value = localDateTimeValue(date);
     openModal(taskModal);
   });
