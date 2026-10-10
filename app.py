@@ -622,10 +622,32 @@ def init_db():
                 "INSERT INTO subjects(user_id,name,description,progress,created_at) VALUES(?,?,?,?,?)",
                 (uid, s[0], s[1], s[2], now())
             )
+        demo_base = datetime.now().replace(
+            second=0,
+            microsecond=0
+        )
         reminders = [
-            ("Ôn tập chương 3 - Trí tuệ nhân tạo", "2026-08-01T09:00"),
-            ("Làm quiz chương 2", "2026-08-01T14:00"),
-            ("Nộp bài tập lớn - Lập trình Web", "2026-08-02T23:59"),
+            (
+                "Ôn tập chương 3 - Trí tuệ nhân tạo",
+                (demo_base + timedelta(days=1)).replace(
+                    hour=9,
+                    minute=0
+                ).isoformat(timespec="minutes")
+            ),
+            (
+                "Làm quiz chương 2",
+                (demo_base + timedelta(days=1)).replace(
+                    hour=14,
+                    minute=0
+                ).isoformat(timespec="minutes")
+            ),
+            (
+                "Nộp bài tập lớn - Lập trình Web",
+                (demo_base + timedelta(days=2)).replace(
+                    hour=23,
+                    minute=59
+                ).isoformat(timespec="minutes")
+            ),
         ]
         for title, due_at in reminders:
             conn.execute(
@@ -970,8 +992,25 @@ def ensure_learning_profile(conn, user_id):
 
 
 def get_shared_subject_context(user_id, subject_id, query="", max_chars=5500):
-    """Ngữ cảnh dùng chung của môn: đề cương + ghi chú/tài liệu chung."""
+    """
+    Ngữ cảnh học thuật của môn cho Chat/Quiz:
+    ưu tiên Shared Syllabus; nếu chưa có thì dùng Personal Syllabus fallback;
+    sau đó mới bổ sung Shared Knowledge.
+    """
     conn = db()
+
+    subject = conn.execute(
+        """
+        SELECT id,personal_syllabus_document_id
+        FROM subjects
+        WHERE id=? AND user_id=?
+        """,
+        (subject_id, user_id)
+    ).fetchone()
+    if not subject:
+        conn.close()
+        return "", []
+
     shared = ensure_shared_subject_for_user_subject(
         conn,
         user_id,
@@ -986,11 +1025,43 @@ def get_shared_subject_context(user_id, subject_id, query="", max_chars=5500):
     source_labels = []
     total = 0
 
-    syllabus_text = (shared["syllabus_text"] or "").strip()
+    shared_syllabus = (shared["syllabus_text"] or "").strip()
+    personal_syllabus = ""
+    personal_syllabus_name = ""
+
+    if not shared_syllabus and subject["personal_syllabus_document_id"]:
+        personal_doc = conn.execute(
+            """
+            SELECT original_name,extracted_text
+            FROM documents
+            WHERE id=? AND user_id=? AND subject_id=?
+            """,
+            (
+                subject["personal_syllabus_document_id"],
+                user_id,
+                subject_id
+            )
+        ).fetchone()
+        if personal_doc:
+            personal_syllabus = (
+                personal_doc["extracted_text"] or ""
+            ).strip()
+            personal_syllabus_name = personal_doc["original_name"] or ""
+
+    syllabus_text = shared_syllabus or personal_syllabus
     if syllabus_text:
         clipped = syllabus_text[:max_chars]
-        parts.append(f"ĐỀ CƯƠNG MÔN HỌC:\n{clipped}")
-        source_labels.append("Đề cương môn học")
+        if shared_syllabus:
+            parts.append(f"ĐỀ CƯƠNG CHUẨN CỦA MÔN:\n{clipped}")
+            source_labels.append("Đề cương chuẩn của môn")
+        else:
+            parts.append(
+                "ĐỀ CƯƠNG CÁ NHÂN FALLBACK "
+                f"({personal_syllabus_name or 'tài liệu cá nhân'}):\n{clipped}"
+            )
+            source_labels.append(
+                personal_syllabus_name or "Đề cương cá nhân"
+            )
         total += len(clipped)
 
     rows = conn.execute(
@@ -1218,7 +1289,7 @@ def get_next_best_action(conn, user_id, subject_id=None):
         elif task_dt >= now_dt and upcoming_task is None:
             upcoming_task = row
 
-    # Deadline toàn cục chỉ dùng ở Dashboard; reminder hiện chưa gắn subject_id.
+    # Deadline toàn cục chỉ dùng ở Dashboard; mỗi AI Plan reminder đã gắn subject_id.
     urgent_reminder = None
     if not subject_id:
         reminder_rows = conn.execute(
@@ -4986,34 +5057,39 @@ def quiz():
                 ).fetchone()
 
             if subject:
-                docs = conn.execute(
-                    """
-                    SELECT original_name,extracted_text
-                    FROM documents
-                    WHERE user_id=? AND subject_id=?
-                    ORDER BY id DESC
-                    LIMIT 8
-                    """,
-                    (uid, subject_id)
-                ).fetchall()
-
-                context_parts = []
-                for doc in docs:
-                    text_value = (doc["extracted_text"] or "").strip()
-                    if text_value:
-                        context_parts.append(
-                            f"TÀI LIỆU {doc['original_name']}:\n{text_value[:4500]}"
-                        )
-
-                shared_context, _ = get_shared_subject_context(
+                backbone = get_course_learning_backbone(
+                    conn,
                     uid,
                     subject_id,
-                    "",
-                    max_chars=7000
+                    query=""
                 )
-                if shared_context:
-                    context_parts.append(shared_context)
 
+                context_parts = []
+                if backbone and backbone["syllabus_text"]:
+                    syllabus_label = (
+                        "ĐỀ CƯƠNG CHUẨN CỦA MÔN"
+                        if backbone["syllabus_source"] == "shared"
+                        else "ĐỀ CƯƠNG CÁ NHÂN FALLBACK"
+                    )
+                    context_parts.append(
+                        f"{syllabus_label}:\n"
+                        f"{backbone['syllabus_text'][:9000]}"
+                    )
+
+                if backbone and backbone["shared_context"]:
+                    context_parts.append(
+                        "KIẾN THỨC DÙNG CHUNG BỔ TRỢ:\n"
+                        + backbone["shared_context"][:5500]
+                    )
+
+                if backbone and backbone["personal_context"]:
+                    context_parts.append(
+                        "TÀI LIỆU CÁ NHÂN BỔ TRỢ:\n"
+                        + backbone["personal_context"][:7500]
+                    )
+
+                # Thứ tự trên là có chủ đích: syllabus luôn đứng đầu context,
+                # nên không bị cắt mất khi môn có nhiều tài liệu.
                 combined_context = "\n\n".join(context_parts)[:22000]
 
                 focus_topics = []
@@ -5840,40 +5916,29 @@ def generate_study_plan_route():
             )
         )
 
-    existing_reminder = conn.execute(
+    # Một môn chỉ giữ 1 deadline đang mở của AI Plan hiện tại.
+    # Tạo lại roadmap nghĩa là thay deadline cũ, không cộng dồn reminder.
+    conn.execute(
         """
-        SELECT id,subject_id
-        FROM reminders
-        WHERE user_id=? AND title=? AND due_at=?
-        LIMIT 1
+        DELETE FROM reminders
+        WHERE user_id=? AND subject_id=? AND done=0
         """,
-        (uid, goal, deadline_dt.isoformat(timespec="minutes"))
-    ).fetchone()
-    if existing_reminder:
-        if not existing_reminder["subject_id"]:
-            conn.execute(
-                """
-                UPDATE reminders
-                SET subject_id=?
-                WHERE id=? AND user_id=?
-                """,
-                (subject_id, existing_reminder["id"], uid)
-            )
-    else:
-        conn.execute(
-            """
-            INSERT INTO reminders(
-                user_id,subject_id,title,due_at,created_at
-            ) VALUES(?,?,?,?,?)
-            """,
-            (
-                uid,
-                subject_id,
-                goal,
-                deadline_dt.isoformat(timespec="minutes"),
-                now()
-            )
+        (uid, subject_id)
+    )
+    conn.execute(
+        """
+        INSERT INTO reminders(
+            user_id,subject_id,title,due_at,created_at
+        ) VALUES(?,?,?,?,?)
+        """,
+        (
+            uid,
+            subject_id,
+            goal,
+            deadline_dt.isoformat(timespec="minutes"),
+            now()
         )
+    )
 
     conn.commit()
     conn.close()
