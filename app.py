@@ -6626,7 +6626,7 @@ def api_mobile_document_summary(doc_id):
         "Bạn là AI Study Agent. Hãy tóm tắt tài liệu sau bằng tiếng Việt. "
         "Chỉ sử dụng nội dung tài liệu, không bịa thêm. Giữ nguyên thuật ngữ, "
         "chia thành: Ý chính, Khái niệm quan trọng, Nội dung cần nhớ. "
-        "Ưu tiên bám cấu trúc chương/mục.\\n\\nTÀI LIỆU:\\n"
+        "Ưu tiên bám cấu trúc chương/mục.\n\nTÀI LIỆU:\n"
         + source_text[:14000]
     )
     generated, ai_error = gemini_generate(prompt)
@@ -6634,10 +6634,10 @@ def api_mobile_document_summary(doc_id):
         return jsonify({"summary": generated.strip(), "used_ai": True})
     chunks = [
         item.strip() for item in
-        re.split(r"\\n{2,}|(?<=[.!?])\\s+", source_text)
+        re.split(r"\n{2,}|(?<=[.!?])\s+", source_text)
         if len(item.strip()) >= 25
     ]
-    fallback = "\\n\\n".join(chunks[:12])[:3500] or source_text[:3500]
+    fallback = "\n\n".join(chunks[:12])[:3500] or source_text[:3500]
     return jsonify({"summary": fallback, "used_ai": False, "ai_error": ai_error or ""})
 
 
