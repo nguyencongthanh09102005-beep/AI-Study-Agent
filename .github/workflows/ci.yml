@@ -73,5 +73,121 @@ jobs:
                   f"{path} returned {response.status_code}"
               )
 
+          # Personal syllabus phải là fallback thực sự cho cả backbone và Chat context.
+          conn = project.db()
+          created_at = project.now()
+          cursor = conn.execute(
+              """
+              INSERT INTO subjects(
+                  user_id,name,code,description,credits,target_score,progress,created_at
+              ) VALUES(?,?,?,?,?,?,?,?)
+              """,
+              (
+                  user["id"],
+                  "CI Personal Syllabus",
+                  "CI-SYL-001",
+                  "CI only",
+                  3,
+                  8.0,
+                  0,
+                  created_at
+              )
+          )
+          test_subject_id = cursor.lastrowid
+          doc_cursor = conn.execute(
+              """
+              INSERT INTO documents(
+                  user_id,subject_id,original_name,stored_name,extracted_text,created_at
+              ) VALUES(?,?,?,?,?,?)
+              """,
+              (
+                  user["id"],
+                  test_subject_id,
+                  "ci_syllabus.txt",
+                  "ci_syllabus.txt",
+                  "Chương 1: Nền tảng CI. Chương 2: Kiểm thử tích hợp.",
+                  created_at
+              )
+          )
+          doc_id = doc_cursor.lastrowid
+          conn.execute(
+              """
+              UPDATE subjects
+              SET personal_syllabus_document_id=?
+              WHERE id=? AND user_id=?
+              """,
+              (doc_id, test_subject_id, user["id"])
+          )
+          conn.commit()
+
+          backbone = project.get_course_learning_backbone(
+              conn,
+              user["id"],
+              test_subject_id
+          )
+          assert backbone["syllabus_source"] == "personal"
+          assert "Nền tảng CI" in backbone["syllabus_text"]
+          conn.close()
+
+          chat_context, chat_sources = project.get_shared_subject_context(
+              user["id"],
+              test_subject_id
+          )
+          assert "ĐỀ CƯƠNG CÁ NHÂN FALLBACK" in chat_context
+          assert "ci_syllabus.txt" in chat_sources
+
+          # Tạo lại AI Plan phải thay deadline đang mở của cùng môn.
+          from datetime import datetime, timedelta
+          project.build_study_plan = lambda **kwargs: [{
+              "date": (datetime.now() + timedelta(days=1)).date().isoformat(),
+              "time": "19:00",
+              "title": "CI study task",
+              "duration": 45,
+              "note": "CI"
+          }]
+
+          deadline_1 = (
+              datetime.now() + timedelta(days=7)
+          ).replace(hour=23, minute=0, second=0, microsecond=0)
+          deadline_2 = (
+              datetime.now() + timedelta(days=14)
+          ).replace(hour=23, minute=0, second=0, microsecond=0)
+
+          for goal, deadline in [
+              ("CI plan cũ", deadline_1),
+              ("CI plan mới", deadline_2),
+          ]:
+              response = client.post(
+                  "/study-plan/generate",
+                  data={
+                      "subject_id": str(test_subject_id),
+                      "goal": goal,
+                      "deadline": deadline.isoformat(timespec="minutes"),
+                      "preferred_time": "19:00",
+                      "daily_minutes": "45",
+                  },
+                  follow_redirects=False,
+              )
+              assert response.status_code in (302, 303)
+
+          conn = project.db()
+          open_reminders = conn.execute(
+              """
+              SELECT title,due_at
+              FROM reminders
+              WHERE user_id=? AND subject_id=? AND done=0
+              ORDER BY id
+              """,
+              (user["id"], test_subject_id)
+          ).fetchall()
+          conn.close()
+
+          assert len(open_reminders) == 1
+          assert open_reminders[0]["title"] == "CI plan mới"
+          assert open_reminders[0]["due_at"] == deadline_2.isoformat(
+              timespec="minutes"
+          )
+
           print("Core web smoke OK:", ", ".join(paths))
+          print("Business flow checks OK: syllabus fallback, deadline replace")
           PY
