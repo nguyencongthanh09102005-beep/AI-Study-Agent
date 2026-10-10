@@ -126,8 +126,8 @@
       <div class="shared-syllabus-readonly">{{ shared_subject.syllabus_text }}</div>
       {% else %}
       <div class="empty-agent">
-        Chưa có đề cương chuẩn trong kho dùng chung. Sinh viên vẫn có thể học bằng tài liệu cá nhân;
-        phần quản lý nội dung chuẩn sẽ thuộc vai trò giảng viên/quản trị học thuật khi mở rộng hệ thống.
+        Chưa có đề cương chuẩn trong kho dùng chung. Study Agent sẽ dùng đề cương cá nhân bạn chọn
+        làm fallback; phần quản lý nội dung chuẩn sẽ thuộc vai trò giảng viên/quản trị học thuật khi mở rộng hệ thống.
       </div>
       {% endif %}
     </div>
@@ -169,6 +169,52 @@
     </div>
 
     <p class="panel-desc">Toàn bộ dữ liệu trong phần này chỉ thuộc tài khoản của bạn và được dùng để cá nhân hóa Study Agent.</p>
+
+    <div class="personal-syllabus-box">
+      <div class="mini-section-head">
+        <h4>📑 Đề cương cá nhân dự phòng</h4>
+        {% if shared_subject.syllabus_text %}
+        <span>Shared syllabus đang được ưu tiên</span>
+        {% elif subject.personal_syllabus_document_id %}
+        <span>Đang dùng khi tạo roadmap</span>
+        {% else %}
+        <span>Chưa chọn</span>
+        {% endif %}
+      </div>
+
+      {% if shared_subject.syllabus_text %}
+      <p>
+        Môn này đã có đề cương chuẩn trong Shared Knowledge. Bạn vẫn có thể chọn một file cá nhân
+        làm bản dự phòng; Study Agent luôn ưu tiên đề cương chuẩn khi bản chuẩn tồn tại.
+      </p>
+      {% else %}
+      <p>
+        Shared Knowledge chưa có đề cương chuẩn. Chọn một tài liệu cá nhân của môn làm đề cương
+        để Study Agent vẫn tạo roadmap theo đúng phạm vi môn học.
+      </p>
+      {% endif %}
+
+      {% if documents %}
+      <form method="post" class="personal-syllabus-form">
+        <input type="hidden" name="action_type" value="personal_syllabus">
+        <select name="personal_syllabus_document_id" aria-label="Chọn tài liệu làm đề cương cá nhân">
+          <option value="">Không dùng đề cương cá nhân</option>
+          {% for doc in documents %}
+          <option value="{{ doc.id }}" {% if subject.personal_syllabus_document_id == doc.id %}selected{% endif %}>
+            {{ doc.original_name }}
+          </option>
+          {% endfor %}
+        </select>
+        <button class="ghost-action" type="submit">Lưu đề cương</button>
+      </form>
+      <small class="personal-syllabus-hint">File này vẫn là tài liệu riêng của bạn, không được đưa vào Shared Knowledge.</small>
+      {% else %}
+      <div class="empty-agent">
+        Chưa có tài liệu cá nhân để chọn làm đề cương.
+        <a href="{{ url_for('documents') }}">Tải tài liệu lên →</a>
+      </div>
+      {% endif %}
+    </div>
 
     <form method="post" class="agent-form personal-form">
       <input type="hidden" name="action_type" value="profile">
