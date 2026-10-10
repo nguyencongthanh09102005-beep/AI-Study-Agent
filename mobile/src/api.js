@@ -12,11 +12,10 @@ export const API_BASE_URL = (
 async function request(path, options = {}) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers || {}),
-    },
     ...options,
+    headers: options.body instanceof FormData
+      ? { ...(options.headers || {}) }
+      : { 'Content-Type': 'application/json', ...(options.headers || {}) },
   });
 
   const text = await response.text();
@@ -53,6 +52,52 @@ export const api = {
 
   subjectDetail: (subjectId) =>
     request(`/api/mobile/subjects/${subjectId}`),
+
+  createSubject: (payload) =>
+    request('/api/mobile/subjects', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  updateSubject: (subjectId, payload) =>
+    request(`/api/mobile/subjects/${subjectId}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+
+  deleteSubject: (subjectId) =>
+    request(`/api/mobile/subjects/${subjectId}`, { method: 'DELETE' }),
+
+  documents: () => request('/api/mobile/documents'),
+
+  uploadDocument: async (subjectId, file) => {
+    const form = new FormData();
+    form.append('subject_id', String(subjectId));
+    form.append('file', {
+      uri: file.uri,
+      name: file.name || 'tai-lieu.pdf',
+      type: file.mimeType || 'application/pdf',
+    });
+    return request('/api/mobile/documents', {
+      method: 'POST',
+      body: form,
+    });
+  },
+
+  moveDocument: (docId, subjectId) =>
+    request(`/api/mobile/documents/${docId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ subject_id: subjectId }),
+    }),
+
+  deleteDocument: (docId) =>
+    request(`/api/mobile/documents/${docId}`, { method: 'DELETE' }),
+
+  setPersonalSyllabus: (subjectId, docId) =>
+    request(`/api/mobile/subjects/${subjectId}/personal-syllabus`, {
+      method: 'PUT',
+      body: JSON.stringify({ document_id: docId }),
+    }),
 
   chat: (subjectId, message) =>
     request('/api/mobile/chat', {
