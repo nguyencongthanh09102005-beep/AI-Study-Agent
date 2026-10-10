@@ -28,6 +28,10 @@ jobs:
         working-directory: mobile
         run: npm install --no-audit --no-fund
 
+      - name: Check Expo dependency compatibility
+        working-directory: mobile
+        run: npx expo install --check
+
       - name: Bundle Mobile for iOS
         working-directory: mobile
         run: npx expo export --platform ios --output-dir dist-ci
