@@ -194,12 +194,12 @@
       </p>
       {% endif %}
 
-      {% if documents %}
+      {% if syllabus_documents %}
       <form method="post" class="personal-syllabus-form">
         <input type="hidden" name="action_type" value="personal_syllabus">
         <select name="personal_syllabus_document_id" aria-label="Chọn tài liệu làm đề cương cá nhân">
           <option value="">Không dùng đề cương cá nhân</option>
-          {% for doc in documents %}
+          {% for doc in syllabus_documents %}
           <option value="{{ doc.id }}" {% if subject.personal_syllabus_document_id == doc.id %}selected{% endif %}>
             {{ doc.original_name }}
           </option>
