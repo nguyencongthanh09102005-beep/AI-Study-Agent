@@ -76,6 +76,11 @@ export const api = {
 
   documents: () => request('/api/mobile/documents'),
 
+  documentDetail: (id) => request(`/api/mobile/documents/${id}`),
+
+  summarizeDocument: (id) =>
+    request(`/api/mobile/documents/${id}/summary`, { method: 'POST' }),
+
   uploadDocument: async (subjectId, file) => {
     const form = new FormData();
     form.append('subject_id', String(subjectId));
