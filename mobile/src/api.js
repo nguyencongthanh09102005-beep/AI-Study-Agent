@@ -40,6 +40,12 @@ export const api = {
       body: JSON.stringify({ email, password }),
     }),
 
+  register: (name, email, password) =>
+    request('/api/mobile/register', {
+      method: 'POST',
+      body: JSON.stringify({ name, email, password }),
+    }),
+
   logout: () =>
     request('/api/mobile/logout', {
       method: 'POST',
