@@ -73,6 +73,36 @@ npx expo start
 
 Mở Expo Go trên iPhone và quét QR. Nếu đổi `EXPO_PUBLIC_API_URL`, restart Expo để nạp lại biến môi trường.
 
+### Chức năng Mobile (React Native / Expo)
+
+- Đăng ký/đăng nhập và dùng chung tài khoản với Web.
+- Dashboard: thống kê môn/tài liệu/bài Quiz và đề xuất Next Best Action theo tiến độ thực tế.
+- Môn học: tạo, sửa, xóa, mở chi tiết, xem điểm yếu và tiến độ.
+- Tài liệu cá nhân: upload PDF/TXT/MD từ ứng dụng Tệp, xem chữ đã trích xuất, tóm tắt AI, đổi môn, xóa, chọn/bỏ đề cương fallback.
+- Study Agent: chat theo môn và mở lại lịch sử câu hỏi đã lưu trên Web.
+- Quiz: tạo theo môn/tài liệu/điểm yếu, chọn 10/20/30 câu, xem danh sách Quiz, làm lại, xem kết quả và đáp án.
+- Lộ trình học: tạo AI Study Plan theo đề cương, thêm/sửa/xóa/tick hoàn thành buổi học, quản lý deadline thủ công.
+- Hồ sơ: phong cách học, thời gian ưu tiên, thời lượng học, mục tiêu, ghi chú.
+
+Các phần dùng chung backend và SQLite với Web. Tài liệu cá nhân không được đưa lên Shared Knowledge. Mobile hiện hiển thị deadline/nhắc việc bên trong ứng dụng, **chưa có push notification nền**. PDF scan/ảnh chưa có OCR; màn đọc tài liệu trên Mobile hiển thị **văn bản trích xuất** thay vì trình xem trang PDF gốc.
+
+### Kịch bản nghiệm thu một lần trên iPhone
+
+1. Bật Flask và Expo, mở Expo Go cùng Wi-Fi.
+2. Tạo tài khoản thử (hoặc đăng nhập Web account) từ Mobile.
+3. Vào Môn học → tạo môn mới → chỉnh tín chỉ/mục tiêu.
+4. Upload một file PDF/TXT có chữ → xem nội dung → tóm tắt → chọn làm đề cương cá nhân.
+5. Mở Kế hoạch → tạo kế hoạch AI với deadline (có nút chọn nhanh 7/14/30 ngày).
+6. Tạo buổi học thủ công → hoàn thành → kiểm tra tiến độ trên Mobile và Web.
+7. Hỏi AI theo môn, kiểm tra lịch sử hiển thị trên Web.
+8. Tạo Quiz theo môn/tài liệu; trả lời sai có chủ đích → kiểm tra điểm yếu và Adaptive task.
+9. Mở Quiz ôn điểm yếu → trả lời đúng → kiểm tra tiến độ và đề xuất học tập thay đổi.
+10. Tạo/sửa/xóa deadline, chỉnh hồ sơ; xác minh Web đọc được dữ liệu.
+11. Đăng xuất, đăng nhập tài khoản thứ hai để xác nhận không thấy tài liệu, chat, quiz và kế hoạch riêng của tài khoản trước.
+
+Các bài test CI sử dụng Flask test_client và Expo iOS export; **vẫn cần chạy thủ công trên iPhone thật** để xác nhận giao diện, quyền chọn tệp và trải nghiệm cảm ứng.
+
+
 Có thể dùng `sample_data/ai_co_ban.txt` để test nhanh luồng Tài liệu → Quiz → AI Chat.
 
 Tài khoản demo mặc định khi database mới được tạo:
