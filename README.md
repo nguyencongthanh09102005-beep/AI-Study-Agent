@@ -10,8 +10,8 @@ Hệ thống trợ lý học tập full-stack sử dụng Flask + SQLite + Gemin
 - AI Chat dựa trên tài liệu; lịch sử từng cuộc trò chuyện được lưu trong SQLite.
 - Tạo Quiz bằng Gemini từ tài liệu, theo môn học hoặc ôn riêng các chủ đề đang yếu.
 - Quiz lưu topic/chapter cho từng câu, cập nhật điểm yếu theo số lần đúng/sai và tự gỡ khỏi danh sách yếu khi đã trả lời đúng đủ lần.
-- AI Study Plan dùng đề cương dùng chung, tài liệu cá nhân, lịch sử Quiz, điểm yếu, mục tiêu điểm và Learning Profile để ưu tiên lộ trình.
-- Shared Knowledge theo môn hỗ trợ nhập đề cương, ghi chú hoặc upload PDF/TXT/Markdown để nhiều sinh viên cùng mã môn tái sử dụng.
+- AI Study Plan ưu tiên đề cương chuẩn dùng chung; nếu chưa có thì dùng đề cương cá nhân fallback, sau đó kết hợp tài liệu cá nhân, lịch sử Quiz, điểm yếu, mục tiêu điểm và Learning Profile để ưu tiên lộ trình.
+- Shared Knowledge theo môn là lớp kiến thức chuẩn dùng chung và ở giao diện sinh viên chỉ đọc. Nếu môn chưa có đề cương chuẩn, sinh viên có thể chọn một tài liệu cá nhân của chính mình làm đề cương fallback; file này vẫn riêng tư và không được đưa vào Shared Knowledge.
 - Tài liệu có xem file thật, tóm tắt AI và fallback cục bộ nếu API tạm thời không phản hồi.
 - Deadline & nhắc việc tích hợp trong Kế hoạch học.
 - Dashboard lấy dữ liệu thật từ SQLite; biểu đồ tuần chỉ tính thời lượng của các task đã bấm Hoàn thành.
@@ -58,7 +58,7 @@ Mở `.env` và điền:
 ```env
 GEMINI_API_KEY=YOUR_KEY
 GEMINI_MODEL=gemini-3.8-flash
-GEMINI_FALLBACK_MODELS=gemini-3.7-flash,gemini-3.5-flash-lite
+GEMINI_FALLBACK_MODELS=gemini-3.6-flash,gemini-3.5-flash-lite
 GEMINI_PRIMARY_RETRIES=2
 GEMINI_REQUEST_TIMEOUT=25
 ```
