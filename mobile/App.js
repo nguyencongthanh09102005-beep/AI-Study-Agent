@@ -63,11 +63,34 @@ function HomeScreen({ dashboard, setTab, loading, onLogout }) {
       />
 
       <View style={styles.mobileStatusRow}>
-        <Text style={styles.mobileStatusText}>Backend: {API_BASE_URL}</Text>
+        <Text style={styles.mobileStatusText}>Đồng bộ Web và iPhone</Text>
+        <TouchableOpacity onPress={() => setTab('profile')} style={styles.logoutButton}>
+          <Text style={styles.logoutButtonText}>⚙ Hồ sơ</Text>
+        </TouchableOpacity>
         <TouchableOpacity onPress={onLogout} style={styles.logoutButton}>
           <Text style={styles.logoutButtonText}>Đăng xuất</Text>
         </TouchableOpacity>
       </View>
+
+      <View style={styles.homeMetricsRow}>
+        <View style={styles.homeMetric}><Text style={styles.homeMetricValue}>{dashboard?.stats?.subject_count || 0}</Text><Text style={styles.homeMetricLabel}>Môn học</Text></View>
+        <View style={styles.homeMetric}><Text style={styles.homeMetricValue}>{dashboard?.stats?.document_count || 0}</Text><Text style={styles.homeMetricLabel}>Tài liệu</Text></View>
+        <View style={styles.homeMetric}><Text style={styles.homeMetricValue}>{dashboard?.stats?.quiz_attempt_count || 0}</Text><Text style={styles.homeMetricLabel}>Bài làm</Text></View>
+      </View>
+
+      {dashboard?.next_best_action && (
+        <TouchableOpacity style={styles.recommendCard}
+          onPress={() => setTab(
+            dashboard.next_best_action.kind === 'weakness' ? 'quiz' :
+            ['task', 'deadline', 'plan'].includes(dashboard.next_best_action.kind)
+              ? 'plan' : 'agent'
+          )}>
+          <Text style={styles.eyebrow}>✦ STUDY AGENT ĐỀ XUẤT</Text>
+          <Text style={styles.cardTitle}>{dashboard.next_best_action.title}</Text>
+          <Text style={styles.muted}>{dashboard.next_best_action.reason}</Text>
+          <Text style={styles.smallActionText}>Xem việc nên làm tiếp →</Text>
+        </TouchableOpacity>
+      )}
 
       <TouchableOpacity style={styles.heroCard} onPress={() => setTab('agent')}>
         <View style={{ flex: 1 }}>
@@ -947,41 +970,130 @@ function PlanScreen({ plan, subjects, userName, refreshData }) {
   );
 }
 
-function LoginScreen({ onLogin }) {
-  const [email, setEmail] = useState('demo@study.local');
-  const [password, setPassword] = useState('123456');
-  const [loading, setLoading] = useState(false);
+function ProfileScreen({ userName, refreshData, onBack }) {
+  const [profile, setProfile] = useState({});
+  const [style, setStyle] = useState('balanced');
+  const [time, setTime] = useState('19:00');
+  const [minutes, setMinutes] = useState('45');
+  const [goals, setGoals] = useState('');
+  const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
 
-  const login = async () => {
-    setLoading(true);
+  useEffect(() => {
+    let active = true;
+    api.profile().then(data => {
+      if (!active) return;
+      const p = data.profile || {};
+      setProfile(p);
+      setStyle(p.learning_style || 'balanced');
+      setTime(p.preferred_study_time || '19:00');
+      setMinutes(String(p.daily_minutes || 45));
+      setGoals(p.goals || '');
+      setNotes(p.notes || '');
+    }).catch(err => { if (active) setError(err.message); });
+    return () => { active = false; };
+  }, []);
+
+  const save = async () => {
+    setBusy(true);
     setError('');
     try {
-      await onLogin(email.trim(), password);
+      await api.updateProfile({
+        learning_style: style,
+        preferred_study_time: time,
+        daily_minutes: Number(minutes),
+        goals,
+        notes,
+      });
+      await refreshData();
+      Alert.alert('Đã lưu', 'Hồ sơ học tập đã được đồng bộ với website.');
     } catch (err) {
-      setError(err.message || 'Không thể đăng nhập.');
-    } finally {
-      setLoading(false);
-    }
+      setError(err.message || 'Lưu thất bại.');
+    } finally { setBusy(false); }
   };
 
   return (
-    <SafeAreaView style={styles.loginSafe}>
-      <StatusBar barStyle="dark-content" />
+    <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
+      <TouchableOpacity onPress={onBack}><Text style={styles.backLink}>← Trang chủ</Text></TouchableOpacity>
+      <Header title="Hồ sơ học tập" subtitle={userName} userName={userName} />
+      <ErrorCard message={error} />
+      <Text style={styles.fieldLabel}>Phong cách học</Text>
+      <View style={styles.actionRow}>
+        {['balanced','visual','reading','practice'].map(value => (
+          <TouchableOpacity key={value} style={[styles.smallAction, style === value && { backgroundColor: '#6567E8' }]}
+            onPress={() => setStyle(value)}>
+            <Text style={[styles.smallActionText, style === value && { color: 'white' }]}>
+              {({ balanced:'Cân bằng', visual:'Trực quan', reading:'Đọc hiểu', practice:'Thực hành' })[value]}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      <Text style={styles.fieldLabel}>Giờ học ưu tiên (HH:MM)</Text>
+      <TextInput style={styles.fieldInput} value={time} onChangeText={setTime} placeholder="19:00" />
+      <Text style={styles.fieldLabel}>Số phút mỗi buổi</Text>
+      <TextInput style={styles.fieldInput} value={minutes} onChangeText={setMinutes} keyboardType="number-pad" />
+      <Text style={styles.fieldLabel}>Mục tiêu học tập</Text>
+      <TextInput style={[styles.fieldInput, { minHeight: 82, textAlignVertical: 'top' }]} multiline value={goals} onChangeText={setGoals} placeholder="Ví dụ: điểm 8 môn Điện toán đám mây" />
+      <Text style={styles.fieldLabel}>Ghi chú cá nhân</Text>
+      <TextInput style={[styles.fieldInput, { minHeight: 82, textAlignVertical: 'top' }]} multiline value={notes} onChangeText={setNotes} />
+      <TouchableOpacity disabled={busy} style={styles.primaryButton} onPress={save}>
+        <Text style={styles.primaryButtonText}>{busy ? 'Đang lưu...' : 'Lưu hồ sơ học tập'}</Text>
+      </TouchableOpacity>
+    </ScrollView>
+  );
+}
+
+function LoginScreen({ onLogin, onRegister }) {
+  const [signup, setSignup] = useState(false);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const submit = async () => {
+    if (signup && password !== confirm) {
+      setError('Xác nhận mật khẩu không trùng khớp.');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      if (signup) await onRegister(name.trim(), email.trim(), password);
+      else await onLogin(email.trim(), password);
+    } catch (err) {
+      setError(err.message || 'Không thể xác thực.');
+    } finally { setLoading(false); }
+  };
+
+  return (
+    <ScrollView contentContainerStyle={styles.loginScroll} keyboardShouldPersistTaps="handled">
       <View style={styles.loginWrap}>
         <View style={styles.logo}><Text style={{ fontSize: 34 }}>🎓</Text></View>
         <Text style={styles.loginTitle}>AI Study Agent</Text>
-        <Text style={styles.loginSubtitle}>Mobile dùng chung dữ liệu với website Flask</Text>
-        <TextInput value={email} onChangeText={setEmail} autoCapitalize="none" style={styles.loginInput} placeholder="Email" />
+        <Text style={styles.loginSubtitle}>Học theo đề cương · AI cá nhân hóa</Text>
+        <View style={styles.actionRow}>
+          <TouchableOpacity style={styles.smallAction} onPress={() => setSignup(false)}>
+            <Text style={[styles.smallActionText, !signup && { fontWeight: '900' }]}>Đăng nhập</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.smallAction} onPress={() => setSignup(true)}>
+            <Text style={[styles.smallActionText, signup && { fontWeight: '900' }]}>Đăng ký</Text>
+          </TouchableOpacity>
+        </View>
+        {signup && <TextInput value={name} onChangeText={setName} style={styles.loginInput} placeholder="Họ và tên" />}
+        <TextInput value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" style={styles.loginInput} placeholder="Email" />
         <TextInput value={password} onChangeText={setPassword} secureTextEntry style={styles.loginInput} placeholder="Mật khẩu" />
-        <TouchableOpacity style={styles.primaryButton} onPress={login} disabled={loading}>
-          <Text style={styles.primaryButtonText}>{loading ? 'Đang đăng nhập...' : 'Đăng nhập'}</Text>
-        </TouchableOpacity>
+        {signup && <TextInput value={confirm} onChangeText={setConfirm} secureTextEntry style={styles.loginInput} placeholder="Nhập lại mật khẩu" />}
         <ErrorCard message={error} />
-        <Text style={styles.loginHint}>Flask cần chạy với FLASK_HOST=0.0.0.0 trên máy Windows.</Text>
-        <Text style={styles.loginHint}>Backend hiện tại: {API_BASE_URL}</Text>
+        <TouchableOpacity style={styles.primaryButton} onPress={submit} disabled={loading}>
+          <Text style={styles.primaryButtonText}>{loading ? 'Đang xử lý...' : signup ? 'Tạo tài khoản' : 'Đăng nhập'}</Text>
+        </TouchableOpacity>
+        <Text style={styles.loginHint}>Cùng một tài khoản dùng trên Web và iPhone.</Text>
+        <Text style={styles.loginHint}>Backend: {API_BASE_URL}</Text>
       </View>
-    </SafeAreaView>
+    </ScrollView>
   );
 }
 
@@ -1015,6 +1127,12 @@ export default function App() {
     setLoggedIn(true);
   };
 
+  const handleRegister = async (name, email, password) => {
+    await api.register(name, email, password);
+    await refreshData();
+    setLoggedIn(true);
+  };
+
   const handleLogout = async () => {
     try {
       await api.logout();
@@ -1036,6 +1154,7 @@ export default function App() {
   const userName = dashboard?.user?.name || '';
 
   const screen = useMemo(() => {
+    if (tab === 'profile') return <ProfileScreen userName={userName} refreshData={refreshData} onBack={() => setTab('home')} />;
     if (tab === 'subjects') return <SubjectsScreen subjects={subjects} userName={userName} refreshData={refreshData} />;
     if (tab === 'agent') return <AgentScreen subjects={subjects} userName={userName} />;
     if (tab === 'quiz') return <QuizScreen subjects={subjects} userName={userName} refreshData={refreshData} />;
@@ -1050,7 +1169,7 @@ export default function App() {
     );
   }, [tab, subjects, dashboard, plan, loading, userName, loggedIn]);
 
-  if (!loggedIn) return <LoginScreen onLogin={handleLogin} />;
+  if (!loggedIn) return <LoginScreen onLogin={handleLogin} onRegister={handleRegister} />;
 
   const tabs = [
     ['home', '⌂', 'Trang chủ'],
@@ -1086,15 +1205,15 @@ export default function App() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F6F8FC' },
   app: { flex: 1 },
-  page: { padding: 20, paddingBottom: 110, backgroundColor: '#F6F8FC' },
+  page: { padding: 16, paddingBottom: 110, backgroundColor: '#F6F8FC' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 },
-  title: { fontSize: 28, fontWeight: '800', color: '#17203A' },
+  title: { fontSize: 24, fontWeight: '800', color: '#17203A' },
   subtitle: { marginTop: 5, fontSize: 13, color: '#7B849A' },
   avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#E8EAFE', alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: '#5965D8', fontWeight: '800' },
   heroCard: { backgroundColor: '#6567E8', borderRadius: 24, padding: 22, flexDirection: 'row', marginBottom: 24 },
   heroEyebrow: { color: '#D8DBFF', fontSize: 11, fontWeight: '800', letterSpacing: 1.1 },
-  heroTitle: { color: 'white', fontSize: 23, lineHeight: 29, fontWeight: '800', marginTop: 8 },
+  heroTitle: { color: 'white', fontSize: 20, lineHeight: 29, fontWeight: '800', marginTop: 8 },
   heroText: { color: '#EEF0FF', fontSize: 13, lineHeight: 19, marginTop: 8 },
   heroButton: { alignSelf: 'flex-start', backgroundColor: 'white', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, marginTop: 16 },
   heroButtonText: { color: '#555DD0', fontWeight: '800' },
@@ -1113,6 +1232,12 @@ const styles = StyleSheet.create({
   deleteActionText: { color: '#B83647', fontSize: 12, fontWeight: '700' },
   secondaryAction: { paddingVertical: 16, alignItems: 'center' },
   secondaryActionText: { fontSize: 14, fontWeight: '700', color: '#5965D8' },
+  homeMetricsRow: { flexDirection: 'row', gap: 9, marginBottom: 16 },
+  homeMetric: { flex: 1, backgroundColor: 'white', borderRadius: 15, padding: 13, borderWidth: 1, borderColor: '#E9ECF7' },
+  homeMetricValue: { color: '#5965D8', fontSize: 21, fontWeight: '900' },
+  homeMetricLabel: { color: '#858DA2', fontSize: 11, marginTop: 4 },
+  recommendCard: { padding: 17, borderRadius: 18, marginBottom: 15, backgroundColor: '#EDF0FF', borderWidth: 1, borderColor: '#CDD5FF', gap: 5 },
+  loginScroll: { flex: 1, backgroundColor: '#F6F8FC' },
   sectionTitle: { fontSize: 17, fontWeight: '800', color: '#202943', marginBottom: 10, marginTop: 4 },
   card: { backgroundColor: 'white', borderRadius: 18, padding: 17, marginBottom: 12, borderWidth: 1, borderColor: '#EBEEF5' },
   subjectCard: { backgroundColor: 'white', borderRadius: 20, padding: 17, marginBottom: 14, borderWidth: 1, borderColor: '#EBEEF5', flexDirection: 'row', gap: 14 },
@@ -1164,7 +1289,7 @@ const styles = StyleSheet.create({
   navLabel: { fontSize: 9, color: '#9AA1B2', marginTop: 4, fontWeight: '700' },
   navActive: { color: '#5E66D8' },
   loginSafe: { flex: 1, backgroundColor: '#F6F8FC', justifyContent: 'center' },
-  loginWrap: { paddingHorizontal: 26, alignItems: 'stretch' },
+  loginWrap: { paddingHorizontal: 26, paddingTop: 80, paddingBottom: 80, alignItems: 'stretch' },
   logo: { alignSelf: 'center', width: 72, height: 72, borderRadius: 24, backgroundColor: '#EBEDFF', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
   loginTitle: { textAlign: 'center', color: '#202943', fontSize: 28, fontWeight: '900' },
   loginSubtitle: { textAlign: 'center', color: '#838B9F', fontSize: 13, marginTop: 7, marginBottom: 28 },
