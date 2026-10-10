@@ -4069,6 +4069,17 @@ def subject_detail(subject_id):
         (uid, subject_id)
     ).fetchall()
 
+    syllabus_documents = conn.execute(
+        """
+        SELECT id,original_name,created_at
+        FROM documents
+        WHERE user_id=? AND subject_id=?
+        ORDER BY id DESC
+        LIMIT 100
+        """,
+        (uid, subject_id)
+    ).fetchall()
+
     quiz_stats = conn.execute(
         """
         SELECT
@@ -4110,6 +4121,7 @@ def subject_detail(subject_id):
         profile=profile,
         weaknesses=weaknesses,
         documents=docs,
+        syllabus_documents=syllabus_documents,
         quiz_stats=quiz_stats,
         upcoming_tasks=upcoming_tasks,
         next_best_action=next_best_action
@@ -4351,6 +4363,17 @@ def update_document_subject(doc_id):
             (new_subject_id, doc_id, uid)
         )
 
+        if old_subject_id and old_subject_id != new_subject_id:
+            conn.execute(
+                """
+                UPDATE subjects
+                SET personal_syllabus_document_id=NULL
+                WHERE id=? AND user_id=?
+                  AND personal_syllabus_document_id=?
+                """,
+                (old_subject_id, uid, doc_id)
+            )
+
         # Quiz sinh từ tài liệu phải luôn đi theo môn của tài liệu.
         conn.execute(
             "UPDATE quizzes SET subject_id=? WHERE document_id=? AND user_id=?",
@@ -4415,6 +4438,15 @@ def delete_document(doc_id):
                   )
             """,
             (uid, doc_id, f"Quiz từ {row['original_name']}")
+        )
+
+        conn.execute(
+            """
+            UPDATE subjects
+            SET personal_syllabus_document_id=NULL
+            WHERE user_id=? AND personal_syllabus_document_id=?
+            """,
+            (uid, doc_id)
         )
 
         conn.execute(
