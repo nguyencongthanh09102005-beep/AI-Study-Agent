@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   SafeAreaView,
   ScrollView,
   StatusBar,
@@ -11,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { api, API_BASE_URL } from './src/api';
+import * as DocumentPicker from 'expo-document-picker';
 
 function Pill({ children }) {
   return <View style={styles.pill}><Text style={styles.pillText}>{children}</Text></View>;
@@ -115,12 +117,255 @@ function HomeScreen({ dashboard, setTab, loading, onLogout }) {
   );
 }
 
-function SubjectsScreen({ subjects, userName }) {
+function SubjectForm({ initial, onSave, onCancel, busy }) {
+  const [name, setName] = useState(initial?.name || '');
+  const [code, setCode] = useState(initial?.code || '');
+  const [credits, setCredits] = useState(String(initial?.credits || 0));
+  const [target, setTarget] = useState(String(initial?.target_score || 0));
+  const [description, setDescription] = useState(initial?.description || '');
+
+  return (
+    <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
+      <Header title={initial ? 'Sửa môn học' : 'Tạo môn học'} subtitle="Thiết lập không gian học tập của bạn" />
+      <Text style={styles.fieldLabel}>Tên môn học *</Text>
+      <TextInput style={styles.fieldInput} value={name} onChangeText={setName} placeholder="Ví dụ: Điện toán đám mây" />
+      <Text style={styles.fieldLabel}>Mã môn học</Text>
+      <TextInput style={styles.fieldInput} value={code} onChangeText={setCode} placeholder="0104123039" />
+      <Text style={styles.fieldLabel}>Số tín chỉ</Text>
+      <TextInput style={styles.fieldInput} value={credits} onChangeText={setCredits} keyboardType="number-pad" />
+      <Text style={styles.fieldLabel}>Mục tiêu điểm (0–10)</Text>
+      <TextInput style={styles.fieldInput} value={target} onChangeText={setTarget} keyboardType="decimal-pad" />
+      <Text style={styles.fieldLabel}>Mô tả môn học</Text>
+      <TextInput style={[styles.fieldInput, { minHeight: 110, textAlignVertical: 'top' }]} multiline value={description} onChangeText={setDescription} />
+      <TouchableOpacity style={styles.primaryButton} disabled={busy} onPress={() => onSave({
+        name: name.trim(), code: code.trim(), credits: credits.trim(),
+        target_score: target.replace(',', '.'), description: description.trim(),
+      })}>
+        <Text style={styles.primaryButtonText}>{busy ? 'Đang lưu…' : initial ? 'Lưu thay đổi' : 'Tạo môn học'}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.secondaryAction} onPress={onCancel}>
+        <Text style={styles.secondaryActionText}>Quay lại</Text>
+      </TouchableOpacity>
+    </ScrollView>
+  );
+}
+
+function SubjectsScreen({ subjects, userName, refreshData }) {
+  const [mode, setMode] = useState('list');
+  const [selectedId, setSelectedId] = useState(null);
+  const [editing, setEditing] = useState(null);
+  const [detail, setDetail] = useState(null);
+  const [documents, setDocuments] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const loadDetail = async (id) => {
+    setBusy(true);
+    setError('');
+    try {
+      const [subjectData, documentData] = await Promise.all([
+        api.subjectDetail(id), api.documents(),
+      ]);
+      setSelectedId(id);
+      setDetail(subjectData);
+      setDocuments(documentData.documents || []);
+      setMode('detail');
+    } catch (err) {
+      setError(err.message || 'Không tải được môn học.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveSubject = async (payload) => {
+    if (!payload.name) {
+      setError('Bạn chưa nhập tên môn học.');
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      const saved = editing
+        ? await api.updateSubject(editing.id, payload)
+        : await api.createSubject(payload);
+      await refreshData();
+      setEditing(null);
+      await loadDetail(saved.subject.id);
+    } catch (err) {
+      setError(err.message || 'Không thể lưu môn học.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const confirmDeleteSubject = () => {
+    Alert.alert('Xóa môn học?', 'Tài liệu, Quiz và task sẽ được giữ lại ở trạng thái chưa phân loại. Lịch sử Chat của môn sẽ bị xóa.', [
+      { text: 'Hủy', style: 'cancel' },
+      { text: 'Xóa môn', style: 'destructive', onPress: async () => {
+        setBusy(true);
+        try {
+          await api.deleteSubject(selectedId);
+          await refreshData();
+          setMode('list');
+          setSelectedId(null);
+          setDetail(null);
+        } catch (err) {
+          setError(err.message || 'Xóa môn thất bại.');
+        } finally { setBusy(false); }
+      } },
+    ]);
+  };
+
+  const pickFile = async () => {
+    try {
+      const picked = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'text/plain', 'text/markdown'],
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+      if (picked.canceled || !picked.assets?.length) return;
+      setBusy(true);
+      setError('');
+      await api.uploadDocument(selectedId, picked.assets[0]);
+      await loadDetail(selectedId);
+      await refreshData();
+    } catch (err) {
+      setError(err.message || 'Không tải được tài liệu.');
+    } finally { setBusy(false); }
+  };
+
+  const confirmDeleteDocument = (doc) => {
+    Alert.alert('Xóa tài liệu?', doc.original_name, [
+      { text: 'Hủy', style: 'cancel' },
+      { text: 'Xóa', style: 'destructive', onPress: async () => {
+        try {
+          setBusy(true);
+          await api.deleteDocument(doc.id);
+          await loadDetail(selectedId);
+          await refreshData();
+        } catch (err) {
+          setError(err.message || 'Xóa tài liệu thất bại.');
+        } finally { setBusy(false); }
+      } },
+    ]);
+  };
+
+  const selectSyllabus = async (docId) => {
+    setBusy(true);
+    setError('');
+    try {
+      await api.setPersonalSyllabus(selectedId, docId);
+      await loadDetail(selectedId);
+    } catch (err) {
+      setError(err.message || 'Không lưu được đề cương.');
+    } finally { setBusy(false); }
+  };
+
+  const moveDocument = (doc) => {
+    const otherSubjects = subjects.filter((item) => item.id !== selectedId);
+    if (!otherSubjects.length) {
+      Alert.alert('Chưa có môn khác', 'Tạo thêm một môn để chuyển tài liệu.');
+      return;
+    }
+    Alert.alert('Chuyển tài liệu sang môn', doc.original_name, [
+      ...otherSubjects.map((item) => ({
+        text: item.name,
+        onPress: async () => {
+          try {
+            setBusy(true);
+            await api.moveDocument(doc.id, item.id);
+            await loadDetail(selectedId);
+            await refreshData();
+          } catch (err) {
+            setError(err.message || 'Không thể chuyển tài liệu.');
+          } finally { setBusy(false); }
+        },
+      })),
+      { text: 'Hủy', style: 'cancel' },
+    ]);
+  };
+
+  if (mode === 'form') return (
+    <View style={styles.safe}>
+      <ErrorCard message={error} />
+      <SubjectForm key={editing?.id || 'new'} initial={editing} busy={busy} onSave={saveSubject}
+        onCancel={() => { setError(''); setMode(editing ? 'detail' : 'list'); }} />
+    </View>
+  );
+
+  if (mode === 'detail' && detail) {
+    const sub = detail.subject || {};
+    const syllabus = detail.shared || {};
+    const docs = documents.filter((doc) => doc.subject_id === selectedId);
+    return (
+      <ScrollView contentContainerStyle={styles.page}>
+        <TouchableOpacity onPress={() => { setMode('list'); setError(''); }}>
+          <Text style={styles.backLink}>← Danh sách môn học</Text>
+        </TouchableOpacity>
+        <Header title={sub.name} subtitle={sub.code || 'Chưa có mã môn'} userName={userName} />
+        <ErrorCard message={error} />
+        {busy && <ActivityIndicator />}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Tổng quan môn học</Text>
+          <Text style={styles.muted}>{sub.credits} tín chỉ · Mục tiêu {sub.target_score} · Tiến độ {sub.progress}%</Text>
+          <Progress value={sub.progress} />
+          {!!sub.description && <Text style={styles.muted}>{sub.description}</Text>}
+          <Text style={styles.muted}>Đề cương đang dùng: {
+            syllabus.syllabus_source === 'shared' ? 'Đề cương chuẩn dùng chung' :
+            syllabus.syllabus_source === 'personal' ? 'Đề cương cá nhân' : 'Chưa chọn'
+          }</Text>
+          {!!syllabus.syllabus_source_name && <Text style={styles.muted}>{syllabus.syllabus_source_name}</Text>}
+        </View>
+        <View style={styles.actionRow}>
+          <TouchableOpacity style={styles.smallAction} onPress={() => { setEditing(sub); setMode('form'); }}><Text style={styles.smallActionText}>✎ Sửa môn</Text></TouchableOpacity>
+          <TouchableOpacity style={[styles.smallAction, styles.deleteAction]} onPress={confirmDeleteSubject}><Text style={styles.deleteActionText}>Xóa môn</Text></TouchableOpacity>
+        </View>
+        <Text style={styles.sectionTitle}>Tài liệu cá nhân ({docs.length})</Text>
+        <TouchableOpacity style={styles.primaryButton} disabled={busy} onPress={pickFile}>
+          <Text style={styles.primaryButtonText}>＋ Tải lên PDF / TXT / MD</Text>
+        </TouchableOpacity>
+        <Text style={styles.muted}>Mọi tệp bạn tải lên chỉ thuộc tài khoản này, không được công khai vào kiến thức chung.</Text>
+        {!docs.length && <View style={styles.card}><Text style={styles.muted}>Chưa có tài liệu. Hãy tải lên đề cương hoặc chương học.</Text></View>}
+        {docs.map((doc) => (
+          <View key={doc.id} style={styles.card}>
+            <Text style={styles.cardTitle}>📄 {doc.original_name}</Text>
+            <Text style={styles.muted}>{doc.extracted_chars ? `${doc.extracted_chars} ký tự đã trích xuất` : 'Chưa có nội dung văn bản trích xuất'}</Text>
+            <View style={styles.actionRow}>
+              <TouchableOpacity style={styles.smallAction} onPress={() => selectSyllabus(doc.id)}>
+                <Text style={styles.smallActionText}>{sub.personal_syllabus_document_id === doc.id ? '✓ Đề cương' : 'Chọn đề cương'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.smallAction} onPress={() => moveDocument(doc)}>
+                <Text style={styles.smallActionText}>Chuyển môn</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.smallAction, styles.deleteAction]} onPress={() => confirmDeleteDocument(doc)}>
+                <Text style={styles.deleteActionText}>Xóa</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ))}
+        {sub.personal_syllabus_document_id ? (
+          <TouchableOpacity style={styles.secondaryAction} onPress={() => selectSyllabus(null)}>
+            <Text style={styles.secondaryActionText}>Bỏ chọn đề cương cá nhân</Text>
+          </TouchableOpacity>
+        ) : null}
+        <Text style={styles.sectionTitle}>Điểm yếu đang cần ôn</Text>
+        {(detail.weaknesses || []).length ? detail.weaknesses.map((w, i) => (
+          <View key={i} style={styles.card}><Text style={styles.cardTitle}>{w.topic}</Text><Text style={styles.muted}>{w.chapter || 'Chưa phân chương'}</Text></View>
+        )) : <Text style={styles.muted}>Chưa có điểm yếu cần ôn.</Text>}
+      </ScrollView>
+    );
+  }
+
   return (
     <ScrollView contentContainerStyle={styles.page}>
-      <Header title="Môn học" subtitle="Tri thức chung + dữ liệu học tập riêng" userName={userName} />
+      <Header title="Môn học" subtitle="Quản lý môn, tài liệu và đề cương cá nhân" userName={userName} />
+      <ErrorCard message={error} />
+      <TouchableOpacity style={styles.primaryButton} onPress={() => { setEditing(null); setError(''); setMode('form'); }}>
+        <Text style={styles.primaryButtonText}>＋ Tạo môn học</Text>
+      </TouchableOpacity>
+      {busy && <ActivityIndicator />}
       {subjects.map((item) => (
-        <View key={item.id} style={styles.subjectCard}>
+        <TouchableOpacity key={item.id} style={styles.subjectCard} onPress={() => loadDetail(item.id)}>
           <View style={styles.subjectIcon}><Text style={{ fontSize: 24 }}>📘</Text></View>
           <View style={{ flex: 1 }}>
             <Text style={styles.cardTitle}>{item.name}</Text>
@@ -131,14 +376,13 @@ function SubjectsScreen({ subjects, userName }) {
               <Pill>{item.progress || 0}%</Pill>
             </View>
             <Progress value={item.progress} />
-            <Text style={styles.weakText}>
-              {item.weaknesses?.length
-                ? `Điểm yếu: ${item.weaknesses.map((w) => w.topic).join(', ')}`
-                : 'Chưa có điểm yếu cần ôn'}
-            </Text>
+            <Text style={styles.weakText}>{item.weaknesses?.length
+              ? `Điểm yếu: ${item.weaknesses.map((w) => w.topic).join(', ')}`
+              : 'Chưa có điểm yếu cần ôn'}</Text>
           </View>
-        </View>
+        </TouchableOpacity>
       ))}
+      {!subjects.length && <View style={styles.card}><Text style={styles.muted}>Bạn chưa có môn học. Bấm “Tạo môn học” để bắt đầu.</Text></View>}
     </ScrollView>
   );
 }
@@ -520,7 +764,7 @@ export default function App() {
   const userName = dashboard?.user?.name || '';
 
   const screen = useMemo(() => {
-    if (tab === 'subjects') return <SubjectsScreen subjects={subjects} userName={userName} />;
+    if (tab === 'subjects') return <SubjectsScreen subjects={subjects} userName={userName} refreshData={refreshData} />;
     if (tab === 'agent') return <AgentScreen subjects={subjects} userName={userName} />;
     if (tab === 'quiz') return <QuizScreen subjects={subjects} userName={userName} refreshData={refreshData} />;
     if (tab === 'plan') return <PlanScreen plan={plan} userName={userName} />;
@@ -587,6 +831,16 @@ const styles = StyleSheet.create({
   mobileStatusText: { flex: 1, color: '#8B93A7', fontSize: 10 },
   logoutButton: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: '#EEF0FF' },
   logoutButtonText: { color: '#5965D8', fontSize: 11, fontWeight: '800' },
+  fieldLabel: { fontSize: 13, fontWeight: '700', color: '#29324D', marginBottom: 8 },
+  fieldInput: { backgroundColor: 'white', borderWidth: 1, borderColor: '#DFE3F0', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, color: '#17203A', marginBottom: 16 },
+  backLink: { color: '#6567E8', fontWeight: '700', marginBottom: 16, fontSize: 13 },
+  actionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
+  smallAction: { paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, backgroundColor: '#EEF0FF' },
+  smallActionText: { color: '#505AD0', fontSize: 12, fontWeight: '700' },
+  deleteAction: { backgroundColor: '#FFF0F1' },
+  deleteActionText: { color: '#B83647', fontSize: 12, fontWeight: '700' },
+  secondaryAction: { paddingVertical: 16, alignItems: 'center' },
+  secondaryActionText: { fontSize: 14, fontWeight: '700', color: '#5965D8' },
   sectionTitle: { fontSize: 17, fontWeight: '800', color: '#202943', marginBottom: 10, marginTop: 4 },
   card: { backgroundColor: 'white', borderRadius: 18, padding: 17, marginBottom: 12, borderWidth: 1, borderColor: '#EBEEF5' },
   subjectCard: { backgroundColor: 'white', borderRadius: 20, padding: 17, marginBottom: 14, borderWidth: 1, borderColor: '#EBEEF5', flexDirection: 'row', gap: 14 },
