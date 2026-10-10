@@ -528,114 +528,214 @@ function QuizScreen({ subjects, userName, refreshData }) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
+  const [saved, setSaved] = useState([]);
+  const [personalDocs, setPersonalDocs] = useState([]);
+  const [mode, setMode] = useState('subject');
+  const [count, setCount] = useState(10);
+  const [selectedDoc, setSelectedDoc] = useState(null);
+  const [tab, setTab] = useState('create');
 
   useEffect(() => {
     if (!subjectId && subjects[0]?.id) setSubjectId(subjects[0].id);
   }, [subjects, subjectId]);
 
-  const generate = async (mode = 'subject') => {
-    if (!subjectId) return;
+  const refreshQuizList = async () => {
+    const [data, docsData] = await Promise.all([
+      api.quizzes(),
+      api.documents(),
+    ]);
+    setSaved(data.quizzes || []);
+    setPersonalDocs(docsData.documents || []);
+  };
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([api.quizzes(), api.documents()]).then(([data, docsData]) => {
+      if (!active) return;
+      setSaved(data.quizzes || []);
+      setPersonalDocs(docsData.documents || []);
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [subjectId]);
+
+  const generate = async () => {
+    if (!subjectId || loading) return;
+    if (mode === 'document' && !selectedDoc) {
+      setError('Hãy chọn tài liệu cá nhân để tạo Quiz.');
+      return;
+    }
     setLoading(true);
     setError('');
     setResult(null);
     try {
-      const data = await api.quizGenerate(subjectId, 10, mode);
+      const data = await api.quizGenerate(subjectId, count, mode, selectedDoc);
       setQuiz(data);
       setAnswers(Array(data.questions?.length || 0).fill(null));
+      setTab('take');
+      await refreshQuizList();
     } catch (err) {
-      setError(err.message || 'Không thể tạo quiz.');
+      setError(err.message || 'Không thể tạo Quiz.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openQuiz = async (id) => {
+    setLoading(true);
+    setError('');
+    setResult(null);
+    try {
+      const data = await api.quizDetail(id);
+      setQuiz(data);
+      setAnswers(Array(data.questions?.length || 0).fill(null));
+      setTab('take');
+    } catch (err) {
+      setError(err.message || 'Không đọc được Quiz.');
     } finally {
       setLoading(false);
     }
   };
 
   const submit = async () => {
-    if (!quiz?.quiz_id) return;
-
-    const unanswered = answers.filter(
-      (value) => value === null || value === undefined
-    ).length;
+    if (!quiz?.quiz_id || loading) return;
+    const unanswered = answers.filter(value => value === null || value === undefined).length;
     if (unanswered) {
-      setError(
-        `Bạn còn ${unanswered} câu chưa trả lời. Hãy hoàn thành tất cả câu hỏi trước khi nộp.`
-      );
+      setError(`Còn ${unanswered} câu chưa trả lời. Hoàn thành tất cả câu hỏi trước khi nộp.`);
       return;
     }
-
     setLoading(true);
     setError('');
     try {
       const data = await api.quizSubmit(quiz.quiz_id, answers);
       setResult(data);
-      await refreshData();
+      setTab('result');
+      await Promise.all([refreshQuizList(), refreshData()]);
     } catch (err) {
-      setError(err.message || 'Không thể nộp quiz.');
+      setError(err.message || 'Không nộp được Quiz.');
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <ScrollView contentContainerStyle={styles.page}>
-      <Header title="Quiz thông minh" subtitle="Kết quả cập nhật điểm yếu thật" userName={userName} />
-      <SubjectSelector
-        subjects={subjects}
-        selectedId={subjectId}
-        onSelect={(id) => {
-          setSubjectId(id);
-          setQuiz(null);
-          setAnswers([]);
-          setResult(null);
-          setError('');
-        }}
-      />
-      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
-        <TouchableOpacity style={[styles.primaryButton, { flex: 1 }]} onPress={() => generate('subject')}>
-          <Text style={styles.primaryButtonText}>Tạo theo môn</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.primaryButton, { flex: 1, backgroundColor: '#7A61C9' }]} onPress={() => generate('weakness')}>
-          <Text style={styles.primaryButtonText}>Ôn điểm yếu</Text>
-        </TouchableOpacity>
-      </View>
+  const changeSubject = (id) => {
+    setSubjectId(id);
+    setQuiz(null);
+    setAnswers([]);
+    setResult(null);
+    setSelectedDoc(null);
+    setError('');
+    setTab('create');
+  };
 
+  const Choice = ({ label, active, onPress }) => (
+    <TouchableOpacity style={[styles.smallAction, active && { backgroundColor: '#6567E8' }]} onPress={onPress}>
+      <Text style={[styles.smallActionText, active && { color: 'white' }]}>{label}</Text>
+    </TouchableOpacity>
+  );
+
+  return (
+    <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
+      <Header title="Quiz & điểm yếu" subtitle="Luyện tập theo đề cương, tài liệu và năng lực" userName={userName} />
+      <SubjectSelector subjects={subjects} selectedId={subjectId} onSelect={changeSubject} />
       <ErrorCard message={error} />
       {loading && <ActivityIndicator />}
-
-      {quiz?.questions?.map((question, qIndex) => (
-        <View key={qIndex} style={styles.card}>
-          <Text style={styles.eyebrow}>CÂU {qIndex + 1} / {quiz.questions.length}</Text>
-          <Text style={styles.quizQuestion}>{question.question}</Text>
-          {!!question.topic && <Text style={styles.muted}>{question.chapter || ''} · {question.topic}</Text>}
-          {question.options.map((item, index) => (
-            <TouchableOpacity
-              key={index}
-              style={[styles.option, answers[qIndex] === index && styles.optionSelected]}
-              onPress={() => {
-                const next = [...answers];
-                next[qIndex] = index;
-                setAnswers(next);
-              }}
-            >
-              <Text style={[styles.optionLetter, answers[qIndex] === index && styles.optionLetterSelected]}>
-                {String.fromCharCode(65 + index)}
-              </Text>
-              <Text style={styles.optionText}>{item}</Text>
+      <View style={styles.actionRow}>
+        <Choice label="Tạo Quiz" active={tab === 'create'} onPress={() => { setTab('create'); setQuiz(null); setResult(null); }} />
+        <Choice label={`Quiz đã lưu (${saved.length})`} active={tab === 'saved'} onPress={() => setTab('saved')} />
+      </View>
+      {tab === 'create' && (
+        <>
+          <Text style={styles.sectionTitle}>Chọn nguồn tạo Quiz</Text>
+          <View style={styles.actionRow}>
+            <Choice label="Theo môn" active={mode === 'subject'} onPress={() => setMode('subject')} />
+            <Choice label="Tài liệu cá nhân" active={mode === 'document'} onPress={() => setMode('document')} />
+            <Choice label="Ôn điểm yếu" active={mode === 'weakness'} onPress={() => setMode('weakness')} />
+          </View>
+          {mode === 'document' && (
+            <>
+              <Text style={styles.fieldLabel}>Chọn tài liệu</Text>
+              {personalDocs.filter(d => d.subject_id === subjectId).map(doc => (
+                <Choice key={doc.id} label={doc.original_name} active={selectedDoc === doc.id} onPress={() => setSelectedDoc(doc.id)} />
+              ))}
+            </>
+          )}
+          <Text style={styles.sectionTitle}>Số câu hỏi</Text>
+          <View style={styles.actionRow}>
+            {[10, 20, 30].map(number => (
+              <Choice key={number} label={String(number)} active={count === number} onPress={() => setCount(number)} />
+            ))}
+          </View>
+          <TouchableOpacity style={styles.primaryButton} onPress={generate} disabled={loading || !subjectId}>
+            <Text style={styles.primaryButtonText}>✦ Tạo Quiz</Text>
+          </TouchableOpacity>
+        </>
+      )}
+      {tab === 'saved' && (
+        <>
+          <Text style={styles.sectionTitle}>Lịch sử Quiz</Text>
+          {!saved.length && <Text style={styles.muted}>Chưa có Quiz. Tạo Quiz để bắt đầu luyện tập.</Text>}
+          {saved.filter(q => !subjectId || q.subject_id === subjectId).map(item => (
+            <TouchableOpacity key={item.id} style={styles.card} onPress={() => openQuiz(item.id)}>
+              <Text style={styles.cardTitle}>{item.title}</Text>
+              <Text style={styles.muted}>Đã làm {item.attempt_count || 0} lần · Điểm cao nhất {item.best_score ?? '—'}%</Text>
+              <Text style={styles.smallActionText}>Làm Quiz →</Text>
             </TouchableOpacity>
           ))}
-        </View>
-      ))}
-
-      {!!quiz?.questions?.length && (
-        <TouchableOpacity style={styles.primaryButton} onPress={submit}>
-          <Text style={styles.primaryButtonText}>Nộp bài</Text>
-        </TouchableOpacity>
+        </>
       )}
-
-      {result && (
-        <View style={styles.insightCard}>
-          <Text style={styles.insightTitle}>Kết quả: {result.correct_count}/{result.total_questions}</Text>
-          <Text style={styles.muted}>Điểm {result.score}%. Study Agent đã cập nhật tín hiệu học tập.</Text>
-        </View>
+      {(tab === 'take' || tab === 'result') && quiz && (
+        <>
+          <TouchableOpacity onPress={() => setTab('saved')}>
+            <Text style={styles.backLink}>← Danh sách Quiz</Text>
+          </TouchableOpacity>
+          <Text style={styles.sectionTitle}>{quiz.title}</Text>
+          {quiz.questions?.map((question, qIndex) => {
+            const chosen = answers[qIndex];
+            const correct = Number(question.answer);
+            return (
+              <View key={qIndex} style={styles.card}>
+                <Text style={styles.eyebrow}>CÂU {qIndex + 1} / {quiz.questions.length}</Text>
+                <Text style={styles.quizQuestion}>{question.question}</Text>
+                {!!question.topic && <Text style={styles.muted}>{question.chapter || ''} · {question.topic}</Text>}
+                {(question.options || []).map((option, index) => (
+                  <TouchableOpacity key={index} disabled={tab === 'result'}
+                    style={[styles.option, chosen === index && styles.optionSelected,
+                      tab === 'result' && index === correct && { borderColor: '#31A879', backgroundColor: '#EAFAF2' }]}
+                    onPress={() => setAnswers(old => old.map((v, n) => n === qIndex ? index : v))}>
+                    <Text style={[styles.optionLetter, chosen === index && styles.optionLetterSelected]}>
+                      {String.fromCharCode(65 + index)}
+                    </Text>
+                    <Text style={styles.optionText}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+                {tab === 'result' && (
+                  <Text style={styles.muted}>
+                    Đáp án đúng: {String.fromCharCode(65 + correct)}
+                    {question.explanation ? ` · ${question.explanation}` : ''}
+                  </Text>
+                )}
+              </View>
+            );
+          })}
+          {tab === 'take' && (
+            <TouchableOpacity style={styles.primaryButton} disabled={loading} onPress={submit}>
+              <Text style={styles.primaryButtonText}>Nộp bài ({answers.filter(a => a !== null).length}/{answers.length})</Text>
+            </TouchableOpacity>
+          )}
+          {tab === 'result' && result && (
+            <View style={styles.insightCard}>
+              <Text style={styles.insightTitle}>Kết quả: {result.correct_count}/{result.total_questions} · {result.score}%</Text>
+              <Text style={styles.muted}>Điểm yếu cần ôn: {result.weakness_count || 0}. Lộ trình Adaptive đã cập nhật.</Text>
+              <TouchableOpacity style={styles.secondaryAction} onPress={() => {
+                setAnswers(Array(quiz.questions?.length || 0).fill(null));
+                setResult(null);
+                setTab('take');
+              }}>
+                <Text style={styles.secondaryActionText}>↻ Làm lại Quiz</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </>
       )}
     </ScrollView>
   );
