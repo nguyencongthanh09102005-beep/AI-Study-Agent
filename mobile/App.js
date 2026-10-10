@@ -86,9 +86,12 @@ function HomeScreen({ dashboard, setTab, loading, onLogout }) {
             <Text style={[styles.cardTitle, { flex: 1 }]}>{task.title}</Text>
             <Text style={styles.time}>{String(task.study_at || '').slice(11, 16)}</Text>
           </View>
-          <Text style={styles.muted}>{task.subject_name || 'Tự học'} · {task.duration} phút</Text>
+          <Text style={styles.muted}>
+            {task.subject_name || 'Tự học'} · {task.duration} phút
+            {task.source === 'adaptive' ? ' · Adaptive' : ''}
+          </Text>
         </View>
-      )) : <View style={styles.card}><Text style={styles.muted}>Chưa có buổi học sắp tới.</Text></View>}
+      )) : <View style={styles.card}><Text style={styles.muted}>Chưa có nhiệm vụ học nào.</Text></View>}
 
       <Text style={styles.sectionTitle}>Tiến độ môn học</Text>
       {subjects.map((item) => (
