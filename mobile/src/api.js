@@ -108,13 +108,14 @@ export const api = {
   chatHistory: (subjectId) =>
     request(`/api/mobile/chat/${subjectId}`),
 
-  quizGenerate: (subjectId, count = 10, mode = 'subject') =>
+  quizGenerate: (subjectId, count = 10, mode = 'subject', documentId = null) =>
     request('/api/mobile/quiz/generate', {
       method: 'POST',
       body: JSON.stringify({
         subject_id: subjectId,
         count,
         mode,
+        document_id: documentId,
       }),
     }),
 
