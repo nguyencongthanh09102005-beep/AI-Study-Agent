@@ -164,6 +164,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const scheduleTitle = document.getElementById("scheduleTitle");
   const scheduleViewLabel = document.getElementById("scheduleViewLabel");
   const emptyState = document.getElementById("scheduleFilterEmpty");
+  const compactTaskTitle = document.getElementById("compactTaskTitle");
+  const compactTaskEmpty = document.getElementById("compactTaskEmpty");
+  const compactTaskRows = [...document.querySelectorAll("[data-compact-task]")];
   const scheduleItems = [...document.querySelectorAll(".schedule-item-new[data-task-date]")];
 
   if (!weekDays || !datePicker) return;
@@ -235,13 +238,25 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function updateHeader() {
+    const selectedKey = toIso(selectedDate);
+    const todayKey = toIso(new Date());
+
     if (currentView === "list") {
       rangeLabel.textContent = "Tất cả nhiệm vụ";
       if (scheduleTitle) scheduleTitle.innerHTML = "◷ &nbsp; Danh sách nhiệm vụ";
       if (scheduleViewLabel) {
         scheduleViewLabel.textContent = `${scheduleItems.length} nhiệm vụ trong kế hoạch`;
       }
+      if (compactTaskTitle) {
+        compactTaskTitle.innerHTML = "▤ &nbsp; Danh sách tất cả nhiệm vụ";
+      }
       return;
+    }
+
+    if (compactTaskTitle) {
+      compactTaskTitle.innerHTML = selectedKey === todayKey
+        ? "▤ &nbsp; Danh sách nhiệm vụ hôm nay"
+        : `▤ &nbsp; Danh sách nhiệm vụ ngày ${formatShort(selectedDate)}`;
     }
 
     if (currentView === "month") {
@@ -266,6 +281,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function filterTasks() {
     let visibleCount = 0;
+    let compactVisibleCount = 0;
     const selectedKey = toIso(selectedDate);
 
     scheduleItems.forEach((item) => {
@@ -275,8 +291,22 @@ document.addEventListener("DOMContentLoaded", () => {
       if (visible) visibleCount += 1;
     });
 
+    compactTaskRows.forEach((item) => {
+      const visible =
+        currentView === "list" || item.dataset.taskDate === selectedKey;
+      item.hidden = !visible;
+      if (visible) compactVisibleCount += 1;
+    });
+
     if (emptyState) {
       emptyState.hidden = visibleCount !== 0 || currentView === "list";
+    }
+
+    if (compactTaskEmpty) {
+      compactTaskEmpty.hidden = compactVisibleCount !== 0;
+      compactTaskEmpty.textContent = currentView === "list"
+        ? "Chưa có nhiệm vụ học nào trong kế hoạch."
+        : `Ngày ${formatShort(selectedDate)} chưa có nhiệm vụ học nào.`;
     }
   }
 
