@@ -179,6 +179,8 @@ function SubjectsScreen({ subjects, userName, refreshData }) {
   const [editing, setEditing] = useState(null);
   const [detail, setDetail] = useState(null);
   const [documents, setDocuments] = useState([]);
+  const [docPreview, setDocPreview] = useState(null);
+  const [docSummary, setDocSummary] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -257,6 +259,30 @@ function SubjectsScreen({ subjects, userName, refreshData }) {
     } finally { setBusy(false); }
   };
 
+  const previewDocument = async (doc) => {
+    setBusy(true);
+    setError('');
+    setDocSummary('');
+    try {
+      const data = await api.documentDetail(doc.id);
+      setDocPreview(data.document);
+    } catch (err) {
+      setError(err.message || 'Không thể đọc tài liệu.');
+    } finally { setBusy(false); }
+  };
+
+  const summarizeDocument = async () => {
+    if (!docPreview) return;
+    setBusy(true);
+    setError('');
+    try {
+      const data = await api.summarizeDocument(docPreview.id);
+      setDocSummary(data.summary || '');
+    } catch (err) {
+      setError(err.message || 'Không thể tóm tắt.');
+    } finally { setBusy(false); }
+  };
+
   const confirmDeleteDocument = (doc) => {
     Alert.alert('Xóa tài liệu?', doc.original_name, [
       { text: 'Hủy', style: 'cancel' },
@@ -308,6 +334,30 @@ function SubjectsScreen({ subjects, userName, refreshData }) {
     ]);
   };
 
+  if (mode === 'preview' && docPreview) return (
+    <ScrollView contentContainerStyle={styles.page}>
+      <TouchableOpacity onPress={() => setMode('detail')}>
+        <Text style={styles.backLink}>← Chi tiết môn học</Text>
+      </TouchableOpacity>
+      <Header title="Nội dung tài liệu" subtitle={docPreview.original_name} userName={userName} />
+      <ErrorCard message={error} />
+      {busy && <ActivityIndicator />}
+      <TouchableOpacity style={styles.primaryButton} onPress={summarizeDocument} disabled={busy}>
+        <Text style={styles.primaryButtonText}>✦ Tóm tắt bằng AI</Text>
+      </TouchableOpacity>
+      {!!docSummary && <View style={styles.card}>
+        <Text style={styles.cardTitle}>Tóm tắt tài liệu</Text>
+        <Text style={[styles.muted, { fontSize: 14, lineHeight: 23 }]}>{docSummary}</Text>
+      </View>}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Văn bản đã trích xuất</Text>
+        <Text style={[styles.muted, { fontSize: 13, lineHeight: 22 }]}>
+          {docPreview.extracted_text || 'Không đọc được văn bản. PDF scan ảnh chưa hỗ trợ OCR.'}
+        </Text>
+      </View>
+    </ScrollView>
+  );
+
   if (mode === 'form') return (
     <View style={styles.safe}>
       <ErrorCard message={error} />
@@ -354,6 +404,12 @@ function SubjectsScreen({ subjects, userName, refreshData }) {
             <Text style={styles.cardTitle}>📄 {doc.original_name}</Text>
             <Text style={styles.muted}>{doc.extracted_chars ? `${doc.extracted_chars} ký tự đã trích xuất` : 'Chưa có nội dung văn bản trích xuất'}</Text>
             <View style={styles.actionRow}>
+              <TouchableOpacity style={styles.smallAction} onPress={async () => {
+                await previewDocument(doc);
+                setMode('preview');
+              }}>
+                <Text style={styles.smallActionText}>Xem nội dung</Text>
+              </TouchableOpacity>
               <TouchableOpacity style={styles.smallAction} onPress={() => selectSyllabus(doc.id)}>
                 <Text style={styles.smallActionText}>{sub.personal_syllabus_document_id === doc.id ? '✓ Đề cương' : 'Chọn đề cương'}</Text>
               </TouchableOpacity>
