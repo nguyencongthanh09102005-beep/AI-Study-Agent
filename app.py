@@ -6298,6 +6298,12 @@ def api_mobile_subject_detail(subject_id):
 
     shared = ensure_shared_subject_for_user_subject(conn, uid, subject_id)
     profile = ensure_learning_profile(conn, uid)
+    backbone = get_course_learning_backbone(
+        conn,
+        uid,
+        subject_id,
+        query=""
+    )
 
     weaknesses = conn.execute(
         """
@@ -6329,7 +6335,15 @@ def api_mobile_subject_detail(subject_id):
             "id": shared["id"],
             "name": shared["name"],
             "code": shared["code"],
-            "syllabus_available": bool((shared["syllabus_text"] or "").strip()),
+            "syllabus_available": bool(backbone and backbone["syllabus_text"]),
+            "syllabus_source": (
+                backbone["syllabus_source"]
+                if backbone else "none"
+            ),
+            "syllabus_source_name": (
+                backbone["syllabus_source_name"]
+                if backbone else ""
+            ),
             "knowledge_count": int(shared_count or 0)
         },
         "profile": {
@@ -6451,6 +6465,50 @@ def api_mobile_chat():
     })
 
 
+@app.route("/api/mobile/chat/<int:subject_id>", methods=["GET"])
+def api_mobile_chat_history(subject_id):
+    uid, error = _mobile_require_user()
+    if error:
+        return error
+
+    conn = db()
+    ensure_subject_chats(uid, conn)
+
+    conversation = conn.execute(
+        """
+        SELECT c.id,c.subject_id,s.name AS subject_name
+        FROM chat_conversations c
+        JOIN subjects s
+          ON s.id=c.subject_id AND s.user_id=c.user_id
+        WHERE c.user_id=? AND c.subject_id=?
+        LIMIT 1
+        """,
+        (uid, subject_id)
+    ).fetchone()
+
+    if not conversation:
+        conn.close()
+        return jsonify({"error": "Không tìm thấy Chat của môn học."}), 404
+
+    rows = conn.execute(
+        """
+        SELECT id,role,content,created_at
+        FROM chat_messages
+        WHERE user_id=? AND conversation_id=?
+        ORDER BY id ASC
+        LIMIT 200
+        """,
+        (uid, conversation["id"])
+    ).fetchall()
+    conn.close()
+
+    return jsonify({
+        "subject_id": subject_id,
+        "subject_name": conversation["subject_name"],
+        "messages": [dict(row) for row in rows]
+    })
+
+
 @app.route("/api/mobile/quiz/generate", methods=["POST"])
 def api_mobile_quiz_generate():
     uid, error = _mobile_require_user()
@@ -6495,30 +6553,39 @@ def api_mobile_quiz_generate():
             (subject_id, uid)
         ).fetchone()
 
-        docs = conn.execute(
-            """
-            SELECT original_name,extracted_text
-            FROM documents
-            WHERE user_id=? AND subject_id=?
-            ORDER BY id DESC
-            LIMIT 8
-            """,
-            (uid, subject_id)
-        ).fetchall()
+        backbone = (
+            get_course_learning_backbone(
+                conn,
+                uid,
+                subject_id,
+                query=""
+            )
+            if subject else None
+        )
 
         context_parts = []
-        for doc in docs:
-            text_value = (doc["extracted_text"] or "").strip()
-            if text_value:
-                context_parts.append(
-                    f"TÀI LIỆU {doc['original_name']}:\n{text_value[:4500]}"
-                )
+        if backbone and backbone["syllabus_text"]:
+            syllabus_label = (
+                "ĐỀ CƯƠNG CHUẨN CỦA MÔN"
+                if backbone["syllabus_source"] == "shared"
+                else "ĐỀ CƯƠNG CÁ NHÂN FALLBACK"
+            )
+            context_parts.append(
+                f"{syllabus_label}:\n"
+                f"{backbone['syllabus_text'][:9000]}"
+            )
 
-        shared_context, _ = get_shared_subject_context(
-            uid, subject_id, "", max_chars=7000
-        )
-        if shared_context:
-            context_parts.append(shared_context)
+        if backbone and backbone["shared_context"]:
+            context_parts.append(
+                "KIẾN THỨC DÙNG CHUNG BỔ TRỢ:\n"
+                + backbone["shared_context"][:5500]
+            )
+
+        if backbone and backbone["personal_context"]:
+            context_parts.append(
+                "TÀI LIỆU CÁ NHÂN BỔ TRỢ:\n"
+                + backbone["personal_context"][:7500]
+            )
 
         focus_topics = []
         if mode == "weakness":
@@ -6740,6 +6807,30 @@ def api_mobile_study_plan():
             )
         )
 
+    # Đồng bộ đúng semantics với Web: tạo lại AI Plan sẽ thay deadline cũ
+    # đang mở của chính môn đó, không để nhiều reminder chồng lên nhau.
+    conn.execute(
+        """
+        DELETE FROM reminders
+        WHERE user_id=? AND subject_id=? AND done=0
+        """,
+        (uid, subject_id)
+    )
+    conn.execute(
+        """
+        INSERT INTO reminders(
+            user_id,subject_id,title,due_at,created_at
+        ) VALUES(?,?,?,?,?)
+        """,
+        (
+            uid,
+            subject_id,
+            goal,
+            deadline_dt.isoformat(timespec="minutes"),
+            now()
+        )
+    )
+
     conn.commit()
 
     rows = conn.execute(
@@ -6757,6 +6848,8 @@ def api_mobile_study_plan():
         "success": True,
         "course_backbone": {
             "has_syllabus": bool(backbone["syllabus_text"]),
+            "syllabus_source": backbone["syllabus_source"],
+            "syllabus_source_name": backbone["syllabus_source_name"],
             "syllabus_topics": backbone["syllabus_topics"][:12],
             "personal_documents": backbone["personal_document_names"],
             "shared_sources": backbone["shared_source_names"],
