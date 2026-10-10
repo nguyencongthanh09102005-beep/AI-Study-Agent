@@ -74,7 +74,7 @@
     </div>
 
     <article class="soft-card goal-card">
-      <div class="card-title-row"><h3>◎ &nbsp; Mục tiêu tuần này</h3><a href="#deadline-list">Chỉnh sửa →</a></div>
+      <div class="card-title-row"><h3>◎ &nbsp; Mục tiêu & deadline</h3><a href="#deadline-list">Chỉnh sửa →</a></div>
       <div class="goal-list">
         {% for r in reminders[:5] %}
         <div class="deadline-item {{ 'completed' if r.done else '' }}" data-reminder-id="{{ r.id }}" data-reminder-title="{{ r.title|e }}" data-urgent="{{ 'true' if r.urgent else 'false' }}">
