@@ -64,6 +64,7 @@ def init_db():
         credits INTEGER DEFAULT 0,
         target_score REAL DEFAULT 0,
         progress INTEGER DEFAULT 0,
+        personal_syllabus_document_id INTEGER DEFAULT NULL,
         created_at TEXT NOT NULL,
         FOREIGN KEY(user_id) REFERENCES users(id)
     );
@@ -83,11 +84,13 @@ def init_db():
     CREATE TABLE IF NOT EXISTS reminders(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
+        subject_id INTEGER,
         title TEXT NOT NULL,
         due_at TEXT DEFAULT '',
         done INTEGER DEFAULT 0,
         created_at TEXT NOT NULL,
-        FOREIGN KEY(user_id) REFERENCES users(id)
+        FOREIGN KEY(user_id) REFERENCES users(id),
+        FOREIGN KEY(subject_id) REFERENCES subjects(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS study_tasks(
@@ -242,6 +245,11 @@ def init_db():
             "ALTER TABLE subjects ADD COLUMN shared_subject_id INTEGER"
         )
 
+    if "personal_syllabus_document_id" not in subject_columns:
+        conn.execute(
+            "ALTER TABLE subjects ADD COLUMN personal_syllabus_document_id INTEGER"
+        )
+
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_subjects_shared_subject "
         "ON subjects(shared_subject_id)"
@@ -253,6 +261,21 @@ def init_db():
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_learning_weaknesses_user_subject "
         "ON learning_weaknesses(user_id, subject_id, miss_count)"
+    )
+
+    reminder_columns = {
+        row["name"]
+        for row in conn.execute(
+            "PRAGMA table_info(reminders)"
+        ).fetchall()
+    }
+    if "subject_id" not in reminder_columns:
+        conn.execute(
+            "ALTER TABLE reminders ADD COLUMN subject_id INTEGER"
+        )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_reminders_user_subject_due "
+        "ON reminders(user_id, subject_id, due_at)"
     )
 
     weakness_columns = {
@@ -1763,8 +1786,8 @@ def login_required(fn):
             return redirect(
             url_for(
                 "login",
-                tab="signup",
-                error="Vui lòng nhập đủ thông tin, mật khẩu tối thiểu 6 ký tự và xác nhận trùng khớp."
+                tab="login",
+                error="Vui lòng đăng nhập để tiếp tục."
             )
         )
         return fn(*args, **kwargs)
@@ -2897,7 +2920,8 @@ def get_course_learning_backbone(conn, user_id, subject_id, query=""):
     """
     subject = conn.execute(
         """
-        SELECT id,name,code,target_score,progress,shared_subject_id
+        SELECT id,name,code,target_score,progress,shared_subject_id,
+               personal_syllabus_document_id
         FROM subjects
         WHERE id=? AND user_id=?
         """,
@@ -2913,9 +2937,44 @@ def get_course_learning_backbone(conn, user_id, subject_id, query=""):
         subject_id
     )
 
-    syllabus_text = (
+    shared_syllabus_text = (
         (shared["syllabus_text"] or "").strip()
         if shared
+        else ""
+    )
+
+    personal_syllabus_doc = None
+    personal_syllabus_text = ""
+    personal_syllabus_id = subject["personal_syllabus_document_id"]
+    if personal_syllabus_id:
+        personal_syllabus_doc = conn.execute(
+            """
+            SELECT id,original_name,extracted_text
+            FROM documents
+            WHERE id=? AND user_id=? AND subject_id=?
+            """,
+            (personal_syllabus_id, user_id, subject_id)
+        ).fetchone()
+        if personal_syllabus_doc:
+            personal_syllabus_text = (
+                personal_syllabus_doc["extracted_text"] or ""
+            ).strip()
+
+    # Đề cương chuẩn luôn ưu tiên. Khi Shared Knowledge chưa có syllabus,
+    # sinh viên có thể chọn một tài liệu cá nhân làm đề cương fallback.
+    syllabus_text = shared_syllabus_text or personal_syllabus_text
+    syllabus_source = (
+        "shared"
+        if shared_syllabus_text
+        else "personal"
+        if personal_syllabus_text
+        else "none"
+    )
+    syllabus_source_name = (
+        "Đề cương chuẩn của môn"
+        if syllabus_source == "shared"
+        else personal_syllabus_doc["original_name"]
+        if personal_syllabus_doc
         else ""
     )
     syllabus_topics = _extract_syllabus_topics(syllabus_text)
@@ -3000,6 +3059,8 @@ def get_course_learning_backbone(conn, user_id, subject_id, query=""):
         "subject": subject,
         "syllabus_text": syllabus_text[:12000],
         "syllabus_topics": syllabus_topics,
+        "syllabus_source": syllabus_source,
+        "syllabus_source_name": syllabus_source_name,
         "personal_context": "\n\n".join(personal_parts),
         "personal_document_names": document_names,
         "shared_context": "\n\n".join(shared_parts),
@@ -3645,6 +3706,44 @@ def dashboard():
 
         reminders.append(item)
 
+    today_start = now_dt.replace(
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0
+    )
+    tomorrow_start = today_start + timedelta(days=1)
+
+    today_task_rows = conn.execute(
+        """
+        SELECT t.id,t.subject_id,t.title,t.study_at,t.duration,t.done,t.source,
+               s.name AS subject_name
+        FROM study_tasks t
+        LEFT JOIN subjects s
+          ON s.id=t.subject_id AND s.user_id=t.user_id
+        WHERE t.user_id=?
+          AND t.study_at>=?
+          AND t.study_at<?
+        ORDER BY t.done ASC,t.study_at ASC,t.id ASC
+        LIMIT 6
+        """,
+        (
+            uid,
+            today_start.isoformat(timespec="minutes"),
+            tomorrow_start.isoformat(timespec="minutes")
+        )
+    ).fetchall()
+
+    today_tasks = []
+    for row in today_task_rows:
+        item = dict(row)
+        try:
+            task_dt = datetime.fromisoformat(row["study_at"])
+            item["time_text"] = task_dt.strftime("%H:%M")
+        except (TypeError, ValueError):
+            item["time_text"] = "--:--"
+        today_tasks.append(item)
+
     next_best_action = get_next_best_action(
         conn,
         uid
@@ -3669,6 +3768,7 @@ def dashboard():
         subjects=subjects,
         documents=documents,
         reminders=reminders,
+        today_tasks=today_tasks,
         quiz_count=quiz_count,
         avg_progress=avg_progress,
         weekly_study_hours=weekly_study_hours,
@@ -3873,6 +3973,34 @@ def subject_detail(subject_id):
                 )
             )
 
+        elif action_type == "personal_syllabus":
+            selected_doc_id = request.form.get(
+                "personal_syllabus_document_id",
+                type=int
+            )
+
+            if selected_doc_id:
+                selected_doc = conn.execute(
+                    """
+                    SELECT id
+                    FROM documents
+                    WHERE id=? AND user_id=? AND subject_id=?
+                    """,
+                    (selected_doc_id, uid, subject_id)
+                ).fetchone()
+                if not selected_doc:
+                    conn.close()
+                    return "Tài liệu đề cương không hợp lệ.", 400
+
+            conn.execute(
+                """
+                UPDATE subjects
+                SET personal_syllabus_document_id=?
+                WHERE id=? AND user_id=?
+                """,
+                (selected_doc_id, subject_id, uid)
+            )
+
         elif action_type in {"syllabus", "shared_file", "shared_note"}:
             # Shared Knowledge là dữ liệu học thuật dùng chung của môn.
             # Ở scope sinh viên hiện tại, tài khoản sinh viên chỉ được đọc,
@@ -4032,6 +4160,10 @@ def delete_subject(subject_id):
         )
         conn.execute(
             "UPDATE study_tasks SET subject_id=NULL WHERE subject_id=? AND user_id=?",
+            (subject_id, uid)
+        )
+        conn.execute(
+            "DELETE FROM reminders WHERE subject_id=? AND user_id=?",
             (subject_id, uid)
         )
         conn.execute(
@@ -5107,6 +5239,32 @@ def submit_quiz():
         }), 400
 
     total_questions = len(questions)
+
+    if len(answers) != total_questions:
+        conn.close()
+        return jsonify({
+            "error": "Vui lòng trả lời đầy đủ tất cả câu hỏi trước khi nộp."
+        }), 400
+
+    validated_answers = []
+    for value in answers:
+        try:
+            selected_value = int(value)
+        except (TypeError, ValueError):
+            conn.close()
+            return jsonify({
+                "error": "Vui lòng trả lời đầy đủ tất cả câu hỏi trước khi nộp."
+            }), 400
+
+        if selected_value not in (0, 1, 2, 3):
+            conn.close()
+            return jsonify({
+                "error": "Đáp án Quiz không hợp lệ."
+            }), 400
+
+        validated_answers.append(selected_value)
+
+    answers = validated_answers
     correct_count = 0
     normalized_answers = []
     subject_id = quiz_row["subject_id"]
@@ -5397,6 +5555,7 @@ def study_plan():
         item["time_text"] = study_dt.strftime("%H:%M")
         item["study_at_input"] = study_dt.strftime("%Y-%m-%dT%H:%M")
         item["is_today"] = study_dt.date() == today
+        item["_study_date"] = study_dt.date()
         item["is_overdue"] = (not row["done"]) and study_dt < now_dt
         completed_tasks += 1 if row["done"] else 0
         overdue_tasks += 1 if item["is_overdue"] else 0
@@ -5464,12 +5623,29 @@ def study_plan():
 
         reminders.append(item)
 
-    total_tasks = len(tasks)
-    completion = round((completed_tasks / total_tasks) * 100) if total_tasks else 0
-    planned_minutes = sum(int(item["duration"] or 0) for item in tasks)
+    week_start_date = today - timedelta(days=today.weekday())
+    week_end_date = week_start_date + timedelta(days=7)
+    week_tasks = [
+        item
+        for item in tasks
+        if week_start_date <= item["_study_date"] < week_end_date
+    ]
+
+    weekly_task_count = len(week_tasks)
+    weekly_completed_count = sum(
+        1 for item in week_tasks if item["done"]
+    )
+    completion = (
+        round((weekly_completed_count / weekly_task_count) * 100)
+        if weekly_task_count else 0
+    )
+    planned_minutes = sum(
+        int(item["duration"] or 0)
+        for item in week_tasks
+    )
     completed_minutes = sum(
         int(item["duration"] or 0)
-        for item in tasks
+        for item in week_tasks
         if item["done"]
     )
     time_completion = (
@@ -5633,13 +5809,38 @@ def generate_study_plan_route():
         )
 
     existing_reminder = conn.execute(
-        "SELECT id FROM reminders WHERE user_id=? AND title=? AND due_at=? LIMIT 1",
+        """
+        SELECT id,subject_id
+        FROM reminders
+        WHERE user_id=? AND title=? AND due_at=?
+        LIMIT 1
+        """,
         (uid, goal, deadline_dt.isoformat(timespec="minutes"))
     ).fetchone()
-    if not existing_reminder:
+    if existing_reminder:
+        if not existing_reminder["subject_id"]:
+            conn.execute(
+                """
+                UPDATE reminders
+                SET subject_id=?
+                WHERE id=? AND user_id=?
+                """,
+                (subject_id, existing_reminder["id"], uid)
+            )
+    else:
         conn.execute(
-            "INSERT INTO reminders(user_id,title,due_at,created_at) VALUES(?,?,?,?)",
-            (uid, goal, deadline_dt.isoformat(timespec="minutes"), now())
+            """
+            INSERT INTO reminders(
+                user_id,subject_id,title,due_at,created_at
+            ) VALUES(?,?,?,?,?)
+            """,
+            (
+                uid,
+                subject_id,
+                goal,
+                deadline_dt.isoformat(timespec="minutes"),
+                now()
+            )
         )
 
     conn.commit()
