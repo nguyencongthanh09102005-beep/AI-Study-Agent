@@ -547,3 +547,85 @@
   padding: 2px 6px;
   font-size: 7.5px;
 }
+
+
+/* =====================================================
+   WEB FINAL POLISH - SELECTED-DAY TASK LIST + READABILITY
+===================================================== */
+.day-schedule-card .card-title-row h3,
+.task-list-head h3 {
+  font-size: 13px;
+}
+
+.schedule-view-label {
+  font-size: 11px;
+}
+
+.week-day b {
+  font-size: 11px;
+}
+
+.week-day .week-date {
+  font-size: 10px;
+}
+
+.week-day small {
+  font-size: 9px;
+}
+
+.schedule-time {
+  font-size: 10px;
+}
+
+.schedule-copy strong {
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.schedule-copy small {
+  font-size: 9.5px;
+  line-height: 1.45;
+}
+
+.schedule-range {
+  font-size: 10px;
+}
+
+.task-compact-list .compact-task-row {
+  font-size: 10px;
+}
+
+.task-compact-list .compact-task-row b {
+  font-size: 10.5px;
+  line-height: 1.35;
+}
+
+.task-compact-list .compact-task-row > span:not(.task-square),
+.task-compact-list .compact-task-row em {
+  font-size: 9.5px;
+}
+
+.date-jump strong,
+.planner-date-picker {
+  font-size: 12px;
+}
+
+.date-jump small {
+  font-size: 10px;
+}
+
+@media (min-width: 1200px) {
+  .schedule-copy strong {
+    font-size: 11.5px;
+  }
+
+  .schedule-copy small,
+  .task-compact-list .compact-task-row > span:not(.task-square),
+  .task-compact-list .compact-task-row em {
+    font-size: 10px;
+  }
+
+  .task-compact-list .compact-task-row b {
+    font-size: 11px;
+  }
+}
