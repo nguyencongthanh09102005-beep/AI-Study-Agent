@@ -48,13 +48,22 @@
       <div class="empty-soft schedule-filter-empty" id="scheduleFilterEmpty" hidden>Không có nhiệm vụ trong khoảng thời gian này.</div>
     </div>
 
-    <div class="task-list-head"><h3>▤ &nbsp; Danh sách nhiệm vụ hôm nay</h3><button type="button" class="ghost-action" id="toggleEditPlan">Chỉnh sửa →</button></div>
-    <div class="task-compact-list">
-      {% for task in today_tasks %}
-      <div><span class="task-square {{ 'checked' if task.done else '' }}">{{ '✓' if task.done else '' }}</span><b>{{ task.title }}{% if task.source == 'adaptive' %} <small class="adaptive-task-inline">Adaptive</small>{% endif %}</b><span>◷ {{ task.time_text }}</span><em>{{ task.subject_name or 'Tự học' }}</em></div>
-      {% else %}
-      <div class="empty-soft">Hôm nay chưa có nhiệm vụ học nào.</div>
+    <div class="task-list-head">
+      <h3 id="compactTaskTitle">▤ &nbsp; Danh sách nhiệm vụ hôm nay</h3>
+      <button type="button" class="ghost-action" id="toggleEditPlan">Chỉnh sửa →</button>
+    </div>
+    <div class="task-compact-list" id="compactTaskList">
+      {% for task in tasks %}
+      <div class="compact-task-row"
+           data-compact-task
+           data-task-date="{{ task.study_at_input[:10] }}">
+        <span class="task-square {{ 'checked' if task.done else '' }}">{{ '✓' if task.done else '' }}</span>
+        <b>{{ task.title }}{% if task.source == 'adaptive' %} <small class="adaptive-task-inline">Adaptive</small>{% endif %}</b>
+        <span>◷ {{ task.time_text }}</span>
+        <em>{{ task.subject_name or 'Tự học' }}</em>
+      </div>
       {% endfor %}
+      <div class="empty-soft" id="compactTaskEmpty" hidden>Ngày này chưa có nhiệm vụ học nào.</div>
     </div>
   </article>
 
