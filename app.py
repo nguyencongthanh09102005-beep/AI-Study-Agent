@@ -6358,6 +6358,307 @@ def api_mobile_subject_detail(subject_id):
     })
 
 
+
+# =====================================================
+# MOBILE PHASE 5B — SUBJECT / PERSONAL DOCUMENT MANAGEMENT
+# =====================================================
+def _mobile_subject_payload(payload):
+    name = str(payload.get("name") or "").strip()[:160]
+    if not name:
+        return None, "Tên môn học không được để trống."
+    code = str(payload.get("code") or "").strip()[:60]
+    description = str(payload.get("description") or "").strip()[:2000]
+    try:
+        credits = int(payload.get("credits") or 0)
+        target_score = float(payload.get("target_score") or 0)
+    except (ValueError, TypeError):
+        return None, "Tín chỉ hoặc mục tiêu điểm không hợp lệ."
+    if not 0 <= credits <= 30 or not 0 <= target_score <= 10:
+        return None, "Tín chỉ phải từ 0–30 và mục tiêu điểm từ 0–10."
+    return (name, code, description, credits, target_score), None
+
+
+@app.route("/api/mobile/subjects", methods=["POST"])
+def api_mobile_create_subject():
+    uid, error = _mobile_require_user()
+    if error:
+        return error
+    values, validation = _mobile_subject_payload(request.get_json(silent=True) or {})
+    if validation:
+        return jsonify({"error": validation}), 400
+    conn = db()
+    created_at = now()
+    cursor = conn.execute(
+        """INSERT INTO subjects(
+            user_id,name,code,description,credits,target_score,progress,created_at
+        ) VALUES(?,?,?,?,?,?,?,?)""",
+        (uid, *values, 0, created_at)
+    )
+    subject_id = cursor.lastrowid
+    conn.execute(
+        """INSERT INTO chat_conversations(
+            user_id,subject_id,title,pinned,created_at,updated_at
+        ) VALUES(?,?,?,?,?,?)""",
+        (uid, subject_id, values[0], 0, created_at, created_at)
+    )
+    ensure_shared_subject_for_user_subject(conn, uid, subject_id)
+    conn.commit()
+    subject = conn.execute(
+        "SELECT * FROM subjects WHERE id=? AND user_id=?", (subject_id, uid)
+    ).fetchone()
+    conn.close()
+    return jsonify({"subject": dict(subject)}), 201
+
+
+@app.route("/api/mobile/subjects/<int:subject_id>", methods=["PUT", "DELETE"])
+def api_mobile_modify_subject(subject_id):
+    uid, error = _mobile_require_user()
+    if error:
+        return error
+    conn = db()
+    old = conn.execute(
+        "SELECT * FROM subjects WHERE id=? AND user_id=?", (subject_id, uid)
+    ).fetchone()
+    if not old:
+        conn.close()
+        return jsonify({"error": "Không tìm thấy môn học."}), 404
+
+    if request.method == "PUT":
+        values, validation = _mobile_subject_payload(request.get_json(silent=True) or {})
+        if validation:
+            conn.close()
+            return jsonify({"error": validation}), 400
+        conn.execute(
+            """UPDATE subjects
+               SET name=?,code=?,description=?,credits=?,target_score=? 
+               WHERE id=? AND user_id=?""",
+            (*values, subject_id, uid)
+        )
+        # Rebind shared knowledge when course code/name changes, never mutate
+        # the shared academic record itself.
+        conn.execute(
+            "UPDATE subjects SET shared_subject_id=NULL WHERE id=? AND user_id=?",
+            (subject_id, uid)
+        )
+        ensure_shared_subject_for_user_subject(conn, uid, subject_id)
+        conn.commit()
+        updated = conn.execute(
+            "SELECT * FROM subjects WHERE id=? AND user_id=?", (subject_id, uid)
+        ).fetchone()
+        conn.close()
+        return jsonify({"subject": dict(updated)})
+
+    # Same deletion semantics as Web: preserve personal documents/quizzes/tasks
+    # as unclassified, remove course-specific chat and reminders.
+    convs = conn.execute(
+        "SELECT id FROM chat_conversations WHERE user_id=? AND subject_id=?",
+        (uid, subject_id)
+    ).fetchall()
+    for conv in convs:
+        conn.execute(
+            "DELETE FROM chat_messages WHERE user_id=? AND conversation_id=?",
+            (uid, conv["id"])
+        )
+    conn.execute(
+        "DELETE FROM chat_conversations WHERE user_id=? AND subject_id=?",
+        (uid, subject_id)
+    )
+    for table in ("documents", "quizzes", "study_tasks"):
+        conn.execute(
+            f"UPDATE {table} SET subject_id=NULL WHERE user_id=? AND subject_id=?",
+            (uid, subject_id)
+        )
+    conn.execute(
+        "DELETE FROM reminders WHERE user_id=? AND subject_id=?",
+        (uid, subject_id)
+    )
+    conn.execute(
+        "DELETE FROM subjects WHERE id=? AND user_id=?", (subject_id, uid)
+    )
+    conn.commit()
+    conn.close()
+    return jsonify({"success": True})
+
+
+@app.route("/api/mobile/documents", methods=["GET", "POST"])
+def api_mobile_documents():
+    uid, error = _mobile_require_user()
+    if error:
+        return error
+
+    conn = db()
+    if request.method == "GET":
+        rows = conn.execute(
+            """SELECT d.id,d.subject_id,d.original_name,d.created_at,
+                      LENGTH(COALESCE(d.extracted_text,'')) AS extracted_chars,
+                      s.name AS subject_name
+               FROM documents d
+               LEFT JOIN subjects s ON s.id=d.subject_id AND s.user_id=d.user_id
+               WHERE d.user_id=? ORDER BY d.id DESC""",
+            (uid,)
+        ).fetchall()
+        conn.close()
+        return jsonify({"documents": [dict(row) for row in rows]})
+
+    file = request.files.get("file")
+    if not file or not file.filename or not allowed_file(file.filename):
+        conn.close()
+        return jsonify({"error": "Chọn tệp PDF, TXT hoặc MD hợp lệ."}), 400
+    raw_subject_id = request.form.get("subject_id")
+    try:
+        subject_id = int(raw_subject_id)
+    except (ValueError, TypeError):
+        conn.close()
+        return jsonify({"error": "Vui lòng chọn môn học trước khi tải tài liệu."}), 400
+    if not owned_subject_id(conn, uid, subject_id):
+        conn.close()
+        return jsonify({"error": "Môn học không tồn tại."}), 404
+
+    original = secure_filename(file.filename)
+    if not original:
+        conn.close()
+        return jsonify({"error": "Tên tệp không hợp lệ."}), 400
+    stored = f"{uid}_{datetime.now().strftime('%Y%m%d%H%M%S%f')}_{original}"
+    target = UPLOAD_DIR / stored
+    try:
+        file.save(target)
+        extracted = extract_text(target)
+        cursor = conn.execute(
+            """INSERT INTO documents(
+                user_id,subject_id,original_name,stored_name,extracted_text,created_at
+            ) VALUES(?,?,?,?,?,?)""",
+            (uid, subject_id, original, stored, extracted, now())
+        )
+        conn.commit()
+        row = conn.execute(
+            "SELECT id,subject_id,original_name,created_at FROM documents WHERE id=? AND user_id=?",
+            (cursor.lastrowid, uid)
+        ).fetchone()
+        return jsonify({"document": dict(row), "extracted_chars": len(extracted or "")}), 201
+    except Exception:
+        target.unlink(missing_ok=True)
+        raise
+    finally:
+        conn.close()
+
+
+@app.route("/api/mobile/documents/<int:doc_id>", methods=["PUT", "DELETE"])
+def api_mobile_modify_document(doc_id):
+    uid, error = _mobile_require_user()
+    if error:
+        return error
+    conn = db()
+    row = conn.execute(
+        "SELECT * FROM documents WHERE id=? AND user_id=?", (doc_id, uid)
+    ).fetchone()
+    if not row:
+        conn.close()
+        return jsonify({"error": "Không tìm thấy tài liệu."}), 404
+
+    if request.method == "PUT":
+        payload = request.get_json(silent=True) or {}
+        new_id = payload.get("subject_id")
+        if new_id is not None:
+            new_id = owned_subject_id(conn, uid, new_id)
+            if not new_id:
+                conn.close()
+                return jsonify({"error": "Môn học không hợp lệ."}), 400
+        old_id = row["subject_id"]
+        conn.execute(
+            "UPDATE documents SET subject_id=? WHERE id=? AND user_id=?",
+            (new_id, doc_id, uid)
+        )
+        if old_id and old_id != new_id:
+            conn.execute(
+                """UPDATE subjects SET personal_syllabus_document_id=NULL
+                   WHERE id=? AND user_id=? AND personal_syllabus_document_id=?""",
+                (old_id, uid, doc_id)
+            )
+        conn.execute(
+            "UPDATE quizzes SET subject_id=? WHERE document_id=? AND user_id=?",
+            (new_id, doc_id, uid)
+        )
+        if old_id:
+            recalculate_subject_progress(uid, old_id, conn)
+        if new_id:
+            recalculate_subject_progress(uid, new_id, conn)
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True})
+
+    old_id = row["subject_id"]
+    quiz_ids = conn.execute(
+        """SELECT id FROM quizzes WHERE user_id=? AND
+           (document_id=? OR (document_id IS NULL AND title=?))""",
+        (uid, doc_id, f"Quiz từ {row['original_name']}")
+    ).fetchall()
+    for quiz in quiz_ids:
+        conn.execute(
+            "DELETE FROM quiz_attempts WHERE user_id=? AND quiz_id=?",
+            (uid, quiz["id"])
+        )
+        conn.execute(
+            "DELETE FROM quizzes WHERE user_id=? AND id=?",
+            (uid, quiz["id"])
+        )
+    conn.execute(
+        """UPDATE subjects SET personal_syllabus_document_id=NULL
+           WHERE user_id=? AND personal_syllabus_document_id=?""",
+        (uid, doc_id)
+    )
+    conn.execute(
+        "DELETE FROM documents WHERE user_id=? AND id=?", (uid, doc_id)
+    )
+    if old_id:
+        recalculate_subject_progress(uid, old_id, conn)
+    conn.commit()
+    conn.close()
+    (UPLOAD_DIR / row["stored_name"]).unlink(missing_ok=True)
+    return jsonify({"success": True})
+
+
+@app.route("/api/mobile/subjects/<int:subject_id>/personal-syllabus", methods=["PUT"])
+def api_mobile_set_personal_syllabus(subject_id):
+    uid, error = _mobile_require_user()
+    if error:
+        return error
+    conn = db()
+    if not owned_subject_id(conn, uid, subject_id):
+        conn.close()
+        return jsonify({"error": "Không tìm thấy môn học."}), 404
+    payload = request.get_json(silent=True) or {}
+    document_id = payload.get("document_id")
+    if document_id not in (None, ""):
+        try:
+            document_id = int(document_id)
+        except (ValueError, TypeError):
+            conn.close()
+            return jsonify({"error": "Tài liệu không hợp lệ."}), 400
+        owned_doc = conn.execute(
+            "SELECT id FROM documents WHERE id=? AND subject_id=? AND user_id=?",
+            (document_id, subject_id, uid)
+        ).fetchone()
+        if not owned_doc:
+            conn.close()
+            return jsonify({"error": "Đề cương phải là tài liệu cá nhân trong môn học."}), 400
+    else:
+        document_id = None
+    conn.execute(
+        """UPDATE subjects SET personal_syllabus_document_id=?
+           WHERE id=? AND user_id=?""",
+        (document_id, subject_id, uid)
+    )
+    conn.commit()
+    backbone = get_course_learning_backbone(conn, uid, subject_id)
+    conn.close()
+    return jsonify({
+        "success": True,
+        "document_id": document_id,
+        "syllabus_source": backbone["syllabus_source"],
+        "syllabus_source_name": backbone["syllabus_source_name"]
+    })
+
+
 @app.route("/api/mobile/chat", methods=["POST"])
 def api_mobile_chat():
     uid, error = _mobile_require_user()
