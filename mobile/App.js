@@ -14,6 +14,14 @@ import {
 import { api, API_BASE_URL } from './src/api';
 import * as DocumentPicker from 'expo-document-picker';
 
+function localInputDate(days = 0, hour = 19, minute = 0) {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  date.setHours(hour, minute, 0, 0);
+  const pad = value => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 function Pill({ children }) {
   return <View style={styles.pill}><Text style={styles.pillText}>{children}</Text></View>;
 }
@@ -825,7 +833,7 @@ function PlanScreen({ plan, subjects, userName, refreshData }) {
   const [mode, setMode] = useState('list');
   const [selectedSubject, setSelectedSubject] = useState(subjects[0]?.id || null);
   const [goal, setGoal] = useState('Nắm vững kiến thức và luyện tập trước kỳ thi');
-  const [deadline, setDeadline] = useState('');
+  const [deadline, setDeadline] = useState(localInputDate(14, 23, 0));
   const [preferredTime, setPreferredTime] = useState('19:00');
   const [dailyMinutes, setDailyMinutes] = useState('45');
   const [taskEdit, setTaskEdit] = useState(null);
@@ -876,7 +884,7 @@ function PlanScreen({ plan, subjects, userName, refreshData }) {
   const openTask = (task = null) => {
     setTaskEdit(task);
     setTaskTitle(task?.title || '');
-    setTaskAt(task?.study_at || '');
+    setTaskAt(task?.study_at || localInputDate(1, 19, 0));
     setTaskDuration(String(task?.duration || 45));
     setTaskNote(task?.note || '');
     setSelectedSubject(task?.subject_id || subjects[0]?.id || null);
@@ -886,7 +894,7 @@ function PlanScreen({ plan, subjects, userName, refreshData }) {
   const openReminder = (reminder = null) => {
     setReminderEdit(reminder);
     setReminderTitle(reminder?.title || '');
-    setReminderAt(reminder?.due_at || '');
+    setReminderAt(reminder?.due_at || localInputDate(7, 23, 59));
     setSelectedSubject(reminder?.subject_id || subjects[0]?.id || null);
     setMode('reminder');
   };
@@ -918,6 +926,15 @@ function PlanScreen({ plan, subjects, userName, refreshData }) {
       {mode === 'generate' ? (
         <>
           {entryField('Mục tiêu học tập', goal, setGoal, 'Ví dụ: Đạt 8 điểm cuối kỳ')}
+          <Text style={styles.fieldLabel}>Thời hạn nhanh</Text>
+          <View style={styles.actionRow}>
+            {[7, 14, 30].map(days => (
+              <TouchableOpacity key={days} style={styles.smallAction}
+                onPress={() => setDeadline(localInputDate(days, 23, 0))}>
+                <Text style={styles.smallActionText}>{days} ngày</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
           {entryField('Deadline (YYYY-MM-DDTHH:MM)', deadline, setDeadline, '2026-11-20T23:00')}
           {entryField('Giờ học ưu tiên (HH:MM)', preferredTime, setPreferredTime, '19:00')}
           {entryField('Số phút mỗi buổi', dailyMinutes, setDailyMinutes, '45')}
@@ -933,6 +950,15 @@ function PlanScreen({ plan, subjects, userName, refreshData }) {
       ) : mode === 'task' ? (
         <>
           {entryField('Tên buổi học', taskTitle, setTaskTitle, 'Đọc chương 1')}
+          <Text style={styles.fieldLabel}>Chọn nhanh ngày học</Text>
+          <View style={styles.actionRow}>
+            <TouchableOpacity style={styles.smallAction} onPress={() => setTaskAt(localInputDate(0,19,0))}>
+              <Text style={styles.smallActionText}>Hôm nay 19:00</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.smallAction} onPress={() => setTaskAt(localInputDate(1,19,0))}>
+              <Text style={styles.smallActionText}>Ngày mai 19:00</Text>
+            </TouchableOpacity>
+          </View>
           {entryField('Ngày giờ (YYYY-MM-DDTHH:MM)', taskAt, setTaskAt, '2026-10-15T19:00')}
           {entryField('Thời lượng (phút)', taskDuration, setTaskDuration, '45')}
           {entryField('Ghi chú', taskNote, setTaskNote, 'Nội dung cần ôn tập', true)}
@@ -951,6 +977,15 @@ function PlanScreen({ plan, subjects, userName, refreshData }) {
       ) : (
         <>
           {entryField('Nội dung nhắc nhở', reminderTitle, setReminderTitle, 'Ôn tập cuối kỳ')}
+          <Text style={styles.fieldLabel}>Thời hạn nhanh</Text>
+          <View style={styles.actionRow}>
+            {[1, 7, 14].map(days => (
+              <TouchableOpacity key={days} style={styles.smallAction}
+                onPress={() => setReminderAt(localInputDate(days, 23, 59))}>
+                <Text style={styles.smallActionText}>{days} ngày nữa</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
           {entryField('Deadline (YYYY-MM-DDTHH:MM)', reminderAt, setReminderAt, '2026-10-20T23:59')}
           <TouchableOpacity style={styles.primaryButton} disabled={busy} onPress={() => run(() => (
             reminderEdit
