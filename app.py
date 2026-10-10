@@ -7393,7 +7393,7 @@ def api_mobile_profile():
     payload = request.get_json(silent=True) or {}
     learning_style = str(payload.get("learning_style", profile["learning_style"] or "balanced")).strip()[:40] or "balanced"
     preferred_time = str(payload.get("preferred_study_time", profile["preferred_study_time"] or "19:00")).strip()
-    if not re.fullmatch(r"(?:[01]\\d|2[0-3]):[0-5]\\d", preferred_time):
+    if not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", preferred_time):
         conn.close()
         return jsonify({"error": "Giờ học cần có dạng HH:MM."}), 400
     daily_minutes = _safe_int(payload.get("daily_minutes"), 45, 15, 240)
