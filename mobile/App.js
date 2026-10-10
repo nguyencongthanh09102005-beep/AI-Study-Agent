@@ -10,7 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { api } from './src/api';
+import { api, API_BASE_URL } from './src/api';
 
 function Pill({ children }) {
   return <View style={styles.pill}><Text style={styles.pillText}>{children}</Text></View>;
@@ -47,7 +47,7 @@ function ErrorCard({ message }) {
   );
 }
 
-function HomeScreen({ dashboard, setTab, loading }) {
+function HomeScreen({ dashboard, setTab, loading, onLogout }) {
   const user = dashboard?.user || {};
   const subjects = dashboard?.subjects || [];
   const tasks = dashboard?.tasks || [];
@@ -59,6 +59,13 @@ function HomeScreen({ dashboard, setTab, loading }) {
         subtitle="Study Agent đang dùng dữ liệu học tập thật từ Flask"
         userName={user.name}
       />
+
+      <View style={styles.mobileStatusRow}>
+        <Text style={styles.mobileStatusText}>Backend: {API_BASE_URL}</Text>
+        <TouchableOpacity onPress={onLogout} style={styles.logoutButton}>
+          <Text style={styles.logoutButtonText}>Đăng xuất</Text>
+        </TouchableOpacity>
+      </View>
 
       <TouchableOpacity style={styles.heroCard} onPress={() => setTab('agent')}>
         <View style={{ flex: 1 }}>
@@ -72,7 +79,7 @@ function HomeScreen({ dashboard, setTab, loading }) {
 
       {loading && <ActivityIndicator />}
 
-      <Text style={styles.sectionTitle}>Sắp tới</Text>
+      <Text style={styles.sectionTitle}>Việc cần làm</Text>
       {tasks.length ? tasks.slice(0, 5).map((task) => (
         <View key={task.id} style={styles.card}>
           <View style={styles.rowBetween}>
@@ -160,19 +167,66 @@ function SubjectSelector({ subjects, selectedId, onSelect }) {
 function AgentScreen({ subjects, userName }) {
   const [subjectId, setSubjectId] = useState(subjects[0]?.id || null);
   const [message, setMessage] = useState('');
-  const [messages, setMessages] = useState([
-    { role: 'assistant', text: 'Chọn môn học rồi hỏi bất kỳ phần nào bạn đang chưa rõ.' },
-  ]);
+  const [messages, setMessages] = useState([]);
   const [sending, setSending] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (!subjectId && subjects[0]?.id) setSubjectId(subjects[0].id);
   }, [subjects, subjectId]);
 
+  useEffect(() => {
+    if (!subjectId) {
+      setMessages([
+        { role: 'assistant', text: 'Chọn môn học rồi hỏi bất kỳ phần nào bạn đang chưa rõ.' },
+      ]);
+      return undefined;
+    }
+
+    let cancelled = false;
+    setLoadingHistory(true);
+    setError('');
+
+    api.chatHistory(subjectId)
+      .then((data) => {
+        if (cancelled) return;
+        const history = (data?.messages || []).map((item) => ({
+          role: item.role,
+          text: item.content,
+        }));
+        setMessages(
+          history.length
+            ? history
+            : [{ role: 'assistant', text: `Bắt đầu hỏi Study Agent về ${data?.subject_name || 'môn học này'}.` }]
+        );
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setError(err.message || 'Không tải được lịch sử Chat.');
+        setMessages([
+          { role: 'assistant', text: 'Không tải được lịch sử cũ, nhưng bạn vẫn có thể thử lại sau.' },
+        ]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingHistory(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [subjectId]);
+
+  const selectSubject = (id) => {
+    setSubjectId(id);
+    setMessage('');
+    setMessages([]);
+    setError('');
+  };
+
   const send = async () => {
     const value = message.trim();
-    if (!value || !subjectId || sending) return;
+    if (!value || !subjectId || sending || loadingHistory) return;
 
     setError('');
     setMessages((old) => [...old, { role: 'user', text: value }]);
@@ -192,8 +246,8 @@ function AgentScreen({ subjects, userName }) {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.chatPage}>
-        <Header title="Study Agent" subtitle="Chat thật với backend Flask" userName={userName} />
-        <SubjectSelector subjects={subjects} selectedId={subjectId} onSelect={setSubjectId} />
+        <Header title="Study Agent" subtitle="Chat đồng bộ với lịch sử trên Web" userName={userName} />
+        <SubjectSelector subjects={subjects} selectedId={subjectId} onSelect={selectSubject} />
         <ErrorCard message={error} />
         <ScrollView style={styles.chatList} contentContainerStyle={{ paddingBottom: 16 }}>
           {messages.map((item, index) => (
@@ -201,7 +255,7 @@ function AgentScreen({ subjects, userName }) {
               <Text style={item.role === 'user' ? styles.userMessageText : styles.aiMessageText}>{item.text}</Text>
             </View>
           ))}
-          {sending && <ActivityIndicator />}
+          {(sending || loadingHistory) && <ActivityIndicator />}
         </ScrollView>
         <View style={styles.composer}>
           <TextInput
@@ -250,6 +304,17 @@ function QuizScreen({ subjects, userName, refreshData }) {
 
   const submit = async () => {
     if (!quiz?.quiz_id) return;
+
+    const unanswered = answers.filter(
+      (value) => value === null || value === undefined
+    ).length;
+    if (unanswered) {
+      setError(
+        `Bạn còn ${unanswered} câu chưa trả lời. Hãy hoàn thành tất cả câu hỏi trước khi nộp.`
+      );
+      return;
+    }
+
     setLoading(true);
     setError('');
     try {
@@ -266,7 +331,17 @@ function QuizScreen({ subjects, userName, refreshData }) {
   return (
     <ScrollView contentContainerStyle={styles.page}>
       <Header title="Quiz thông minh" subtitle="Kết quả cập nhật điểm yếu thật" userName={userName} />
-      <SubjectSelector subjects={subjects} selectedId={subjectId} onSelect={setSubjectId} />
+      <SubjectSelector
+        subjects={subjects}
+        selectedId={subjectId}
+        onSelect={(id) => {
+          setSubjectId(id);
+          setQuiz(null);
+          setAnswers([]);
+          setResult(null);
+          setError('');
+        }}
+      />
       <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
         <TouchableOpacity style={[styles.primaryButton, { flex: 1 }]} onPress={() => generate('subject')}>
           <Text style={styles.primaryButtonText}>Tạo theo môn</Text>
@@ -341,7 +416,10 @@ function PlanScreen({ plan, userName }) {
           <View style={styles.timelineCard}>
             <Text style={styles.timelineDay}>{String(task.study_at || '').replace('T', ' ').slice(0, 16)}</Text>
             <Text style={styles.cardTitle}>{task.title}</Text>
-            <Text style={styles.muted}>{task.subject_name || 'Tự học'} · {task.duration} phút</Text>
+            <Text style={styles.muted}>
+              {task.subject_name || 'Tự học'} · {task.duration} phút
+              {task.source === 'adaptive' ? ' · Adaptive' : ''}
+            </Text>
             {!!task.note && <Text style={styles.muted}>{task.note}</Text>}
           </View>
         </View>
@@ -382,6 +460,7 @@ function LoginScreen({ onLogin }) {
         </TouchableOpacity>
         <ErrorCard message={error} />
         <Text style={styles.loginHint}>Flask cần chạy với FLASK_HOST=0.0.0.0 trên máy Windows.</Text>
+        <Text style={styles.loginHint}>Backend hiện tại: {API_BASE_URL}</Text>
       </View>
     </SafeAreaView>
   );
@@ -417,6 +496,18 @@ export default function App() {
     setLoggedIn(true);
   };
 
+  const handleLogout = async () => {
+    try {
+      await api.logout();
+    } finally {
+      setLoggedIn(false);
+      setTab('home');
+      setDashboard(null);
+      setSubjects([]);
+      setPlan(null);
+    }
+  };
+
   useEffect(() => {
     if (loggedIn) {
       refreshData().catch(() => {});
@@ -430,8 +521,15 @@ export default function App() {
     if (tab === 'agent') return <AgentScreen subjects={subjects} userName={userName} />;
     if (tab === 'quiz') return <QuizScreen subjects={subjects} userName={userName} refreshData={refreshData} />;
     if (tab === 'plan') return <PlanScreen plan={plan} userName={userName} />;
-    return <HomeScreen dashboard={dashboard} setTab={setTab} loading={loading} />;
-  }, [tab, subjects, dashboard, plan, loading, userName]);
+    return (
+      <HomeScreen
+        dashboard={dashboard}
+        setTab={setTab}
+        loading={loading}
+        onLogout={handleLogout}
+      />
+    );
+  }, [tab, subjects, dashboard, plan, loading, userName, loggedIn]);
 
   if (!loggedIn) return <LoginScreen onLogin={handleLogin} />;
 
@@ -449,7 +547,14 @@ export default function App() {
       <View style={styles.app}>{screen}</View>
       <View style={styles.bottomNav}>
         {tabs.map(([key, icon, label]) => (
-          <TouchableOpacity key={key} style={styles.navItem} onPress={() => setTab(key)}>
+          <TouchableOpacity
+            key={key}
+            style={styles.navItem}
+            onPress={() => {
+              setTab(key);
+              refreshData().catch(() => {});
+            }}
+          >
             <Text style={[styles.navIcon, tab === key && styles.navActive]}>{icon}</Text>
             <Text style={[styles.navLabel, tab === key && styles.navActive]}>{label}</Text>
           </TouchableOpacity>
@@ -475,6 +580,10 @@ const styles = StyleSheet.create({
   heroButton: { alignSelf: 'flex-start', backgroundColor: 'white', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, marginTop: 16 },
   heroButtonText: { color: '#555DD0', fontWeight: '800' },
   robot: { width: 72, justifyContent: 'center', alignItems: 'center' },
+  mobileStatusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: -8, marginBottom: 14 },
+  mobileStatusText: { flex: 1, color: '#8B93A7', fontSize: 10 },
+  logoutButton: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: '#EEF0FF' },
+  logoutButtonText: { color: '#5965D8', fontSize: 11, fontWeight: '800' },
   sectionTitle: { fontSize: 17, fontWeight: '800', color: '#202943', marginBottom: 10, marginTop: 4 },
   card: { backgroundColor: 'white', borderRadius: 18, padding: 17, marginBottom: 12, borderWidth: 1, borderColor: '#EBEEF5' },
   subjectCard: { backgroundColor: 'white', borderRadius: 20, padding: 17, marginBottom: 14, borderWidth: 1, borderColor: '#EBEEF5', flexDirection: 'row', gap: 14 },
