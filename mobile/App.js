@@ -641,36 +641,208 @@ function QuizScreen({ subjects, userName, refreshData }) {
   );
 }
 
-function PlanScreen({ plan, userName }) {
-  const profile = plan?.profile || {};
-  const tasks = plan?.tasks || [];
+function PlanScreen({ plan, subjects, userName, refreshData }) {
+  const [local, setLocal] = useState(plan || {});
+  const [mode, setMode] = useState('list');
+  const [selectedSubject, setSelectedSubject] = useState(subjects[0]?.id || null);
+  const [goal, setGoal] = useState('Nắm vững kiến thức và luyện tập trước kỳ thi');
+  const [deadline, setDeadline] = useState('');
+  const [preferredTime, setPreferredTime] = useState('19:00');
+  const [dailyMinutes, setDailyMinutes] = useState('45');
+  const [taskEdit, setTaskEdit] = useState(null);
+  const [taskTitle, setTaskTitle] = useState('');
+  const [taskAt, setTaskAt] = useState('');
+  const [taskDuration, setTaskDuration] = useState('45');
+  const [taskNote, setTaskNote] = useState('');
+  const [reminders, setReminders] = useState([]);
+  const [reminderEdit, setReminderEdit] = useState(null);
+  const [reminderTitle, setReminderTitle] = useState('');
+  const [reminderAt, setReminderAt] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    setLocal(plan || {});
+  }, [plan]);
+
+  const refresh = async () => {
+    const [updated, deadlineData] = await Promise.all([api.studyPlan(), api.reminders()]);
+    setLocal(updated);
+    setReminders(deadlineData.reminders || []);
+    await refreshData();
+  };
+
+  useEffect(() => {
+    let active = true;
+    api.reminders()
+      .then((data) => { if (active) setReminders(data.reminders || []); })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
+
+  const run = async (action, successMode = 'list') => {
+    setBusy(true);
+    setError('');
+    try {
+      await action();
+      await refresh();
+      setMode(successMode);
+    } catch (err) {
+      setError(err.message || 'Không thực hiện được thao tác.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const openTask = (task = null) => {
+    setTaskEdit(task);
+    setTaskTitle(task?.title || '');
+    setTaskAt(task?.study_at || '');
+    setTaskDuration(String(task?.duration || 45));
+    setTaskNote(task?.note || '');
+    setSelectedSubject(task?.subject_id || subjects[0]?.id || null);
+    setMode('task');
+  };
+
+  const openReminder = (reminder = null) => {
+    setReminderEdit(reminder);
+    setReminderTitle(reminder?.title || '');
+    setReminderAt(reminder?.due_at || '');
+    setSelectedSubject(reminder?.subject_id || subjects[0]?.id || null);
+    setMode('reminder');
+  };
+
+  const confirmDelete = (label, action) => {
+    Alert.alert('Xác nhận xóa', label, [
+      { text: 'Hủy', style: 'cancel' },
+      { text: 'Xóa', style: 'destructive', onPress: () => run(action) },
+    ]);
+  };
+
+  const entryField = (label, value, update, placeholder, multiline = false) => (
+    <View>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <TextInput style={[styles.fieldInput, multiline && { minHeight: 85, textAlignVertical: 'top' }]}
+        value={value} onChangeText={update} placeholder={placeholder}
+        multiline={multiline} />
+    </View>
+  );
+
+  if (mode !== 'list') return (
+    <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
+      <TouchableOpacity onPress={() => setMode('list')}><Text style={styles.backLink}>← Kế hoạch học</Text></TouchableOpacity>
+      <Header title={mode === 'generate' ? 'Tạo kế hoạch AI' : mode === 'task' ? 'Buổi học' : 'Nhắc nhở'} userName={userName} />
+      <ErrorCard message={error} />
+      {busy && <ActivityIndicator />}
+      <Text style={styles.fieldLabel}>Môn học</Text>
+      <SubjectSelector subjects={subjects} selectedId={selectedSubject} onSelect={setSelectedSubject} />
+      {mode === 'generate' ? (
+        <>
+          {entryField('Mục tiêu học tập', goal, setGoal, 'Ví dụ: Đạt 8 điểm cuối kỳ')}
+          {entryField('Deadline (YYYY-MM-DDTHH:MM)', deadline, setDeadline, '2026-11-20T23:00')}
+          {entryField('Giờ học ưu tiên (HH:MM)', preferredTime, setPreferredTime, '19:00')}
+          {entryField('Số phút mỗi buổi', dailyMinutes, setDailyMinutes, '45')}
+          <Text style={styles.muted}>AI ưu tiên đề cương môn học, tài liệu, điểm yếu và mục tiêu riêng.</Text>
+          <TouchableOpacity style={styles.primaryButton} disabled={busy} onPress={() =>
+            run(() => api.generateStudyPlan({
+              subject_id: selectedSubject, goal, deadline,
+              preferred_time: preferredTime, daily_minutes: Number(dailyMinutes),
+            }))}>
+            <Text style={styles.primaryButtonText}>✦ Tạo lộ trình AI</Text>
+          </TouchableOpacity>
+        </>
+      ) : mode === 'task' ? (
+        <>
+          {entryField('Tên buổi học', taskTitle, setTaskTitle, 'Đọc chương 1')}
+          {entryField('Ngày giờ (YYYY-MM-DDTHH:MM)', taskAt, setTaskAt, '2026-10-15T19:00')}
+          {entryField('Thời lượng (phút)', taskDuration, setTaskDuration, '45')}
+          {entryField('Ghi chú', taskNote, setTaskNote, 'Nội dung cần ôn tập', true)}
+          <TouchableOpacity style={styles.primaryButton} disabled={busy} onPress={() => run(() => (
+            taskEdit ? api.updateTask(taskEdit.id, {
+              subject_id: selectedSubject, title: taskTitle, study_at: taskAt,
+              duration: Number(taskDuration), note: taskNote,
+            }) : api.createTask({
+              subject_id: selectedSubject, title: taskTitle, study_at: taskAt,
+              duration: Number(taskDuration), note: taskNote,
+            })
+          ))}>
+            <Text style={styles.primaryButtonText}>{taskEdit ? 'Lưu buổi học' : 'Thêm buổi học'}</Text>
+          </TouchableOpacity>
+        </>
+      ) : (
+        <>
+          {entryField('Nội dung nhắc nhở', reminderTitle, setReminderTitle, 'Ôn tập cuối kỳ')}
+          {entryField('Deadline (YYYY-MM-DDTHH:MM)', reminderAt, setReminderAt, '2026-10-20T23:59')}
+          <TouchableOpacity style={styles.primaryButton} disabled={busy} onPress={() => run(() => (
+            reminderEdit
+              ? api.updateReminder(reminderEdit.id, {
+                subject_id: selectedSubject, title: reminderTitle, due_at: reminderAt, done: reminderEdit.done,
+              })
+              : api.createReminder({
+                subject_id: selectedSubject, title: reminderTitle, due_at: reminderAt,
+              })
+          ))}>
+            <Text style={styles.primaryButtonText}>{reminderEdit ? 'Lưu deadline' : 'Thêm deadline'}</Text>
+          </TouchableOpacity>
+        </>
+      )}
+    </ScrollView>
+  );
+
+  const profile = local?.profile || {};
+  const tasks = local?.tasks || [];
 
   return (
     <ScrollView contentContainerStyle={styles.page}>
-      <Header title="Lộ trình của bạn" subtitle="Kế hoạch thật từ backend" userName={userName} />
+      <Header title="Kế hoạch học tập" subtitle="Lộ trình AI và lịch học cá nhân" userName={userName} />
+      <ErrorCard message={error} />
+      {busy && <ActivityIndicator />}
       <View style={styles.profileCard}>
         <Text style={styles.eyebrow}>HỒ SƠ HỌC TẬP</Text>
         <View style={styles.profileGrid}>
-          <View><Text style={styles.metric}>{profile.learning_style || 'balanced'}</Text><Text style={styles.metricLabel}>Phong cách</Text></View>
           <View><Text style={styles.metric}>{profile.daily_minutes || 45}'</Text><Text style={styles.metricLabel}>Mỗi buổi</Text></View>
           <View><Text style={styles.metric}>{profile.preferred_study_time || '19:00'}</Text><Text style={styles.metricLabel}>Giờ ưu tiên</Text></View>
+          <View><Text style={styles.metric}>{tasks.filter(t => t.done).length}/{tasks.length}</Text><Text style={styles.metricLabel}>Hoàn thành</Text></View>
         </View>
       </View>
-
-      {tasks.length ? tasks.map((task, index) => (
-        <View key={task.id || index} style={styles.timelineRow}>
-          <View style={styles.timelineDot}><Text style={styles.timelineIndex}>{index + 1}</Text></View>
-          <View style={styles.timelineCard}>
-            <Text style={styles.timelineDay}>{String(task.study_at || '').replace('T', ' ').slice(0, 16)}</Text>
-            <Text style={styles.cardTitle}>{task.title}</Text>
-            <Text style={styles.muted}>
-              {task.subject_name || 'Tự học'} · {task.duration} phút
-              {task.source === 'adaptive' ? ' · Adaptive' : ''}
-            </Text>
-            {!!task.note && <Text style={styles.muted}>{task.note}</Text>}
+      <TouchableOpacity style={styles.primaryButton} onPress={() => setMode('generate')}>
+        <Text style={styles.primaryButtonText}>✦ Tạo kế hoạch bằng AI</Text>
+      </TouchableOpacity>
+      <View style={styles.actionRow}>
+        <TouchableOpacity style={styles.smallAction} onPress={() => openTask()}><Text style={styles.smallActionText}>＋ Buổi học</Text></TouchableOpacity>
+        <TouchableOpacity style={styles.smallAction} onPress={() => openReminder()}><Text style={styles.smallActionText}>＋ Deadline</Text></TouchableOpacity>
+        <TouchableOpacity style={styles.smallAction} onPress={() => run(async () => {}, 'list')}><Text style={styles.smallActionText}>↻ Làm mới</Text></TouchableOpacity>
+      </View>
+      <Text style={styles.sectionTitle}>Lịch học ({tasks.length})</Text>
+      {!tasks.length && <View style={styles.card}><Text style={styles.muted}>Chưa có kế hoạch. Bạn có thể tạo lịch AI ngay trên iPhone.</Text></View>}
+      {tasks.map((task) => (
+        <View key={task.id} style={styles.card}>
+          <TouchableOpacity onPress={() => run(() => api.toggleTask(task.id))}>
+            <Text style={styles.cardTitle}>{task.done ? '☑' : '□'} {task.title}</Text>
+          </TouchableOpacity>
+          <Text style={styles.muted}>{String(task.study_at || '').replace('T', ' ').slice(0, 16)} · {task.subject_name || 'Tự học'} · {task.duration} phút</Text>
+          {!!task.note && <Text style={styles.muted}>{task.note}</Text>}
+          {!!task.source && <Text style={styles.muted}>Nguồn: {task.source === 'adaptive' ? 'Adaptive Learning' : task.source === 'ai' ? 'AI Study Plan' : 'Thủ công'}</Text>}
+          <View style={styles.actionRow}>
+            <TouchableOpacity style={styles.smallAction} onPress={() => openTask(task)}><Text style={styles.smallActionText}>Sửa</Text></TouchableOpacity>
+            <TouchableOpacity style={[styles.smallAction, styles.deleteAction]} onPress={() => confirmDelete(task.title, () => api.deleteTask(task.id))}><Text style={styles.deleteActionText}>Xóa</Text></TouchableOpacity>
           </View>
         </View>
-      )) : <View style={styles.card}><Text style={styles.muted}>Chưa có kế hoạch học.</Text></View>}
+      ))}
+      <Text style={styles.sectionTitle}>Deadline & nhắc nhở</Text>
+      {reminders.map(item => (
+        <View key={item.id} style={styles.card}>
+          <Text style={styles.cardTitle}>{item.done ? '✓ ' : ''}{item.title}</Text>
+          <Text style={styles.muted}>{String(item.due_at || '').replace('T', ' ').slice(0, 16)} · {item.subject_name || 'Cá nhân'}</Text>
+          <View style={styles.actionRow}>
+            <TouchableOpacity style={styles.smallAction} onPress={() => openReminder(item)}><Text style={styles.smallActionText}>Sửa</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.smallAction} onPress={() => run(() => api.updateReminder(item.id, {
+              title: item.title, due_at: item.due_at, subject_id: item.subject_id, done: !item.done,
+            }))}><Text style={styles.smallActionText}>{item.done ? 'Chưa xong' : 'Hoàn thành'}</Text></TouchableOpacity>
+            <TouchableOpacity style={[styles.smallAction, styles.deleteAction]} onPress={() => confirmDelete(item.title, () => api.deleteReminder(item.id))}><Text style={styles.deleteActionText}>Xóa</Text></TouchableOpacity>
+          </View>
+        </View>
+      ))}
     </ScrollView>
   );
 }
@@ -767,7 +939,7 @@ export default function App() {
     if (tab === 'subjects') return <SubjectsScreen subjects={subjects} userName={userName} refreshData={refreshData} />;
     if (tab === 'agent') return <AgentScreen subjects={subjects} userName={userName} />;
     if (tab === 'quiz') return <QuizScreen subjects={subjects} userName={userName} refreshData={refreshData} />;
-    if (tab === 'plan') return <PlanScreen plan={plan} userName={userName} />;
+    if (tab === 'plan') return <PlanScreen plan={plan} subjects={subjects} userName={userName} refreshData={refreshData} />;
     return (
       <HomeScreen
         dashboard={dashboard}
