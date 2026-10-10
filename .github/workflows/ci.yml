@@ -19,6 +19,19 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Mobile dependencies
+        working-directory: mobile
+        run: npm install --no-audit --no-fund
+
+      - name: Bundle Mobile for iOS
+        working-directory: mobile
+        run: npx expo export --platform ios --output-dir dist-ci
+
       - name: Compile Flask backend
         run: python -m py_compile app.py
 
@@ -31,6 +44,7 @@ jobs:
           node --check static/js/mockup.js
           node --check static/js/study_plan.js
           node --check static/js/chat.js
+          node --check mobile/src/api.js
 
       - name: Smoke test core web pages
         run: |
@@ -188,6 +202,289 @@ jobs:
               timespec="minutes"
           )
 
+          # =====================================================
+          # PHASE 5: 2-user isolation + Web/Mobile shared-data integration
+          # =====================================================
+          conn = project.db()
+          password_hash = project.generate_password_hash("ci-pass-123")
+
+          user_a_id = conn.execute(
+              """
+              INSERT INTO users(name,email,password_hash,created_at)
+              VALUES(?,?,?,?)
+              """,
+              ("CI User A", "ci-user-a@study.local", password_hash, project.now())
+          ).lastrowid
+          user_b_id = conn.execute(
+              """
+              INSERT INTO users(name,email,password_hash,created_at)
+              VALUES(?,?,?,?)
+              """,
+              ("CI User B", "ci-user-b@study.local", password_hash, project.now())
+          ).lastrowid
+
+          subject_a_id = conn.execute(
+              """
+              INSERT INTO subjects(
+                  user_id,name,code,description,credits,target_score,progress,created_at
+              ) VALUES(?,?,?,?,?,?,?,?)
+              """,
+              (
+                  user_a_id, "CI Shared Course", "CI-SHARED-001",
+                  "A", 3, 8.0, 0, project.now()
+              )
+          ).lastrowid
+          subject_b_id = conn.execute(
+              """
+              INSERT INTO subjects(
+                  user_id,name,code,description,credits,target_score,progress,created_at
+              ) VALUES(?,?,?,?,?,?,?,?)
+              """,
+              (
+                  user_b_id, "CI Shared Course", "CI-SHARED-001",
+                  "B", 3, 9.0, 0, project.now()
+              )
+          ).lastrowid
+          conn.commit()
+
+          shared_a = project.ensure_shared_subject_for_user_subject(
+              conn, user_a_id, subject_a_id
+          )
+          shared_b = project.ensure_shared_subject_for_user_subject(
+              conn, user_b_id, subject_b_id
+          )
+          assert shared_a["id"] == shared_b["id"]
+
+          project.ensure_subject_chats(user_a_id, conn)
+          project.ensure_subject_chats(user_b_id, conn)
+
+          private_filename = "ci_private_user_a.txt"
+          project.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+          (project.UPLOAD_DIR / private_filename).write_text(
+              "PRIVATE A ONLY",
+              encoding="utf-8"
+          )
+          conn.execute(
+              """
+              INSERT INTO documents(
+                  user_id,subject_id,original_name,stored_name,extracted_text,created_at
+              ) VALUES(?,?,?,?,?,?)
+              """,
+              (
+                  user_a_id, subject_a_id, "private_a.txt", private_filename,
+                  "Tài liệu riêng của user A", project.now()
+              )
+          )
+
+          chat_a = conn.execute(
+              """
+              SELECT id FROM chat_conversations
+              WHERE user_id=? AND subject_id=?
+              """,
+              (user_a_id, subject_a_id)
+          ).fetchone()
+          conn.execute(
+              """
+              INSERT INTO chat_messages(
+                  user_id,conversation_id,role,content,created_at
+              ) VALUES(?,?,?,?,?)
+              """,
+              (
+                  user_a_id, chat_a["id"], "user",
+                  "Tin nhắn riêng của A", project.now()
+              )
+          )
+
+          quiz_payload = [{
+              "question": "CI adaptive question?",
+              "topic": "CI Topic",
+              "chapter": "CI Chapter",
+              "options": ["Đúng", "Sai 1", "Sai 2", "Sai 3"],
+              "answer": 0
+          }]
+          quiz_a_id = conn.execute(
+              """
+              INSERT INTO quizzes(
+                  user_id,subject_id,document_id,title,payload,created_at
+              ) VALUES(?,?,?,?,?,?)
+              """,
+              (
+                  user_a_id, subject_a_id, None, "CI Adaptive Quiz",
+                  project.json.dumps(quiz_payload, ensure_ascii=False),
+                  project.now()
+              )
+          ).lastrowid
+          conn.commit()
+          conn.close()
+
+          client_a = project.app.test_client()
+          client_b = project.app.test_client()
+
+          for mobile_client, email in [
+              (client_a, "ci-user-a@study.local"),
+              (client_b, "ci-user-b@study.local"),
+          ]:
+              response = mobile_client.post(
+                  "/api/mobile/login",
+                  json={"email": email, "password": "ci-pass-123"}
+              )
+              assert response.status_code == 200
+
+          # Cùng mã môn -> Shared Subject giống nhau, nhưng subject cá nhân khác nhau.
+          subjects_a = client_a.get("/api/mobile/subjects").get_json()
+          subjects_b = client_b.get("/api/mobile/subjects").get_json()
+          assert any(item["id"] == subject_a_id for item in subjects_a)
+          assert not any(item["id"] == subject_a_id for item in subjects_b)
+          assert any(item["id"] == subject_b_id for item in subjects_b)
+
+          # User B không đọc được subject, file hay chat của User A.
+          assert client_b.get(
+              f"/api/mobile/subjects/{subject_a_id}"
+          ).status_code == 404
+          assert client_b.get(
+              f"/uploads/{private_filename}"
+          ).status_code == 404
+          assert client_a.get(
+              f"/uploads/{private_filename}"
+          ).status_code == 200
+          assert client_b.get(
+              f"/api/mobile/chat/{subject_a_id}"
+          ).status_code == 404
+
+          history_a = client_a.get(
+              f"/api/mobile/chat/{subject_a_id}"
+          )
+          assert history_a.status_code == 200
+          assert any(
+              item["content"] == "Tin nhắn riêng của A"
+              for item in history_a.get_json()["messages"]
+          )
+
+          # Web tạo task -> Mobile nhìn thấy cùng task -> Web toggle -> Mobile thấy done.
+          create_task = client_a.post(
+              "/study-plan/tasks/create",
+              data={
+                  "subject_id": str(subject_a_id),
+                  "title": "CI Web to Mobile task",
+                  "study_at": (
+                      datetime.now() + timedelta(days=1)
+                  ).replace(
+                      hour=18, minute=0, second=0, microsecond=0
+                  ).isoformat(timespec="minutes"),
+                  "duration": "45",
+                  "note": "sync"
+              },
+              follow_redirects=False
+          )
+          assert create_task.status_code in (302, 303)
+
+          mobile_plan = client_a.get(
+              "/api/mobile/study-plan"
+          ).get_json()
+          synced_task = next(
+              item for item in mobile_plan["tasks"]
+              if item["title"] == "CI Web to Mobile task"
+          )
+
+          toggle = client_a.post(
+              f"/study-plan/tasks/{synced_task['id']}/toggle",
+              follow_redirects=False
+          )
+          assert toggle.status_code in (302, 303)
+          mobile_plan_after = client_a.get(
+              "/api/mobile/study-plan"
+          ).get_json()
+          toggled_task = next(
+              item for item in mobile_plan_after["tasks"]
+              if item["id"] == synced_task["id"]
+          )
+          assert toggled_task["done"] == 1
+
+          # Mobile Quiz sai -> weakness + adaptive task; làm đúng -> resolve + gỡ task.
+          wrong_result = client_a.post(
+              "/api/mobile/quiz/submit",
+              json={"quiz_id": quiz_a_id, "answers": [1]}
+          )
+          assert wrong_result.status_code == 200
+          wrong_data = wrong_result.get_json()
+          assert wrong_data["weakness_count"] == 1
+          assert wrong_data["adaptive_task"] is not None
+
+          mobile_subjects_after_wrong = client_a.get(
+              "/api/mobile/subjects"
+          ).get_json()
+          a_after_wrong = next(
+              item for item in mobile_subjects_after_wrong
+              if item["id"] == subject_a_id
+          )
+          assert len(a_after_wrong["weaknesses"]) == 1
+
+          correct_result = client_a.post(
+              "/api/mobile/quiz/submit",
+              json={"quiz_id": quiz_a_id, "answers": [0]}
+          )
+          assert correct_result.status_code == 200
+          correct_data = correct_result.get_json()
+          assert correct_data["weakness_count"] == 0
+          assert "CI Topic" in correct_data["resolved_topics"]
+
+          conn = project.db()
+          open_adaptive = conn.execute(
+              """
+              SELECT COUNT(*) AS c
+              FROM study_tasks
+              WHERE user_id=? AND subject_id=?
+                AND source='adaptive' AND done=0
+              """,
+              (user_a_id, subject_a_id)
+          ).fetchone()["c"]
+          conn.close()
+          assert int(open_adaptive or 0) == 0
+
+          # Mobile tạo lại Study Plan cũng phải thay deadline giống Web.
+          mobile_deadline_1 = (
+              datetime.now() + timedelta(days=10)
+          ).replace(hour=21, minute=0, second=0, microsecond=0)
+          mobile_deadline_2 = (
+              datetime.now() + timedelta(days=16)
+          ).replace(hour=21, minute=0, second=0, microsecond=0)
+
+          for goal, deadline in [
+              ("Mobile plan cũ", mobile_deadline_1),
+              ("Mobile plan mới", mobile_deadline_2),
+          ]:
+              response = client_a.post(
+                  "/api/mobile/study-plan",
+                  json={
+                      "subject_id": subject_a_id,
+                      "goal": goal,
+                      "deadline": deadline.isoformat(timespec="minutes"),
+                      "preferred_time": "19:00",
+                      "daily_minutes": 45,
+                  }
+              )
+              assert response.status_code == 200
+
+          conn = project.db()
+          mobile_reminders = conn.execute(
+              """
+              SELECT title,due_at
+              FROM reminders
+              WHERE user_id=? AND subject_id=? AND done=0
+              ORDER BY id
+              """,
+              (user_a_id, subject_a_id)
+          ).fetchall()
+          conn.close()
+          assert len(mobile_reminders) == 1
+          assert mobile_reminders[0]["title"] == "Mobile plan mới"
+          assert mobile_reminders[0]["due_at"] == mobile_deadline_2.isoformat(
+              timespec="minutes"
+          )
+
+          (project.UPLOAD_DIR / private_filename).unlink(missing_ok=True)
+
           print("Core web smoke OK:", ", ".join(paths))
           print("Business flow checks OK: syllabus fallback, deadline replace")
+          print("Phase 5 checks OK: 2-user isolation, Web/Mobile sync, adaptive loop")
           PY
