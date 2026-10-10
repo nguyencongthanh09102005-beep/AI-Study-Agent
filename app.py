@@ -6584,6 +6584,63 @@ def api_mobile_documents():
         conn.close()
 
 
+@app.route("/api/mobile/documents/<int:doc_id>", methods=["GET"])
+def api_mobile_document_detail(doc_id):
+    uid, error = _mobile_require_user()
+    if error:
+        return error
+    conn = db()
+    row = conn.execute(
+        """SELECT id,subject_id,original_name,created_at,extracted_text
+           FROM documents WHERE id=? AND user_id=?""",
+        (doc_id, uid)
+    ).fetchone()
+    conn.close()
+    if not row:
+        return jsonify({"error": "Không tìm thấy tài liệu."}), 404
+    payload = dict(row)
+    payload["extracted_text"] = (payload["extracted_text"] or "")[:30000]
+    return jsonify({"document": payload})
+
+
+@app.route("/api/mobile/documents/<int:doc_id>/summary", methods=["POST"])
+def api_mobile_document_summary(doc_id):
+    uid, error = _mobile_require_user()
+    if error:
+        return error
+    conn = db()
+    row = conn.execute(
+        "SELECT original_name,extracted_text FROM documents WHERE id=? AND user_id=?",
+        (doc_id, uid)
+    ).fetchone()
+    conn.close()
+    if not row:
+        return jsonify({"error": "Không tìm thấy tài liệu."}), 404
+    source_text = (row["extracted_text"] or "").strip()
+    if not source_text:
+        return jsonify({
+            "summary": "Chưa trích xuất được nội dung chữ từ tài liệu này; PDF scan/ảnh chưa hỗ trợ OCR.",
+            "used_ai": False
+        })
+    prompt = (
+        "Bạn là AI Study Agent. Hãy tóm tắt tài liệu sau bằng tiếng Việt. "
+        "Chỉ sử dụng nội dung tài liệu, không bịa thêm. Giữ nguyên thuật ngữ, "
+        "chia thành: Ý chính, Khái niệm quan trọng, Nội dung cần nhớ. "
+        "Ưu tiên bám cấu trúc chương/mục.\\n\\nTÀI LIỆU:\\n"
+        + source_text[:14000]
+    )
+    generated, ai_error = gemini_generate(prompt)
+    if generated:
+        return jsonify({"summary": generated.strip(), "used_ai": True})
+    chunks = [
+        item.strip() for item in
+        re.split(r"\\n{2,}|(?<=[.!?])\\s+", source_text)
+        if len(item.strip()) >= 25
+    ]
+    fallback = "\\n\\n".join(chunks[:12])[:3500] or source_text[:3500]
+    return jsonify({"summary": fallback, "used_ai": False, "ai_error": ai_error or ""})
+
+
 @app.route("/api/mobile/documents/<int:doc_id>", methods=["PUT", "DELETE"])
 def api_mobile_modify_document(doc_id):
     uid, error = _mobile_require_user()
