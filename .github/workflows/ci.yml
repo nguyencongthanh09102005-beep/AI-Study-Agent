@@ -488,6 +488,85 @@ jobs:
 
           (project.UPLOAD_DIR / private_filename).unlink(missing_ok=True)
 
+          # Mobile Stage 1: CRUD môn, tài liệu riêng và personal syllabus.
+          from io import BytesIO
+          response = client_a.post(
+              "/api/mobile/subjects",
+              json={
+                  "name": "CI Mobile CRUD",
+                  "code": "CI-MOBILE-001",
+                  "credits": 3,
+                  "target_score": 8.0,
+                  "description": "Test tạo môn trên iPhone",
+              }
+          )
+          assert response.status_code == 201, response.get_data(as_text=True)
+          managed_id = response.get_json()["subject"]["id"]
+          assert client_b.put(
+              f"/api/mobile/subjects/{managed_id}",
+              json={"name": "Không được sửa"}
+          ).status_code == 404
+
+          update_result = client_a.put(
+              f"/api/mobile/subjects/{managed_id}",
+              json={
+                  "name": "CI Mobile Edited",
+                  "code": "CI-MOBILE-001",
+                  "credits": 4,
+                  "target_score": 9,
+                  "description": "Đã chỉnh",
+              }
+          )
+          assert update_result.status_code == 200
+          assert update_result.get_json()["subject"]["credits"] == 4
+
+          upload_result = client_a.post(
+              "/api/mobile/documents",
+              data={
+                  "subject_id": str(managed_id),
+                  "file": (BytesIO(b"CI mobile sample syllabus"), "ci-mobile.txt"),
+              },
+              content_type="multipart/form-data"
+          )
+          assert upload_result.status_code == 201, upload_result.get_data(as_text=True)
+          managed_doc_id = upload_result.get_json()["document"]["id"]
+          assert client_b.delete(
+              f"/api/mobile/documents/{managed_doc_id}"
+          ).status_code == 404
+
+          syllabus_response = client_a.put(
+              f"/api/mobile/subjects/{managed_id}/personal-syllabus",
+              json={"document_id": managed_doc_id}
+          )
+          assert syllabus_response.status_code == 200
+          detail_response = client_a.get(
+              f"/api/mobile/subjects/{managed_id}"
+          )
+          assert detail_response.status_code == 200
+          assert detail_response.get_json()["subject"]["personal_syllabus_document_id"] == managed_doc_id
+          assert detail_response.get_json()["shared"]["syllabus_source"] == "personal"
+
+          # Other user's document cannot be selected as syllabus.
+          assert client_b.put(
+              f"/api/mobile/subjects/{subject_b_id}/personal-syllabus",
+              json={"document_id": managed_doc_id}
+          ).status_code == 400
+
+          delete_doc_result = client_a.delete(
+              f"/api/mobile/documents/{managed_doc_id}"
+          )
+          assert delete_doc_result.status_code == 200
+          assert client_a.get(
+              f"/api/mobile/subjects/{managed_id}"
+          ).get_json()["subject"]["personal_syllabus_document_id"] is None
+          assert client_a.delete(
+              f"/api/mobile/subjects/{managed_id}"
+          ).status_code == 200
+          assert client_a.get(
+              f"/api/mobile/subjects/{managed_id}"
+          ).status_code == 404
+          print("Mobile Stage 1 CRUD and private document tests OK")
+
           print("Core web smoke OK:", ", ".join(paths))
           print("Business flow checks OK: syllabus fallback, deadline replace")
           print("Phase 5 checks OK: 2-user isolation, Web/Mobile sync, adaptive loop")
