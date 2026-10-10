@@ -45,6 +45,34 @@ python app.py
 
 Mở: `http://127.0.0.1:5000`
 
+## Chạy Mobile bằng Expo Go
+
+Mobile dùng cùng Flask backend và SQLite với Web.
+
+Android Emulator có thể dùng mặc định `http://10.0.2.2:5000`.
+
+Với iPhone thật / Expo Go, điện thoại và laptop nên cùng Wi-Fi. Trong thư mục `mobile`, tạo file `.env` từ `.env.example` rồi thay IPv4 LAN của máy Windows:
+
+```env
+EXPO_PUBLIC_API_URL=http://192.168.1.15:5000
+```
+
+Flask phải lắng nghe LAN:
+
+```env
+FLASK_HOST=0.0.0.0
+```
+
+Sau đó:
+
+```bash
+cd mobile
+npm install
+npx expo start
+```
+
+Mở Expo Go trên iPhone và quét QR. Nếu đổi `EXPO_PUBLIC_API_URL`, restart Expo để nạp lại biến môi trường.
+
 Có thể dùng `sample_data/ai_co_ban.txt` để test nhanh luồng Tài liệu → Quiz → AI Chat.
 
 Tài khoản demo mặc định khi database mới được tạo:
