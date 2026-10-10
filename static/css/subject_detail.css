@@ -38,3 +38,53 @@
 .future-role-note{display:flex;gap:9px;align-items:flex-start;margin-top:16px;padding:11px 12px;border-radius:13px;background:#eef3fb;color:#7382a4}
 .future-role-note p{margin:0;font-size:9px;line-height:1.55}
 .future-role-note strong{color:#41567f}
+
+
+/* =====================================================
+   WEB FINALIZATION - PERSONAL SYLLABUS FALLBACK
+===================================================== */
+.personal-syllabus-box{
+  margin:0 0 18px;
+  padding:14px;
+  border:1px solid #dfe7f4;
+  border-radius:14px;
+  background:linear-gradient(145deg,#f8fbff,#eef4fb);
+}
+.personal-syllabus-box p{
+  margin:0 0 11px;
+  color:#7383a6;
+  font-size:9.5px;
+  line-height:1.55;
+}
+.personal-syllabus-form{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:9px;
+  align-items:center;
+}
+.personal-syllabus-form select{
+  width:100%;
+  min-height:40px;
+  border:1px solid #d9e2f2;
+  border-radius:11px;
+  background:#fff;
+  color:#35486f;
+  padding:0 11px;
+  font:inherit;
+  font-size:9.5px;
+  outline:none;
+}
+.personal-syllabus-hint{
+  display:block;
+  margin-top:8px;
+  color:#8794b1;
+  font-size:8.5px;
+  line-height:1.45;
+}
+.personal-syllabus-box .empty-agent a{
+  color:#5d6ff2;
+  font-weight:900;
+}
+@media(max-width:620px){
+  .personal-syllabus-form{grid-template-columns:1fr}
+}
