@@ -6206,7 +6206,7 @@ def api_mobile_dashboard():
 
     task_rows = conn.execute(
         """
-        SELECT t.id,t.title,t.study_at,t.duration,t.done,
+        SELECT t.id,t.title,t.study_at,t.duration,t.done,t.source,
                s.id AS subject_id,s.name AS subject_name
         FROM study_tasks t
         LEFT JOIN subjects s
