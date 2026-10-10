@@ -6285,7 +6285,8 @@ def api_mobile_subject_detail(subject_id):
 
     subject = conn.execute(
         """
-        SELECT id,name,code,description,credits,target_score,progress,shared_subject_id
+        SELECT id,name,code,description,credits,target_score,progress,shared_subject_id,
+               personal_syllabus_document_id
         FROM subjects
         WHERE id=? AND user_id=?
         """,
