@@ -127,6 +127,39 @@ export const api = {
       }),
     }),
 
+  quizzes: (subjectId = null) =>
+    request('/api/mobile/quizzes' + (subjectId ? `?subject_id=${subjectId}` : '')),
+
+  quizDetail: (id) => request(`/api/mobile/quizzes/${id}`),
+
+  createTask: (payload) =>
+    request('/api/mobile/tasks', { method: 'POST', body: JSON.stringify(payload) }),
+
+  updateTask: (id, payload) =>
+    request(`/api/mobile/tasks/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+
+  toggleTask: (id) =>
+    request(`/api/mobile/tasks/${id}/toggle`, { method: 'POST' }),
+
+  deleteTask: (id) =>
+    request(`/api/mobile/tasks/${id}`, { method: 'DELETE' }),
+
+  reminders: () => request('/api/mobile/reminders'),
+
+  createReminder: (payload) =>
+    request('/api/mobile/reminders', { method: 'POST', body: JSON.stringify(payload) }),
+
+  updateReminder: (id, payload) =>
+    request(`/api/mobile/reminders/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+
+  deleteReminder: (id) =>
+    request(`/api/mobile/reminders/${id}`, { method: 'DELETE' }),
+
+  profile: () => request('/api/mobile/profile'),
+
+  updateProfile: (payload) =>
+    request('/api/mobile/profile', { method: 'PUT', body: JSON.stringify(payload) }),
+
   studyPlan: () => request('/api/mobile/study-plan'),
 
   generateStudyPlan: (payload) =>
