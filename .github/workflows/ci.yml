@@ -567,6 +567,132 @@ jobs:
           ).status_code == 404
           print("Mobile Stage 1 CRUD and private document tests OK")
 
+          # Mobile Stage 2–4: planner, deadlines, quizzes, profile,
+          # registration, dashboard recommendations and access control.
+          task_at = (datetime.now() + timedelta(days=3)).replace(
+              hour=20, minute=0, second=0, microsecond=0
+          ).isoformat(timespec="minutes")
+          created = client_a.post(
+              "/api/mobile/tasks",
+              json={
+                  "subject_id": subject_a_id,
+                  "title": "Mobile tạo buổi học",
+                  "study_at": task_at,
+                  "duration": 45,
+                  "note": "mobile CRUD"
+              }
+          )
+          assert created.status_code == 201, created.get_data(as_text=True)
+          stage_task = created.get_json()["task"]["id"]
+          assert client_b.post(
+              f"/api/mobile/tasks/{stage_task}/toggle"
+          ).status_code == 404
+          assert client_b.delete(
+              f"/api/mobile/tasks/{stage_task}"
+          ).status_code == 404
+          assert client_a.put(
+              f"/api/mobile/tasks/{stage_task}",
+              json={
+                  "subject_id": subject_a_id, "title": "Đã chỉnh từ Mobile",
+                  "study_at": task_at, "duration": 60, "note": "edited"
+              }
+          ).status_code == 200
+          assert client_a.post(
+              f"/api/mobile/tasks/{stage_task}/toggle"
+          ).get_json()["done"] == 1
+          assert client_a.delete(
+              f"/api/mobile/tasks/{stage_task}"
+          ).status_code == 200
+
+          reminder_created = client_a.post(
+              "/api/mobile/reminders",
+              json={
+                  "subject_id": subject_a_id, "title": "CI mobile reminder",
+                  "due_at": task_at
+              }
+          )
+          assert reminder_created.status_code == 201
+          reminder_id = reminder_created.get_json()["reminder"]["id"]
+          assert client_b.delete(
+              f"/api/mobile/reminders/{reminder_id}"
+          ).status_code == 404
+          reminder_update = client_a.put(
+              f"/api/mobile/reminders/{reminder_id}",
+              json={
+                  "subject_id": subject_a_id,
+                  "title": "CI deadline updated", "due_at": task_at, "done": True
+              }
+          )
+          assert reminder_update.status_code == 200
+          assert reminder_update.get_json()["reminder"]["done"] == 1
+          assert client_a.delete(
+              f"/api/mobile/reminders/{reminder_id}"
+          ).status_code == 200
+
+          quizzes = client_a.get("/api/mobile/quizzes").get_json()["quizzes"]
+          assert any(q["id"] == quiz_a_id and q["attempt_count"] == 2 for q in quizzes)
+          assert not any(
+              q["id"] == quiz_a_id
+              for q in client_b.get("/api/mobile/quizzes").get_json()["quizzes"]
+          )
+          assert client_b.get(
+              f"/api/mobile/quizzes/{quiz_a_id}"
+          ).status_code == 404
+          quiz_details = client_a.get(
+              f"/api/mobile/quizzes/{quiz_a_id}"
+          ).get_json()
+          assert len(quiz_details["attempts"]) == 2
+          assert len(quiz_details["questions"]) == 1
+
+          assert client_a.put(
+              "/api/mobile/profile",
+              json={
+                  "learning_style": "visual",
+                  "preferred_study_time": "20:15",
+                  "daily_minutes": 60,
+                  "goals": "CI mobile learning goals",
+                  "notes": "A only"
+              }
+          ).status_code == 200
+          assert client_a.get(
+              "/api/mobile/profile"
+          ).get_json()["profile"]["goals"] == "CI mobile learning goals"
+          assert client_b.get(
+              "/api/mobile/profile"
+          ).get_json()["profile"]["goals"] != "CI mobile learning goals"
+          assert client_a.put(
+              "/api/mobile/profile",
+              json={"preferred_study_time": "99:99"}
+          ).status_code == 400
+
+          dashboard_a = client_a.get("/api/mobile/dashboard")
+          assert dashboard_a.status_code == 200
+          assert "next_best_action" in dashboard_a.get_json()
+          assert dashboard_a.get_json()["stats"]["quiz_attempt_count"] >= 2
+
+          fresh_client = project.app.test_client()
+          fresh_registration = fresh_client.post(
+              "/api/mobile/register",
+              json={
+                  "name": "CI New Mobile User",
+                  "email": "ci-new-mobile@study.local",
+                  "password": "test-pass-123"
+              }
+          )
+          assert fresh_registration.status_code == 201
+          assert fresh_client.get(
+              "/api/mobile/subjects"
+          ).get_json() == []
+          assert client_b.post(
+              "/api/mobile/register",
+              json={
+                  "name": "Duplicate", "email": "ci-new-mobile@study.local",
+                  "password": "123456"
+              }
+          ).status_code == 409
+
+          print("Mobile Stages 2–4 business flows and account isolation OK")
+
           print("Core web smoke OK:", ", ".join(paths))
           print("Business flow checks OK: syllabus fallback, deadline replace")
           print("Phase 5 checks OK: 2-user isolation, Web/Mobile sync, adaptive loop")
