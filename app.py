@@ -7160,6 +7160,258 @@ def api_mobile_study_plan():
     })
 
 
+
+# =====================================================
+# MOBILE FEATURE PARITY — PLANNER, QUIZZES, PERSONAL PROFILE
+# =====================================================
+@app.route("/api/mobile/tasks", methods=["POST"])
+@app.route("/api/mobile/tasks/<int:task_id>", methods=["PUT", "DELETE"])
+def api_mobile_tasks(task_id=None):
+    uid, error = _mobile_require_user()
+    if error:
+        return error
+    conn = db()
+    old = None
+    if task_id is not None:
+        old = conn.execute(
+            "SELECT * FROM study_tasks WHERE id=? AND user_id=?",
+            (task_id, uid)
+        ).fetchone()
+        if not old:
+            conn.close()
+            return jsonify({"error": "Không tìm thấy buổi học."}), 404
+    if request.method == "DELETE":
+        conn.execute(
+            "DELETE FROM study_tasks WHERE id=? AND user_id=?", (task_id, uid)
+        )
+        if old["subject_id"]:
+            recalculate_subject_progress(uid, old["subject_id"], conn)
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True})
+
+    payload = request.get_json(silent=True) or {}
+    subject_value = payload.get("subject_id")
+    subject_id = owned_subject_id(conn, uid, subject_value) if subject_value else None
+    if subject_value and not subject_id:
+        conn.close()
+        return jsonify({"error": "Môn học không hợp lệ."}), 400
+    title = str(payload.get("title") or "").strip()[:240]
+    study_at = str(payload.get("study_at") or "").strip()
+    note = str(payload.get("note") or "").strip()[:1500]
+    duration = _safe_int(payload.get("duration"), 45, 15, 240)
+    try:
+        parsed = datetime.fromisoformat(study_at)
+    except (ValueError, TypeError):
+        parsed = None
+    if not title or not parsed:
+        conn.close()
+        return jsonify({"error": "Cần tên nhiệm vụ và thời gian hợp lệ (YYYY-MM-DDTHH:MM)."}), 400
+
+    if old:
+        conn.execute(
+            """UPDATE study_tasks SET title=?,subject_id=?,study_at=?,duration=?,note=?
+               WHERE id=? AND user_id=?""",
+            (title, subject_id, study_at, duration, note, task_id, uid)
+        )
+        if old["subject_id"]:
+            recalculate_subject_progress(uid, old["subject_id"], conn)
+    else:
+        task_id = conn.execute(
+            """INSERT INTO study_tasks(
+                 user_id,subject_id,title,study_at,duration,note,done,source,created_at
+               ) VALUES(?,?,?,?,?,?,?,?,?)""",
+            (uid, subject_id, title, study_at, duration, note, 0, "manual", now())
+        ).lastrowid
+    if subject_id:
+        recalculate_subject_progress(uid, subject_id, conn)
+    conn.commit()
+    row = conn.execute(
+        "SELECT * FROM study_tasks WHERE id=? AND user_id=?", (task_id, uid)
+    ).fetchone()
+    conn.close()
+    return jsonify({"task": dict(row)}), 200 if old else 201
+
+
+@app.route("/api/mobile/tasks/<int:task_id>/toggle", methods=["POST"])
+def api_mobile_toggle_task(task_id):
+    uid, error = _mobile_require_user()
+    if error:
+        return error
+    conn = db()
+    row = conn.execute(
+        "SELECT * FROM study_tasks WHERE id=? AND user_id=?", (task_id, uid)
+    ).fetchone()
+    if not row:
+        conn.close()
+        return jsonify({"error": "Không tìm thấy buổi học."}), 404
+    done = 0 if row["done"] else 1
+    conn.execute(
+        "UPDATE study_tasks SET done=?, completed_at=? WHERE id=? AND user_id=?",
+        (done, now() if done else "", task_id, uid)
+    )
+    if row["subject_id"]:
+        recalculate_subject_progress(uid, row["subject_id"], conn)
+    conn.commit()
+    conn.close()
+    return jsonify({"success": True, "done": done})
+
+
+@app.route("/api/mobile/reminders", methods=["GET", "POST"])
+@app.route("/api/mobile/reminders/<int:reminder_id>", methods=["PUT", "DELETE"])
+def api_mobile_reminders(reminder_id=None):
+    uid, error = _mobile_require_user()
+    if error:
+        return error
+    conn = db()
+    if request.method == "GET":
+        rows = conn.execute(
+            """SELECT r.*, s.name AS subject_name FROM reminders r
+               LEFT JOIN subjects s ON s.id=r.subject_id AND s.user_id=r.user_id
+               WHERE r.user_id=? ORDER BY r.done ASC,r.due_at ASC""",
+            (uid,)
+        ).fetchall()
+        conn.close()
+        return jsonify({"reminders": [dict(row) for row in rows]})
+    existing = None
+    if reminder_id is not None:
+        existing = conn.execute(
+            "SELECT * FROM reminders WHERE id=? AND user_id=?",
+            (reminder_id, uid)
+        ).fetchone()
+        if not existing:
+            conn.close()
+            return jsonify({"error": "Không tìm thấy deadline."}), 404
+    if request.method == "DELETE":
+        conn.execute(
+            "DELETE FROM reminders WHERE id=? AND user_id=?", (reminder_id, uid)
+        )
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True})
+
+    payload = request.get_json(silent=True) or {}
+    title = str(payload.get("title") or "").strip()[:240]
+    due_at = str(payload.get("due_at") or "").strip()
+    subject_value = payload.get("subject_id")
+    subject_id = owned_subject_id(conn, uid, subject_value) if subject_value else None
+    if subject_value and not subject_id:
+        conn.close()
+        return jsonify({"error": "Môn học không hợp lệ."}), 400
+    if not title:
+        conn.close()
+        return jsonify({"error": "Vui lòng nhập tiêu đề."}), 400
+    try:
+        datetime.fromisoformat(due_at)
+    except (ValueError, TypeError):
+        conn.close()
+        return jsonify({"error": "Thời hạn không hợp lệ."}), 400
+    done = 1 if payload.get("done") else 0
+    if existing:
+        conn.execute(
+            """UPDATE reminders SET title=?,due_at=?,subject_id=?,done=?
+               WHERE id=? AND user_id=?""",
+            (title, due_at, subject_id, done, reminder_id, uid)
+        )
+    else:
+        reminder_id = conn.execute(
+            """INSERT INTO reminders(user_id,subject_id,title,due_at,done,created_at)
+               VALUES(?,?,?,?,?,?)""",
+            (uid, subject_id, title, due_at, done, now())
+        ).lastrowid
+    conn.commit()
+    row = conn.execute(
+        "SELECT * FROM reminders WHERE id=? AND user_id=?", (reminder_id, uid)
+    ).fetchone()
+    conn.close()
+    return jsonify({"reminder": dict(row)}), 200 if existing else 201
+
+
+@app.route("/api/mobile/quizzes", methods=["GET"])
+def api_mobile_quizzes():
+    uid, error = _mobile_require_user()
+    if error:
+        return error
+    conn = db()
+    subject_id = request.args.get("subject_id", type=int)
+    if subject_id and not owned_subject_id(conn, uid, subject_id):
+        conn.close()
+        return jsonify({"error": "Không tìm thấy môn học."}), 404
+    rows = conn.execute(
+        """SELECT q.id,q.subject_id,q.document_id,q.title,q.created_at,
+                  s.name AS subject_name,COUNT(qa.id) AS attempt_count,
+                  MAX(qa.score) AS best_score
+           FROM quizzes q
+           LEFT JOIN quiz_attempts qa ON qa.quiz_id=q.id AND qa.user_id=q.user_id
+           LEFT JOIN subjects s ON s.id=q.subject_id AND s.user_id=q.user_id
+           WHERE q.user_id=? AND (? IS NULL OR q.subject_id=?)
+           GROUP BY q.id ORDER BY q.id DESC LIMIT 100""",
+        (uid, subject_id, subject_id)
+    ).fetchall()
+    conn.close()
+    return jsonify({"quizzes": [dict(row) for row in rows]})
+
+
+@app.route("/api/mobile/quizzes/<int:quiz_id>", methods=["GET"])
+def api_mobile_quiz_detail(quiz_id):
+    uid, error = _mobile_require_user()
+    if error:
+        return error
+    conn = db()
+    quiz = conn.execute(
+        "SELECT * FROM quizzes WHERE id=? AND user_id=?", (quiz_id, uid)
+    ).fetchone()
+    if not quiz:
+        conn.close()
+        return jsonify({"error": "Không tìm thấy Quiz."}), 404
+    attempts = conn.execute(
+        """SELECT id,score,correct_count,total_questions,answers_json,created_at
+           FROM quiz_attempts WHERE quiz_id=? AND user_id=?
+           ORDER BY id DESC LIMIT 20""",
+        (quiz_id, uid)
+    ).fetchall()
+    conn.close()
+    return jsonify({
+        "quiz_id": quiz_id,
+        "subject_id": quiz["subject_id"],
+        "title": quiz["title"],
+        "questions": json.loads(quiz["payload"] or "[]"),
+        "attempts": [dict(row) for row in attempts]
+    })
+
+
+@app.route("/api/mobile/profile", methods=["GET", "PUT"])
+def api_mobile_profile():
+    uid, error = _mobile_require_user()
+    if error:
+        return error
+    conn = db()
+    profile = ensure_learning_profile(conn, uid)
+    if request.method == "GET":
+        conn.close()
+        return jsonify({"profile": dict(profile)})
+    payload = request.get_json(silent=True) or {}
+    learning_style = str(payload.get("learning_style", profile["learning_style"] or "balanced")).strip()[:40] or "balanced"
+    preferred_time = str(payload.get("preferred_study_time", profile["preferred_study_time"] or "19:00")).strip()
+    if not re.fullmatch(r"(?:[01]\\d|2[0-3]):[0-5]\\d", preferred_time):
+        conn.close()
+        return jsonify({"error": "Giờ học cần có dạng HH:MM."}), 400
+    daily_minutes = _safe_int(payload.get("daily_minutes"), 45, 15, 240)
+    goals = str(payload.get("goals", profile["goals"] or "")).strip()[:1200]
+    notes = str(payload.get("notes", profile["notes"] or "")).strip()[:1200]
+    conn.execute(
+        """UPDATE learning_profiles SET learning_style=?,preferred_study_time=?,
+                  daily_minutes=?,goals=?,notes=?,updated_at=? WHERE user_id=?""",
+        (learning_style, preferred_time, daily_minutes, goals, notes, now(), uid)
+    )
+    conn.commit()
+    updated = conn.execute(
+        "SELECT * FROM learning_profiles WHERE user_id=?", (uid,)
+    ).fetchone()
+    conn.close()
+    return jsonify({"profile": dict(updated)})
+
+
 @app.route("/uploads/<path:filename>")
 @login_required
 def uploaded_file(filename):
