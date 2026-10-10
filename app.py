@@ -1962,7 +1962,7 @@ def gemini_generate(prompt):
 
     Thứ tự mặc định:
     1) GEMINI_MODEL (mặc định gemini-3.8-flash)
-    2) GEMINI_FALLBACK_MODELS (mặc định 3.7 Flash, 3.5 Flash-Lite)
+    2) GEMINI_FALLBACK_MODELS (mặc định 3.6 Flash, 3.5 Flash-Lite)
 
     Chỉ retry các lỗi tạm thời: 408, 429 và 5xx.
     """
@@ -1981,7 +1981,7 @@ def gemini_generate(prompt):
 
     fallback_raw = os.getenv(
         "GEMINI_FALLBACK_MODELS",
-        "gemini-3.7-flash,gemini-3.5-flash-lite"
+        "gemini-3.6-flash,gemini-3.5-flash-lite"
     )
 
     models = [primary_model]
