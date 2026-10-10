@@ -232,11 +232,21 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       if (answered < questions.length) {
-        const wantSubmit = confirm(
-          `Bạn mới làm ${answered}/${questions.length} câu. Bạn vẫn muốn nộp bài?`
-        );
+        resultBox?.classList.add("show");
+        if (resultTitle) resultTitle.textContent = "Chưa thể nộp bài";
+        if (resultText) {
+          resultText.textContent =
+            `Bạn mới trả lời ${answered}/${questions.length} câu. Hãy hoàn thành tất cả câu hỏi để kết quả Adaptive Learning chính xác.`;
+        }
 
-        if (!wantSubmit) return;
+        const firstUnanswered = Array.from(questions).find(
+          question => !question.querySelector('input[type="radio"]:checked')
+        );
+        firstUnanswered?.scrollIntoView({
+          behavior: "smooth",
+          block: "center"
+        });
+        return;
       }
 
       const oldSubmitText = submitBtn.textContent;
