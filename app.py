@@ -6156,6 +6156,34 @@ def api_mobile_login():
     })
 
 
+@app.route("/api/mobile/register", methods=["POST"])
+def api_mobile_register():
+    payload = request.get_json(silent=True) or {}
+    name = str(payload.get("name") or "").strip()[:120]
+    email = str(payload.get("email") or "").strip().lower()[:240]
+    password = str(payload.get("password") or "")
+    if not name or not email or "@" not in email or len(password) < 6:
+        return jsonify({"error": "Cần tên, email và mật khẩu ít nhất 6 ký tự."}), 400
+    conn = db()
+    try:
+        cursor = conn.execute(
+            "INSERT INTO users(name,email,password_hash,created_at) VALUES(?,?,?,?)",
+            (name, email, generate_password_hash(password), now())
+        )
+        uid = cursor.lastrowid
+        conn.commit()
+        ensure_learning_profile(conn, uid)
+        conn.commit()
+        session["user_id"] = uid
+        session["user_name"] = name
+        return jsonify({"success": True, "user": {"id": uid, "name": name, "email": email}}), 201
+    except sqlite3.IntegrityError:
+        conn.rollback()
+        return jsonify({"error": "Email này đã được đăng ký."}), 409
+    finally:
+        conn.close()
+
+
 @app.route("/api/mobile/logout", methods=["POST"])
 def api_mobile_logout():
     session.clear()
@@ -6219,12 +6247,25 @@ def api_mobile_dashboard():
     ).fetchall()
 
     profile = ensure_learning_profile(conn, uid)
+    next_best_action = get_next_best_action(conn, uid)
+    stats = {
+        "subject_count": len(subjects),
+        "task_count": len(task_rows),
+        "quiz_attempt_count": conn.execute(
+            "SELECT COUNT(*) AS c FROM quiz_attempts WHERE user_id=?", (uid,)
+        ).fetchone()["c"],
+        "document_count": conn.execute(
+            "SELECT COUNT(*) AS c FROM documents WHERE user_id=?", (uid,)
+        ).fetchone()["c"],
+    }
     conn.close()
 
     return jsonify({
         "user": dict(user) if user else {},
         "subjects": subjects,
         "tasks": [dict(row) for row in task_rows],
+        "next_best_action": next_best_action,
+        "stats": stats,
         "profile": {
             "learning_style": profile["learning_style"],
             "preferred_study_time": profile["preferred_study_time"],
