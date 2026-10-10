@@ -1,6 +1,13 @@
-// Android Emulator truy cập Flask trên máy Windows qua 10.0.2.2.
-// Khi deploy backend thật, đổi URL này thành domain HTTPS của server.
-export const API_BASE_URL = 'http://10.0.2.2:5000';
+// Android Emulator có thể dùng mặc định 10.0.2.2.
+// iPhone/Expo Go cần EXPO_PUBLIC_API_URL trỏ tới IP LAN của máy chạy Flask,
+// ví dụ http://192.168.1.15:5000.
+const configuredBaseUrl = String(
+  process.env.EXPO_PUBLIC_API_URL || ''
+).trim();
+
+export const API_BASE_URL = (
+  configuredBaseUrl || 'http://10.0.2.2:5000'
+).replace(/\/$/, '');
 
 async function request(path, options = {}) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -52,6 +59,9 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ subject_id: subjectId, message }),
     }),
+
+  chatHistory: (subjectId) =>
+    request(`/api/mobile/chat/${subjectId}`),
 
   quizGenerate: (subjectId, count = 10, mode = 'subject') =>
     request('/api/mobile/quiz/generate', {
