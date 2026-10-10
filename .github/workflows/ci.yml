@@ -31,3 +31,47 @@ jobs:
           node --check static/js/mockup.js
           node --check static/js/study_plan.js
           node --check static/js/chat.js
+
+      - name: Smoke test core web pages
+        run: |
+          python - <<'PY'
+          import app as project
+
+          project.init_db()
+
+          conn = project.db()
+          user = conn.execute(
+              "SELECT id,name FROM users WHERE email=?",
+              ("demo@study.local",)
+          ).fetchone()
+          subject = conn.execute(
+              "SELECT id FROM subjects WHERE user_id=? ORDER BY id LIMIT 1",
+              (user["id"],)
+          ).fetchone()
+          conn.close()
+
+          client = project.app.test_client()
+
+          with client.session_transaction() as sess:
+              sess["user_id"] = user["id"]
+              sess["user_name"] = user["name"]
+
+          paths = [
+              "/dashboard",
+              "/subjects",
+              "/documents",
+              "/quiz",
+              "/study-plan",
+              "/chat",
+          ]
+          if subject:
+              paths.append(f"/subjects/{subject['id']}")
+
+          for path in paths:
+              response = client.get(path)
+              assert response.status_code == 200, (
+                  f"{path} returned {response.status_code}"
+              )
+
+          print("Core web smoke OK:", ", ".join(paths))
+          PY
