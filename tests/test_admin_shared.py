@@ -139,6 +139,135 @@ def verify_common_library():
     assert conn.execute("SELECT role FROM users WHERE email='alice-ci@study.local'").fetchone()[0] == "student"
     conn.close()
 
+    # Edit permissions and duplicate course-key safety.
+    assert admin.get("/admin").status_code == 200
+    html = admin.get("/admin").get_data(as_text=True)
+    assert f"/admin/subjects/{shared_id}/edit" in html
+    assert f"/admin/subjects/{shared_id}/delete" in html
+    assert "data-edit-subject" in html
+    assert alice.post(f"/admin/subjects/{shared_id}/edit", data={
+        "csrf_token": token, "code": "HACKED", "name": "No",
+    }).status_code == 403
+    assert alice.post(f"/admin/subjects/{shared_id}/delete", data={
+        "csrf_token": token, "confirm_code": "CLOUD101",
+    }).status_code == 403
+    assert anonymous.post(f"/admin/subjects/{shared_id}/delete", data={
+        "csrf_token": token, "confirm_code": "CLOUD101",
+    }).status_code in (302, 303)
+    assert admin.post(f"/admin/subjects/{shared_id}/edit", data={
+        "code": "CLOUD202", "name": "Đám mây 2",
+    }).status_code == 400
+    assert admin.post(f"/admin/subjects/{shared_id}/delete", data={
+        "confirm_code": "CLOUD101",
+    }).status_code == 400
+    # The unrelated student course has already created a distinct shared stub.
+    collision = admin.post(f"/admin/subjects/{shared_id}/edit", data={
+        "csrf_token": token, "code": "UNRELATED222", "name": "Tên trùng",
+    }, follow_redirects=True)
+    assert "Mã môn này đã được dùng" in collision.get_data(as_text=True)
+    conn = project.db()
+    assert conn.execute(
+        "SELECT code FROM shared_subjects WHERE id=?", (shared_id,)
+    ).fetchone()["code"] == "CLOUD101"
+    # Insert a private student document and Quiz to prove they survive deleting
+    # a shared subject, even when that shared catalog is linked to the course.
+    alice_id = conn.execute(
+        "SELECT user_id FROM subjects WHERE id=?", (alice_sub,)
+    ).fetchone()["user_id"]
+    personal_file = project.UPLOAD_DIR / "alice_personal.txt"
+    personal_file.write_text("Tài liệu cá nhân của Alice", encoding="utf-8")
+    conn.execute(
+        """INSERT INTO documents (
+          user_id,subject_id,original_name,stored_name,extracted_text,created_at
+        ) VALUES(?,?,?,?,?,?)""",
+        (alice_id, alice_sub, "alice_personal.txt", "alice_personal.txt",
+         "Tài liệu cá nhân của Alice", project.now())
+    )
+    conn.commit()
+    conn.close()
+
+    renamed = admin.post(f"/admin/subjects/{shared_id}/edit", data={
+        "csrf_token": token, "code": "CLOUD202", "name": "Điện toán đám mây nâng cao",
+        "description": "Môn nâng cao sau khi sửa mã",
+    })
+    assert renamed.status_code in (302, 303)
+    conn = project.db()
+    row = conn.execute(
+        "SELECT code,name,subject_key FROM shared_subjects WHERE id=?", (shared_id,)
+    ).fetchone()
+    assert row["code"] == "CLOUD202"
+    assert row["name"] == "Điện toán đám mây nâng cao"
+    assert row["subject_key"] == "code:cloud202"
+    assert conn.execute(
+        "SELECT shared_subject_id FROM subjects WHERE id=?", (alice_sub,)
+    ).fetchone()["shared_subject_id"] is None
+    assert conn.execute(
+        "SELECT COUNT(*) FROM documents WHERE user_id=? AND subject_id=?",
+        (alice_id, alice_sub)
+    ).fetchone()[0] == 1
+    conn.close()
+
+    # Upload into the renamed catalog. Old-code courses no longer see it.
+    upload2 = admin.post("/admin/documents", data={
+        "csrf_token": token, "shared_subject_id": str(shared_id),
+        "file": (BytesIO("Bài giảng chung mã mới CLOUD202".encode("utf-8")),
+                 "bai_giang_moi.txt"),
+    }, content_type="multipart/form-data")
+    assert upload2.status_code in (302, 303)
+    conn = project.db()
+    file2 = conn.execute(
+        "SELECT id,stored_name FROM shared_documents WHERE shared_subject_id=?",
+        (shared_id,)
+    ).fetchone()
+    assert file2
+    doc2_id, doc2_stored = file2["id"], file2["stored_name"]
+    conn.close()
+    assert "bai_giang_moi.txt" not in alice.get("/documents").get_data(as_text=True)
+    assert "bai_giang_moi.txt" not in bob.get("/documents").get_data(as_text=True)
+    assert alice.get(f"/shared-documents/{doc2_id}/file").status_code == 403
+    new_subject = register(project.app.test_client(), "unused-ci@study.local", "CLOUD202")
+    # The student with new code receives new materials automatically.
+    new_client = project.app.test_client()
+    login = new_client.post("/login", data={
+        "email": "unused-ci@study.local", "password": "123456789",
+    })
+    assert login.status_code in (302, 303)
+    assert "bai_giang_moi.txt" in new_client.get("/documents").get_data(as_text=True)
+    assert new_client.get(f"/shared-documents/{doc2_id}/file").status_code == 200
+
+    # Deleting shared catalog invalidates shared file access, not personal files.
+    bad_confirm = admin.post(f"/admin/subjects/{shared_id}/delete", data={
+        "csrf_token": token, "confirm_code": "WRONG",
+    })
+    assert bad_confirm.status_code == 400
+    deleted_course = admin.post(f"/admin/subjects/{shared_id}/delete", data={
+        "csrf_token": token, "confirm_code": "CLOUD202",
+    })
+    assert deleted_course.status_code in (302, 303)
+    conn = project.db()
+    assert conn.execute(
+        "SELECT COUNT(*) FROM shared_subjects WHERE id=?", (shared_id,)
+    ).fetchone()[0] == 0
+    assert conn.execute(
+        "SELECT COUNT(*) FROM shared_documents WHERE shared_subject_id=?", (shared_id,)
+    ).fetchone()[0] == 0
+    assert conn.execute(
+        "SELECT COUNT(*) FROM shared_knowledge WHERE shared_subject_id=?", (shared_id,)
+    ).fetchone()[0] == 0
+    assert conn.execute(
+        "SELECT COUNT(*) FROM subjects WHERE id IN (?,?,?)",
+        (alice_sub, bob_sub, new_subject)
+    ).fetchone()[0] == 3
+    assert conn.execute(
+        "SELECT COUNT(*) FROM documents WHERE user_id=? AND subject_id=?",
+        (alice_id, alice_sub)
+    ).fetchone()[0] == 1
+    conn.close()
+    assert personal_file.exists()
+    assert not (project.UPLOAD_DIR / doc2_stored).exists()
+    assert new_client.get(f"/shared-documents/{doc2_id}/file").status_code == 404
+    assert "bai_giang_moi.txt" not in new_client.get("/documents").get_data(as_text=True)
+
 
 if __name__ == "__main__":
     old_db, old_upload = project.DB_PATH, project.UPLOAD_DIR
