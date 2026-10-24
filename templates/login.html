@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/polish.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/mockup.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/auth-password.css') }}">
 </head>
 <body class="auth-page mock-auth-page">
   <div class="auth-shell-new">
@@ -45,7 +46,14 @@
           {% if error %}<div class="message error-message"><strong>Đăng nhập thất bại</strong><span>{{ error }}</span></div>{% endif %}
           <form method="post" action="{{ url_for('login') }}" class="auth-form-new">
             <label><span>Email</span><div><i>✉</i><input type="email" id="loginEmail" name="email" placeholder="Nhập email của bạn" autocomplete="email" required></div></label>
-            <label><span>Mật khẩu</span><div><i>♙</i><input type="password" id="loginPassword" name="password" placeholder="Nhập mật khẩu" autocomplete="current-password" required><button type="button" class="password-toggle" data-target="loginPassword">◉</button></div></label>
+            <div class="auth-password-group">
+              <label for="loginPassword">Mật khẩu</label>
+              <div class="auth-password-field">
+                <i aria-hidden="true">♙</i>
+                <input type="password" id="loginPassword" name="password" placeholder="Nhập mật khẩu" autocomplete="current-password" required>
+                <button type="button" class="password-toggle" data-target="loginPassword" aria-controls="loginPassword" aria-label="Hiện mật khẩu" title="Hiện mật khẩu" aria-pressed="false"><svg class="eye-icon eye-icon-show" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.1 12a10.5 10.5 0 0 1 19.8 0 10.5 10.5 0 0 1-19.8 0Z"/><circle cx="12" cy="12" r="3"/></svg><svg class="eye-icon eye-icon-hide" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 3 18 18"/><path d="M10.6 5.3a10.4 10.4 0 0 1 11.3 6.7 10.5 10.5 0 0 1-4 5"/><path d="M6.5 6.5a10.4 10.4 0 0 0-4.4 5.5 10.5 10.5 0 0 0 14.2 5.8"/><path d="M10.6 10.6a3 3 0 0 0 3.8 3.8"/></svg></button>
+              </div>
+            </div>
             <button class="auth-submit" type="submit">→ &nbsp; Đăng nhập</button>
           </form>
           <div class="auth-bottom-switch">Chưa có tài khoản? <button type="button" data-auth-tab="signup">Tạo tài khoản ngay →</button></div>
@@ -57,8 +65,22 @@
           <form method="post" action="{{ url_for('register') }}" class="auth-form-new">
             <label><span>Họ và tên</span><div><i>♙</i><input type="text" name="name" placeholder="Nhập họ và tên" autocomplete="name" required></div></label>
             <label><span>Email</span><div><i>✉</i><input type="email" name="email" placeholder="Nhập email của bạn" autocomplete="email" required></div></label>
-            <label><span>Mật khẩu</span><div><i>♙</i><input type="password" id="signupPassword" name="password" minlength="6" placeholder="Tối thiểu 6 ký tự" autocomplete="new-password" required><button type="button" class="password-toggle" data-target="signupPassword">◉</button></div></label>
-            <label><span>Xác nhận mật khẩu</span><div><i>✓</i><input type="password" id="confirmPassword" name="confirm_password" placeholder="Nhập lại mật khẩu" autocomplete="new-password" required><button type="button" class="password-toggle" data-target="confirmPassword">◉</button></div></label>
+            <div class="auth-password-group">
+              <label for="signupPassword">Mật khẩu</label>
+              <div class="auth-password-field">
+                <i aria-hidden="true">♙</i>
+                <input type="password" id="signupPassword" name="password" minlength="6" placeholder="Tối thiểu 6 ký tự" autocomplete="new-password" required>
+                <button type="button" class="password-toggle" data-target="signupPassword" aria-controls="signupPassword" aria-label="Hiện mật khẩu" title="Hiện mật khẩu" aria-pressed="false"><svg class="eye-icon eye-icon-show" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.1 12a10.5 10.5 0 0 1 19.8 0 10.5 10.5 0 0 1-19.8 0Z"/><circle cx="12" cy="12" r="3"/></svg><svg class="eye-icon eye-icon-hide" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 3 18 18"/><path d="M10.6 5.3a10.4 10.4 0 0 1 11.3 6.7 10.5 10.5 0 0 1-4 5"/><path d="M6.5 6.5a10.4 10.4 0 0 0-4.4 5.5 10.5 10.5 0 0 0 14.2 5.8"/><path d="M10.6 10.6a3 3 0 0 0 3.8 3.8"/></svg></button>
+              </div>
+            </div>
+            <div class="auth-password-group">
+              <label for="confirmPassword">Xác nhận mật khẩu</label>
+              <div class="auth-password-field">
+                <i aria-hidden="true">✓</i>
+                <input type="password" id="confirmPassword" name="confirm_password" placeholder="Nhập lại mật khẩu" autocomplete="new-password" required>
+                <button type="button" class="password-toggle" data-target="confirmPassword" aria-controls="confirmPassword" aria-label="Hiện xác nhận mật khẩu" title="Hiện xác nhận mật khẩu" aria-pressed="false"><svg class="eye-icon eye-icon-show" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.1 12a10.5 10.5 0 0 1 19.8 0 10.5 10.5 0 0 1-19.8 0Z"/><circle cx="12" cy="12" r="3"/></svg><svg class="eye-icon eye-icon-hide" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 3 18 18"/><path d="M10.6 5.3a10.4 10.4 0 0 1 11.3 6.7 10.5 10.5 0 0 1-4 5"/><path d="M6.5 6.5a10.4 10.4 0 0 0-4.4 5.5 10.5 10.5 0 0 0 14.2 5.8"/><path d="M10.6 10.6a3 3 0 0 0 3.8 3.8"/></svg></button>
+              </div>
+            </div>
             <p class="terms-line">Tài khoản được dùng để tách dữ liệu học tập cá nhân trong hệ thống.</p>
             <button class="auth-submit" type="submit">→ &nbsp; Tạo tài khoản</button>
           </form>
@@ -75,10 +97,9 @@ document.addEventListener("DOMContentLoaded", function(){
     document.querySelectorAll("[data-auth-tab]").forEach(function(b){b.classList.toggle("active", b.dataset.authTab===name);});
   }
   document.querySelectorAll("[data-auth-tab]").forEach(function(b){b.addEventListener("click",function(){setPane(b.dataset.authTab);});});
-  document.querySelectorAll(".password-toggle").forEach(function(button){
-    button.addEventListener("click",function(){var input=document.getElementById(button.dataset.target); if(!input)return; input.type=input.type==="password"?"text":"password";});
-  });
+
 });
 </script>
+<script src="{{ url_for('static', filename='js/auth-password.js') }}"></script>
 </body>
 </html>
