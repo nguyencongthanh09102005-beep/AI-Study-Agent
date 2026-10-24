@@ -4297,6 +4297,24 @@ def delete_subject(subject_id):
 @app.route("/admin")
 @admin_required
 def admin_dashboard():
+    # Keep the original Admin entry point for the subjects page.
+    if request.args.get("view") == "documents":
+        return redirect(url_for(
+            "admin_shared_documents",
+            error=request.args.get("error", ""),
+            notice=request.args.get("notice", "")
+        ))
+    return _render_admin_page("subjects")
+
+
+@app.route("/admin/documents", methods=["GET"])
+@admin_required
+def admin_shared_documents():
+    return _render_admin_page("documents")
+
+
+def _render_admin_page(admin_view):
+    # Both pages share the current Admin layout but render different sections.
     conn = db()
     subjects = conn.execute(
         """SELECT ss.*, COUNT(sd.id) AS document_count
@@ -4316,9 +4334,9 @@ def admin_dashboard():
     notice = request.args.get("notice", "").strip()[:250]
     return render_template(
         "admin.html", subjects=subjects, documents=documents, student_count=count,
-        page="admin", csrf_token=admin_form_token(), error=error,
-        notice=notice, upload_max_mb=MAX_UPLOAD_MB,
-        view=request.args.get("view", "subjects")
+        page="admin", admin_view=admin_view,
+        csrf_token=admin_form_token(), error=error,
+        notice=notice, upload_max_mb=MAX_UPLOAD_MB
     )
 
 
@@ -4474,13 +4492,13 @@ def admin_add_document():
     upload = request.files.get("file")
     if not subject_id or not upload or not upload.filename or not allowed_file(upload.filename):
         return redirect(url_for(
-            "admin_dashboard", view="documents", error="Chọn môn và tệp PDF, TXT hoặc MD hợp lệ."
+            "admin_shared_documents", error="Chọn môn và tệp PDF, TXT hoặc MD hợp lệ."
         ))
     original = os.path.basename(upload.filename.replace("\\", "/")).strip()[:180]
     safe = secure_filename(original)
     if not safe:
         return redirect(url_for(
-            "admin_dashboard", view="documents", error="Tên tệp không hợp lệ."
+            "admin_shared_documents", error="Tên tệp không hợp lệ."
         ))
     conn = db()
     shared_subject = conn.execute(
@@ -4489,7 +4507,7 @@ def admin_add_document():
     if not shared_subject:
         conn.close()
         return redirect(url_for(
-            "admin_dashboard", view="documents", error="Môn học dùng chung không tồn tại."
+            "admin_shared_documents", error="Môn học dùng chung không tồn tại."
         ))
     stored = "shared_" + secrets.token_hex(12) + "_" + safe
     target = UPLOAD_DIR / stored
@@ -4501,7 +4519,7 @@ def admin_add_document():
             target.unlink(missing_ok=True)
             conn.close()
             return redirect(url_for(
-                "admin_dashboard", view="documents",
+                "admin_shared_documents",
                 error="Tệp không trích xuất được chữ. PDF scan ảnh cần OCR trước khi tải."
             ))
         timestamp = now()
@@ -4549,7 +4567,7 @@ def admin_add_document():
         except Exception:
             pass
     return redirect(url_for(
-        "admin_dashboard", view="documents",
+        "admin_shared_documents",
         notice="Đã lưu và trích xuất nội dung tài liệu dùng chung."
     ))
 
@@ -4579,7 +4597,7 @@ def admin_delete_document(doc_id):
     conn.close()
     (UPLOAD_DIR / doc["stored_name"]).unlink(missing_ok=True)
     return redirect(url_for(
-        "admin_dashboard", view="documents", notice="Đã xóa tài liệu dùng chung."
+        "admin_shared_documents", notice="Đã xóa tài liệu dùng chung."
     ))
 
 
