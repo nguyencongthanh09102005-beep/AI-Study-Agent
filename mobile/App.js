@@ -188,6 +188,7 @@ function SubjectsScreen({ subjects, userName, refreshData }) {
   const [detail, setDetail] = useState(null);
   const [documents, setDocuments] = useState([]);
   const [docPreview, setDocPreview] = useState(null);
+  const [sharedDocPreview, setSharedDocPreview] = useState(null);
   const [docSummary, setDocSummary] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -279,6 +280,18 @@ function SubjectsScreen({ subjects, userName, refreshData }) {
     } finally { setBusy(false); }
   };
 
+  const previewSharedDocument = async (doc) => {
+    setBusy(true);
+    setError('');
+    try {
+      const data = await api.sharedDocumentDetail(doc.id);
+      setSharedDocPreview(data.document);
+      setMode('shared-preview');
+    } catch (err) {
+      setError(err.message || 'Không xem được tài liệu dùng chung.');
+    } finally { setBusy(false); }
+  };
+
   const summarizeDocument = async () => {
     if (!docPreview) return;
     setBusy(true);
@@ -366,6 +379,25 @@ function SubjectsScreen({ subjects, userName, refreshData }) {
     </ScrollView>
   );
 
+  if (mode === 'shared-preview' && sharedDocPreview) return (
+    <ScrollView contentContainerStyle={styles.page}>
+      <TouchableOpacity onPress={() => setMode('detail')}>
+        <Text style={styles.backLink}>← Chi tiết môn học</Text>
+      </TouchableOpacity>
+      <Header title="Tài liệu dùng chung" subtitle={sharedDocPreview.original_name} userName={userName} />
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>{sharedDocPreview.subject_name} · Đã xử lý</Text>
+        <Text style={styles.muted}>Tài liệu do quản trị viên cung cấp, chỉ đọc.</Text>
+      </View>
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Nội dung trích xuất</Text>
+        <Text style={[styles.muted, { fontSize: 13, lineHeight: 22 }]}>
+          {sharedDocPreview.extracted_text || 'Chưa có nội dung văn bản.'}
+        </Text>
+      </View>
+    </ScrollView>
+  );
+
   if (mode === 'form') return (
     <View style={styles.safe}>
       <ErrorCard message={error} />
@@ -435,6 +467,17 @@ function SubjectsScreen({ subjects, userName, refreshData }) {
             <Text style={styles.secondaryActionText}>Bỏ chọn đề cương cá nhân</Text>
           </TouchableOpacity>
         ) : null}
+        <Text style={styles.sectionTitle}>Tài liệu dùng chung ({(detail.shared_documents || []).length})</Text>
+        <Text style={styles.muted}>Được quản trị viên tải và xử lý sẵn theo mã môn; bạn có quyền xem nhưng không thể sửa.</Text>
+        {(detail.shared_documents || []).length ? detail.shared_documents.map((doc) => (
+          <View key={'shared-' + doc.id} style={styles.card}>
+            <Text style={styles.cardTitle}>📚 {doc.original_name}</Text>
+            <Text style={styles.muted}>{doc.is_syllabus ? 'Đề cương chuẩn · ' : ''}✓ {doc.extracted_chars || 0} ký tự đã trích xuất</Text>
+            <TouchableOpacity style={styles.secondaryAction} disabled={busy} onPress={() => previewSharedDocument(doc)}>
+              <Text style={styles.secondaryActionText}>◉ Xem tài liệu chung</Text>
+            </TouchableOpacity>
+          </View>
+        )) : <Text style={styles.muted}>Chưa có tài liệu chung cho mã môn này.</Text>}
         <Text style={styles.sectionTitle}>Điểm yếu đang cần ôn</Text>
         {(detail.weaknesses || []).length ? detail.weaknesses.map((w, i) => (
           <View key={i} style={styles.card}><Text style={styles.cardTitle}>{w.topic}</Text><Text style={styles.muted}>{w.chapter || 'Chưa phân chương'}</Text></View>
