@@ -24,8 +24,8 @@
 
     <nav class="side-nav" aria-label="Điều hướng chính">
       {% if page == 'admin' %}
-      <a href="{{ url_for('admin_dashboard') }}#admin-subjects" class="active"><span>▱</span><b>Quản lý môn học</b></a>
-      <a href="{{ url_for('admin_dashboard', view='documents') }}#admin-documents"><span>▤</span><b>Tài liệu dùng chung</b></a>
+      <a href="{{ url_for('admin_dashboard') }}" class="{{ 'active' if admin_view != 'documents' else '' }}"><span>▱</span><b>Quản lý môn học</b></a>
+      <a href="{{ url_for('admin_shared_documents') }}" class="{{ 'active' if admin_view == 'documents' else '' }}"><span>▤</span><b>Tài liệu dùng chung</b></a>
       {% else %}
       <a class="{{ 'active' if page=='dashboard' else '' }}" href="{{ url_for('dashboard') }}"><span>⌂</span><b>Tổng quan</b></a>
       <a class="{{ 'active' if page=='subjects' else '' }}" href="{{ url_for('subjects') }}"><span>▱</span><b>Môn học</b></a>
