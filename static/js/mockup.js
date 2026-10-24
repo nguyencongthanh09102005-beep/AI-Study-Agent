@@ -73,8 +73,28 @@ document.addEventListener("DOMContentLoaded", function () {
   var fileInput = document.getElementById("documentFileInput");
   var fileName = document.getElementById("selectedFileName");
   if (fileInput && fileName) {
-    fileInput.addEventListener("change", function () {
-      fileName.textContent = fileInput.files && fileInput.files[0] ? fileInput.files[0].name : "Chưa chọn file";
+    var uploadForm = document.getElementById("uploadForm");
+    var uploadError = document.getElementById("uploadSizeError");
+    var uploadButton = uploadForm ? uploadForm.querySelector('button[type="submit"]') : null;
+    var maxMb = Number(uploadForm && uploadForm.dataset.uploadMaxMb) || 50;
+    function validateUploadSize() {
+      var selected = fileInput.files && fileInput.files[0];
+      fileName.textContent = selected ? selected.name : "Chưa chọn file";
+      // Một request multipart có thêm dữ liệu bao ngoài file nên cần chừa ít dư địa.
+      var tooLarge = !!(selected && selected.size > (maxMb * 1024 * 1024 - 64 * 1024));
+      if (uploadError) {
+        uploadError.hidden = !tooLarge;
+        uploadError.textContent = tooLarge
+          ? "Tệp quá lớn (" + (selected.size / (1024 * 1024)).toFixed(1) +
+            " MB). Giới hạn tải lên " + maxMb + " MB. Hãy nén hoặc chia PDF thành các tệp nhỏ hơn."
+          : "";
+      }
+      if (uploadButton) uploadButton.disabled = tooLarge;
+      return !tooLarge;
+    }
+    fileInput.addEventListener("change", validateUploadSize);
+    if (uploadForm) uploadForm.addEventListener("submit", function (event) {
+      if (!validateUploadSize()) event.preventDefault();
     });
   }
 
