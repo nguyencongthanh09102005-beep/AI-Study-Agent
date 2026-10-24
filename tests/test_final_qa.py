@@ -160,6 +160,63 @@ def check_upload_limit():
     assert "Tệp vừa chọn vượt giới hạn" in page.get_data(as_text=True)
 
 
+def check_web_auth_forms():
+    """Three reveal controls render; login and registration continue to work."""
+    client = project.app.test_client()
+    response = client.get("/login")
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "auth-password.css" in html
+    assert "auth-password.js" in html
+    assert html.count('class="auth-password-field"') == 3
+    assert html.count('class="password-toggle"') == 3
+
+    for field_id in ("loginPassword", "signupPassword", "confirmPassword"):
+        assert html.count(f'id="{field_id}"') == 1
+        assert f'<label for="{field_id}">' in html
+        assert f'data-target="{field_id}"' in html
+        assert f'aria-controls="{field_id}"' in html
+    assert "eye-icon-show" in html and "eye-icon-hide" in html
+
+    email = "ci-auth-password-qa@study.local"
+    mismatch = client.post("/register", data={
+        "name": "Test Account",
+        "email": email,
+        "password": "test-password-123",
+        "confirm_password": "does-not-match",
+    })
+    assert mismatch.status_code in (302, 303)
+    assert "tab=signup" in mismatch.headers["Location"]
+    conn = project.db()
+    assert conn.execute(
+        "SELECT id FROM users WHERE email=?", (email,)
+    ).fetchone() is None
+    conn.close()
+
+    registered = client.post("/register", data={
+        "name": "Test Account",
+        "email": email,
+        "password": "test-password-123",
+        "confirm_password": "test-password-123",
+    })
+    assert registered.status_code in (302, 303)
+    assert "/dashboard" in registered.headers["Location"]
+    assert client.get("/dashboard").status_code == 200
+    client.get("/logout")
+
+    failed_login = client.post("/login", data={
+        "email": email, "password": "not-the-password",
+    })
+    assert failed_login.status_code == 200
+    assert "Email hoặc mật khẩu không đúng" in failed_login.get_data(as_text=True)
+
+    login = client.post("/login", data={
+        "email": email, "password": "test-password-123",
+    })
+    assert login.status_code in (302, 303)
+    assert "/dashboard" in login.headers["Location"]
+
+
 if __name__ == "__main__":
     # Isolated temporary DB: safe to run repeatedly without altering real learner data.
     old_db_path, old_upload_dir = project.DB_PATH, project.UPLOAD_DIR
@@ -172,6 +229,7 @@ if __name__ == "__main__":
             check_quiz_generation()
             check_adaptive_delete()
             check_upload_limit()
+            check_web_auth_forms()
     finally:
         project.DB_PATH, project.UPLOAD_DIR = old_db_path, old_upload_dir
     print("Final QA checks passed")
