@@ -52,3 +52,20 @@
 .auth-page .auth-admin-heading{display:inline-flex;gap:8px;padding:7px 10px;border-radius:10px;background:#e2e7ff;color:#5e63cc;font-size:11px;font-weight:800;margin-bottom:15px}
 @media(max-width:1100px){.page-admin .admin-content-grid{grid-template-columns:1fr}}
 @media(max-width:650px){.page-admin .admin-stats{grid-template-columns:1fr}.page-admin .admin-form-card,.page-admin .admin-table-card{padding:15px}.auth-page .auth-tabs.auth-tabs-three button{font-size:10px}}
+
+/* Keep course editing/deletion inside the existing neumorphic Admin cards. */
+.page-admin .admin-subject-actions {min-width:130px;gap:7px;flex-wrap:nowrap}
+.page-admin .admin-subject-actions button {font-size:10px;padding:8px 9px}
+.page-admin .admin-subject-actions .admin-edit-btn {background:#e2e9ff;color:#5268c8;font-weight:800}
+.page-admin .admin-subject-actions .admin-delete-btn {background:#ffe7ed;color:#c85165;font-weight:800}
+.page-admin .admin-cancel-edit {display:block;width:100%;margin-top:9px;min-height:39px;
+  border-radius:12px;background:#e9eefb;color:#5c6a95;font-weight:800;font-size:11px;
+  border:1px solid #dae3f5;cursor:pointer}
+.page-admin .admin-cancel-edit[hidden] {display:none}
+.page-admin .admin-cancel-edit:hover {background:#dfe7f8}
+.page-admin .admin-subject-actions button:focus-visible,.page-admin .admin-cancel-edit:focus-visible {
+  outline:2px solid #626de7;outline-offset:2px}
+@media(max-width:650px) {
+  .page-admin .admin-subject-actions {min-width:unset}
+  .page-admin .admin-subject-actions button {padding:7px}
+}
