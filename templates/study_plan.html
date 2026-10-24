@@ -6,7 +6,7 @@
 {% block content %}
 <section class="mock-page-head">
   <div><h2>▦ &nbsp; Kế hoạch học tập</h2><p>Lên kế hoạch hôm nay, chạm tới ước mơ ngày mai! ✨</p></div>
-  <div class="head-actions"><button type="button" class="soft-primary" id="openAiPlanner">＋ <span>Tạo kế hoạch mới</span></button><div class="quote-card compact">❝ <span>"Kỷ luật hôm nay<br>là tự do ngày mai."</span></div></div>
+  <div class="head-actions"><button type="button" class="soft-primary" id="openAiPlanner">＋ <span>Tạo kế hoạch mới</span></button></div>
 </section>
 
 <section class="soft-card week-strip-card">
@@ -31,7 +31,13 @@
 
 <section class="planner-layout-new">
   <article class="soft-card day-schedule-card">
-    <div class="card-title-row"><div><h3 id="scheduleTitle">◷ &nbsp; Lịch học trong ngày</h3><small class="schedule-view-label" id="scheduleViewLabel">Hôm nay</small></div><button type="button" class="ghost-action edit-only" id="addTaskButton">＋ Thêm buổi học</button></div>
+    <div class="card-title-row planner-agenda-header">
+      <div><h3 id="scheduleTitle">◷ &nbsp; Lịch học trong ngày</h3><small class="schedule-view-label" id="scheduleViewLabel">Hôm nay</small></div>
+      <div class="planner-agenda-actions">
+        <button type="button" class="ghost-action edit-only" id="addTaskButton">＋ Thêm buổi học</button>
+        <button type="button" class="ghost-action planner-edit-trigger" id="toggleEditPlan" aria-pressed="false">✎ Chỉnh sửa</button>
+      </div>
+    </div>
     <div class="time-schedule">
       {% for task in tasks %}
       <div class="schedule-item-new {{ 'done' if task.done else '' }} {{ 'overdue' if task.is_overdue else '' }}" data-searchable="{{ task.title|e }}" data-task-id="{{ task.id }}" data-task-date="{{ task.study_at_input[:10] }}" data-task-datetime="{{ task.study_at_input }}">
@@ -39,42 +45,27 @@
         <span class="schedule-color c{{ (loop.index0 % 4) + 1 }}"></span>
         <span class="schedule-copy"><strong>{{ task.title }}{% if task.source == 'adaptive' %} <em class="adaptive-task-badge">Adaptive</em>{% endif %}</strong><small>{{ task.subject_name or 'Học tập' }}{% if task.note %} · {{ task.note }}{% endif %}</small></span>
         <span class="schedule-range">{{ task.duration }} phút</span>
-        <form method="post" action="{{ url_for('toggle_study_task', task_id=task.id) }}"><button type="submit" class="task-check {{ 'checked' if task.done else '' }}">{{ '✓' if task.done else '' }}</button></form>
-        <div class="task-actions"><button type="button" class="icon-action move-task-btn" title="Chuyển lịch nhiệm vụ" data-id="{{ task.id }}" data-title="{{ task.title|e }}" data-subject-id="{{ task.subject_id or '' }}" data-study-at="{{ task.study_at_input }}" data-duration="{{ task.duration }}" data-note="{{ task.note|e }}">↪</button><button type="button" class="icon-action edit-task-btn edit-only" data-id="{{ task.id }}" data-title="{{ task.title|e }}" data-subject-id="{{ task.subject_id or '' }}" data-study-at="{{ task.study_at_input }}" data-duration="{{ task.duration }}" data-note="{{ task.note|e }}">✎</button><form class="edit-only" method="post" action="{{ url_for('delete_study_task', task_id=task.id) }}" data-confirm-title="Xóa buổi học?" data-confirm-message="Buổi học “{{ task.title }}” sẽ bị xóa." data-confirm-label="Xóa"><button type="submit" class="icon-action danger">×</button></form></div>
+        <form method="post" action="{{ url_for('toggle_study_task', task_id=task.id) }}"><button type="submit" class="task-check {{ 'checked' if task.done else '' }}" aria-label="{{ 'Đánh dấu chưa hoàn thành' if task.done else 'Đánh dấu hoàn thành' }}: {{ task.title }}">{{ '✓' if task.done else '' }}</button></form>
+        <div class="task-actions"><button type="button" class="icon-action move-task-btn" title="Chuyển lịch nhiệm vụ" aria-label="Chuyển lịch: {{ task.title }}" data-id="{{ task.id }}" data-title="{{ task.title|e }}" data-subject-id="{{ task.subject_id or '' }}" data-study-at="{{ task.study_at_input }}" data-duration="{{ task.duration }}" data-note="{{ task.note|e }}">↪</button><button type="button" class="icon-action edit-task-btn edit-only" title="Sửa buổi học" aria-label="Sửa: {{ task.title }}" data-id="{{ task.id }}" data-title="{{ task.title|e }}" data-subject-id="{{ task.subject_id or '' }}" data-study-at="{{ task.study_at_input }}" data-duration="{{ task.duration }}" data-note="{{ task.note|e }}">✎</button><form class="edit-only" method="post" action="{{ url_for('delete_study_task', task_id=task.id) }}" data-confirm-title="Xóa buổi học?" data-confirm-message="Buổi học “{{ task.title }}” sẽ bị xóa." data-confirm-label="Xóa"><button type="submit" class="icon-action danger" title="Xóa buổi học" aria-label="Xóa: {{ task.title }}">×</button></form></div>
       </div>
-      {% else %}
-      <div class="empty-soft">Chưa có lịch học. Tạo kế hoạch mới để AI sắp xếp lịch cho bạn.</div>
       {% endfor %}
-      <div class="empty-soft schedule-filter-empty" id="scheduleFilterEmpty" hidden>Không có nhiệm vụ trong khoảng thời gian này.</div>
+      <div class="empty-soft schedule-filter-empty" id="scheduleFilterEmpty" hidden>Ngày này chưa có buổi học. Bạn có thể chọn ngày khác hoặc tạo kế hoạch mới.</div>
     </div>
 
-    <div class="task-list-head">
-      <h3 id="compactTaskTitle">▤ &nbsp; Danh sách nhiệm vụ hôm nay</h3>
-      <button type="button" class="ghost-action" id="toggleEditPlan">Chỉnh sửa →</button>
-    </div>
-    <div class="task-compact-list" id="compactTaskList">
-      {% for task in tasks %}
-      <div class="compact-task-row"
-           data-compact-task
-           data-task-date="{{ task.study_at_input[:10] }}">
-        <span class="task-square {{ 'checked' if task.done else '' }}">{{ '✓' if task.done else '' }}</span>
-        <b>{{ task.title }}{% if task.source == 'adaptive' %} <small class="adaptive-task-inline">Adaptive</small>{% endif %}</b>
-        <span>◷ {{ task.time_text }}</span>
-        <em>{{ task.subject_name or 'Tự học' }}</em>
-      </div>
-      {% endfor %}
-      <div class="empty-soft" id="compactTaskEmpty" hidden>Ngày này chưa có nhiệm vụ học nào.</div>
-    </div>
   </article>
 
   <aside class="planner-side-stack">
-    <div class="side-stat-grid">
-      <article class="soft-card ring-stat"><h3>◉ &nbsp; Tiến độ tuần này</h3><div class="ring" style="--p:{{ completion }}"><strong>{{ completion }}%</strong></div><div><span>Đã hoàn thành</span><b>{{ completion }}%</b><small>mục tiêu tuần</small></div></article>
-      <article class="soft-card time-stat"><h3>◷ &nbsp; Thời gian học</h3><strong>{{ (completed_minutes / 60)|round(1) }} / {{ (planned_minutes / 60)|round(1) }} giờ</strong><small>Đã hoàn thành / đã lên lịch</small><div class="progress-track"><i style="width: {{ time_completion }}%"></i></div></article>
-    </div>
+    <article class="soft-card planner-progress-summary">
+      <div class="planner-progress-heading">
+        <div><h3>◉ &nbsp; Tiến độ tuần này</h3><small>{{ weekly_completed_count }} / {{ weekly_task_count }} buổi học đã hoàn thành</small></div>
+        <strong class="planner-progress-percent">{{ completion }}%</strong>
+      </div>
+      <div class="planner-progress-bar" role="progressbar" aria-label="Tiến độ tuần này" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ completion }}"><span style="width: {{ completion }}%"></span></div>
+      <div class="planner-progress-hours"><span>◷ Thời gian học</span><strong>{{ (completed_minutes / 60)|round(1) }} / {{ (planned_minutes / 60)|round(1) }} giờ</strong></div>
+    </article>
 
     <article class="soft-card goal-card">
-      <div class="card-title-row"><h3>◎ &nbsp; Mục tiêu & deadline</h3><a href="#deadline-list">Chỉnh sửa →</a></div>
+      <div class="card-title-row"><h3>◎ &nbsp; Mục tiêu & deadline</h3><span class="planner-deadline-count">{{ reminders|length }} mục tiêu</span></div>
       <div class="goal-list">
         {% for r in reminders[:5] %}
         <div class="deadline-item {{ 'completed' if r.done else '' }}" data-reminder-id="{{ r.id }}" data-reminder-title="{{ r.title|e }}" data-urgent="{{ 'true' if r.urgent else 'false' }}">
@@ -87,7 +78,7 @@
       </div>
     </article>
 
-    <article class="soft-card encouragement"><div><span class="plant-icon">🌱</span><h3>Bạn đang làm rất tốt!</h3><p>{{ agent_tip }}</p></div><div class="mountain-art">◢◣</div></article>
+    <article class="soft-card planner-insight"><span class="planner-insight-icon" aria-hidden="true">✦</span><div><h3>Gợi ý từ Study Agent</h3><p>{{ agent_tip }}</p></div></article>
   </aside>
 </section>
 
