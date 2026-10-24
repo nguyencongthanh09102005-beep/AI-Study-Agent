@@ -4543,6 +4543,27 @@ def documents():
         (uid,)
     ).fetchall()
 
+    # Resolve current code -> shared subject linkage for older student accounts too.
+    # This makes an admin upload visible on the very next student page request.
+    shared_subject_names = {}
+    for student_subject in subs:
+        common = ensure_shared_subject_for_user_subject(conn, uid, student_subject["id"])
+        if common:
+            shared_subject_names[common["id"]] = student_subject["name"]
+
+    shared_docs = []
+    if shared_subject_names:
+        placeholders = ",".join("?" for _ in shared_subject_names)
+        shared_docs = conn.execute(
+            f"""SELECT sd.id,sd.original_name,sd.created_at,sd.is_syllabus,
+                       sd.shared_subject_id,ss.code,ss.name AS shared_subject_name
+                FROM shared_documents sd
+                JOIN shared_subjects ss ON ss.id=sd.shared_subject_id
+                WHERE sd.shared_subject_id IN ({placeholders})
+                ORDER BY sd.id DESC""",
+            tuple(shared_subject_names.keys())
+        ).fetchall()
+
     extracted_count = sum(
         1 for row in docs
         if (row["extracted_text"] or "").strip()
@@ -4571,6 +4592,7 @@ def documents():
         extracted_count=extracted_count,
         extraction_percent=extraction_percent,
         storage_mb=storage_mb,
+        shared_documents=shared_docs,
         upload_max_mb=MAX_UPLOAD_MB,
         upload_error=request.args.get("upload_error") == "too_large"
     )
