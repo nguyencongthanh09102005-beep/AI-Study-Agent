@@ -1,0 +1,188 @@
+/* Study plan clarity pass: loaded after the shared mockup styles.
+   Existing violet/blue palette, soft cards, calendar and modal behavior retained. */
+.page-study_plan .mock-page-head { gap: 18px; margin-bottom: 18px; }
+.page-study_plan .mock-page-head h2 { font-size: clamp(21px, 2vw, 27px); }
+.page-study_plan .mock-page-head p { font-size: 12px; line-height: 1.5; }
+.page-study_plan .head-actions { flex: 0 0 auto; }
+.page-study_plan #openAiPlanner { min-height: 43px; padding: 0 16px; white-space: nowrap; }
+
+.page-study_plan .week-strip-card { padding: 16px 18px; margin-bottom: 19px; }
+.page-study_plan .week-strip-top {
+  display: flex !important;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.page-study_plan .week-strip-top > span { display: none; }
+.page-study_plan .week-strip-top .date-jump { min-width: 154px; padding: 6px 10px; }
+.page-study_plan .week-strip-top .segmented-filter {
+  display: flex !important;
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+.page-study_plan .week-strip-top .planner-date-picker { max-width: 155px; }
+.page-study_plan .circle-nav { font-size: 20px; cursor: pointer; }
+.page-study_plan .circle-nav:disabled { opacity: .38; cursor: not-allowed; }
+.page-study_plan .week-days { gap: 9px; }
+.page-study_plan .week-day {
+  min-height: 66px;
+  border-radius: 12px;
+  transition: background .18s ease, box-shadow .18s ease;
+}
+.page-study_plan .week-day:hover { transform: none; }
+.page-study_plan .week-day b { font-size: 12px; }
+.page-study_plan .week-day .week-date { font-size: 11px; }
+.page-study_plan .week-day small { font-size: 10px; }
+.page-study_plan .week-days.month-grid .month-day small { font-size: 9px; }
+
+@media (min-width: 1370px) {
+  .page-study_plan .planner-layout-new {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1.6fr) minmax(300px, .85fr) !important;
+    gap: 20px !important;
+    align-items: start !important;
+  }
+}
+@media (max-width: 1369px) {
+  .page-study_plan .planner-layout-new {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+.page-study_plan .day-schedule-card { min-width: 0; padding: 20px; }
+.page-study_plan .planner-side-stack { gap: 16px !important; }
+.page-study_plan .planner-agenda-header { gap: 12px; align-items: flex-start; }
+.page-study_plan .planner-agenda-header h3 { font-size: 16px; margin: 0; }
+.page-study_plan .planner-agenda-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.page-study_plan .planner-agenda-actions .ghost-action {
+  min-height: 34px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 800;
+}
+.page-study_plan .planner-edit-trigger[aria-pressed="true"] {
+  background: #e4e7ff;
+  color: #554fdb;
+}
+.page-study_plan .time-schedule { gap: 9px; margin-top: 15px; }
+.page-study_plan .schedule-item-new {
+  min-width: 0;
+  min-height: 72px;
+  gap: 10px;
+  padding: 12px 13px;
+  background: #edf2fb;
+  border: 1px solid rgba(219, 227, 245, .7);
+  border-radius: 13px;
+}
+.page-study_plan .schedule-item-new:hover { transform: none; border-color: #c6d0f2; }
+.page-study_plan .schedule-item-new.done { opacity: .72; }
+.page-study_plan .schedule-item-new.done .schedule-copy strong { text-decoration: line-through; }
+.page-study_plan .schedule-item-new.overdue:not(.done) { border-color: #ffcec2; }
+.page-study_plan .schedule-time { font-size: 12px; font-weight: 700; white-space: nowrap; }
+.page-study_plan .schedule-copy { min-width: 0; }
+.page-study_plan .schedule-copy strong { font-size: 13px; font-weight: 750; line-height: 1.4; overflow-wrap: anywhere; }
+.page-study_plan .schedule-copy small { font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+.page-study_plan .schedule-range { font-size: 11px; white-space: nowrap; }
+.page-study_plan .task-actions .icon-action { width: 31px; height: 31px; }
+.page-study_plan .task-check { min-width: 29px; min-height: 29px; }
+.page-study_plan .schedule-filter-empty { border-radius: 13px; padding: 27px 18px; }
+.page-study_plan .schedule-filter-empty[hidden] { display: none !important; }
+
+.page-study_plan .planner-progress-summary { padding: 20px; }
+.page-study_plan .planner-progress-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.page-study_plan .planner-progress-heading h3 { margin: 0 0 6px; font-size: 14px; color: #28396b; }
+.page-study_plan .planner-progress-heading small { font-size: 11px; color: #8493b3; line-height: 1.5; }
+.page-study_plan .planner-progress-percent { font-size: 26px; color: #5e62ef; }
+.page-study_plan .planner-progress-bar {
+  height: 10px; overflow: hidden; border-radius: 99px;
+  background: #dfe7f5; margin-top: 14px;
+}
+.page-study_plan .planner-progress-bar span {
+  display: block; height: 100%; border-radius: inherit;
+  background: linear-gradient(90deg, #6da3ff, #6254f7);
+}
+.page-study_plan .planner-progress-hours {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; margin-top: 13px;
+  font-size: 11px; color: #7381a3;
+}
+.page-study_plan .planner-progress-hours strong { color: #31436f; font-size: 12px; }
+
+.page-study_plan .goal-card { padding: 19px; }
+.page-study_plan .goal-card .card-title-row h3 { font-size: 14px; margin: 0; }
+.page-study_plan .planner-deadline-count {
+  font-size: 10px; white-space: nowrap; color: #8190b1;
+  background: #e5ecfa; padding: 6px 9px; border-radius: 10px;
+}
+.page-study_plan .goal-list { margin-top: 13px; }
+.page-study_plan .goal-list b { font-size: 11.5px; line-height: 1.35; }
+.page-study_plan .goal-list small { font-size: 10px; }
+.page-study_plan .goal-list .deadline-item { gap: 7px !important; }
+.page-study_plan .goal-list .deadline-item > span:nth-of-type(1) { min-width: 0; }
+.page-study_plan .deadline-badge { font-size: 9px; }
+
+.page-study_plan .planner-insight {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 15px 17px;
+}
+.page-study_plan .planner-insight-icon {
+  display: grid; place-items: center; flex: 0 0 34px;
+  width: 34px; height: 34px; border-radius: 12px;
+  background: #e3e6ff; color: #645cf0; font-size: 17px;
+}
+.page-study_plan .planner-insight h3 { font-size: 12px; margin: 2px 0 5px; color: #324273; }
+.page-study_plan .planner-insight p { margin: 0; font-size: 11px; line-height: 1.6; color: #7988a8; }
+
+@media (max-width: 980px) {
+  .page-study_plan .week-strip-top .segmented-filter {
+    flex: 1 0 100%; justify-content: flex-start; margin: 3px 0 0;
+  }
+}
+@media (max-width: 680px) {
+  .page-study_plan .mock-page-head { align-items: stretch; }
+  .page-study_plan #openAiPlanner { width: 100%; }
+  .page-study_plan .week-strip-card { padding: 12px; }
+  .page-study_plan .week-strip-top .planner-date-picker { max-width: 100%; flex: 1 0 130px; }
+  .page-study_plan .week-strip-top .date-jump { flex: 1 1 125px; min-width: 125px; }
+  .page-study_plan .week-days:not(.month-grid) {
+    grid-template-columns: repeat(7, minmax(44px, 1fr));
+    overflow-x: auto;
+    padding-bottom: 6px;
+  }
+  .page-study_plan .week-days:not(.month-grid) .week-day:nth-child(n+5) { display: flex !important; }
+  .page-study_plan .week-days.month-grid .week-day:nth-child(n+5) { display: grid !important; }
+  .page-study_plan .day-schedule-card { padding: 13px; }
+  .page-study_plan .planner-agenda-header { flex-direction: column; }
+  .page-study_plan .planner-agenda-actions { width: 100%; justify-content: flex-start; }
+  .page-study_plan .schedule-item-new {
+    grid-template-columns: 50px 4px minmax(0,1fr) 32px;
+    padding: 10px;
+    gap: 8px;
+  }
+  .page-study_plan .schedule-time { grid-column: 1; grid-row: 1; font-size: 11px; }
+  .page-study_plan .schedule-color { grid-column: 2; grid-row: 1; }
+  .page-study_plan .schedule-copy { grid-column: 3; grid-row: 1; }
+  .page-study_plan .schedule-copy strong { font-size: 12px; }
+  .page-study_plan .schedule-copy small { font-size: 10px; }
+  .page-study_plan .schedule-item-new > form { grid-column: 4; grid-row: 1; }
+  .page-study_plan .schedule-range { grid-column: 1 / 3; grid-row: 2; font-size: 10px; }
+  .page-study_plan .task-actions { grid-column: 3 / -1; grid-row: 2; justify-content: flex-end; }
+  .page-study_plan .planner-progress-summary,
+  .page-study_plan .goal-card { padding: 15px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-study_plan .week-day, .page-study_plan .schedule-item-new { transition: none !important; }
+}
