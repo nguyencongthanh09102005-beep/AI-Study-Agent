@@ -7,8 +7,8 @@
 {% block content %}
 <section class="mock-page-head admin-page-head">
   <div>
-    <h2><span class="title-folder">✦</span> Quản trị AI Study Agent</h2>
-    <p>Kho kiến thức học thuật dùng chung · Chỉ quản trị viên được thêm tài liệu</p>
+    <h2><span class="title-folder">✦</span> {{ 'Quản lý tài liệu dùng chung' if admin_view == 'documents' else 'Quản lý môn học chung' }}</h2>
+    <p>{{ 'Tải lên và quản lý giáo trình dùng chung theo mã môn học.' if admin_view == 'documents' else 'Tạo, chỉnh sửa và xóa môn trong kho kiến thức chung.' }}</p>
   </div>
   <span class="admin-role-pill">♜ Quyền quản trị viên</span>
 </section>
@@ -22,6 +22,7 @@
   <article class="soft-card admin-stat-card"><span class="admin-stat-icon green">♙</span><div><strong>{{ student_count }}</strong><small>Tài khoản sinh viên</small></div></article>
 </section>
 
+{% if admin_view == 'subjects' %}
 <section class="admin-section" id="admin-subjects">
   <div class="admin-section-head"><div><h3>▱ Quản lý môn học chung</h3><p>Tài liệu sẽ tự liên kết với sinh viên theo mã môn học.</p></div></div>
   <div class="admin-content-grid">
@@ -72,7 +73,9 @@
     </div>
   </div>
 </section>
+{% endif %}
 
+{% if admin_view == 'documents' %}
 <section class="admin-section" id="admin-documents">
   <div class="admin-section-head"><div><h3>▤ Quản lý tài liệu dùng chung</h3><p>Admin tải file một lần; hệ thống trích xuất chữ và lưu sẵn để Study Agent tái sử dụng.</p></div></div>
   <div class="admin-content-grid">
@@ -115,6 +118,7 @@
     </div>
   </div>
 </section>
+{% endif %}
 {% endblock %}
 {% block scripts %}
 <script>
