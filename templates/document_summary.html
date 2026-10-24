@@ -2,6 +2,7 @@
 {% block title %}Tóm tắt · {{ document.original_name }}{% endblock %}
 {% block page_title %}Tóm tắt tài liệu{% endblock %}
 {% block page_desc %}Tóm tắt nội dung học tập từ tài liệu đã tải lên{% endblock %}
+{% block page_styles %}<link rel="stylesheet" href="{{ url_for('static', filename='css/document-summary.css') }}">{% endblock %}
 
 {% block content %}
 <section class="soft-card" style="padding:22px;max-width:980px;margin:0 auto;">
@@ -27,7 +28,7 @@
   </div>
   {% endif %}
 
-  <article style="white-space:pre-wrap;line-height:1.75;color:#344057;font-size:14px;background:#f7f9fd;border-radius:16px;padding:20px;">{{ summary }}</article>
+  <article id="documentSummary" class="study-markdown">{{ summary }}</article>
 
   {% if ai_error and not used_ai %}
   <details style="margin-top:14px;color:#7b8497;font-size:11px;">
@@ -37,3 +38,4 @@
   {% endif %}
 </section>
 {% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/document-summary.js') }}"></script>{% endblock %}
