@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}Quản trị · AI Study Agent{% endblock %}
+{% block page_title %}Quản trị kho kiến thức dùng chung{% endblock %}
+{% block page_desc %}Tạo môn học và quản lý tài liệu chung{% endblock %}
+{% block page_styles %}<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">{% endblock %}
+
+{% block content %}
+<section class="mock-page-head admin-page-head">
+  <div>
+    <h2><span class="title-folder">✦</span> Quản trị AI Study Agent</h2>
+    <p>Kho kiến thức học thuật dùng chung · Chỉ quản trị viên được thêm tài liệu</p>
+  </div>
+  <span class="admin-role-pill">♜ Quyền quản trị viên</span>
+</section>
+
+{% if error %}<div class="admin-message admin-error" role="alert">{{ error }}</div>{% endif %}
+{% if notice %}<div class="admin-message admin-notice" role="status">{{ notice }}</div>{% endif %}
+
+<section class="admin-stats">
+  <article class="soft-card admin-stat-card"><span class="admin-stat-icon blue">▱</span><div><strong>{{ subjects|length }}</strong><small>Môn học chung</small></div></article>
+  <article class="soft-card admin-stat-card"><span class="admin-stat-icon purple">▤</span><div><strong>{{ documents|length }}</strong><small>Tài liệu chung gần đây</small></div></article>
+  <article class="soft-card admin-stat-card"><span class="admin-stat-icon green">♙</span><div><strong>{{ student_count }}</strong><small>Tài khoản sinh viên</small></div></article>
+</section>
+
+<section class="admin-section" id="admin-subjects">
+  <div class="admin-section-head"><div><h3>▱ Quản lý môn học chung</h3><p>Tài liệu sẽ tự liên kết với sinh viên theo mã môn học.</p></div></div>
+  <div class="admin-content-grid">
+    <form class="soft-card admin-form-card" method="post" action="{{ url_for('admin_add_subject') }}">
+      <h4>＋ Thêm / cập nhật môn học</h4>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label for="sharedCode">Mã môn học <span>*</span></label>
+      <input id="sharedCode" name="code" maxlength="50" required placeholder="Ví dụ: 0104123005" autocomplete="off">
+      <label for="sharedName">Tên môn học <span>*</span></label>
+      <input id="sharedName" name="name" maxlength="180" required placeholder="Ví dụ: Quản trị mạng">
+      <label for="sharedDescription">Mô tả môn học</label>
+      <textarea id="sharedDescription" name="description" rows="3" maxlength="900" placeholder="Giới thiệu ngắn về môn học"></textarea>
+      <button class="admin-primary" type="submit">＋ Lưu môn học chung</button>
+      <p class="admin-form-hint">Nếu mã môn đã tồn tại, hệ thống cập nhật tên và mô tả mà không mất tài liệu.</p>
+    </form>
+    <div class="soft-card admin-table-card">
+      <div class="admin-card-title"><strong>Danh sách môn học dùng chung</strong><small>{{ subjects|length }} môn</small></div>
+      <div class="admin-table-scroll"><table class="admin-table">
+        <thead><tr><th>Mã môn</th><th>Tên môn học</th><th>Tài liệu</th><th>Đề cương</th></tr></thead>
+        <tbody>
+        {% for item in subjects %}
+          <tr><td><span class="admin-code">{{ item.code or '—' }}</span></td><td><strong>{{ item.name }}</strong></td><td>{{ item.document_count }}</td><td>{% if item.syllabus_text %}<span class="admin-success">✓ Đã có</span>{% else %}<span class="admin-muted">Chưa có</span>{% endif %}</td></tr>
+        {% else %}
+          <tr><td colspan="4" class="admin-empty">Chưa có môn dùng chung. Hãy thêm môn đầu tiên.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table></div>
+    </div>
+  </div>
+</section>
+
+<section class="admin-section" id="admin-documents">
+  <div class="admin-section-head"><div><h3>▤ Quản lý tài liệu dùng chung</h3><p>Admin tải file một lần; hệ thống trích xuất chữ và lưu sẵn để Study Agent tái sử dụng.</p></div></div>
+  <div class="admin-content-grid">
+    <form class="soft-card admin-form-card" method="post" enctype="multipart/form-data" action="{{ url_for('admin_add_document') }}" id="adminUploadForm" data-max-mb="{{ upload_max_mb }}">
+      <h4>↑ Tải tài liệu chung</h4>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label for="sharedSubject">Thuộc môn học <span>*</span></label>
+      <select id="sharedSubject" name="shared_subject_id" required>
+        <option value="">Chọn môn học</option>
+        {% for item in subjects %}<option value="{{ item.id }}">{{ item.code }} · {{ item.name }}</option>{% endfor %}
+      </select>
+      <label for="adminUploadFile">Tài liệu học tập <span>*</span></label>
+      <input id="adminUploadFile" type="file" name="file" accept=".pdf,.txt,.md" required>
+      <span class="admin-form-hint">PDF / TXT / MD · Tối đa {{ upload_max_mb }} MB · PDF scan ảnh chưa hỗ trợ OCR</span>
+      <label class="admin-checkbox"><input type="checkbox" name="is_syllabus" value="1"> Đặt làm đề cương chuẩn của môn</label>
+      <p id="adminFileError" class="admin-file-error" role="alert" hidden></p>
+      <button class="admin-primary" type="submit">↑ Tải lên & xử lý tài liệu</button>
+      <p class="admin-form-hint">Tài liệu được lưu chung, không lấy từ thư mục cá nhân của sinh viên.</p>
+    </form>
+    <div class="soft-card admin-table-card">
+      <div class="admin-card-title"><strong>Tài liệu đã xử lý</strong><small>Chung cho sinh viên cùng mã môn</small></div>
+      <div class="admin-table-scroll"><table class="admin-table">
+        <thead><tr><th>Tài liệu</th><th>Môn học</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+        <tbody>
+        {% for item in documents %}
+          <tr>
+            <td><strong class="admin-filename">{{ item.original_name }}</strong><small>{{ item.created_at[:10] }}</small></td>
+            <td><span class="admin-code">{{ item.subject_code }}</span></td>
+            <td>{% if item.is_syllabus %}<span class="admin-success">✓ Đề cương</span>{% else %}<span class="admin-success">✓ Đã đọc</span>{% endif %}</td>
+            <td><div class="admin-actions">
+              <a href="{{ url_for('shared_document_file', doc_id=item.id) }}" target="_blank" rel="noopener">Xem</a>
+              <form method="post" action="{{ url_for('admin_delete_document', doc_id=item.id) }}" onsubmit="return confirm('Xóa tài liệu chung này khỏi tất cả sinh viên?');"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit">Xóa</button></form>
+            </div></td>
+          </tr>
+        {% else %}
+          <tr><td colspan="4" class="admin-empty">Chưa tải tài liệu nào lên kho chung.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table></div>
+    </div>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+(function(){
+  var form = document.getElementById('adminUploadForm');
+  var input = document.getElementById('adminUploadFile');
+  var error = document.getElementById('adminFileError');
+  if (!form || !input || !error) return;
+  var limit = Number(form.dataset.maxMb || 50) * 1024 * 1024 - 65536;
+  function validate() {
+    var file = input.files && input.files[0];
+    var invalid = file && file.size > limit;
+    error.hidden = !invalid;
+    error.textContent = invalid ? 'Tệp quá lớn. Hãy nén hoặc chia nhỏ PDF trước khi tải.' : '';
+    return !invalid;
+  }
+  input.addEventListener('change', validate);
+  form.addEventListener('submit', function(e){ if (!validate()) e.preventDefault(); });
+})();
+</script>
+{% endblock %}
