@@ -1225,6 +1225,7 @@ function LoginScreen({ onLogin, onRegister }) {
 
 export default function App() {
   const [loggedIn, setLoggedIn] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
   const [tab, setTab] = useState('home');
   const [dashboard, setDashboard] = useState(null);
   const [subjects, setSubjects] = useState([]);
@@ -1246,6 +1247,18 @@ export default function App() {
       setLoading(false);
     }
   };
+
+  // Khôi phục phiên nếu cookie session vẫn còn hợp lệ sau khi mở lại ứng dụng.
+  // Không lưu mật khẩu trên thiết bị; nếu phiên đã hết hạn thì đăng nhập lại.
+  useEffect(() => {
+    let active = true;
+    api.session()
+      .then(() => refreshData())
+      .then(() => { if (active) setLoggedIn(true); })
+      .catch(() => { if (active) setLoggedIn(false); })
+      .finally(() => { if (active) setCheckingSession(false); });
+    return () => { active = false; };
+  }, []);
 
   const handleLogin = async (email, password) => {
     await api.login(email, password);
@@ -1295,6 +1308,14 @@ export default function App() {
     );
   }, [tab, subjects, dashboard, plan, loading, userName, loggedIn]);
 
+  if (checkingSession) {
+    return (
+      <SafeAreaView style={[styles.safe, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" />
+        <Text style={{ marginTop: 12, color: '#667085' }}>Đang kiểm tra phiên đăng nhập...</Text>
+      </SafeAreaView>
+    );
+  }
   if (!loggedIn) return <LoginScreen onLogin={handleLogin} onRegister={handleRegister} />;
 
   const tabs = [
