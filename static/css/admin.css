@@ -1,0 +1,54 @@
+/* Admin pages reuse the existing Study Agent shell / sidebar / card palette. */
+.page-admin .admin-page-head{margin-bottom:21px}
+.page-admin .admin-role-pill{border-radius:15px;padding:11px 15px;background:#e3e5ff;color:#5963dd;font-weight:800;font-size:11px}
+.page-admin .admin-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin-bottom:26px}
+.page-admin .admin-stat-card{padding:19px;display:flex;gap:15px;align-items:center}
+.page-admin .admin-stat-icon{display:grid;place-items:center;width:48px;height:48px;border-radius:16px;font-size:22px;font-weight:800}
+.page-admin .admin-stat-icon.blue{background:#dce8ff;color:#4c69ff}
+.page-admin .admin-stat-icon.purple{background:#eadfff;color:#855df0}
+.page-admin .admin-stat-icon.green{background:#d8f3e9;color:#15a577}
+.page-admin .admin-stat-card strong{display:block;font-size:25px;color:#1b2850}
+.page-admin .admin-stat-card small{font-size:11px;color:#7887ae}
+.page-admin .admin-section{margin-bottom:28px;scroll-margin-top:26px}
+.page-admin .admin-section-head{margin:0 2px 14px}
+.page-admin .admin-section-head h3{font-size:19px;margin:0 0 5px;color:#1e2b55}
+.page-admin .admin-section-head p{font-size:12px;color:#7b88a5;margin:0}
+.page-admin .admin-content-grid{display:grid;grid-template-columns:minmax(280px,.85fr) minmax(390px,1.5fr);gap:20px}
+.page-admin .admin-form-card,.page-admin .admin-table-card{padding:20px;min-width:0}
+.page-admin .admin-form-card h4{font-size:15px;margin:0 0 17px;color:#233467}
+.page-admin .admin-form-card>label:not(.admin-checkbox){display:block;font-size:11px;color:#4b5d87;font-weight:800;margin:13px 0 6px}
+.page-admin .admin-form-card>label>span{color:#d95867}
+.page-admin .admin-form-card input:not([type=checkbox]):not([type=hidden]),.page-admin .admin-form-card select,.page-admin .admin-form-card textarea{display:block;width:100%;box-sizing:border-box;min-height:44px;padding:10px 13px;border:0;outline:0;border-radius:13px;background:#edf2fb;box-shadow:var(--inset);color:#263962;font-size:12px}
+.page-admin .admin-form-card input:focus-visible,.page-admin .admin-form-card select:focus-visible,.page-admin .admin-form-card textarea:focus-visible{outline:2px solid #6772f1;outline-offset:2px}
+.page-admin .admin-form-card textarea{resize:vertical}
+.page-admin .admin-checkbox{display:flex;gap:10px;align-items:center;margin:17px 0;color:#455988;font-size:12px;cursor:pointer}
+.page-admin .admin-checkbox input{width:17px;height:17px;accent-color:#5d65ff}
+.page-admin .admin-primary{display:block;width:100%;min-height:45px;margin-top:16px;border:0;border-radius:13px;color:white;font-weight:800;font-size:12px;background:linear-gradient(135deg,#76a4ff,#594dff);box-shadow:0 9px 18px rgba(86,89,255,.18);cursor:pointer}
+.page-admin .admin-primary:hover{filter:brightness(1.05)}
+.page-admin .admin-form-hint{font-size:10px;color:#8693b2;line-height:1.6;margin:11px 0 0}
+.page-admin .admin-file-error{color:#b94e4e;font-size:11px}
+.page-admin .admin-card-title{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:15px}
+.page-admin .admin-card-title strong{font-size:14px;color:#26355b}
+.page-admin .admin-card-title small{font-size:10px;color:#7c8eb3}
+.page-admin .admin-table-scroll{overflow-x:auto}
+.page-admin .admin-table{width:100%;border-collapse:collapse;font-size:11px;text-align:left}
+.page-admin .admin-table th{padding:11px 12px;background:#e6edfa;color:#637399;white-space:nowrap;font-size:10px}
+.page-admin .admin-table td{padding:12px;border-bottom:1px solid #e4eafa;vertical-align:middle;color:#4a5c82}
+.page-admin .admin-table td strong{font-size:11px;color:#24355e}
+.page-admin .admin-table td small{display:block;color:#93a0bc;font-size:9px;margin-top:3px}
+.page-admin .admin-code{display:inline-block;white-space:nowrap;border-radius:9px;padding:6px 8px;background:#dfe8ff;color:#5368b8;font-size:10px;font-weight:800}
+.page-admin .admin-success{display:inline-block;white-space:nowrap;color:#19a17c;font-size:10px;font-weight:800}
+.page-admin .admin-muted{color:#9aa5bd;font-size:10px}
+.page-admin .admin-filename{max-width:225px;overflow-wrap:anywhere;display:block}
+.page-admin .admin-empty{text-align:center;padding:26px!important;color:#9aa6bb!important}
+.page-admin .admin-actions{display:flex;gap:8px;align-items:center}
+.page-admin .admin-actions a,.page-admin .admin-actions button{font:inherit;white-space:nowrap;border:0;border-radius:9px;padding:7px 9px;background:#e1e9ff;color:#5268c8;cursor:pointer}
+.page-admin .admin-actions button{background:#ffe7ed;color:#c85165}
+.page-admin .admin-message{border-radius:12px;padding:11px 15px;margin:12px 0 18px;font-size:12px;font-weight:700}
+.page-admin .admin-error{background:#fff0f0;color:#be3d54}
+.page-admin .admin-notice{background:#e9f7ef;color:#218665}
+.auth-page .auth-tabs.auth-tabs-three{grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}
+.auth-page .auth-tabs.auth-tabs-three button{font-size:11px;padding:0 4px;white-space:nowrap}
+.auth-page .auth-admin-heading{display:inline-flex;gap:8px;padding:7px 10px;border-radius:10px;background:#e2e7ff;color:#5e63cc;font-size:11px;font-weight:800;margin-bottom:15px}
+@media(max-width:1100px){.page-admin .admin-content-grid{grid-template-columns:1fr}}
+@media(max-width:650px){.page-admin .admin-stats{grid-template-columns:1fr}.page-admin .admin-form-card,.page-admin .admin-table-card{padding:15px}.auth-page .auth-tabs.auth-tabs-three button{font-size:10px}}
