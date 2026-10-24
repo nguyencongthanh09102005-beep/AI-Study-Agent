@@ -1,6 +1,8 @@
 """Final-demo regression checks; run after SQLite init in CI."""
 import json
 import re
+from pathlib import Path
+from tempfile import TemporaryDirectory
 import app as project
 
 
@@ -94,6 +96,16 @@ def check_adaptive_delete():
 
 
 if __name__ == "__main__":
-    check_quiz_generation()
-    check_adaptive_delete()
+    # Isolated temporary DB: safe to run repeatedly without altering real learner data.
+    old_db_path, old_upload_dir = project.DB_PATH, project.UPLOAD_DIR
+    try:
+        with TemporaryDirectory() as directory:
+            project.DB_PATH = Path(directory) / "final_qa.db"
+            project.UPLOAD_DIR = Path(directory) / "uploads"
+            project.UPLOAD_DIR.mkdir()
+            project.init_db()
+            check_quiz_generation()
+            check_adaptive_delete()
+    finally:
+        project.DB_PATH, project.UPLOAD_DIR = old_db_path, old_upload_dir
     print("Final QA checks passed")
