@@ -99,6 +99,12 @@ def verify_common_library():
         assert response.status_code == 200
         assert "de_cuong_cloud.txt" in response.get_data(as_text=True)
         assert client.get(f"/shared-documents/{doc_id}/file").status_code == 200
+        mobile = client.get(f"/api/mobile/subjects/{subject_id}")
+        assert mobile.status_code == 200
+        assert any(d["id"] == doc_id for d in mobile.get_json()["shared_documents"])
+        mobile_doc = client.get(f"/api/mobile/shared-documents/{doc_id}")
+        assert mobile_doc.status_code == 200
+        assert "IaaS" in mobile_doc.get_json()["document"]["extracted_text"]
         detail = client.get(f"/subjects/{subject_id}")
         assert detail.status_code == 200
         assert "de_cuong_cloud.txt" in detail.get_data(as_text=True)
@@ -113,6 +119,8 @@ def verify_common_library():
 
     assert "de_cuong_cloud.txt" not in stranger.get("/documents").get_data(as_text=True)
     assert stranger.get(f"/shared-documents/{doc_id}/file").status_code == 403
+    assert stranger.get(f"/api/mobile/shared-documents/{doc_id}").status_code == 403
+    assert stranger.get(f"/api/mobile/subjects/{outsider_sub}").get_json()["shared_documents"] == []
     assert stranger.post("/admin/documents", data={
         "csrf_token": token, "shared_subject_id": str(shared_id),
         "file": (BytesIO(b"attack"), "attack.txt"),
