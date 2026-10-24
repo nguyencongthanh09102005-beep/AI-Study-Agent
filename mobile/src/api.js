@@ -46,6 +46,8 @@ export const api = {
       body: JSON.stringify({ name, email, password }),
     }),
 
+  session: () => request('/api/mobile/session'),
+
   logout: () =>
     request('/api/mobile/logout', {
       method: 'POST',
