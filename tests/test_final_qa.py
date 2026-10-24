@@ -168,10 +168,14 @@ def check_web_auth_forms():
     html = response.get_data(as_text=True)
     assert "auth-password.css" in html
     assert "auth-password.js" in html
-    assert html.count('class="auth-password-field"') == 3
-    assert html.count('class="password-toggle"') == 3
+    assert html.count('class="auth-password-field"') == 4
+    assert html.count('class="password-toggle"') == 4
+    assert 'data-auth-pane="admin"' in html
+    assert '/admin/login' in html
+    assert 'Đăng nhập quản trị viên' in html
+    assert 'Đăng ký Admin' not in html
 
-    for field_id in ("loginPassword", "signupPassword", "confirmPassword"):
+    for field_id in ("loginPassword", "signupPassword", "confirmPassword", "adminPassword"):
         assert html.count(f'id="{field_id}"') == 1
         assert f'<label for="{field_id}">' in html
         assert f'data-target="{field_id}"' in html
