@@ -50,7 +50,11 @@ jobs:
           node --check static/js/mockup.js
           node --check static/js/study_plan.js
           node --check static/js/chat.js
+          node --check static/js/document-summary.js
           node --check mobile/src/api.js
+
+      - name: Document summary Markdown/XSS tests
+        run: node tests/test_document_summary_markdown.js
 
       - name: Final QA regression tests
         run: python tests/test_final_qa.py
