@@ -115,6 +115,13 @@ Mặc định `DEMO_ACCOUNT_ENABLED=0`, để tránh tự sinh tài khoản dùn
 
 Quiz yêu cầu đủ số câu hợp lệ từ Gemini. Nếu AI lỗi hoặc sinh thiếu, hệ thống báo lỗi để thử lại, **không tự bù bằng câu điền từ vô nghĩa**. Khi xóa Quiz hoặc tài liệu sinh Quiz, điểm yếu và nhiệm vụ Adaptive chưa hoàn thành được tính lại từ các lượt làm Quiz còn lại. Mobile thử khôi phục cookie session khi mở lại; nếu phiên không còn hợp lệ, người dùng đăng nhập lại.
 
+## Tải tài liệu và lỗi 413
+
+Tệp PDF/TXT/MD được giới hạn mặc định theo `MAX_UPLOAD_MB=50` trong `.env`.
+Đây là giới hạn toàn bộ request HTTP (bao gồm multipart). Có thể thay đổi trong khoảng 5–100 MB rồi khởi động lại Flask.
+Giao diện Web kiểm tra dung lượng khi chọn file; nếu quá giới hạn, hệ thống hiển thị thông báo thay cho trang lỗi trắng. API Mobile trả JSON kèm mã HTTP 413.
+PDF ảnh scan vẫn chưa hỗ trợ OCR; tệp rất lớn có thể trích xuất chậm nên ưu tiên tài liệu PDF có chữ, hoặc chia theo chương.
+
 ## Bật Gemini
 
 Mở `.env` và điền:
