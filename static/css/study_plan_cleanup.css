@@ -24,6 +24,7 @@
 .page-study_plan .circle-nav { font-size: 20px; cursor: pointer; }
 .page-study_plan .circle-nav:disabled { opacity: .38; cursor: not-allowed; }
 .page-study_plan .week-days { gap: 9px; }
+.page-study_plan #weekDays[hidden] { display: none !important; }
 .page-study_plan .week-day {
   min-height: 66px;
   border-radius: 12px;
