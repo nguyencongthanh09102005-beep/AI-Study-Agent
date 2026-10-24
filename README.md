@@ -17,6 +17,26 @@ Hệ thống trợ lý học tập full-stack sử dụng Flask + SQLite + Gemin
 - Dashboard lấy dữ liệu thật từ SQLite; biểu đồ tuần chỉ tính thời lượng của các task đã bấm Hoàn thành.
 - Tiến độ môn học tự động: 60% mức hoàn thành Study Plan + 40% điểm Quiz trung bình (lấy điểm cao nhất của mỗi Quiz). Nếu chỉ có một nguồn dữ liệu thì dùng nguồn đó.
 
+## Admin và tài liệu dùng chung (Shared Knowledge)
+
+Trang đăng nhập vẫn là `/login` với 3 lựa chọn: **Đăng nhập sinh viên**, **Tạo tài khoản sinh viên**, **Quản trị viên** (chỉ đăng nhập, KHÔNG có đăng ký Admin).
+
+Tài khoản Admin được tạo **trực tiếp trên máy chạy Flask**, không có mật khẩu mặc định/công khai. Sau khi cài Python dependencies, mở Terminal trong thư mục gốc:
+
+```bash
+python scripts/create_admin.py --email admin@example.com --name "Quản trị viên"
+```
+
+Lệnh sẽ yêu cầu nhập mật khẩu hai lần, tối thiểu 10 ký tự (không hiện trên màn hình), sau đó tạo hoặc cấp quyền Admin cho email đó trong SQLite cục bộ. Thay email bằng email do bạn kiểm soát, KHÔNG dùng email demo/mật khẩu dễ đoán. Chạy lệnh trên **máy chứa database thật** (`data/study_agent.db`), rồi chọn tab Quản trị viên tại `http://127.0.0.1:5000/login?tab=admin`. Sinh viên đăng ký bình thường luôn mang role `student`, không thể tự cấp quyền Admin.
+
+Giao diện Admin dùng **cùng giao diện, logo, sidebar và tông màu của Web sinh viên**, chỉ có 2 phần:
+- **Quản lý môn học chung**: thêm môn (mã môn bắt buộc + tên + mô tả), cập nhật bằng mã môn trùng.
+- **Quản lý tài liệu chung**: chọn môn, upload PDF/TXT/MD, tùy chọn đánh dấu đề cương chuẩn, xem/xóa tài liệu. Form giới hạn kích thước theo `MAX_UPLOAD_MB`.
+
+Tài liệu dùng chung được trích xuất chữ ngay khi Admin tải lên và lưu kết quả trong `shared_documents` / `shared_knowledge`. Các tài khoản sinh viên có môn **trùng mã môn** tự thấy file chung ở trang Tài liệu và chi tiết môn (Web/Mobile). Chat AI và Quiz sử dụng văn bản đã trích xuất từ kho chung, không phải đọc PDF lại ở mỗi yêu cầu. **Đây là cache trích xuất PDF, không phải Gemini trả lời sẵn**; tạo câu trả lời và Quiz vẫn cần gọi Gemini. PDF scan ảnh chưa hỗ trợ OCR. Truy cập/xem file chung chỉ cho người có môn trùng mã hoặc Admin; tải lên/xóa bị kiểm tra quyền Admin và CSRF ở backend.
+
+Kiểm thử: `python tests/test_admin_shared.py` sử dụng SQLite tạm, có 2 sinh viên chung mã môn và 1 sinh viên khác môn để xác minh phân quyền và tự đồng bộ. CI chạy tự động bài test này.
+
 ## Cách chạy Windows
 
 ```bat
