@@ -82,6 +82,7 @@ def init_db():
         name TEXT NOT NULL,
         email TEXT UNIQUE NOT NULL,
         password_hash TEXT NOT NULL,
+        role TEXT NOT NULL DEFAULT 'student',
         created_at TEXT NOT NULL
     );
 
@@ -214,6 +215,21 @@ def init_db():
         FOREIGN KEY(created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
     );
 
+    CREATE TABLE IF NOT EXISTS shared_documents(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        shared_subject_id INTEGER NOT NULL,
+        original_name TEXT NOT NULL,
+        stored_name TEXT NOT NULL UNIQUE,
+        extracted_text TEXT NOT NULL DEFAULT '',
+        knowledge_id INTEGER,
+        is_syllabus INTEGER NOT NULL DEFAULT 0,
+        created_by_user_id INTEGER NOT NULL,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY(shared_subject_id) REFERENCES shared_subjects(id) ON DELETE CASCADE,
+        FOREIGN KEY(knowledge_id) REFERENCES shared_knowledge(id) ON DELETE SET NULL,
+        FOREIGN KEY(created_by_user_id) REFERENCES users(id)
+    );
+
     CREATE TABLE IF NOT EXISTS learning_profiles(
         user_id INTEGER PRIMARY KEY,
         learning_style TEXT DEFAULT 'balanced',
@@ -242,6 +258,13 @@ def init_db():
     );
     """)
 
+    conn.commit()
+
+    # Migrate old databases: all existing accounts are students by default.
+    user_columns = {row["name"] for row in conn.execute("PRAGMA table_info(users)")}
+    if "role" not in user_columns:
+        conn.execute("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'student'")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_shared_documents_subject ON shared_documents(shared_subject_id,id)")
     conn.commit()
 
     # =====================================================
@@ -936,15 +959,17 @@ def ensure_shared_subject_for_user_subject(conn, user_id, subject_id):
     if not subject:
         return None
 
+    subject_key = _normalize_subject_key(subject["code"], subject["name"])
     if subject["shared_subject_id"]:
         shared = conn.execute(
             "SELECT * FROM shared_subjects WHERE id=?",
             (subject["shared_subject_id"],)
         ).fetchone()
-        if shared:
+        # If the student edits the course code, relink to the correct shared
+        # library instead of leaking materials from the old course.
+        if shared and shared["subject_key"] == subject_key:
             return shared
 
-    subject_key = _normalize_subject_key(subject["code"], subject["name"])
     shared = conn.execute(
         "SELECT * FROM shared_subjects WHERE subject_key=?",
         (subject_key,)
@@ -1949,6 +1974,33 @@ def login_required(fn):
         )
         return fn(*args, **kwargs)
     return wrapper
+
+def admin_required(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        uid = session.get("user_id")
+        if not uid:
+            return redirect(url_for("login", tab="admin"))
+        conn = db()
+        row = conn.execute("SELECT role FROM users WHERE id=?", (uid,)).fetchone()
+        conn.close()
+        if not row or row["role"] != "admin":
+            return "Bạn không có quyền truy cập trang quản trị.", 403
+        return fn(*args, **kwargs)
+    return wrapper
+
+
+def admin_form_token():
+    if "admin_csrf_token" not in session:
+        session["admin_csrf_token"] = secrets.token_urlsafe(32)
+    return session["admin_csrf_token"]
+
+
+def admin_csrf_valid():
+    submitted = request.form.get("csrf_token", "")
+    expected = session.get("admin_csrf_token", "")
+    return bool(expected and submitted and secrets.compare_digest(submitted, expected))
+
 
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -3412,14 +3464,17 @@ def _format_weekday(dt):
 @app.route("/")
 def index():
     if "user_id" in session:
-        return redirect(url_for("dashboard"))
+        conn = db()
+        user = conn.execute("SELECT role FROM users WHERE id=?", (session["user_id"],)).fetchone()
+        conn.close()
+        return redirect(url_for("admin_dashboard" if user and user["role"] == "admin" else "dashboard"))
     return redirect(url_for("login"))
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
     error = request.args.get("error", "").strip()[:300]
     auth_tab = request.args.get("tab", "login").strip().lower()
-    if auth_tab not in {"login", "signup"}:
+    if auth_tab not in {"login", "signup", "admin"}:
         auth_tab = "login"
 
     if request.method == "POST":
@@ -3429,7 +3484,8 @@ def login():
         conn = db()
         user = conn.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
         conn.close()
-        if user and check_password_hash(user["password_hash"], password):
+        if user and user["role"] == "student" and check_password_hash(user["password_hash"], password):
+            session.clear()
             session["user_id"] = user["id"]
             session["user_name"] = user["name"]
             return redirect(url_for("dashboard"))
@@ -3440,6 +3496,21 @@ def login():
         error=error,
         auth_tab=auth_tab
     )
+
+@app.route("/admin/login", methods=["POST"])
+def admin_login():
+    email = request.form.get("email", "").strip().lower()
+    password = request.form.get("password", "")
+    conn = db()
+    user = conn.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
+    conn.close()
+    if user and user["role"] == "admin" and check_password_hash(user["password_hash"], password):
+        session.clear()
+        session["user_id"] = user["id"]
+        session["user_name"] = user["name"]
+        return redirect(url_for("admin_dashboard"))
+    return redirect(url_for("login", tab="admin", error="Tài khoản quản trị hoặc mật khẩu không đúng."))
+
 
 @app.route("/register", methods=["POST"])
 def register():
