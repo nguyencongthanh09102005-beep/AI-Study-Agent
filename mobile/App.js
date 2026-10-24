@@ -355,7 +355,7 @@ function SubjectsScreen({ subjects, userName, refreshData }) {
       </TouchableOpacity>
       {!!docSummary && <View style={styles.card}>
         <Text style={styles.cardTitle}>Tóm tắt tài liệu</Text>
-        <Text style={[styles.muted, { fontSize: 14, lineHeight: 23 }]}>{docSummary}</Text>
+        <ChatFormattedText value={docSummary} style={[styles.muted, { fontSize: 14, lineHeight: 23 }]} />
       </View>}
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Văn bản đã trích xuất</Text>
@@ -506,7 +506,10 @@ function ChatFormattedText({ value, style }) {
     <Text style={style}>
       {rows.map((row, rowIndex) => {
         const heading = row.match(/^\s{0,3}#{1,6}\s+(.*)$/);
-        const content = heading ? heading[1] : row;
+        const bullet = !heading && row.match(/^\s*[-*+•]\s+(.+)$/);
+        const numbered = !heading && !bullet && row.match(/^\s*(\d+[.)])\s+(.+)$/);
+        const content = heading ? heading[1] : bullet ? '• ' + bullet[1]
+          : numbered ? numbered[1] + ' ' + numbered[2] : row;
         const segments = content.split(/(\*\*[^*\n]+\*\*)/g);
         return (
           <Text key={rowIndex} style={heading ? { fontWeight: '700' } : undefined}>
