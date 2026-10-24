@@ -1,8 +1,12 @@
 """Final-demo regression checks; run after SQLite init in CI."""
 import json
 import re
+import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
+
+# Dùng được cả 'python -m tests...' lẫn chạy trực tiếp file tests/...
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import app as project
 
 
@@ -14,13 +18,17 @@ def check_quiz_generation():
         assert project.build_quiz("Đám mây hỗ trợ cung cấp tài nguyên điện toán.", 10) == []
 
         def fake_ai(prompt):
-            n = int(re.search(r"Tạo đúng (\d+) câu", prompt).group(1))
+            count_match = re.search(r"Tạo đúng (\d+) câu", prompt)
+            group_match = re.search(r"cho NHÓM (\d+)", prompt)
+            assert count_match and group_match, "Quiz prompt format changed"
+            n = int(count_match.group(1))
+            group = int(group_match.group(1))
             questions = [
                 {
-                    "question": f"Kiểm tra QA {i}?",
+                    "question": f"CI question group {group}, item {i}?",
                     "topic": "Điện toán đám mây",
                     "chapter": "Chương 1",
-                    "options": [f"Đúng {i}", "Sai một", "Sai hai", "Sai ba"],
+                    "options": [f"Đúng {group}-{i}", "Sai một", "Sai hai", "Sai ba"],
                     "answer": 0,
                 }
                 for i in range(n)
@@ -28,11 +36,25 @@ def check_quiz_generation():
             return json.dumps(questions, ensure_ascii=False), None
 
         project.gemini_generate = fake_ai
-        questions = project.build_quiz("Kiến thức điện toán đám mây.", 10)
-        assert len(questions) == 10
-        for i, q in enumerate(questions):
-            assert q["options"][q["answer"]] == f"Đúng {i}"
-            assert len(set(q["options"])) == 4
+        for count in (10, 20, 30):
+            questions = project.build_quiz("Kiến thức điện toán đám mây.", count)
+            assert len(questions) == count, f"Wrong count: {count}"
+            assert len({q["question"] for q in questions}) == count
+            for i, q in enumerate(questions):
+                group = i // 10 + 1
+                position = i % 10
+                assert q["options"][q["answer"]] == f"Đúng {group}-{position}"
+                assert len({option.casefold() for option in q["options"]}) == 4
+                assert 0 <= q["answer"] < 4
+
+        # Gemini trả đáp án trùng nhau hoặc thiếu câu: tuyệt đối không lưu quiz giả.
+        project.gemini_generate = lambda prompt: (json.dumps([{
+            "question": "Câu thiếu chất lượng?",
+            "topic": "Kiến thức nền", "chapter": "Chương 1",
+            "options": ["Trùng", "Trùng", "Sai 2", "Sai 3"],
+            "answer": 0,
+        }]), None)
+        assert project.build_quiz("Kiến thức điện toán đám mây.", 10) == []
     finally:
         project.gemini_generate = original
 
