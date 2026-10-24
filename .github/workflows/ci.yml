@@ -51,7 +51,11 @@ jobs:
           node --check static/js/study_plan.js
           node --check static/js/chat.js
           node --check static/js/document-summary.js
+          node --check static/js/auth-password.js
           node --check mobile/src/api.js
+
+      - name: Password eye toggle tests
+        run: node tests/test_auth_password.js
 
       - name: Document summary Markdown/XSS tests
         run: node tests/test_document_summary_markdown.js
