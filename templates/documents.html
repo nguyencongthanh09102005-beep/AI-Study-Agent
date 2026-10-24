@@ -19,17 +19,23 @@
 </div>
 
 <section class="document-top-grid">
-  <form method="post" enctype="multipart/form-data" class="soft-card upload-dropzone" id="uploadForm">
+  <form method="post" enctype="multipart/form-data" class="soft-card upload-dropzone" id="uploadForm" data-upload-max-mb="{{ upload_max_mb }}">
+    {% if upload_error %}
+    <div role="alert" class="upload-limit-alert" style="padding:10px 12px;border-radius:10px;background:#fff1ec;color:#a43b25;border:1px solid #f5b9a9">
+      Tệp vừa chọn vượt giới hạn {{ upload_max_mb }} MB. Hãy nén hoặc chia nhỏ tệp rồi thử lại.
+    </div>
+    {% endif %}
     <label class="dropzone-inner">
       <input id="documentFileInput" type="file" name="file" accept=".pdf,.txt,.md" required>
       <span class="upload-cloud">↑</span>
-      <span><strong>Tải tài liệu cá nhân</strong><small>Kéo thả file vào đây hoặc nhấn để chọn file</small><em>Chỉ bạn và Personal Agent của bạn sử dụng · PDF, TXT, Markdown</em></span>
+      <span><strong>Tải tài liệu cá nhân</strong><small>Kéo thả file vào đây hoặc nhấn để chọn file</small><em>Chỉ bạn và Personal Agent của bạn sử dụng · PDF, TXT, Markdown · Tối đa {{ upload_max_mb }} MB/tệp</em></span>
     </label>
     <div class="upload-inline-controls">
       <select name="subject_id"><option value="">Tất cả môn học</option>{% for s in subjects %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}</select>
       <span id="selectedFileName">Chưa chọn file</span>
       <button class="soft-primary" type="submit">↑ Tải lên</button>
     </div>
+    <div id="uploadSizeError" role="alert" hidden style="padding:8px 12px;color:#a43b25;font-size:13px"></div>
   </form>
 
   <article class="soft-card storage-card">
