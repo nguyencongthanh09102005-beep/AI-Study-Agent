@@ -224,6 +224,10 @@ def verify_common_library():
     conn.close()
     assert "bai_giang_moi.txt" not in alice.get("/documents").get_data(as_text=True)
     assert "bai_giang_moi.txt" not in bob.get("/documents").get_data(as_text=True)
+    # Old-code stub created on demand must NOT reappear as an Admin course.
+    old_catalog = admin.get("/admin").get_data(as_text=True)
+    assert 'data-code="CLOUD101"' not in old_catalog
+    assert 'data-code="UNRELATED222"' not in old_catalog
     assert alice.get(f"/shared-documents/{doc2_id}/file").status_code == 403
     new_subject = register(project.app.test_client(), "unused-ci@study.local", "CLOUD202")
     # The student with new code receives new materials automatically.
@@ -267,6 +271,14 @@ def verify_common_library():
     assert not (project.UPLOAD_DIR / doc2_stored).exists()
     assert new_client.get(f"/shared-documents/{doc2_id}/file").status_code == 404
     assert "bai_giang_moi.txt" not in new_client.get("/documents").get_data(as_text=True)
+    conn = project.db()
+    placeholder = conn.execute(
+        "SELECT admin_managed FROM shared_subjects WHERE subject_key='code:cloud202'"
+    ).fetchone()
+    assert placeholder and placeholder["admin_managed"] == 0
+    conn.close()
+    # Even after student revisits a deleted code, Admin catalog stays empty.
+    assert 'data-code="CLOUD202"' not in admin.get("/admin").get_data(as_text=True)
 
 
 if __name__ == "__main__":
