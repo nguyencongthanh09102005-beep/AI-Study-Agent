@@ -61,6 +61,9 @@ export const api = {
   subjectDetail: (subjectId) =>
     request(`/api/mobile/subjects/${subjectId}`),
 
+  sharedDocumentDetail: (id) =>
+    request(`/api/mobile/shared-documents/${id}`),
+
   createSubject: (payload) =>
     request('/api/mobile/subjects', {
       method: 'POST',
