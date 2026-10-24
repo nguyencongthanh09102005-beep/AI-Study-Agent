@@ -85,4 +85,22 @@
   <div class="soft-card empty-soft">Chưa có tài liệu. Hãy tải file đầu tiên.</div>
   {% endfor %}
 </section>
+
+<section class="document-section-head" style="margin-top:30px"><h3>▤ &nbsp; Tài liệu dùng chung ({{ shared_documents|length }})</h3><span class="private-list-label" style="background:#e1e7ff;color:#5065d8">♜ Quản trị viên cung cấp</span></section>
+<p style="font-size:12px;color:#7484a8;margin:3px 0 15px">Tự động liên kết theo mã môn học của bạn. Study Agent sử dụng nội dung đã được xử lý.</p>
+<section class="document-card-grid" id="sharedDocumentGrid">
+  {% for d in shared_documents %}
+  {% set ext = d.original_name.rsplit('.', 1)[-1]|lower if '.' in d.original_name else 'txt' %}
+  <article class="soft-card document-card-new" data-document-card data-type="{{ ext }}" data-searchable="{{ d.original_name|e }} {{ d.shared_subject_name|e }}">
+    <div class="doc-card-top">
+      <span class="file-icon {{ ext }}">{{ ext|upper }}</span>
+      <div class="doc-title"><h3>{{ d.original_name }}</h3><span class="subject-tag">{{ d.shared_subject_name }} · {{ d.code }}</span></div>
+    </div>
+    <div class="doc-meta"><span>▦ {{ d.created_at }}</span><span>✓ Đã xử lý</span>{% if d.is_syllabus %}<span>📑 Đề cương chuẩn</span>{% endif %}</div>
+    <div class="doc-actions" style="display:flex;gap:9px"><a style="padding:0 16px" href="{{ url_for('shared_document_file', doc_id=d.id) }}" target="_blank" rel="noopener">◉ Xem file chung</a></div>
+  </article>
+  {% else %}
+  <div class="soft-card empty-soft">Chưa có tài liệu chung cho các môn của bạn. Khi Admin tải lên theo mã môn, file sẽ tự xuất hiện tại đây.</div>
+  {% endfor %}
+</section>
 {% endblock %}
