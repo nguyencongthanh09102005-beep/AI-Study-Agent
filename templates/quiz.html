@@ -123,7 +123,7 @@
         {% for q in quiz.questions %}
         {% set question_index = loop.index %}
         {% set option_letters = ['A','B','C','D'] %}
-        <div class="quiz-question-card" data-answer="{{ q.answer }}">
+        <div class="quiz-question-card">
           <div class="question-header"><span class="question-number">{{ question_index }}</span><b class="question-title">{{ q.question }}</b><button type="button" class="question-bookmark" title="Đánh dấu">♡</button></div>
           <div class="question-options">
             {% for option in q.options %}

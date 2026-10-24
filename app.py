@@ -1,4 +1,5 @@
 import os
+import secrets
 import sqlite3
 import json
 import re
@@ -30,7 +31,9 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 DB_PATH.parent.mkdir(exist_ok=True)
 
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "change-this-secret-before-deploy")
+# Khi thiếu SECRET_KEY, dùng khóa ngẫu nhiên chỉ cho phiên chạy hiện tại.
+# Khi triển khai cần đặt SECRET_KEY bí mật, ổn định trong biến môi trường.
+app.secret_key = os.getenv("SECRET_KEY") or secrets.token_hex(32)
 app.config["MAX_CONTENT_LENGTH"] = 20 * 1024 * 1024
 
 ALLOWED_EXTENSIONS = {"pdf", "txt", "md"}
@@ -2671,6 +2674,7 @@ YÊU CẦU BẮT BUỘC:
 - Không lặp câu hỏi đã tạo trước đó.
 - Không tạo câu hỏi vô nghĩa kiểu xóa một từ ngẫu nhiên.
 - Không hỏi thông tin không có trong tài liệu.
+- Không tạo câu hỏi chỉ để nhớ email, số điện thoại, tên giảng viên hoặc thông tin hành chính; ưu tiên kiến thức chuyên môn.
 - Ưu tiên phủ nhiều phần kiến thức khác nhau trong tài liệu.
 - Mỗi câu phải có "topic": tên chủ đề/khái niệm ngắn gọn mà câu hỏi đang kiểm tra.
 - Mỗi câu phải có "chapter": tên chương/phần tương ứng nếu xác định được từ tài liệu.
@@ -5551,6 +5555,12 @@ def submit_quiz():
         "score": score,
         "correct_count": correct_count,
         "total_questions": total_questions,
+        # Chỉ tiết lộ đáp án và lời giải sau khi server chấm bài.
+        "correct_answers": [
+            int(q.get("answer")) if str(q.get("answer", "")).isdigit() else -1
+            for q in questions
+        ],
+        "explanations": [str(q.get("explanation") or "") for q in questions],
         "subject_id": subject_id,
         "subject_name": subject_name,
         "attempt_count": int(attempt_stats["attempt_count"] or 0),
@@ -6909,6 +6919,15 @@ def api_mobile_chat_history(subject_id):
     })
 
 
+def public_quiz_questions(questions):
+    """Không đưa đáp án và lời giải Quiz chưa nộp xuống client."""
+    return [
+        {key: value for key, value in question.items()
+         if key not in ("answer", "explanation")}
+        for question in questions
+    ]
+
+
 @app.route("/api/mobile/quiz/generate", methods=["POST"])
 def api_mobile_quiz_generate():
     uid, error = _mobile_require_user()
@@ -7042,7 +7061,7 @@ def api_mobile_quiz_generate():
     return jsonify({
         "quiz_id": quiz_id,
         "title": title,
-        "questions": questions
+        "questions": public_quiz_questions(questions)
     })
 
 
@@ -7076,12 +7095,17 @@ def api_mobile_study_plan():
               ON s.id=t.subject_id AND s.user_id=t.user_id
             WHERE t.user_id=?
             ORDER BY t.done ASC,t.study_at ASC
-            LIMIT 40
+            LIMIT 200
             """,
             (uid,)
         ).fetchall()
+        total_tasks = conn.execute(
+            "SELECT COUNT(*) FROM study_tasks WHERE user_id=?", (uid,)
+        ).fetchone()[0]
         conn.close()
         return jsonify({
+            "total_tasks": total_tasks,
+            "truncated": total_tasks > len(rows),
             "profile": {
                 "learning_style": profile["learning_style"],
                 "preferred_study_time": profile["preferred_study_time"],
@@ -7473,7 +7497,7 @@ def api_mobile_quiz_detail(quiz_id):
         "quiz_id": quiz_id,
         "subject_id": quiz["subject_id"],
         "title": quiz["title"],
-        "questions": json.loads(quiz["payload"] or "[]"),
+        "questions": public_quiz_questions(json.loads(quiz["payload"] or "[]")),
         "attempts": [dict(row) for row in attempts]
     })
 
@@ -7529,7 +7553,7 @@ def uploaded_file(filename):
 if __name__ == "__main__":
     init_db()
     app.run(
-        debug=os.getenv("FLASK_DEBUG", "1") == "1",
+        debug=os.getenv("FLASK_DEBUG", "0") == "1",
         host=os.getenv("FLASK_HOST", "0.0.0.0"),
         port=int(os.getenv("FLASK_PORT", "5000"))
     )

@@ -498,6 +498,31 @@ function SubjectSelector({ subjects, selectedId, onSelect }) {
   );
 }
 
+// Hiển thị Markdown cơ bản trong phản hồi AI mà không cần thư viện ngoài.
+// React Native Text không tự định dạng dấu **in đậm** từ Gemini.
+function ChatFormattedText({ value, style }) {
+  const rows = String(value ?? '').split(/\r?\n/);
+  return (
+    <Text style={style}>
+      {rows.map((row, rowIndex) => {
+        const heading = row.match(/^\s{0,3}#{1,6}\s+(.*)$/);
+        const content = heading ? heading[1] : row;
+        const segments = content.split(/(\*\*[^*\n]+\*\*)/g);
+        return (
+          <Text key={rowIndex} style={heading ? { fontWeight: '700' } : undefined}>
+            {segments.map((part, partIndex) => (
+              part.startsWith('**') && part.endsWith('**') && part.length > 4
+                ? <Text key={partIndex} style={{ fontWeight: '700' }}>{part.slice(2, -2)}</Text>
+                : <Text key={partIndex}>{part}</Text>
+            ))}
+            {rowIndex < rows.length - 1 ? '\n' : ''}
+          </Text>
+        );
+      })}
+    </Text>
+  );
+}
+
 function AgentScreen({ subjects, userName }) {
   const [subjectId, setSubjectId] = useState(subjects[0]?.id || null);
   const [message, setMessage] = useState('');
@@ -552,6 +577,10 @@ function AgentScreen({ subjects, userName }) {
   }, [subjectId]);
 
   const selectSubject = (id) => {
+    if (sending) {
+      setError('Đợi câu trả lời hoàn tất rồi hãy đổi môn học.');
+      return;
+    }
     setSubjectId(id);
     setMessage('');
     setMessages([]);
@@ -563,7 +592,8 @@ function AgentScreen({ subjects, userName }) {
     if (!value || !subjectId || sending || loadingHistory) return;
 
     setError('');
-    setMessages((old) => [...old, { role: 'user', text: value }]);
+    const pendingItem = { role: 'user', text: value };
+    setMessages((old) => [...old, pendingItem]);
     setMessage('');
     setSending(true);
 
@@ -571,7 +601,10 @@ function AgentScreen({ subjects, userName }) {
       const result = await api.chat(subjectId, value);
       setMessages((old) => [...old, { role: 'assistant', text: result.answer }]);
     } catch (err) {
-      setError(err.message || 'Không thể gửi câu hỏi.');
+      // Không giả vờ tin nhắn đã lưu khi API gặp lỗi.
+      setMessages((old) => old.filter((item) => item !== pendingItem));
+      setMessage((current) => current || value);
+      setError(err.message || 'Không thể gửi câu hỏi. Bạn có thể gửi lại.');
     } finally {
       setSending(false);
     }
@@ -586,7 +619,7 @@ function AgentScreen({ subjects, userName }) {
         <ScrollView style={styles.chatList} contentContainerStyle={{ paddingBottom: 16 }}>
           {messages.map((item, index) => (
             <View key={index} style={[styles.message, item.role === 'user' ? styles.userMessage : styles.aiMessage]}>
-              <Text style={item.role === 'user' ? styles.userMessageText : styles.aiMessageText}>{item.text}</Text>
+              <ChatFormattedText value={item.text} style={item.role === 'user' ? styles.userMessageText : styles.aiMessageText} />
             </View>
           ))}
           {(sending || loadingHistory) && <ActivityIndicator />}
@@ -778,7 +811,9 @@ function QuizScreen({ subjects, userName, refreshData }) {
           <Text style={styles.sectionTitle}>{quiz.title}</Text>
           {quiz.questions?.map((question, qIndex) => {
             const chosen = answers[qIndex];
-            const correct = Number(question.answer);
+            const correct = tab === 'result' && result?.correct_answers
+              ? Number(result.correct_answers[qIndex])
+              : -1;
             return (
               <View key={qIndex} style={styles.card}>
                 <Text style={styles.eyebrow}>CÂU {qIndex + 1} / {quiz.questions.length}</Text>
@@ -798,7 +833,7 @@ function QuizScreen({ subjects, userName, refreshData }) {
                 {tab === 'result' && (
                   <Text style={styles.muted}>
                     Đáp án đúng: {String.fromCharCode(65 + correct)}
-                    {question.explanation ? ` · ${question.explanation}` : ''}
+                    {result?.explanations?.[qIndex] ? ` · ${result.explanations[qIndex]}` : ''}
                   </Text>
                 )}
               </View>

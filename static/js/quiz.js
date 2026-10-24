@@ -314,8 +314,8 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         // Chấm và khóa đáp án trên giao diện
-        questions.forEach(question => {
-          const correctAnswer = Number(question.dataset.answer);
+        questions.forEach((question, questionIndex) => {
+          const correctAnswer = Number(data.correct_answers?.[questionIndex]);
           const selected = question.querySelector('input[type="radio"]:checked');
           const options = question.querySelectorAll(".quiz-option");
 
