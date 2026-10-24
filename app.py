@@ -198,6 +198,7 @@ def init_db():
         name TEXT NOT NULL,
         description TEXT DEFAULT '',
         syllabus_text TEXT DEFAULT '',
+        admin_managed INTEGER NOT NULL DEFAULT 1,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
     );
@@ -265,6 +266,11 @@ def init_db():
     if "role" not in user_columns:
         conn.execute("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'student'")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_shared_documents_subject ON shared_documents(shared_subject_id,id)")
+    shared_columns = {row["name"] for row in conn.execute("PRAGMA table_info(shared_subjects)")}
+    if "admin_managed" not in shared_columns:
+        # Preserve old catalog entries on existing databases; only future
+        # student-generated placeholders are hidden from the Admin catalog.
+        conn.execute("ALTER TABLE shared_subjects ADD COLUMN admin_managed INTEGER NOT NULL DEFAULT 1")
     conn.commit()
 
     # =====================================================
@@ -980,8 +986,8 @@ def ensure_shared_subject_for_user_subject(conn, user_id, subject_id):
         cur = conn.execute(
             """
             INSERT INTO shared_subjects(
-                subject_key,code,name,description,syllabus_text,created_at,updated_at
-            ) VALUES(?,?,?,?,?,?,?)
+                subject_key,code,name,description,syllabus_text,admin_managed,created_at,updated_at
+            ) VALUES(?,?,?,?,?,?,?,?)
             """,
             (
                 subject_key,
@@ -989,6 +995,7 @@ def ensure_shared_subject_for_user_subject(conn, user_id, subject_id):
                 subject["name"],
                 subject["description"] or "",
                 "",
+                0,
                 created_at,
                 created_at
             )
@@ -4295,6 +4302,7 @@ def admin_dashboard():
         """SELECT ss.*, COUNT(sd.id) AS document_count
            FROM shared_subjects ss
            LEFT JOIN shared_documents sd ON sd.shared_subject_id=ss.id
+           WHERE ss.admin_managed=1
            GROUP BY ss.id ORDER BY ss.updated_at DESC, ss.id DESC"""
     ).fetchall()
     documents = conn.execute(
@@ -4332,7 +4340,7 @@ def admin_add_subject():
     timestamp = now()
     if existing:
         conn.execute(
-            "UPDATE shared_subjects SET code=?,name=?,description=?,updated_at=? WHERE id=?",
+            "UPDATE shared_subjects SET code=?,name=?,description=?,admin_managed=1,updated_at=? WHERE id=?",
             (code, name, description, timestamp, existing["id"])
         )
         notice = "Đã cập nhật môn học dùng chung."
@@ -4366,7 +4374,7 @@ def admin_edit_subject(subject_id):
     conn = db()
     try:
         original = conn.execute(
-            "SELECT id,subject_key FROM shared_subjects WHERE id=?", (subject_id,)
+            "SELECT id,subject_key FROM shared_subjects WHERE id=? AND admin_managed=1", (subject_id,)
         ).fetchone()
         if not original:
             return "Không tìm thấy môn học chung.", 404
@@ -4420,7 +4428,7 @@ def admin_delete_subject(subject_id):
     uploaded_files = []
     try:
         subject = conn.execute(
-            "SELECT id,code FROM shared_subjects WHERE id=?", (subject_id,)
+            "SELECT id,code FROM shared_subjects WHERE id=? AND admin_managed=1", (subject_id,)
         ).fetchone()
         if not subject:
             return "Không tìm thấy môn học chung.", 404
@@ -4476,7 +4484,7 @@ def admin_add_document():
         ))
     conn = db()
     shared_subject = conn.execute(
-        "SELECT id FROM shared_subjects WHERE id=?", (subject_id,)
+        "SELECT id FROM shared_subjects WHERE id=? AND admin_managed=1", (subject_id,)
     ).fetchone()
     if not shared_subject:
         conn.close()
