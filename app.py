@@ -35,6 +35,10 @@ app = Flask(__name__)
 # Khi triển khai cần đặt SECRET_KEY bí mật, ổn định trong biến môi trường.
 app.secret_key = os.getenv("SECRET_KEY") or secrets.token_hex(32)
 app.config["MAX_CONTENT_LENGTH"] = 20 * 1024 * 1024
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+# Bật chỉ khi chạy HTTPS thật; khi demo LAN HTTP giữ =0.
+app.config["SESSION_COOKIE_SECURE"] = os.getenv("SESSION_COOKIE_SECURE", "0") == "1"
 
 ALLOWED_EXTENSIONS = {"pdf", "txt", "md"}
 
@@ -609,7 +613,7 @@ def init_db():
     conn.commit()
 
     demo = conn.execute("SELECT id FROM users WHERE email=?", ("demo@study.local",)).fetchone()
-    if not demo:
+    if not demo and os.getenv("DEMO_ACCOUNT_ENABLED", "0") == "1":
         cur = conn.execute(
             "INSERT INTO users(name,email,password_hash,created_at) VALUES(?,?,?,?)",
             ("Nguyễn Công Thành", "demo@study.local", generate_password_hash("123456"), now())
@@ -1682,6 +1686,62 @@ def record_quiz_learning_signal(
         )
 
 
+
+def rebuild_subject_learning_signals(conn, user_id, subject_id):
+    """Tính lại điểm yếu từ các lượt Quiz còn tồn tại sau khi xóa/đổi môn.
+
+    Không dùng dữ liệu quiz đã xóa để duy trì điểm yếu hoặc task Adaptive.
+    Những nhiệm vụ Adaptive đã hoàn thành được giữ làm lịch sử học tập.
+    """
+    if not subject_id or not owned_subject_id(conn, user_id, subject_id):
+        return
+
+    attempts = conn.execute(
+        """
+        SELECT q.payload, qa.answers_json
+        FROM quiz_attempts qa
+        JOIN quizzes q ON q.id=qa.quiz_id AND q.user_id=qa.user_id
+        WHERE qa.user_id=? AND q.subject_id=?
+        ORDER BY qa.created_at ASC, qa.id ASC
+        """,
+        (user_id, subject_id)
+    ).fetchall()
+
+    conn.execute(
+        "DELETE FROM learning_weaknesses WHERE user_id=? AND subject_id=?",
+        (user_id, subject_id)
+    )
+
+    for attempt in attempts:
+        try:
+            questions = json.loads(attempt["payload"] or "[]")
+            answers = json.loads(attempt["answers_json"] or "[]")
+        except (ValueError, TypeError):
+            continue
+        if not isinstance(questions, list) or not isinstance(answers, list):
+            continue
+        for question, chosen in zip(questions, answers):
+            if not isinstance(question, dict) or isinstance(chosen, bool):
+                continue
+            try:
+                chosen = int(chosen)
+                expected = int(question["answer"])
+            except (TypeError, ValueError, KeyError):
+                continue
+            if chosen not in (0, 1, 2, 3) or expected not in (0, 1, 2, 3):
+                continue
+            record_quiz_learning_signal(
+                conn, user_id, subject_id,
+                str(question.get("topic") or ""),
+                str(question.get("chapter") or ""),
+                chosen == expected,
+                str(question.get("question") or "")
+            )
+
+    sync_adaptive_review_task(conn, user_id, subject_id)
+    recalculate_subject_progress(user_id, subject_id, conn)
+
+
 def get_active_weakness_rows(conn, user_id, subject_id, limit=12):
     """Các chủ đề vẫn còn yếu: số lần sai đang lớn hơn số lần làm đúng."""
     if not subject_id:
@@ -2395,133 +2455,10 @@ def build_quiz(text, question_count=10, focus_topics=None):
     clean_text = (text or "").strip()
 
 
-    # =====================================================
-    # FALLBACK CỤC BỘ
-    # =====================================================
-    def fallback_quiz(limit):
-        sentences = [
-            s.strip()
-            for s in re.split(
-                r"(?<=[.!?])\s+",
-                clean_text
-            )
-            if 35 <= len(s.strip()) <= 500
-        ]
-
-        focus_pairs = []
-        for item in focus_topics[:8]:
-            if isinstance(item, dict):
-                topic = str(item.get("topic") or "").strip()
-                chapter = str(item.get("chapter") or "").strip()
-            else:
-                topic = str(item or "").strip()
-                chapter = ""
-
-            tokens = [
-                token.casefold()
-                for token in re.findall(r"[\wÀ-ỹ]+", topic, flags=re.UNICODE)
-                if len(token) >= 3
-            ]
-            if topic and tokens:
-                focus_pairs.append((topic, chapter, tokens))
-
-        def fallback_priority(sentence):
-            lowered = sentence.casefold()
-            return max(
-                (
-                    sum(lowered.count(token) for token in tokens)
-                    for _, _, tokens in focus_pairs
-                ),
-                default=0
-            )
-
-        if focus_pairs:
-            sentences.sort(
-                key=lambda sentence: fallback_priority(sentence),
-                reverse=True
-            )
-
-        questions = []
-        used_questions = set()
-
-        for sentence in sentences:
-            if len(questions) >= limit:
-                break
-
-            words = [
-                w
-                for w in re.findall(
-                    r"\b[\wÀ-ỹ]+\b",
-                    sentence
-                )
-                if len(w) >= 5
-            ]
-
-            if not words:
-                continue
-
-            answer = max(words, key=len)
-
-            masked = re.sub(
-                re.escape(answer),
-                "______",
-                sentence,
-                count=1,
-                flags=re.IGNORECASE
-            )
-
-            question_text = f"Điền từ phù hợp: {masked}"
-            normalized = question_text.casefold()
-
-            if normalized in used_questions:
-                continue
-
-            used_questions.add(normalized)
-
-            matched_topic = ""
-            matched_chapter = ""
-            lowered_sentence = sentence.casefold()
-
-            for focus_topic, focus_chapter, tokens in focus_pairs:
-                if any(token in lowered_sentence for token in tokens):
-                    matched_topic = focus_topic
-                    matched_chapter = focus_chapter
-                    break
-
-            questions.append({
-                "question": question_text,
-                "topic": matched_topic or answer,
-                "chapter": matched_chapter or "Nội dung tài liệu",
-                "options": [
-                    answer,
-                    "Dữ liệu",
-                    "Hệ thống",
-                    "Thuật toán"
-                ],
-                "answer": 0
-            })
-
-        if not questions:
-            questions = [
-                {
-                    "question": "AI Study Agent có mục tiêu chính là gì?",
-                    "topic": "Mục tiêu của AI Study Agent",
-                    "chapter": "Nội dung tài liệu",
-                    "options": [
-                        "Hỗ trợ sinh viên học tập",
-                        "Bán sản phẩm",
-                        "Quản lý giao thông",
-                        "Chỉnh sửa hình ảnh"
-                    ],
-                    "answer": 0
-                }
-            ]
-
-        return questions[:limit]
-
-
+    # Không bịa câu điền từ hay đáp án A cố định khi Gemini không khả dụng.
+    # Trả lỗi rõ ràng để không làm méo dữ liệu Adaptive Learning.
     if not clean_text:
-        return fallback_quiz(question_count)
+        return []
 
 
     # =====================================================
@@ -2812,38 +2749,9 @@ Cấu trúc:
             batch_number += 1
 
 
-    # =====================================================
-    # NẾU GEMINI THIẾU MỘT ÍT CÂU -> BÙ BẰNG FALLBACK
-    # =====================================================
-    if len(questions) < question_count:
-        fallback_items = fallback_quiz(
-            question_count
-        )
-
-        for item in fallback_items:
-            normalized_text = re.sub(
-                r"\s+",
-                " ",
-                item["question"].casefold()
-            ).strip()
-
-            if normalized_text in used_question_texts:
-                continue
-
-            used_question_texts.add(
-                normalized_text
-            )
-
-            questions.append(item)
-
-            if len(questions) >= question_count:
-                break
-
-
-    if not questions:
-        return fallback_quiz(
-            question_count
-        )
+    # Không ghi Quiz bị thiếu câu. Nguồn AI lỗi -> UI hướng dẫn thử lại.
+    if len(questions) != question_count:
+        return []
 
     # Với Quiz ôn điểm yếu, chuẩn hóa topic/chapter về đúng nhãn weakness cũ.
     # Nhờ vậy lần làm đúng sau đó sẽ tăng correct_count của chính weakness đó,
@@ -2918,7 +2826,17 @@ Cấu trúc:
                     "Nội dung tài liệu"
                 )
 
-    return questions[:question_count]
+    # Hoán vị bốn lựa chọn, đồng thời cập nhật đáp án đúng tương ứng.
+    # Tránh mẫu đáp án cố định, vẫn giữ chấm điểm tuyệt đối ở backend.
+    for question in questions:
+        permutation = list(range(4))
+        random.shuffle(permutation)
+        original_options = list(question["options"])
+        original_answer = question["answer"]
+        question["options"] = [original_options[i] for i in permutation]
+        question["answer"] = permutation.index(original_answer)
+
+    return questions
 
 def _safe_int(value, default, minimum, maximum):
     try:
@@ -5148,6 +5066,11 @@ def quiz():
             conn.commit()
 
         conn.close()
+        if not questions:
+            return redirect(url_for(
+                "quiz",
+                generation_error="Không tạo đủ câu hỏi hợp lệ. Kiểm tra tài liệu và kết nối Gemini rồi thử lại."
+            ))
         return redirect(url_for("quiz"))
 
     # =====================================================
@@ -5235,7 +5158,8 @@ def quiz():
         quizzes=parsed,
         selected_document_id=selected_document_id,
         selected_subject_id=selected_subject_id,
-        selected_quiz_mode=selected_quiz_mode
+        selected_quiz_mode=selected_quiz_mode,
+        generation_error=request.args.get("generation_error", "").strip()[:240]
     )
 
 # =====================================================
@@ -5278,11 +5202,7 @@ def delete_quiz(quiz_id):
     )
 
     if quiz_row and quiz_row["subject_id"]:
-        recalculate_subject_progress(
-            uid,
-            quiz_row["subject_id"],
-            conn
-        )
+        rebuild_subject_learning_signals(conn, uid, quiz_row["subject_id"])
 
     conn.commit()
     conn.close()
@@ -6200,6 +6120,22 @@ def api_mobile_logout():
     return jsonify({"success": True})
 
 
+@app.route("/api/mobile/session", methods=["GET"])
+def api_mobile_session():
+    uid, error = _mobile_require_user()
+    if error:
+        return error
+    conn = db()
+    user = conn.execute(
+        "SELECT id,name,email FROM users WHERE id=?", (uid,)
+    ).fetchone()
+    conn.close()
+    if not user:
+        session.clear()
+        return jsonify({"error": "Phiên đăng nhập không hợp lệ."}), 401
+    return jsonify({"user": dict(user)})
+
+
 @app.route("/api/mobile/dashboard", methods=["GET"])
 def api_mobile_dashboard():
     uid, error = _mobile_require_user()
@@ -7037,7 +6973,7 @@ def api_mobile_quiz_generate():
     if not questions:
         conn.close()
         return jsonify({
-            "error": "Chưa đủ tài liệu hoặc dữ liệu điểm yếu để tạo Quiz."
+            "error": "Chưa đủ tài liệu, dữ liệu điểm yếu hoặc Gemini chưa tạo đủ câu hỏi hợp lệ. Hãy kiểm tra nguồn học và thử lại."
         }), 400
 
     cursor = conn.execute(
