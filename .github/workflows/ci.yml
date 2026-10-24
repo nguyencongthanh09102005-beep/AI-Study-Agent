@@ -66,6 +66,9 @@ jobs:
       - name: Admin + Shared Knowledge cross-account tests
         run: python tests/test_admin_shared.py
 
+      - name: Study Plan layout and task action regressions
+        run: python tests/test_study_plan_ui.py
+
       - name: Final QA regression tests
         run: python tests/test_final_qa.py
 
