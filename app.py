@@ -4133,6 +4133,15 @@ def subject_detail(subject_id):
         (shared["id"],)
     ).fetchall()
 
+    shared_file_ids = {
+        row["knowledge_id"]: row["id"]
+        for row in conn.execute(
+            "SELECT knowledge_id,id FROM shared_documents "
+            "WHERE shared_subject_id=?",
+            (shared["id"],)
+        ).fetchall()
+    }
+
     weaknesses = conn.execute(
         """
         SELECT topic,chapter,miss_count,correct_count,last_seen_at
@@ -4205,6 +4214,7 @@ def subject_detail(subject_id):
         subject=subject,
         shared_subject=shared,
         shared_items=shared_items,
+        shared_file_ids=shared_file_ids,
         profile=profile,
         weaknesses=weaknesses,
         documents=docs,
