@@ -25,6 +25,7 @@ def verify_common_library():
     conn.close()
 
     assert anonymous.get("/admin").status_code in (302, 303)
+    assert anonymous.get("/admin/documents").status_code in (302, 303)
     assert anonymous.post("/admin/subjects", data={"name": "Hacked", "code": "ZZ"}).status_code in (302, 303)
     assert anonymous.get("/shared-documents/1/file").status_code in (302, 303)
 
@@ -35,7 +36,21 @@ def verify_common_library():
     assert "/admin" in admin_login.headers["Location"]
     admin_page = admin.get("/admin")
     assert admin_page.status_code == 200
-    assert "Quản lý môn học chung" in admin_page.get_data(as_text=True)
+    html_subjects = admin_page.get_data(as_text=True)
+    assert "Quản lý môn học chung" in html_subjects
+    assert 'id="adminSubjectForm"' in html_subjects
+    assert 'id="adminUploadForm"' not in html_subjects
+    assert 'id="admin-documents"' not in html_subjects
+    assert 'href="/admin/documents"' in html_subjects
+    assert 'href="/admin" class="active"' in html_subjects
+    doc_page = admin.get("/admin/documents")
+    assert doc_page.status_code == 200
+    html_docs = doc_page.get_data(as_text=True)
+    assert 'id="adminUploadForm"' in html_docs
+    assert 'id="adminSubjectForm"' not in html_docs
+    assert 'id="admin-subjects"' not in html_docs
+    assert 'href="/admin/documents" class="active"' in html_docs
+    assert admin.get("/admin?view=documents").headers["Location"].startswith("/admin/documents")
     with admin.session_transaction() as sess:
         token = sess["admin_csrf_token"]
 
@@ -61,6 +76,8 @@ def verify_common_library():
         ), "de_cuong_cloud.txt"),
     }, content_type="multipart/form-data")
     assert uploaded.status_code in (302, 303), uploaded.get_data(as_text=True)
+    assert "/admin/documents" in uploaded.headers["Location"]
+    assert "de_cuong_cloud.txt" in admin.get("/admin/documents").get_data(as_text=True)
     conn = project.db()
     row = conn.execute(
         "SELECT * FROM shared_documents WHERE shared_subject_id=?", (shared_id,)
@@ -83,6 +100,7 @@ def verify_common_library():
         })
         assert response.status_code in (302, 303)
         assert client.get("/admin").status_code == 403
+        assert client.get("/admin/documents").status_code == 403
         subject = client.post("/api/mobile/subjects", json={
             "name": "Điện toán đám mây" if code == "CLOUD101" else "Môn khác",
             "code": code, "credits": 3, "target_score": 8.0,
@@ -129,6 +147,7 @@ def verify_common_library():
 
     deleted = admin.post(f"/admin/documents/{doc_id}/delete", data={"csrf_token": token})
     assert deleted.status_code in (302, 303)
+    assert "/admin/documents" in deleted.headers["Location"]
     assert alice.get(f"/shared-documents/{doc_id}/file").status_code == 404
     assert "de_cuong_cloud.txt" not in alice.get("/documents").get_data(as_text=True)
     conn = project.db()
