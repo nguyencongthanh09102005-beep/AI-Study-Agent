@@ -56,7 +56,7 @@
                   data-code="{{ item.code or '' }}" data-name="{{ item.name }}"
                   data-description="{{ item.description or '' }}" aria-label="Sửa môn {{ item.name }}">✎ Sửa</button>
                 <form method="post" action="{{ url_for('admin_delete_subject', subject_id=item.id) }}"
-                  onsubmit="return confirm('Xóa môn {{ item.code|e }} – {{ item.name|e }} và TOÀN BỘ tài liệu dùng chung của môn này?\\n\\nMôn học, tài liệu cá nhân và tiến độ của sinh viên sẽ không bị xóa.');">
+                  onsubmit="return confirm('Xóa môn học này và TOÀN BỘ tài liệu dùng chung?\\n\\nDữ liệu học tập và tài liệu cá nhân của sinh viên sẽ được giữ nguyên.');">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                   <input type="hidden" name="confirm_code" value="{{ item.code }}">
                   <button type="submit" class="admin-delete-btn" aria-label="Xóa môn {{ item.name }}">× Xóa</button>
