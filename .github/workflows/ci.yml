@@ -60,6 +60,9 @@ jobs:
       - name: Document summary Markdown/XSS tests
         run: node tests/test_document_summary_markdown.js
 
+      - name: Admin + Shared Knowledge cross-account tests
+        run: python tests/test_admin_shared.py
+
       - name: Final QA regression tests
         run: python tests/test_final_qa.py
 
