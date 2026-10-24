@@ -105,9 +105,15 @@ Các bài test CI sử dụng Flask test_client và Expo iOS export; **vẫn c�
 
 Có thể dùng `sample_data/ai_co_ban.txt` để test nhanh luồng Tài liệu → Quiz → AI Chat.
 
-Tài khoản demo mặc định khi database mới được tạo:
+Tài khoản demo **chỉ tự tạo khi** đặt `DEMO_ACCOUNT_ENABLED=1` trong `.env` trước lần khởi tạo database:
 - Email: `demo@study.local`
 - Mật khẩu: `123456`
+
+Mặc định `DEMO_ACCOUNT_ENABLED=0`, để tránh tự sinh tài khoản dùng chung mật khẩu yếu khi triển khai. Nếu database cũ đã có tài khoản demo, cần xóa hoặc đổi mật khẩu bằng biện pháp quản trị an toàn trước khi mở Internet. Khi chạy HTTPS production, dùng `SESSION_COOKIE_SECURE=1`. Khi demo qua HTTP LAN trên iPhone, giữ `SESSION_COOKIE_SECURE=0`.
+
+### Chất lượng Quiz
+
+Quiz yêu cầu đủ số câu hợp lệ từ Gemini. Nếu AI lỗi hoặc sinh thiếu, hệ thống báo lỗi để thử lại, **không tự bù bằng câu điền từ vô nghĩa**. Khi xóa Quiz hoặc tài liệu sinh Quiz, điểm yếu và nhiệm vụ Adaptive chưa hoàn thành được tính lại từ các lượt làm Quiz còn lại. Mobile thử khôi phục cookie session khi mở lại; nếu phiên không còn hợp lệ, người dùng đăng nhập lại.
 
 ## Bật Gemini
 
