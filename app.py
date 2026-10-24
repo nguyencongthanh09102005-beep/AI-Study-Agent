@@ -6663,6 +6663,15 @@ def api_mobile_subject_detail(subject_id):
         (uid, subject_id)
     ).fetchone()["c"]
 
+    common_docs = conn.execute(
+        """SELECT id,original_name,is_syllabus,created_at,
+                  LENGTH(extracted_text) AS extracted_chars
+           FROM shared_documents
+           WHERE shared_subject_id=?
+           ORDER BY id DESC LIMIT 60""",
+        (shared["id"],)
+    ).fetchall()
+
     conn.close()
 
     return jsonify({
@@ -6690,9 +6699,46 @@ def api_mobile_subject_detail(subject_id):
             "notes": profile["notes"]
         },
         "document_count": int(document_count or 0),
+        "shared_documents": [dict(row) for row in common_docs],
         "weaknesses": [dict(row) for row in weaknesses]
     })
 
+
+
+@app.route("/api/mobile/shared-documents/<int:doc_id>")
+def api_mobile_shared_document(doc_id):
+    uid, error = _mobile_require_user()
+    if error:
+        return error
+    conn = db()
+    row = conn.execute(
+        """SELECT sd.id,sd.original_name,sd.extracted_text,sd.is_syllabus,
+                  sd.shared_subject_id,ss.name AS subject_name
+           FROM shared_documents sd
+           JOIN shared_subjects ss ON ss.id=sd.shared_subject_id
+           WHERE sd.id=?""",
+        (doc_id,)
+    ).fetchone()
+    if not row:
+        conn.close()
+        return jsonify({"error": "Không tìm thấy tài liệu chung."}), 404
+    student_subjects = conn.execute(
+        "SELECT id FROM subjects WHERE user_id=?", (uid,)
+    ).fetchall()
+    for item in student_subjects:
+        ensure_shared_subject_for_user_subject(conn, uid, item["id"])
+    allowed = conn.execute(
+        "SELECT id FROM subjects WHERE user_id=? AND shared_subject_id=? LIMIT 1",
+        (uid, row["shared_subject_id"])
+    ).fetchone()
+    if not allowed:
+        conn.close()
+        return jsonify({"error": "Bạn chưa đăng ký môn học tương ứng."}), 403
+    output = dict(row)
+    # Full extracted text stays cached in DB for the AI. Preview only a sensible limit on iPhone.
+    output["extracted_text"] = (row["extracted_text"] or "")[:20000]
+    conn.close()
+    return jsonify({"document": output})
 
 
 # =====================================================
