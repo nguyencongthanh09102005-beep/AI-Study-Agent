@@ -334,6 +334,20 @@ jobs:
               )
               assert response.status_code == 200
 
+          # Đáp án Quiz phải được giữ trên server cho đến khi nộp bài.
+          quiz_detail = client_a.get(
+              f"/api/mobile/quizzes/{quiz_a_id}"
+          )
+          assert quiz_detail.status_code == 200
+          public_question = quiz_detail.get_json()["questions"][0]
+          assert "answer" not in public_question
+          assert "explanation" not in public_question
+          assert client_b.get(
+              f"/api/mobile/quizzes/{quiz_a_id}"
+          ).status_code == 404
+          assert client_a.get("/quiz").status_code == 200
+          assert b'data-answer=' not in client_a.get("/quiz").data
+
           # Cùng mã môn -> Shared Subject giống nhau, nhưng subject cá nhân khác nhau.
           subjects_a = client_a.get("/api/mobile/subjects").get_json()
           subjects_b = client_b.get("/api/mobile/subjects").get_json()
@@ -411,6 +425,7 @@ jobs:
           )
           assert wrong_result.status_code == 200
           wrong_data = wrong_result.get_json()
+          assert wrong_data["correct_answers"] == [0]
           assert wrong_data["weakness_count"] == 1
           assert wrong_data["adaptive_task"] is not None
 
@@ -429,6 +444,7 @@ jobs:
           )
           assert correct_result.status_code == 200
           correct_data = correct_result.get_json()
+          assert correct_data["correct_answers"] == [0]
           assert correct_data["weakness_count"] == 0
           assert "CI Topic" in correct_data["resolved_topics"]
 
