@@ -1,0 +1,58 @@
+/* Trình bày nội dung tóm tắt AI đã chuyển từ Markdown sang HTML an toàn. */
+.study-markdown {
+  white-space: pre-wrap; /* Fallback khi JavaScript bị tắt. */
+  line-height: 1.8;
+  color: #344057;
+  font-size: 14px;
+  background: #f7f9fd;
+  border-radius: 16px;
+  padding: 22px 24px;
+  overflow-wrap: anywhere;
+}
+.study-markdown.is-rendered { white-space: normal; }
+.study-markdown h3,
+.study-markdown h4,
+.study-markdown h5,
+.study-markdown h6 {
+  color: #252f60;
+  margin: 22px 0 9px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+.study-markdown h3 { font-size: 18px; }
+.study-markdown h4 { font-size: 16px; }
+.study-markdown h5,
+.study-markdown h6 { font-size: 15px; }
+.study-markdown h3:first-child,
+.study-markdown h4:first-child,
+.study-markdown h5:first-child { margin-top: 0; }
+.study-markdown p { margin: 0 0 14px; }
+.study-markdown ul,
+.study-markdown ol { margin: 4px 0 18px; padding-left: 26px; }
+.study-markdown li { margin: 6px 0; padding-left: 3px; }
+.study-markdown li::marker { color: #6465ed; }
+.study-markdown strong { color: #263257; font-weight: 800; }
+.study-markdown em { font-style: italic; }
+.study-markdown hr {
+  margin: 20px 0;
+  border: 0;
+  height: 1px;
+  background: #dfe4f1;
+}
+.study-markdown pre {
+  white-space: pre-wrap;
+  background: #eaf0fb;
+  border-radius: 10px;
+  padding: 12px;
+  overflow-x: auto;
+}
+.study-markdown code {
+  font-size: .94em;
+  background: #eaf0fb;
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+@media (max-width: 620px) {
+  .study-markdown { padding: 16px; font-size: 13px; }
+  .study-markdown h3 { font-size: 16px; }
+}
