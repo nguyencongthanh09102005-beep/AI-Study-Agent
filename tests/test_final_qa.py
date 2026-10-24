@@ -2,6 +2,7 @@
 import json
 import re
 import sys
+from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -117,6 +118,48 @@ def check_adaptive_delete():
     conn.close()
 
 
+def check_upload_limit():
+    """Ensure oversized uploads show a human-readable Web error and JSON for mobile."""
+    client = project.app.test_client()
+    registered = client.post("/api/mobile/register", json={
+        "name": "Upload Size QA",
+        "email": "upload-limit-qa@study.local",
+        "password": "ci-sample-password",
+    })
+    assert registered.status_code == 201
+
+    original_limit = project.app.config["MAX_CONTENT_LENGTH"]
+    try:
+        project.app.config["MAX_CONTENT_LENGTH"] = 1024
+        web_response = client.post(
+            "/documents",
+            data={"file": (BytesIO(b"x" * 2048), "oversized.txt")},
+            content_type="multipart/form-data",
+        )
+        assert web_response.status_code == 303
+        assert "upload_error=too_large" in web_response.headers["Location"]
+
+        mobile_response = client.post(
+            "/api/mobile/documents",
+            data={"file": (BytesIO(b"x" * 2048), "oversized.txt")},
+            content_type="multipart/form-data",
+        )
+        assert mobile_response.status_code == 413
+        payload = mobile_response.get_json()
+        assert payload and "max_upload_mb" in payload
+        assert "error" in payload
+    finally:
+        project.app.config["MAX_CONTENT_LENGTH"] = original_limit
+
+    # Neither failed request must persist a document.
+    docs = client.get("/api/mobile/documents")
+    assert docs.status_code == 200
+    assert docs.get_json()["documents"] == []
+    page = client.get("/documents?upload_error=too_large")
+    assert page.status_code == 200
+    assert "Tệp vừa chọn vượt giới hạn" in page.get_data(as_text=True)
+
+
 if __name__ == "__main__":
     # Isolated temporary DB: safe to run repeatedly without altering real learner data.
     old_db_path, old_upload_dir = project.DB_PATH, project.UPLOAD_DIR
@@ -128,6 +171,7 @@ if __name__ == "__main__":
             project.init_db()
             check_quiz_generation()
             check_adaptive_delete()
+            check_upload_limit()
     finally:
         project.DB_PATH, project.UPLOAD_DIR = old_db_path, old_upload_dir
     print("Final QA checks passed")
