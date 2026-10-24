@@ -27,7 +27,21 @@ Tài khoản Admin được tạo **trực tiếp trên máy chạy Flask**, kh�
 python scripts/create_admin.py --email admin@example.com --name "Quản trị viên"
 ```
 
-Lệnh sẽ yêu cầu nhập mật khẩu hai lần, tối thiểu 10 ký tự (không hiện trên màn hình), sau đó tạo hoặc cấp quyền Admin cho email đó trong SQLite cục bộ. Thay email bằng email do bạn kiểm soát, KHÔNG dùng email demo/mật khẩu dễ đoán. Chạy lệnh trên **máy chứa database thật** (`data/study_agent.db`), rồi chọn tab Quản trị viên tại `http://127.0.0.1:5000/login?tab=admin`. Sinh viên đăng ký bình thường luôn mang role `student`, không thể tự cấp quyền Admin.
+Lệnh sẽ yêu cầu nhập mật khẩu hai lần, tối thiểu 10 ký tự (không hiện trên màn hình), rồi tạo tài khoản Admin trong SQLite cục bộ. Thay email bằng email do bạn kiểm soát, KHÔNG dùng email demo/mật khẩu dễ đoán. Chạy lệnh trên **máy chứa database thật** (`data/study_agent.db`), rồi chọn tab Quản trị viên tại `http://127.0.0.1:5000/login?tab=admin`. Sinh viên đăng ký bình thường luôn mang role `student`, không thể tự cấp quyền Admin. **Lưu ý:** script đã được bảo vệ để **từ chối** nếu email thuộc tài khoản sinh viên; tuyệt đối không chuyển vai trò hoặc ghi đè mật khẩu sinh viên. Nếu email thuộc tài khoản Admin sẵn có, chạy lại lệnh là đổi mật khẩu Admin.
+
+### Khôi phục nếu từng dùng chung email để tạo tài khoản Admin
+
+Trước bản sửa này, `scripts/create_admin.py` có thể ghi đè vai trò và mật khẩu của **chính tài khoản sinh viên**, gây lỗi khi đăng nhập tab Sinh viên. Dữ liệu học vẫn gắn với ID tài khoản cũ. **Đừng đăng ký lại sinh viên** vì tài khoản mới không có tài liệu đã lưu; **đừng xóa database**.
+
+Để tách ra thành tài khoản sinh viên (email gốc) và Admin (email mới), trước tiên `git pull origin main`, **dừng Flask**, sau đó chạy trong thư mục gốc:
+
+```bash
+python scripts/restore_student.py --email student@gmail.com --admin-email student+admin@gmail.com
+```
+
+Ví dụ dùng `+admin` với Gmail như một địa chỉ email phụ nhưng vẫn nhận thư trong cùng hộp thư. Cũng có thể dùng một email khác do bạn kiểm soát. Script sẽ hỏi tên hiển thị sinh viên, mật khẩu **MỚI** cho sinh viên và mật khẩu **MỚI, KHÁC** cho Admin (đều >=10 ký tự). Mật khẩu cũ của sinh viên **không thể tự khôi phục** vì đã bị ghi đè bằng hash của Admin; hãy đặt mật khẩu mới mạnh và không dùng lại mật khẩu từng chia sẻ. Script **giữ nguyên user ID** và mọi dữ liệu học cá nhân, tự sao lưu database vào `data/study_agent_backup_before_account_recovery_*.db` trước khi sửa và từ chối chạy lại nếu tài khoản đã được khôi phục. Khởi động Flask lại, đăng nhập theo tab tương ứng. Không phải chạy script khôi phục này nếu bạn chưa từng gặp sự cố.
+
+
 
 Giao diện Admin dùng **cùng giao diện, logo, sidebar và tông màu của Web sinh viên**, gồm **2 trang riêng biệt**: `/admin` để quản lý môn học và `/admin/documents` để quản lý tài liệu chung. Click từng mục trong sidebar mở trang tương ứng; upload/xóa file sẽ quay về trang tài liệu.
 - **Quản lý môn học chung**: thêm môn (mã môn bắt buộc + tên + mô tả), bấm **Sửa** để chỉnh cả mã môn, tên môn và mô tả; bấm **Xóa** để xóa môn khỏi kho chung cùng tất cả tài liệu chung của môn (có xác nhận). Môn cá nhân, file cá nhân, Quiz, điểm yếu và kế hoạch của sinh viên vẫn được giữ nguyên. Nếu sửa **mã môn**, sinh viên có mã cũ sẽ không còn thấy tài liệu chung cho đến khi mã môn cá nhân được chỉnh khớp mã mới; mã trùng môn khác sẽ bị từ chối.
