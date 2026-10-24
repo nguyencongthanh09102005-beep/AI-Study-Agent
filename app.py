@@ -4274,6 +4274,224 @@ def delete_subject(subject_id):
     conn.close()
     return redirect(url_for("subjects"))
 
+# =============================================================
+# ADMIN: shared course catalog and pre-extracted common documents
+# =============================================================
+@app.route("/admin")
+@admin_required
+def admin_dashboard():
+    conn = db()
+    subjects = conn.execute(
+        """SELECT ss.*, COUNT(sd.id) AS document_count
+           FROM shared_subjects ss
+           LEFT JOIN shared_documents sd ON sd.shared_subject_id=ss.id
+           GROUP BY ss.id ORDER BY ss.updated_at DESC, ss.id DESC"""
+    ).fetchall()
+    documents = conn.execute(
+        """SELECT sd.*, ss.name AS subject_name, ss.code AS subject_code
+           FROM shared_documents sd JOIN shared_subjects ss ON ss.id=sd.shared_subject_id
+           ORDER BY sd.id DESC LIMIT 120"""
+    ).fetchall()
+    count = conn.execute("SELECT COUNT(*) FROM users WHERE role='student'").fetchone()[0]
+    conn.close()
+    error = request.args.get("error", "").strip()[:250]
+    notice = request.args.get("notice", "").strip()[:250]
+    return render_template(
+        "admin.html", subjects=subjects, documents=documents, student_count=count,
+        page="admin", csrf_token=admin_form_token(), error=error,
+        notice=notice, upload_max_mb=MAX_UPLOAD_MB,
+        view=request.args.get("view", "subjects")
+    )
+
+
+@app.route("/admin/subjects", methods=["POST"])
+@admin_required
+def admin_add_subject():
+    if not admin_csrf_valid():
+        return "Phiên biểu mẫu không hợp lệ. Hãy tải lại trang quản trị.", 400
+    code = re.sub(r"\s+", "", request.form.get("code", "")).upper()[:50]
+    name = request.form.get("name", "").strip()[:180]
+    description = request.form.get("description", "").strip()[:900]
+    if not code or not name:
+        return redirect(url_for("admin_dashboard", error="Vui lòng nhập mã môn và tên môn."))
+    key = _normalize_subject_key(code, name)
+    conn = db()
+    existing = conn.execute(
+        "SELECT id FROM shared_subjects WHERE subject_key=?", (key,)
+    ).fetchone()
+    timestamp = now()
+    if existing:
+        conn.execute(
+            "UPDATE shared_subjects SET code=?,name=?,description=?,updated_at=? WHERE id=?",
+            (code, name, description, timestamp, existing["id"])
+        )
+        notice = "Đã cập nhật môn học dùng chung."
+    else:
+        conn.execute(
+            """INSERT INTO shared_subjects(
+                subject_key,code,name,description,syllabus_text,created_at,updated_at
+            ) VALUES(?,?,?,?,?,?,?)""",
+            (key, code, name, description, "", timestamp, timestamp)
+        )
+        notice = "Đã tạo môn học dùng chung."
+    conn.commit()
+    conn.close()
+    return redirect(url_for("admin_dashboard", notice=notice))
+
+
+@app.route("/admin/documents", methods=["POST"])
+@admin_required
+def admin_add_document():
+    if not admin_csrf_valid():
+        return "Phiên biểu mẫu không hợp lệ. Hãy tải lại trang quản trị.", 400
+    subject_id = request.form.get("shared_subject_id", type=int)
+    upload = request.files.get("file")
+    if not subject_id or not upload or not upload.filename or not allowed_file(upload.filename):
+        return redirect(url_for(
+            "admin_dashboard", view="documents", error="Chọn môn và tệp PDF, TXT hoặc MD hợp lệ."
+        ))
+    original = os.path.basename(upload.filename.replace("\\", "/")).strip()[:180]
+    safe = secure_filename(original)
+    if not safe:
+        return redirect(url_for(
+            "admin_dashboard", view="documents", error="Tên tệp không hợp lệ."
+        ))
+    conn = db()
+    shared_subject = conn.execute(
+        "SELECT id FROM shared_subjects WHERE id=?", (subject_id,)
+    ).fetchone()
+    if not shared_subject:
+        conn.close()
+        return redirect(url_for(
+            "admin_dashboard", view="documents", error="Môn học dùng chung không tồn tại."
+        ))
+    stored = "shared_" + secrets.token_hex(12) + "_" + safe
+    target = UPLOAD_DIR / stored
+    is_syllabus = request.form.get("is_syllabus") == "1"
+    try:
+        upload.save(target)
+        extracted = extract_text(target)
+        if not extracted.strip():
+            target.unlink(missing_ok=True)
+            conn.close()
+            return redirect(url_for(
+                "admin_dashboard", view="documents",
+                error="Tệp không trích xuất được chữ. PDF scan ảnh cần OCR trước khi tải."
+            ))
+        timestamp = now()
+        cur = conn.execute(
+            """INSERT INTO shared_knowledge(
+                shared_subject_id,title,content,source_type,created_by_user_id,created_at,updated_at
+            ) VALUES(?,?,?,?,?,?,?)""",
+            (subject_id, original, extracted, "shared_document", session["user_id"],
+             timestamp, timestamp)
+        )
+        knowledge_id = cur.lastrowid
+        conn.execute(
+            """INSERT INTO shared_documents(
+                shared_subject_id,original_name,stored_name,extracted_text,
+                knowledge_id,is_syllabus,created_by_user_id,created_at
+            ) VALUES(?,?,?,?,?,?,?,?)""",
+            (subject_id, original, stored, extracted, knowledge_id,
+             int(is_syllabus), session["user_id"], timestamp)
+        )
+        if is_syllabus:
+            # Only one official syllabus per course; newest admin upload wins.
+            conn.execute(
+                "UPDATE shared_documents SET is_syllabus=0 "
+                "WHERE shared_subject_id=? AND stored_name<>?",
+                (subject_id, stored)
+            )
+            conn.execute(
+                "UPDATE shared_subjects SET syllabus_text=?,updated_at=? WHERE id=?",
+                (extracted[:20000], timestamp, subject_id)
+            )
+        else:
+            conn.execute(
+                "UPDATE shared_subjects SET updated_at=? WHERE id=?",
+                (timestamp, subject_id)
+            )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        target.unlink(missing_ok=True)
+        raise
+    finally:
+        # Avoid leaking handles if file extraction or SQLite insert fails.
+        try:
+            conn.close()
+        except Exception:
+            pass
+    return redirect(url_for(
+        "admin_dashboard", view="documents",
+        notice="Đã lưu và trích xuất nội dung tài liệu dùng chung."
+    ))
+
+
+@app.route("/admin/documents/<int:doc_id>/delete", methods=["POST"])
+@admin_required
+def admin_delete_document(doc_id):
+    if not admin_csrf_valid():
+        return "Phiên biểu mẫu không hợp lệ. Hãy tải lại trang quản trị.", 400
+    conn = db()
+    doc = conn.execute(
+        "SELECT * FROM shared_documents WHERE id=?", (doc_id,)
+    ).fetchone()
+    if not doc:
+        conn.close()
+        return "Không tìm thấy tài liệu.", 404
+    conn.execute("DELETE FROM shared_documents WHERE id=?", (doc_id,))
+    if doc["knowledge_id"]:
+        conn.execute("DELETE FROM shared_knowledge WHERE id=?", (doc["knowledge_id"],))
+    if doc["is_syllabus"]:
+        # Shared syllabus fallback: reset rather than serve deleted content.
+        conn.execute(
+            "UPDATE shared_subjects SET syllabus_text='',updated_at=? WHERE id=?",
+            (now(), doc["shared_subject_id"])
+        )
+    conn.commit()
+    conn.close()
+    (UPLOAD_DIR / doc["stored_name"]).unlink(missing_ok=True)
+    return redirect(url_for(
+        "admin_dashboard", view="documents", notice="Đã xóa tài liệu dùng chung."
+    ))
+
+
+@app.route("/shared-documents/<int:doc_id>/file")
+@login_required
+def shared_document_file(doc_id):
+    conn = db()
+    document = conn.execute(
+        "SELECT * FROM shared_documents WHERE id=?", (doc_id,)
+    ).fetchone()
+    if not document:
+        conn.close()
+        return "Không tìm thấy tài liệu.", 404
+
+    account = conn.execute(
+        "SELECT role FROM users WHERE id=?", (session["user_id"],)
+    ).fetchone()
+    authorized = bool(account and account["role"] == "admin")
+    if not authorized:
+        # A student may read common files ONLY for their own registered course.
+        subjects = conn.execute(
+            "SELECT id FROM subjects WHERE user_id=?", (session["user_id"],)
+        ).fetchall()
+        for item in subjects:
+            ensure_shared_subject_for_user_subject(conn, session["user_id"], item["id"])
+        authorized = bool(conn.execute(
+            "SELECT id FROM subjects WHERE user_id=? AND shared_subject_id=? LIMIT 1",
+            (session["user_id"], document["shared_subject_id"])
+        ).fetchone())
+    conn.close()
+    if not authorized:
+        return "Không có quyền xem tài liệu của môn học này.", 403
+    return send_from_directory(
+        UPLOAD_DIR, document["stored_name"],
+        as_attachment=False, download_name=document["original_name"]
+    )
+
+
 @app.route("/documents", methods=["GET", "POST"])
 @login_required
 def documents():
