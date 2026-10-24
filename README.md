@@ -29,7 +29,7 @@ python scripts/create_admin.py --email admin@example.com --name "Quản trị vi
 
 Lệnh sẽ yêu cầu nhập mật khẩu hai lần, tối thiểu 10 ký tự (không hiện trên màn hình), sau đó tạo hoặc cấp quyền Admin cho email đó trong SQLite cục bộ. Thay email bằng email do bạn kiểm soát, KHÔNG dùng email demo/mật khẩu dễ đoán. Chạy lệnh trên **máy chứa database thật** (`data/study_agent.db`), rồi chọn tab Quản trị viên tại `http://127.0.0.1:5000/login?tab=admin`. Sinh viên đăng ký bình thường luôn mang role `student`, không thể tự cấp quyền Admin.
 
-Giao diện Admin dùng **cùng giao diện, logo, sidebar và tông màu của Web sinh viên**, chỉ có 2 phần:
+Giao diện Admin dùng **cùng giao diện, logo, sidebar và tông màu của Web sinh viên**, gồm **2 trang riêng biệt**: `/admin` để quản lý môn học và `/admin/documents` để quản lý tài liệu chung. Click từng mục trong sidebar mở trang tương ứng; upload/xóa file sẽ quay về trang tài liệu.
 - **Quản lý môn học chung**: thêm môn (mã môn bắt buộc + tên + mô tả), bấm **Sửa** để chỉnh cả mã môn, tên môn và mô tả; bấm **Xóa** để xóa môn khỏi kho chung cùng tất cả tài liệu chung của môn (có xác nhận). Môn cá nhân, file cá nhân, Quiz, điểm yếu và kế hoạch của sinh viên vẫn được giữ nguyên. Nếu sửa **mã môn**, sinh viên có mã cũ sẽ không còn thấy tài liệu chung cho đến khi mã môn cá nhân được chỉnh khớp mã mới; mã trùng môn khác sẽ bị từ chối.
 - **Quản lý tài liệu chung**: chọn môn, upload PDF/TXT/MD, tùy chọn đánh dấu đề cương chuẩn, xem/xóa tài liệu. Form giới hạn kích thước theo `MAX_UPLOAD_MB`.
 
