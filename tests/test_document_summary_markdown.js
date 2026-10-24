@@ -50,7 +50,7 @@ assert.match(attack, /&amp;/);
 assert.match(attack, /<code>&lt;script&gt;evil\(\)&lt;\/script&gt;<\/code>/);
 
 const fence = renderStudyMarkdown("Dữ liệu:\n\x60\x60\x60python\nprint('<script>')\n\x60\x60\x60");
-assert.match(fence, /<pre><code>print\('&lt;script&gt;'\)<\/code><\/pre>/);
+assert.match(fence, /<pre><code>print\(&#39;&lt;script&gt;&#39;\)<\/code><\/pre>/);
 assert.equal(renderStudyMarkdown(""), "");
 
 console.log("Markdown document-summary rendering and XSS regression tests passed");
