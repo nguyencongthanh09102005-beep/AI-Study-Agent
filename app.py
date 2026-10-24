@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, send_from_directory
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
+from werkzeug.exceptions import RequestEntityTooLarge
 
 try:
     from pypdf import PdfReader
@@ -34,13 +35,35 @@ app = Flask(__name__)
 # Khi thiếu SECRET_KEY, dùng khóa ngẫu nhiên chỉ cho phiên chạy hiện tại.
 # Khi triển khai cần đặt SECRET_KEY bí mật, ổn định trong biến môi trường.
 app.secret_key = os.getenv("SECRET_KEY") or secrets.token_hex(32)
-app.config["MAX_CONTENT_LENGTH"] = 20 * 1024 * 1024
+# Giới hạn kích thước TOÀN BỘ HTTP request, gồm file và multipart headers.
+# File PDF lớn cần được chấp nhận nhưng vẫn phải có ngưỡng để tránh DOS.
+try:
+    MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "50"))
+except (TypeError, ValueError):
+    MAX_UPLOAD_MB = 50
+MAX_UPLOAD_MB = max(5, min(MAX_UPLOAD_MB, 100))
+app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_MB * 1024 * 1024
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 # Bật chỉ khi chạy HTTPS thật; khi demo LAN HTTP giữ =0.
 app.config["SESSION_COOKIE_SECURE"] = os.getenv("SESSION_COOKIE_SECURE", "0") == "1"
 
 ALLOWED_EXTENSIONS = {"pdf", "txt", "md"}
+
+
+@app.errorhandler(RequestEntityTooLarge)
+def handle_upload_too_large(error):
+    """Thay trang lỗi Werkzeug bằng phản hồi thân thiện cho Web và Mobile."""
+    message = (
+        f"Tệp vượt giới hạn tải lên {MAX_UPLOAD_MB} MB. "
+        "Hãy chọn tệp nhỏ hơn hoặc nén/chia nhỏ PDF."
+    )
+    if request.path.startswith("/api/"):
+        return jsonify({"error": message, "max_upload_mb": MAX_UPLOAD_MB}), 413
+    if request.path == "/documents":
+        # Redirect GET tránh trình duyệt ở lại trang lỗi POST và giúp giữ giao diện.
+        return redirect(url_for("documents", upload_error="too_large"), code=303)
+    return message, 413
 
 def db():
     conn = sqlite3.connect(DB_PATH)
@@ -4258,7 +4281,9 @@ def documents():
         subjects=subs,
         extracted_count=extracted_count,
         extraction_percent=extraction_percent,
-        storage_mb=storage_mb
+        storage_mb=storage_mb,
+        upload_max_mb=MAX_UPLOAD_MB,
+        upload_error=request.args.get("upload_error") == "too_large"
     )
 
 
