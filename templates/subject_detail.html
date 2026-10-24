@@ -126,8 +126,7 @@
       <div class="shared-syllabus-readonly">{{ shared_subject.syllabus_text }}</div>
       {% else %}
       <div class="empty-agent">
-        Chưa có đề cương chuẩn trong kho dùng chung. Study Agent sẽ dùng đề cương cá nhân bạn chọn
-        làm fallback; phần quản lý nội dung chuẩn sẽ thuộc vai trò giảng viên/quản trị học thuật khi mở rộng hệ thống.
+        Chưa có đề cương chuẩn trong kho dùng chung. Khi Admin tải lên, hệ thống sẽ tự liên kết theo mã môn; trong thời gian này Study Agent có thể dùng đề cương cá nhân của bạn.
       </div>
       {% endif %}
     </div>
@@ -143,8 +142,9 @@
           <span class="shared-item-icon">▤</span>
           <div>
             <strong>{{ item.title }}</strong>
-            <small>{{ item.source_type }} · {{ item.created_at[:10] }}</small>
+            <small>{{ 'Tài liệu chuẩn đã xử lý' if item.source_type == 'shared_document' else item.source_type }} · {{ item.created_at[:10] }}</small>
             <p>{{ item.content[:180] }}{% if item.content|length > 180 %}…{% endif %}</p>
+            {% if shared_file_ids.get(item.id) %}<a href="{{ url_for('shared_document_file', doc_id=shared_file_ids[item.id]) }}" target="_blank" rel="noopener" style="color:#5265ff;font-size:11px;font-weight:800;">◉ Xem tài liệu chung</a>{% endif %}
           </div>
         </div>
         {% else %}
@@ -155,7 +155,7 @@
 
     <div class="future-role-note">
       <span>🔒</span>
-      <p><strong>Scope hiện tại:</strong> sinh viên chỉ đọc Shared Knowledge. Việc quản lý đề cương và bài giảng chuẩn được để cho vai trò giảng viên/thầy cô ở giai đoạn phát triển sau.</p>
+      <p><strong>Tài liệu dùng chung:</strong> được quản trị viên cung cấp và xử lý trước. Sinh viên chỉ xem và sử dụng trong Chat AI, Quiz, kế hoạch học; không thể thay đổi kho chung.</p>
     </div>
   </article>
 
