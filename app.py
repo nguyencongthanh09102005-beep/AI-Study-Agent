@@ -4373,10 +4373,9 @@ def update_document_subject(doc_id):
             (new_subject_id, doc_id, uid)
         )
 
-        if old_subject_id:
-            recalculate_subject_progress(uid, old_subject_id, conn)
-        if new_subject_id:
-            recalculate_subject_progress(uid, new_subject_id, conn)
+        # Quiz sinh từ tài liệu đổi môn: chuyển cả tín hiệu học tương ứng.
+        for affected_id in {old_subject_id, new_subject_id} - {None}:
+            rebuild_subject_learning_signals(conn, uid, affected_id)
 
         conn.commit()
 
@@ -4404,7 +4403,7 @@ def delete_document(doc_id):
 
         quiz_rows = conn.execute(
             """
-            SELECT id
+            SELECT id,subject_id
             FROM quizzes
             WHERE user_id=?
               AND (
@@ -4414,6 +4413,9 @@ def delete_document(doc_id):
             """,
             (uid, doc_id, f"Quiz từ {row['original_name']}")
         ).fetchall()
+        affected_subject_ids = {subject_id} | {
+            quiz_row["subject_id"] for quiz_row in quiz_rows
+        }
 
         for quiz_row in quiz_rows:
             conn.execute(
@@ -4447,8 +4449,8 @@ def delete_document(doc_id):
             (doc_id, uid)
         )
 
-        if subject_id:
-            recalculate_subject_progress(uid, subject_id, conn)
+        for affected_id in affected_subject_ids - {None}:
+            rebuild_subject_learning_signals(conn, uid, affected_id)
 
         conn.commit()
 
@@ -6623,20 +6625,21 @@ def api_mobile_modify_document(doc_id):
             "UPDATE quizzes SET subject_id=? WHERE document_id=? AND user_id=?",
             (new_id, doc_id, uid)
         )
-        if old_id:
-            recalculate_subject_progress(uid, old_id, conn)
-        if new_id:
-            recalculate_subject_progress(uid, new_id, conn)
+        for affected_id in {old_id, new_id} - {None}:
+            rebuild_subject_learning_signals(conn, uid, affected_id)
         conn.commit()
         conn.close()
         return jsonify({"success": True})
 
     old_id = row["subject_id"]
     quiz_ids = conn.execute(
-        """SELECT id FROM quizzes WHERE user_id=? AND
+        """SELECT id,subject_id FROM quizzes WHERE user_id=? AND
            (document_id=? OR (document_id IS NULL AND title=?))""",
         (uid, doc_id, f"Quiz từ {row['original_name']}")
     ).fetchall()
+    affected_subject_ids = {old_id} | {
+        quiz_row["subject_id"] for quiz_row in quiz_ids
+    }
     for quiz in quiz_ids:
         conn.execute(
             "DELETE FROM quiz_attempts WHERE user_id=? AND quiz_id=?",
@@ -6654,8 +6657,8 @@ def api_mobile_modify_document(doc_id):
     conn.execute(
         "DELETE FROM documents WHERE user_id=? AND id=?", (uid, doc_id)
     )
-    if old_id:
-        recalculate_subject_progress(uid, old_id, conn)
+    for affected_id in affected_subject_ids - {None}:
+        rebuild_subject_learning_signals(conn, uid, affected_id)
     conn.commit()
     conn.close()
     (UPLOAD_DIR / row["stored_name"]).unlink(missing_ok=True)
