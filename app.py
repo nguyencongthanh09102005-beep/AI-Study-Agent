@@ -6216,6 +6216,8 @@ def study_plan():
         deadline_week=deadline_week,
         reminder_today=reminder_today,
         completion=completion,
+        weekly_task_count=weekly_task_count,
+        weekly_completed_count=weekly_completed_count,
         planned_minutes=planned_minutes,
         completed_minutes=completed_minutes,
         time_completion=time_completion,
