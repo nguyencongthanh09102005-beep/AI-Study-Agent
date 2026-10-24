@@ -4,6 +4,12 @@
 {% block page_styles %}<link rel="stylesheet" href="{{ url_for('static', filename='css/quiz.css') }}">{% endblock %}
 
 {% block content %}
+{% if generation_error %}
+<div class="soft-card" role="alert" style="padding:14px 18px;margin-bottom:16px;border-left:4px solid #e78d5b;color:#9e4d20">
+  {{ generation_error }}
+</div>
+{% endif %}
+
 <section class="soft-card quiz-create-hub" id="quizCreateModes" data-initial-mode="{{ selected_quiz_mode or ('document' if selected_document_id else 'subject') }}">
   <div class="quiz-create-hub-head">
     <div class="quiz-create-title">
