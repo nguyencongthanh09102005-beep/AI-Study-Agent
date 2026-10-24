@@ -13,7 +13,7 @@
   <div class="auth-shell-new">
     <header class="auth-brandbar">
       <a class="brand" href="{{ url_for('login') }}"><span class="brand-logo"><img src="{{ url_for('static', filename='images/ai-robot.svg') }}" alt=""></span><span class="brand-copy"><strong>AI Study Agent</strong><small>Học thông minh hơn ✦</small></span></a>
-      <div class="auth-top-switch">Chưa có tài khoản? <button type="button" data-auth-tab="signup">Tạo tài khoản</button></div>
+      <div class="auth-top-switch">Chưa có tài khoản sinh viên? <button type="button" data-auth-tab="signup">Tạo tài khoản</button></div>
     </header>
 
     <main class="auth-main-new">
@@ -39,11 +39,15 @@
       </section>
 
       <section class="auth-form-card">
-        <div class="auth-tabs"><button class="{{ 'active' if auth_tab != 'signup' else '' }}" type="button" data-auth-tab="login">↪ &nbsp; Đăng nhập</button><button class="{{ 'active' if auth_tab == 'signup' else '' }}" type="button" data-auth-tab="signup">♙ &nbsp; Tạo tài khoản</button></div>
+        <div class="auth-tabs auth-tabs-three">
+          <button class="{{ 'active' if auth_tab == 'login' else '' }}" type="button" data-auth-tab="login">↪ Đăng nhập</button>
+          <button class="{{ 'active' if auth_tab == 'signup' else '' }}" type="button" data-auth-tab="signup">♙ Tạo tài khoản</button>
+          <button class="{{ 'active' if auth_tab == 'admin' else '' }}" type="button" data-auth-tab="admin">♜ Quản trị viên</button>
+        </div>
 
-        <div class="auth-pane {{ 'active' if auth_tab != 'signup' else '' }}" data-auth-pane="login">
+        <div class="auth-pane {{ 'active' if auth_tab == 'login' else '' }}" data-auth-pane="login">
           <h2>Chào mừng trở lại!</h2><p>Đăng nhập để tiếp tục hành trình học tập thông minh.</p>
-          {% if error %}<div class="message error-message"><strong>Đăng nhập thất bại</strong><span>{{ error }}</span></div>{% endif %}
+          {% if error and auth_tab == 'login' %}<div class="message error-message"><strong>Đăng nhập thất bại</strong><span>{{ error }}</span></div>{% endif %}
           <form method="post" action="{{ url_for('login') }}" class="auth-form-new">
             <label><span>Email</span><div><i>✉</i><input type="email" id="loginEmail" name="email" placeholder="Nhập email của bạn" autocomplete="email" required></div></label>
             <div class="auth-password-group">
@@ -85,6 +89,25 @@
             <button class="auth-submit" type="submit">→ &nbsp; Tạo tài khoản</button>
           </form>
           <div class="auth-bottom-switch">Đã có tài khoản? <button type="button" data-auth-tab="login">Đăng nhập ngay →</button></div>
+        </div>
+        <div class="auth-pane {{ 'active' if auth_tab == 'admin' else '' }}" data-auth-pane="admin">
+          <div class="auth-admin-heading"><span>♜</span> Cổng quản trị học thuật</div>
+          <h2>Đăng nhập quản trị viên</h2>
+          <p>Quản lý môn học và tài liệu dùng chung của AI Study Agent.</p>
+          {% if error and auth_tab == 'admin' %}<div class="message error-message" role="alert"><strong>Đăng nhập thất bại</strong><span>{{ error }}</span></div>{% endif %}
+          <form method="post" action="{{ url_for('admin_login') }}" class="auth-form-new">
+            <label><span>Email quản trị</span><div><i>✉</i><input type="email" name="email" placeholder="Email được cấp quyền Admin" autocomplete="username" required></div></label>
+            <div class="auth-password-group">
+              <label for="adminPassword">Mật khẩu</label>
+              <div class="auth-password-field">
+                <i aria-hidden="true">♙</i>
+                <input type="password" id="adminPassword" name="password" placeholder="Nhập mật khẩu quản trị" autocomplete="current-password" required>
+                <button type="button" class="password-toggle" data-target="adminPassword" data-label="mật khẩu quản trị" aria-controls="adminPassword" aria-label="Hiện mật khẩu quản trị" title="Hiện mật khẩu quản trị" aria-pressed="false"><svg class="eye-icon eye-icon-show" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.1 12a10.5 10.5 0 0 1 19.8 0 10.5 10.5 0 0 1-19.8 0Z"/><circle cx="12" cy="12" r="3"/></svg><svg class="eye-icon eye-icon-hide" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 3 18 18"/><path d="M10.6 5.3a10.4 10.4 0 0 1 11.3 6.7 10.5 10.5 0 0 1-4 5"/><path d="M6.5 6.5a10.4 10.4 0 0 0-4.4 5.5"/><path d="M10.6 10.6a3 3 0 0 0 3.8 3.8"/></svg></button>
+              </div>
+            </div>
+            <button class="auth-submit" type="submit">↗ &nbsp; Vào trang quản trị</button>
+          </form>
+          <div class="auth-bottom-switch">Tài khoản quản trị được cấp riêng; <strong>không có đăng ký Admin</strong>.</div>
         </div>
       </section>
     </main>
