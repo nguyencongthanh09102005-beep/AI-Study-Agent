@@ -4349,6 +4349,114 @@ def admin_add_subject():
     return redirect(url_for("admin_dashboard", notice=notice))
 
 
+@app.route("/admin/subjects/<int:subject_id>/edit", methods=["POST"])
+@admin_required
+def admin_edit_subject(subject_id):
+    """Update the common course code/name without modifying student-owned courses."""
+    if not admin_csrf_valid():
+        return "Phiên biểu mẫu không hợp lệ. Hãy tải lại trang quản trị.", 400
+    code = re.sub(r"\s+", "", request.form.get("code", "")).upper()[:50]
+    name = request.form.get("name", "").strip()[:180]
+    description = request.form.get("description", "").strip()[:900]
+    if not code or not name:
+        return redirect(url_for(
+            "admin_dashboard", error="Mã môn và tên môn không được để trống."
+        ))
+
+    conn = db()
+    try:
+        original = conn.execute(
+            "SELECT id,subject_key FROM shared_subjects WHERE id=?", (subject_id,)
+        ).fetchone()
+        if not original:
+            return "Không tìm thấy môn học chung.", 404
+
+        new_key = _normalize_subject_key(code, name)
+        collision = conn.execute(
+            "SELECT id FROM shared_subjects WHERE subject_key=? AND id<>?",
+            (new_key, subject_id)
+        ).fetchone()
+        if collision:
+            return redirect(url_for(
+                "admin_dashboard",
+                error="Mã môn này đã được dùng bởi một môn khác. Vui lòng chọn mã khác."
+            ))
+
+        conn.execute(
+            """UPDATE shared_subjects
+               SET subject_key=?,code=?,name=?,description=?,updated_at=?
+               WHERE id=?""",
+            (new_key, code, name, description, now(), subject_id)
+        )
+        if new_key != original["subject_key"]:
+            # Personal subjects keep their original code, notes and files.
+            # Unlink old-code enrollments; new-code enrollments are resolved by
+            # ensure_shared_subject_for_user_subject on their next request.
+            conn.execute(
+                "UPDATE subjects SET shared_subject_id=NULL WHERE shared_subject_id=?",
+                (subject_id,)
+            )
+        conn.commit()
+    except sqlite3.IntegrityError:
+        conn.rollback()
+        return redirect(url_for(
+            "admin_dashboard", error="Mã môn đã tồn tại. Không thể lưu thay đổi."
+        ))
+    finally:
+        conn.close()
+    return redirect(url_for(
+        "admin_dashboard", notice="Đã cập nhật mã môn và tên môn học chung."
+    ))
+
+
+@app.route("/admin/subjects/<int:subject_id>/delete", methods=["POST"])
+@admin_required
+def admin_delete_subject(subject_id):
+    """Delete the common catalog entry and its materials, never student data."""
+    if not admin_csrf_valid():
+        return "Phiên biểu mẫu không hợp lệ. Hãy tải lại trang quản trị.", 400
+
+    conn = db()
+    uploaded_files = []
+    try:
+        subject = conn.execute(
+            "SELECT id,code FROM shared_subjects WHERE id=?", (subject_id,)
+        ).fetchone()
+        if not subject:
+            return "Không tìm thấy môn học chung.", 404
+
+        if request.form.get("confirm_code", "").strip() != (subject["code"] or ""):
+            return "Mã môn xác nhận xóa không hợp lệ.", 400
+
+        uploaded_files = [
+            row["stored_name"] for row in conn.execute(
+                "SELECT stored_name FROM shared_documents WHERE shared_subject_id=?",
+                (subject_id,)
+            ).fetchall()
+        ]
+        # Preserve ALL student-owned subjects, personal PDFs, quizzes, plans,
+        # weaknesses and learning progress; only their shared catalog link goes.
+        conn.execute(
+            "UPDATE subjects SET shared_subject_id=NULL WHERE shared_subject_id=?",
+            (subject_id,)
+        )
+        conn.execute("DELETE FROM shared_subjects WHERE id=?", (subject_id,))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+    for filename in uploaded_files:
+        (UPLOAD_DIR / filename).unlink(missing_ok=True)
+
+    return redirect(url_for(
+        "admin_dashboard",
+        notice="Đã xóa môn học và tài liệu chung. Dữ liệu cá nhân của sinh viên vẫn được giữ nguyên."
+    ))
+
+
 @app.route("/admin/documents", methods=["POST"])
 @admin_required
 def admin_add_document():
