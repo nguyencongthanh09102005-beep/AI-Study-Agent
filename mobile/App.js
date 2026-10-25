@@ -13,6 +13,10 @@ import {
 } from 'react-native';
 import { api, API_BASE_URL } from './src/api';
 import * as DocumentPicker from 'expo-document-picker';
+const {
+  localDateKey, addDays, getWeekDates, getPlanOverview,
+  getVisiblePlanTasks, splitReminders,
+} = require('./src/plan-utils');
 
 function localInputDate(days = 0, hour = 19, minute = 0) {
   const date = new Date();
@@ -912,6 +916,10 @@ function QuizScreen({ subjects, userName, refreshData }) {
 function PlanScreen({ plan, subjects, userName, refreshData }) {
   const [local, setLocal] = useState(plan || {});
   const [mode, setMode] = useState('list');
+  const [planView, setPlanView] = useState('week');
+  const [selectedDate, setSelectedDate] = useState(localDateKey(new Date()));
+  const [showCompletedReminders, setShowCompletedReminders] = useState(false);
+  const [showAllPending, setShowAllPending] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState(subjects[0]?.id || null);
   const [goal, setGoal] = useState('Nắm vững kiến thức và luyện tập trước kỳ thi');
   const [deadline, setDeadline] = useState(localInputDate(14, 23, 0));
@@ -1084,60 +1092,226 @@ function PlanScreen({ plan, subjects, userName, refreshData }) {
     </ScrollView>
   );
 
-  const profile = local?.profile || {};
+
   const tasks = local?.tasks || [];
+  const weekDays = getWeekDates(selectedDate);
+  const overview = getPlanOverview(tasks, selectedDate);
+  const displayedTasks = getVisiblePlanTasks(tasks, selectedDate, planView === 'list');
+  const { pending, completed } = splitReminders(reminders);
+  const pendingVisible = showAllPending ? pending : pending.slice(0, 5);
+  const dayLabels = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+  const dateLabel = key => key?.slice(8, 10) + '/' + key?.slice(5, 7);
+
+  const renderReminder = item => (
+    <View key={item.id} style={[styles.planReminderRow, item.done && styles.planReminderDone]}>
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel={item.done ? 'Đánh dấu chưa xong: ' + item.title : 'Hoàn thành: ' + item.title}
+        style={[styles.planCheck, item.done && styles.planCheckDone]}
+        disabled={busy}
+        onPress={() => run(() => api.updateReminder(item.id, {
+          title: item.title, due_at: item.due_at, subject_id: item.subject_id,
+          done: !item.done,
+        }))}
+      >
+        <Text style={[styles.planCheckText, item.done && styles.planCheckTextDone]}>{item.done ? '✓' : ''}</Text>
+      </TouchableOpacity>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={[styles.planReminderTitle, item.done && styles.planDoneTitle]}>{item.title}</Text>
+        <Text style={styles.planReminderMeta}>
+          {String(item.due_at || '').replace('T', ' ').slice(0, 16)} · {item.subject_name || 'Cá nhân'}
+        </Text>
+      </View>
+      <TouchableOpacity
+        accessibilityRole="button" accessibilityLabel={'Sửa deadline: ' + item.title}
+        style={styles.planIconAction} onPress={() => openReminder(item)} disabled={busy}>
+        <Text style={styles.planIconText}>✎</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        accessibilityRole="button" accessibilityLabel={'Xóa deadline: ' + item.title}
+        style={styles.planIconAction}
+        onPress={() => confirmDelete(item.title, () => api.deleteReminder(item.id))} disabled={busy}>
+        <Text style={[styles.planIconText, { color: '#B83D52' }]}>×</Text>
+      </TouchableOpacity>
+    </View>
+  );
 
   return (
-    <ScrollView contentContainerStyle={styles.page}>
-      <Header title="Kế hoạch học tập" subtitle="Lộ trình AI và lịch học cá nhân" userName={userName} />
+    <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
+      <Header title="Kế hoạch học tập" subtitle="Học theo lịch · Theo dõi tiến độ · Ôn tập cùng AI" userName={userName} />
       <ErrorCard message={error} />
       {busy && <ActivityIndicator />}
-      <View style={styles.profileCard}>
-        <Text style={styles.eyebrow}>HỒ SƠ HỌC TẬP</Text>
-        <View style={styles.profileGrid}>
-          <View><Text style={styles.metric}>{profile.daily_minutes || 45}'</Text><Text style={styles.metricLabel}>Mỗi buổi</Text></View>
-          <View><Text style={styles.metric}>{profile.preferred_study_time || '19:00'}</Text><Text style={styles.metricLabel}>Giờ ưu tiên</Text></View>
-          <View><Text style={styles.metric}>{tasks.filter(t => t.done).length}/{tasks.length}</Text><Text style={styles.metricLabel}>Hoàn thành</Text></View>
-        </View>
-      </View>
-      <TouchableOpacity style={styles.primaryButton} onPress={() => setMode('generate')}>
+      <TouchableOpacity style={styles.primaryButton} disabled={busy} onPress={() => setMode('generate')}>
         <Text style={styles.primaryButtonText}>✦ Tạo kế hoạch bằng AI</Text>
       </TouchableOpacity>
-      <View style={styles.actionRow}>
-        <TouchableOpacity style={styles.smallAction} onPress={() => openTask()}><Text style={styles.smallActionText}>＋ Buổi học</Text></TouchableOpacity>
-        <TouchableOpacity style={styles.smallAction} onPress={() => openReminder()}><Text style={styles.smallActionText}>＋ Deadline</Text></TouchableOpacity>
-        <TouchableOpacity style={styles.smallAction} onPress={() => run(async () => {}, 'list')}><Text style={styles.smallActionText}>↻ Làm mới</Text></TouchableOpacity>
+      <View style={styles.planToolbar}>
+        <TouchableOpacity style={styles.smallAction} disabled={busy} onPress={() => openTask()}>
+          <Text style={styles.smallActionText}>＋ Buổi học</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.smallAction} disabled={busy} onPress={() => openReminder()}>
+          <Text style={styles.smallActionText}>＋ Deadline</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.smallAction} disabled={busy} onPress={() => run(async () => {}, 'list')}>
+          <Text style={styles.smallActionText}>↻ Làm mới</Text>
+        </TouchableOpacity>
       </View>
-      <Text style={styles.sectionTitle}>Lịch học ({tasks.length})</Text>
-      {!tasks.length && <View style={styles.card}><Text style={styles.muted}>Chưa có kế hoạch. Bạn có thể tạo lịch AI ngay trên iPhone.</Text></View>}
-      {tasks.map((task) => (
-        <View key={task.id} style={styles.card}>
-          <TouchableOpacity onPress={() => run(() => api.toggleTask(task.id))}>
-            <Text style={styles.cardTitle}>{task.done ? '☑' : '□'} {task.title}</Text>
+
+      <View style={styles.planCalendarCard}>
+        <View style={styles.planSectionRow}>
+          <Text style={styles.planSectionTitle}>◷ Lịch học</Text>
+          <View style={styles.planViewTabs}>
+            {['week', 'list'].map(key => (
+              <TouchableOpacity key={key} accessibilityRole="button"
+                accessibilityState={{ selected: planView === key }}
+                style={[styles.planViewTab, planView === key && styles.planViewTabSelected]}
+                onPress={() => setPlanView(key)}>
+                <Text style={[styles.planViewLabel, planView === key && styles.planViewLabelSelected]}>
+                  {key === 'week' ? 'Tuần' : 'Danh sách'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+        {planView === 'week' && (
+          <>
+            <View style={styles.planCalendarNav}>
+              <TouchableOpacity style={styles.planArrow} accessibilityLabel="Tuần trước"
+                onPress={() => setSelectedDate(addDays(selectedDate, -7))}>
+                <Text style={styles.planArrowText}>‹</Text>
+              </TouchableOpacity>
+              <View style={{ flex: 1, alignItems: 'center' }}>
+                <Text style={styles.planWeekRange}>
+                  {dateLabel(weekDays[0])} – {dateLabel(weekDays[6])}
+                </Text>
+              </View>
+              <TouchableOpacity style={styles.planArrow} accessibilityLabel="Tuần sau"
+                onPress={() => setSelectedDate(addDays(selectedDate, 7))}>
+                <Text style={styles.planArrowText}>›</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.planTodayButton}
+                onPress={() => setSelectedDate(localDateKey(new Date()))}>
+                <Text style={styles.planTodayText}>Hôm nay</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.planWeekRow}>
+              {weekDays.map((date, i) => {
+                const active = date === selectedDate;
+                const count = tasks.filter(t => String(t.study_at || '').slice(0, 10) === date).length;
+                return (
+                  <TouchableOpacity key={date} style={[styles.planDayCell, active && styles.planDayCellActive]}
+                    accessibilityRole="button"
+                    accessibilityLabel={dayLabels[i] + ' ' + date + ': ' + count + ' buổi học'}
+                    accessibilityState={{ selected: active }}
+                    onPress={() => setSelectedDate(date)}>
+                    <Text style={[styles.planDayName, active && styles.planDayActiveText]}>{dayLabels[i]}</Text>
+                    <Text style={[styles.planDayDate, active && styles.planDayActiveText]}>{date.slice(8, 10)}</Text>
+                    <Text style={[styles.planDayCount, active && styles.planDayActiveText]}>{count} buổi</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </>
+        )}
+      </View>
+
+      <View style={styles.card}>
+        <View style={styles.planSectionRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.planSectionTitle}>
+              {planView === 'week' ? 'Lịch ngày ' + dateLabel(selectedDate) : 'Danh sách nhiệm vụ'}
+            </Text>
+            <Text style={styles.planSectionSubtitle}>
+              {displayedTasks.length} buổi học · Nhấn dấu ✓ để đánh dấu hoàn thành
+            </Text>
+          </View>
+          <TouchableOpacity style={styles.planEditButton} disabled={busy} onPress={() => openTask()}>
+            <Text style={styles.planEditButtonText}>＋ Thêm</Text>
           </TouchableOpacity>
-          <Text style={styles.muted}>{String(task.study_at || '').replace('T', ' ').slice(0, 16)} · {task.subject_name || 'Tự học'} · {task.duration} phút</Text>
-          {!!task.note && <Text style={styles.muted}>{task.note}</Text>}
-          {!!task.source && <Text style={styles.muted}>Nguồn: {task.source === 'adaptive' ? 'Adaptive Learning' : task.source === 'ai' ? 'AI Study Plan' : 'Thủ công'}</Text>}
-          <View style={styles.actionRow}>
-            <TouchableOpacity style={styles.smallAction} onPress={() => openTask(task)}><Text style={styles.smallActionText}>Sửa</Text></TouchableOpacity>
-            <TouchableOpacity style={[styles.smallAction, styles.deleteAction]} onPress={() => confirmDelete(task.title, () => api.deleteTask(task.id))}><Text style={styles.deleteActionText}>Xóa</Text></TouchableOpacity>
-          </View>
         </View>
-      ))}
-      <Text style={styles.sectionTitle}>Deadline & nhắc nhở</Text>
-      {reminders.map(item => (
-        <View key={item.id} style={styles.card}>
-          <Text style={styles.cardTitle}>{item.done ? '✓ ' : ''}{item.title}</Text>
-          <Text style={styles.muted}>{String(item.due_at || '').replace('T', ' ').slice(0, 16)} · {item.subject_name || 'Cá nhân'}</Text>
-          <View style={styles.actionRow}>
-            <TouchableOpacity style={styles.smallAction} onPress={() => openReminder(item)}><Text style={styles.smallActionText}>Sửa</Text></TouchableOpacity>
-            <TouchableOpacity style={styles.smallAction} onPress={() => run(() => api.updateReminder(item.id, {
-              title: item.title, due_at: item.due_at, subject_id: item.subject_id, done: !item.done,
-            }))}><Text style={styles.smallActionText}>{item.done ? 'Chưa xong' : 'Hoàn thành'}</Text></TouchableOpacity>
-            <TouchableOpacity style={[styles.smallAction, styles.deleteAction]} onPress={() => confirmDelete(item.title, () => api.deleteReminder(item.id))}><Text style={styles.deleteActionText}>Xóa</Text></TouchableOpacity>
+        {!displayedTasks.length && (
+          <Text style={styles.planEmptyText}>
+            {planView === 'week' ? 'Ngày này chưa có lịch học. Chọn ngày khác hoặc tạo kế hoạch mới.' : 'Chưa có nhiệm vụ học. Hãy tạo kế hoạch để bắt đầu.'}
+          </Text>
+        )}
+        {displayedTasks.map(task => (
+          <View key={task.id} style={[styles.planTaskRow, task.done && styles.planTaskDone]}>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel={(task.done ? 'Đánh dấu chưa xong: ' : 'Hoàn thành: ') + task.title}
+              style={[styles.planCheck, task.done && styles.planCheckDone]}
+              disabled={busy} onPress={() => run(() => api.toggleTask(task.id))}>
+              <Text style={[styles.planCheckText, task.done && styles.planCheckTextDone]}>{task.done ? '✓' : ''}</Text>
+            </TouchableOpacity>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={[styles.planTaskTitle, task.done && styles.planDoneTitle]}>{task.title}</Text>
+              <Text style={styles.planTaskMeta}>
+                {String(task.study_at || '').replace('T', ' ').slice(0, 16)} · {task.subject_name || 'Tự học'} · {task.duration} phút
+              </Text>
+              {!!task.note && <Text style={styles.planTaskNote} numberOfLines={3}>{task.note}</Text>}
+              {task.source === 'adaptive' && <Text style={styles.planAdaptiveTag}>✦ Ôn tập điểm yếu</Text>}
+            </View>
+            <View style={styles.planTaskActions}>
+              <TouchableOpacity style={styles.planIconAction} disabled={busy}
+                accessibilityLabel={'Sửa buổi học: ' + task.title}
+                onPress={() => openTask(task)}>
+                <Text style={styles.planIconText}>✎</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.planIconAction} disabled={busy}
+                accessibilityLabel={'Xóa buổi học: ' + task.title}
+                onPress={() => confirmDelete(task.title, () => api.deleteTask(task.id))}>
+                <Text style={[styles.planIconText, { color: '#B83D52' }]}>×</Text>
+              </TouchableOpacity>
+            </View>
           </View>
+        ))}
+      </View>
+
+      <View style={styles.planProgressCard}>
+        <View style={styles.planSectionRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.planSectionTitle}>◉ Tiến độ tuần đang chọn</Text>
+            <Text style={styles.planSectionSubtitle}>{overview.completed}/{overview.total} buổi học đã hoàn thành</Text>
+          </View>
+          <Text style={styles.planProgressPercent}>{overview.percentage}%</Text>
         </View>
-      ))}
+        <Progress value={overview.percentage} />
+        <Text style={styles.planProgressHours}>
+          ◷ Thời gian học: {(overview.completedMinutes / 60).toFixed(1)} / {(overview.minutes / 60).toFixed(1)} giờ
+        </Text>
+      </View>
+
+      <View style={styles.card}>
+        <View style={styles.planSectionRow}>
+          <Text style={styles.planSectionTitle}>◎ Mục tiêu & deadline</Text>
+          <Text style={styles.planSectionSubtitle}>{pending.length} cần làm</Text>
+        </View>
+        {!pending.length && (
+          <Text style={styles.planEmptyText}>
+            {completed.length ? '✓ Không còn deadline chưa hoàn thành.' : 'Chưa có mục tiêu. Bạn có thể thêm deadline mới.'}
+          </Text>
+        )}
+        {pendingVisible.map(renderReminder)}
+        {pending.length > 5 && (
+          <TouchableOpacity style={styles.planCollapseButton}
+            onPress={() => setShowAllPending(value => !value)}>
+            <Text style={styles.planCollapseText}>
+              {showAllPending ? 'Thu gọn deadline cần làm' : 'Xem thêm ' + (pending.length - 5) + ' deadline'}
+            </Text>
+            <Text style={styles.planCollapseText}>{showAllPending ? '⌃' : '⌄'}</Text>
+          </TouchableOpacity>
+        )}
+        {!!completed.length && (
+          <>
+            <TouchableOpacity style={styles.planCollapseButton} accessibilityRole="button"
+              accessibilityState={{ expanded: showCompletedReminders }}
+              onPress={() => setShowCompletedReminders(value => !value)}>
+              <Text style={styles.planCollapseText}>✓ Đã hoàn thành ({completed.length})</Text>
+              <Text style={styles.planCollapseText}>{showCompletedReminders ? '⌃' : '⌄'}</Text>
+            </TouchableOpacity>
+            {showCompletedReminders && completed.map(renderReminder)}
+          </>
+        )}
+      </View>
     </ScrollView>
   );
 }
