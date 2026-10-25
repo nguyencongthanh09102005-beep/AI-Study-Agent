@@ -72,6 +72,9 @@ jobs:
       - name: Study Plan layout and task action regressions
         run: python tests/test_study_plan_ui.py
 
+      - name: Final roles and manual deadline data-integrity audit
+        run: python tests/test_final_integrity_audit.py
+
       - name: Final QA regression tests
         run: python tests/test_final_qa.py
 
