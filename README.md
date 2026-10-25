@@ -81,6 +81,8 @@ Mở: `http://127.0.0.1:5000`
 
 ## Chạy Mobile bằng Expo Go
 
+**iPhone Expo Go hiện dùng SDK 58; Mobile AI Study Agent đã nâng lên Expo SDK 58 (React Native 0.88, React 19.3).** Trên máy Windows phải dùng **Node.js 22.13 trở lên**: kiểm tra bằng `node -v` trước khi chạy. Nếu bản Node cũ, cập nhật Node.js rồi mở lại VS Code/Terminal. Không thay đổi Flask hoặc database chỉ vì nâng Expo.
+
 Mobile dùng cùng Flask backend và SQLite với Web.
 
 Android Emulator có thể dùng mặc định `http://10.0.2.2:5000`.
@@ -102,10 +104,11 @@ Sau đó:
 ```bash
 cd mobile
 npm install
-npx expo start
+npx expo install --check
+npx expo start --clear
 ```
 
-Mở Expo Go trên iPhone và quét QR. Nếu đổi `EXPO_PUBLIC_API_URL`, restart Expo để nạp lại biến môi trường.
+Mở Expo Go SDK 58 trên iPhone và quét QR. Nếu đổi `EXPO_PUBLIC_API_URL`, restart Expo để nạp lại biến môi trường. Nếu `npx expo install --check` báo lệch phiên bản, chạy `npx expo install --fix` rồi `npx expo-doctor@latest` và `npx expo start --clear`. Chỉ chạy các lệnh này trong thư mục `mobile`. Nếu có lỗi cache sau khi nâng SDK, tắt Expo, xóa thư mục `mobile/node_modules` (không xóa `data/` hoặc thư mục uploads), chạy lại `npm install`, sau đó khởi động Expo với `--clear`.
 
 ### Chức năng Mobile (React Native / Expo)
 
