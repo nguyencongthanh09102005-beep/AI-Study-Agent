@@ -119,6 +119,7 @@ def init_db():
         title TEXT NOT NULL,
         due_at TEXT DEFAULT '',
         done INTEGER DEFAULT 0,
+        source TEXT NOT NULL DEFAULT 'manual',
         created_at TEXT NOT NULL,
         FOREIGN KEY(user_id) REFERENCES users(id),
         FOREIGN KEY(subject_id) REFERENCES subjects(id) ON DELETE CASCADE
@@ -331,6 +332,11 @@ def init_db():
     if "subject_id" not in reminder_columns:
         conn.execute(
             "ALTER TABLE reminders ADD COLUMN subject_id INTEGER"
+        )
+    if "source" not in reminder_columns:
+        # Never treat old manual deadlines as automatically generated.
+        conn.execute(
+            "ALTER TABLE reminders ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'"
         )
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_reminders_user_subject_due "
@@ -1971,14 +1977,23 @@ def sync_adaptive_review_task(conn, user_id, subject_id):
 def login_required(fn):
     @wraps(fn)
     def wrapper(*args, **kwargs):
-        if "user_id" not in session:
-            return redirect(
-            url_for(
-                "login",
-                tab="login",
+        uid = session.get("user_id")
+        if not uid:
+            return redirect(url_for(
+                "login", tab="login",
                 error="Vui lòng đăng nhập để tiếp tục."
-            )
-        )
+            ))
+        conn = db()
+        user = conn.execute("SELECT role FROM users WHERE id=?", (uid,)).fetchone()
+        conn.close()
+        if not user:
+            session.clear()
+            return redirect(url_for("login", tab="login"))
+        # All student views and mutations are restricted to students.
+        # Admin can only preview shared PDFs through an additional
+        # per-document authorization in shared_document_file.
+        if user["role"] != "student" and request.endpoint != "shared_document_file":
+            return "Vui lòng sử dụng trang quản trị.", 403
         return fn(*args, **kwargs)
     return wrapper
 
@@ -6342,21 +6357,22 @@ def generate_study_plan_route():
     conn.execute(
         """
         DELETE FROM reminders
-        WHERE user_id=? AND subject_id=? AND done=0
+        WHERE user_id=? AND subject_id=? AND done=0 AND source='ai'
         """,
         (uid, subject_id)
     )
     conn.execute(
         """
         INSERT INTO reminders(
-            user_id,subject_id,title,due_at,created_at
-        ) VALUES(?,?,?,?,?)
+            user_id,subject_id,title,due_at,source,created_at
+        ) VALUES(?,?,?,?,?,?)
         """,
         (
             uid,
             subject_id,
             goal,
             deadline_dt.isoformat(timespec="minutes"),
+            "ai",
             now()
         )
     )
@@ -6542,6 +6558,14 @@ def _mobile_require_user():
     uid = session.get("user_id")
     if not uid:
         return None, (jsonify({"error": "Phiên đăng nhập đã hết hạn."}), 401)
+    conn = db()
+    user = conn.execute("SELECT role FROM users WHERE id=?", (uid,)).fetchone()
+    conn.close()
+    if not user:
+        session.clear()
+        return None, (jsonify({"error": "Phiên đăng nhập không hợp lệ."}), 401)
+    if user["role"] != "student":
+        return None, (jsonify({"error": "Tài khoản quản trị không thể sử dụng API sinh viên."}), 403)
     return uid, None
 
 
@@ -6556,14 +6580,18 @@ def api_mobile_login():
 
     conn = db()
     user = conn.execute(
-        "SELECT id,name,email,password_hash FROM users WHERE email=?",
+        "SELECT id,name,email,password_hash,role FROM users WHERE email=?",
         (email,)
     ).fetchone()
     conn.close()
 
-    if not user or not check_password_hash(user["password_hash"], password):
+    if (
+        not user or user["role"] != "student"
+        or not check_password_hash(user["password_hash"], password)
+    ):
         return jsonify({"error": "Email hoặc mật khẩu không đúng."}), 401
 
+    session.clear()
     session["user_id"] = user["id"]
     session["user_name"] = user["name"]
 
@@ -7710,21 +7738,22 @@ def api_mobile_study_plan():
     conn.execute(
         """
         DELETE FROM reminders
-        WHERE user_id=? AND subject_id=? AND done=0
+        WHERE user_id=? AND subject_id=? AND done=0 AND source='ai'
         """,
         (uid, subject_id)
     )
     conn.execute(
         """
         INSERT INTO reminders(
-            user_id,subject_id,title,due_at,created_at
-        ) VALUES(?,?,?,?,?)
+            user_id,subject_id,title,due_at,source,created_at
+        ) VALUES(?,?,?,?,?,?)
         """,
         (
             uid,
             subject_id,
             goal,
             deadline_dt.isoformat(timespec="minutes"),
+            "ai",
             now()
         )
     )
