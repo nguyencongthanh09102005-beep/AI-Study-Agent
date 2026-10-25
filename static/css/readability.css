@@ -168,3 +168,32 @@ body.study-ui.page-study_plan .schedule-item-new.done .schedule-copy strong {
 body.study-ui.page-study_plan .deadline-item.completed {
   opacity: 1;
 }
+
+/* Standalone login/registration/admin-login screen uses its own body class. */
+body.mock-auth-page .brand-copy small,
+body.mock-auth-page .auth-visual-copy > p,
+body.mock-auth-page .feature-list small,
+body.mock-auth-page .auth-top-switch,
+body.mock-auth-page .auth-bottom-switch,
+body.mock-auth-page .auth-pane > p,
+body.mock-auth-page .terms-line {
+  color: #51658b;
+}
+body.mock-auth-page .auth-form-new label > span,
+body.mock-auth-page .auth-password-group > label {
+  color: #394e76;
+}
+body.mock-auth-page .auth-form-new input {
+  color: #233861;
+}
+body.mock-auth-page .auth-form-new input::placeholder {
+  color: #7081a2;
+  opacity: 1;
+}
+body.mock-auth-page .auth-options,
+body.mock-auth-page .auth-divider {
+  color: #52658b;
+}
+body.mock-auth-page .auth-tabs button:not(.active) {
+  color: #455b87;
+}
