@@ -30,6 +30,9 @@ jobs:
         working-directory: mobile
         run: npm install --no-audit --no-fund
 
+      - name: Check iPhone Expo Go SDK 58 manifest compatibility
+        run: node tests/test_expo_sdk_compat.js
+
       - name: Check Expo dependency compatibility
         working-directory: mobile
         run: npx expo install --check
