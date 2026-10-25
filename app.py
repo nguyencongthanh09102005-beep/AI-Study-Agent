@@ -6205,6 +6205,11 @@ def study_plan():
             "Chưa có lịch học. Hãy chọn môn, mục tiêu và deadline để AI tạo kế hoạch đầu tiên."
         )
 
+    # Keep pending deadlines immediately visible. Completed deadlines are
+    # still available (with edit/toggle controls) inside a collapsible group.
+    pending_reminders = [item for item in reminders if not item["done"]]
+    completed_reminders = [item for item in reminders if item["done"]]
+
     return render_template(
         "study_plan.html",
         page="study_plan",
@@ -6212,6 +6217,8 @@ def study_plan():
         tasks=tasks,
         today_tasks=today_tasks,
         reminders=reminders,
+        pending_reminders=pending_reminders,
+        completed_reminders=completed_reminders,
         priority_count=priority_count,
         deadline_week=deadline_week,
         reminder_today=reminder_today,
