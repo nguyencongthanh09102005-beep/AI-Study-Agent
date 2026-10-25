@@ -187,3 +187,94 @@
 @media (prefers-reduced-motion: reduce) {
   .page-study_plan .week-day, .page-study_plan .schedule-item-new { transition: none !important; }
 }
+
+/* Final agenda layout: full-width calendar tasks first; compact summary and
+   deadlines below so a light study day doesn't leave half the page empty. */
+.page-study_plan .planner-layout-new {
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 16px !important;
+}
+.page-study_plan .planner-side-stack {
+  display: grid !important;
+  grid-template-columns: minmax(260px, .75fr) minmax(320px, 1.25fr);
+  align-items: start !important;
+  gap: 16px !important;
+}
+.page-study_plan .planner-insight {
+  grid-column: 1 / -1;
+}
+.page-study_plan .day-schedule-card { padding: 20px; }
+.page-study_plan .schedule-item-new.done { opacity: 1; }
+.page-study_plan .schedule-item-new.done .schedule-copy strong {
+  color: #405680;
+  text-decoration-line: line-through;
+  text-decoration-thickness: 1px;
+}
+.page-study_plan .schedule-copy strong { color: #263b67; font-size: 13.5px; }
+.page-study_plan .schedule-copy small { color: #52668d; font-size: 11.5px; }
+.page-study_plan .schedule-time,
+.page-study_plan .schedule-range { color: #50648a; font-size: 11.5px; }
+.page-study_plan .goal-card .goal-list {
+  display: grid;
+  gap: 8px;
+}
+.page-study_plan .goal-list b {
+  color: #2f436c;
+  font-size: 12px;
+}
+.page-study_plan .goal-list small { color: #556b92; font-size: 10.5px; }
+.page-study_plan .goal-list .deadline-item.completed { opacity: 1; }
+.page-study_plan .planner-deadline-empty {
+  padding: 12px 13px;
+  border-radius: 11px;
+  background: #edf3fb;
+  color: #526687;
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+.page-study_plan .planner-deadline-details {
+  margin-top: 12px;
+  border-top: 1px solid #dbe4f5;
+  padding-top: 10px;
+}
+.page-study_plan .planner-deadline-details summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  cursor: pointer;
+  list-style: none;
+  color: #4d62a0;
+  font-weight: 750;
+  font-size: 11.5px;
+  border-radius: 10px;
+  padding: 9px 12px;
+  background: #e8eefc;
+}
+.page-study_plan .planner-deadline-details summary::-webkit-details-marker {
+  display: none;
+}
+.page-study_plan .planner-deadline-details summary:hover { background: #dfe7fa; }
+.page-study_plan .planner-deadline-details summary:focus-visible {
+  outline: 2px solid #5266ea;
+  outline-offset: 2px;
+}
+.page-study_plan .planner-deadline-details summary > span:last-child {
+  font-size: 16px;
+  transition: transform .15s ease;
+}
+.page-study_plan .planner-deadline-details[open] summary > span:last-child {
+  transform: rotate(180deg);
+}
+.page-study_plan .planner-deadline-details > .goal-list { margin-top: 9px; }
+.page-study_plan .goal-list .deadline-item.completed b {
+  color: #4f6388;
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+@media (max-width: 900px) {
+  .page-study_plan .planner-side-stack {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .page-study_plan .planner-insight { grid-column: auto; }
+}
