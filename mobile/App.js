@@ -1228,6 +1228,9 @@ function PlanScreen({ plan, subjects, userName, refreshData }) {
             <Text style={styles.planEditButtonText}>＋ Thêm</Text>
           </TouchableOpacity>
         </View>
+        {!!local?.truncated && (
+          <Text style={styles.planSectionSubtitle}>Đang hiển thị 200 nhiệm vụ gần nhất. Danh sách đầy đủ có thể xem trên Web.</Text>
+        )}
         {!displayedTasks.length && (
           <Text style={styles.planEmptyText}>
             {planView === 'week' ? 'Ngày này chưa có lịch học. Chọn ngày khác hoặc tạo kế hoạch mới.' : 'Chưa có nhiệm vụ học. Hãy tạo kế hoạch để bắt đầu.'}
@@ -1711,7 +1714,7 @@ const styles = StyleSheet.create({
   planViewTabs: { flexDirection: 'row', padding: 3, backgroundColor: '#E9EEFB', borderRadius: 11, gap: 3 },
   planViewTab: { paddingVertical: 8, paddingHorizontal: 10, borderRadius: 9 },
   planViewTabSelected: { backgroundColor: '#6265E8' },
-  planViewLabel: { fontSize: 11, fontWeight: '750', color: '#496087' },
+  planViewLabel: { fontSize: 11, fontWeight: '800', color: '#496087' },
   planViewLabelSelected: { color: 'white' },
   planCalendarNav: { flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 11 },
   planArrow: { backgroundColor: '#E9EFFB', width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
