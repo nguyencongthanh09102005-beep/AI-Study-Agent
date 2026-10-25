@@ -122,6 +122,28 @@ def test():
     ).fetchone()[0] == 1
     conn.close()
 
+    # Simulate a user's older SQLite DB without the newly introduced source
+    # column. Restart migration must keep every deadline, not crash or delete.
+    conn = project.db()
+    count_before = conn.execute(
+        "SELECT COUNT(*) FROM reminders WHERE user_id=?", (student_id,)
+    ).fetchone()[0]
+    conn.execute("ALTER TABLE reminders DROP COLUMN source")
+    conn.commit()
+    conn.close()
+    project.init_db()
+    conn = project.db()
+    assert "source" in {
+        row["name"] for row in conn.execute("PRAGMA table_info(reminders)")
+    }
+    assert conn.execute(
+        "SELECT COUNT(*) FROM reminders WHERE user_id=?", (student_id,)
+    ).fetchone()[0] == count_before
+    assert conn.execute(
+        "SELECT source FROM reminders WHERE id=?", (manual_id,)
+    ).fetchone()["source"] == "manual"
+    conn.close()
+
 
 def assert_deadline_integrity(manual_id, old_ai_id, done_ai_id, user_id, subject_id, title):
     conn = project.db()
