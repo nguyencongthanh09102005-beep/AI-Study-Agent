@@ -109,16 +109,16 @@ Mở Expo Go trên iPhone và quét QR. Nếu đổi `EXPO_PUBLIC_API_URL`, rest
 
 ### Chức năng Mobile (React Native / Expo)
 
-- Đăng ký/đăng nhập và dùng chung tài khoản với Web.
+- Sinh viên đăng ký/đăng nhập và dùng chung tài khoản với Web; có nút Hiện/Ẩn mật khẩu. **Admin chỉ đăng nhập Web** bằng tab Quản trị viên, không có đăng ký Admin/Mobile Admin.
 - Dashboard: thống kê môn/tài liệu/bài Quiz và đề xuất Next Best Action theo tiến độ thực tế.
 - Môn học: tạo, sửa, xóa, mở chi tiết, xem điểm yếu và tiến độ.
 - Tài liệu cá nhân: upload PDF/TXT/MD từ ứng dụng Tệp, xem chữ đã trích xuất, tóm tắt AI, đổi môn, xóa, chọn/bỏ đề cương fallback.
 - Study Agent: chat theo môn và mở lại lịch sử câu hỏi đã lưu trên Web.
 - Quiz: tạo theo môn/tài liệu/điểm yếu, chọn 10/20/30 câu, xem danh sách Quiz, làm lại, xem kết quả và đáp án.
-- Lộ trình học: tạo AI Study Plan theo đề cương, thêm/sửa/xóa/tick hoàn thành buổi học, quản lý deadline thủ công.
+- Lộ trình học: tạo AI Study Plan theo đề cương; lịch **Tuần** (chọn ngày, chuyển tuần, về hôm nay) và **Danh sách**; thẻ tiến độ/số giờ học của tuần; thêm/sửa/xóa/tick hoàn thành buổi học. Deadline chưa hoàn thành hiện trước, nhóm đã hoàn thành thu gọn/mở lại và vẫn có thể sửa/xóa/đánh dấu lại. Các deadline thủ công được giữ nguyên khi tạo lại kế hoạch AI.
 - Hồ sơ: phong cách học, thời gian ưu tiên, thời lượng học, mục tiêu, ghi chú.
 
-Các phần dùng chung backend và SQLite với Web. Tài liệu cá nhân không được đưa lên Shared Knowledge. Mobile hiện hiển thị deadline/nhắc việc bên trong ứng dụng, **chưa có push notification nền**. PDF scan/ảnh chưa có OCR; màn đọc tài liệu trên Mobile hiển thị **văn bản trích xuất** thay vì trình xem trang PDF gốc.
+Đợt đồng bộ giao diện Mobile đã tăng độ tương phản chữ phụ/mô tả, cỡ chữ và nhãn thanh điều hướng, giữ bảng màu xanh–tím của Web. Web có chế độ lịch Tháng đầy đủ; Mobile ưu tiên lịch Tuần và Danh sách để vừa màn hình iPhone. Các phần dùng chung backend và SQLite với Web. Tài liệu cá nhân không được đưa lên Shared Knowledge. Mobile hiện hiển thị deadline/nhắc việc bên trong ứng dụng, **chưa có push notification nền**. PDF scan/ảnh chưa có OCR; màn đọc tài liệu trên Mobile hiển thị **văn bản trích xuất** thay vì trình xem trang PDF gốc.
 
 ### Kịch bản nghiệm thu một lần trên iPhone
 
@@ -126,7 +126,7 @@ Các phần dùng chung backend và SQLite với Web. Tài liệu cá nhân khô
 2. Tạo tài khoản thử (hoặc đăng nhập Web account) từ Mobile.
 3. Vào Môn học → tạo môn mới → chỉnh tín chỉ/mục tiêu.
 4. Upload một file PDF/TXT có chữ → xem nội dung → tóm tắt → chọn làm đề cương cá nhân.
-5. Mở Kế hoạch → tạo kế hoạch AI với deadline (có nút chọn nhanh 7/14/30 ngày).
+5. Mở Kế hoạch → chọn ngày trong lịch Tuần, chuyển sang Danh sách, xác nhận % tiến độ; tạo kế hoạch AI với deadline (nút chọn nhanh 7/14/30 ngày) và kiểm tra nhóm deadline đã hoàn thành có thể thu/mở.
 6. Tạo buổi học thủ công → hoàn thành → kiểm tra tiến độ trên Mobile và Web.
 7. Hỏi AI theo môn, kiểm tra lịch sử hiển thị trên Web.
 8. Tạo Quiz theo môn/tài liệu; trả lời sai có chủ đích → kiểm tra điểm yếu và Adaptive task.
