@@ -33,10 +33,14 @@ def verify():
            VALUES(?,?,?,?,?,?,?,?)""",
         (user, subject, "Làm quiz PaaS", second, 45, "", 0, now)
     ).lastrowid
-    conn.execute(
+    reminder_pending = conn.execute(
         "INSERT INTO reminders(user_id,subject_id,title,due_at,created_at) VALUES(?,?,?,?,?)",
         (user, subject, "Ôn trước ngày thi", second, now)
-    )
+    ).lastrowid
+    reminder_done = conn.execute(
+        "INSERT INTO reminders(user_id,subject_id,title,due_at,done,created_at) VALUES(?,?,?,?,?,?)",
+        (user, subject, "Đã nộp báo cáo", first, 1, now)
+    ).lastrowid
     conn.commit()
     conn.close()
 
@@ -71,8 +75,29 @@ def verify():
     assert "Ghi chú cá nhân" in html
     assert "Mục tiêu & deadline" in html
     assert "Ôn trước ngày thi" in html
+    assert "Đã nộp báo cáo" in html
     assert "Gợi ý từ Study Agent" in html
     assert "study_plan_cleanup.css" in html
+    assert "readability.css" in html
+    assert 'id="deadline-list"' in html
+    assert "✓ Đã hoàn thành (1)" in html
+    assert "1 cần làm" in html
+    assert '<details class="planner-deadline-details planner-completed-details">' in html
+    assert html.find("Ôn trước ngày thi") < html.find("Đã nộp báo cáo")
+    assert f'/study-plan/reminders/{reminder_pending}/toggle' in html
+    assert f'/study-plan/reminders/{reminder_done}/toggle' in html
+    assert f'data-reminder-id="{reminder_done}"' in html
+
+    # Completed reminders remain editable and can be re-opened after collapse.
+    resumed = client.post(f"/study-plan/reminders/{reminder_done}/toggle")
+    assert resumed.status_code in (302, 303)
+    reopened_html = client.get("/study-plan").get_data(as_text=True)
+    assert "2 cần làm" in reopened_html
+    assert "planner-completed-details" not in reopened_html
+    # Complete the same reminder again to restore an expandable finished group.
+    retoggled = client.post(f"/study-plan/reminders/{reminder_done}/toggle")
+    assert retoggled.status_code in (302, 303)
+    assert "✓ Đã hoàn thành (1)" in client.get("/study-plan").get_data(as_text=True)
 
     # Action semantics must remain functional after template/layout cleanup.
     check = client.post(f"/study-plan/tasks/{task2}/toggle")
@@ -94,6 +119,7 @@ def verify():
     empty_html = client.get("/study-plan").get_data(as_text=True)
     assert 'id="scheduleFilterEmpty"' in empty_html
     assert 'id="compactTaskList"' not in empty_html
+    assert "✓ Đã hoàn thành (1)" in empty_html
 
 
 if __name__ == "__main__":
