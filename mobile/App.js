@@ -1396,6 +1396,8 @@ function LoginScreen({ onLogin, onRegister }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -1420,24 +1422,50 @@ function LoginScreen({ onLogin, onRegister }) {
         <View style={styles.logo}><Text style={{ fontSize: 34 }}>🎓</Text></View>
         <Text style={styles.loginTitle}>AI Study Agent</Text>
         <Text style={styles.loginSubtitle}>Học theo đề cương · AI cá nhân hóa</Text>
-        <View style={styles.actionRow}>
-          <TouchableOpacity style={styles.smallAction} onPress={() => setSignup(false)}>
-            <Text style={[styles.smallActionText, !signup && { fontWeight: '900' }]}>Đăng nhập</Text>
+        <View style={styles.authSegment}>
+          <TouchableOpacity style={[styles.authSegmentButton, !signup && styles.authSegmentSelected]}
+            accessibilityRole="button" accessibilityState={{ selected: !signup }}
+            onPress={() => { setSignup(false); setError(''); }}>
+            <Text style={[styles.authSegmentText, !signup && styles.authSegmentTextSelected]}>Đăng nhập</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.smallAction} onPress={() => setSignup(true)}>
-            <Text style={[styles.smallActionText, signup && { fontWeight: '900' }]}>Đăng ký</Text>
+          <TouchableOpacity style={[styles.authSegmentButton, signup && styles.authSegmentSelected]}
+            accessibilityRole="button" accessibilityState={{ selected: signup }}
+            onPress={() => { setSignup(true); setError(''); }}>
+            <Text style={[styles.authSegmentText, signup && styles.authSegmentTextSelected]}>Đăng ký sinh viên</Text>
           </TouchableOpacity>
         </View>
         {signup && <TextInput value={name} onChangeText={setName} style={styles.loginInput} placeholder="Họ và tên" />}
-        <TextInput value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" style={styles.loginInput} placeholder="Email" />
-        <TextInput value={password} onChangeText={setPassword} secureTextEntry style={styles.loginInput} placeholder="Mật khẩu" />
-        {signup && <TextInput value={confirm} onChangeText={setConfirm} secureTextEntry style={styles.loginInput} placeholder="Nhập lại mật khẩu" />}
+        <TextInput value={email} onChangeText={setEmail} autoCapitalize="none"
+          keyboardType="email-address" autoComplete="email" style={styles.loginInput}
+          placeholder="Email" placeholderTextColor="#7484A2" />
+        <View style={styles.loginPasswordRow}>
+          <TextInput value={password} onChangeText={setPassword} secureTextEntry={!showPassword}
+            autoComplete={signup ? 'new-password' : 'current-password'}
+            style={[styles.loginInput, styles.loginPasswordInput]}
+            placeholder="Mật khẩu" placeholderTextColor="#7484A2" />
+          <TouchableOpacity accessibilityLabel={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+            style={styles.loginEyeButton} onPress={() => setShowPassword(v => !v)}>
+            <Text style={styles.loginEyeText}>{showPassword ? 'Ẩn' : 'Hiện'}</Text>
+          </TouchableOpacity>
+        </View>
+        {signup && (
+          <View style={styles.loginPasswordRow}>
+            <TextInput value={confirm} onChangeText={setConfirm} secureTextEntry={!showConfirm}
+              autoComplete="new-password" style={[styles.loginInput, styles.loginPasswordInput]}
+              placeholder="Nhập lại mật khẩu" placeholderTextColor="#7484A2" />
+            <TouchableOpacity accessibilityLabel={showConfirm ? 'Ẩn mật khẩu xác nhận' : 'Hiện mật khẩu xác nhận'}
+              style={styles.loginEyeButton} onPress={() => setShowConfirm(v => !v)}>
+              <Text style={styles.loginEyeText}>{showConfirm ? 'Ẩn' : 'Hiện'}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
         <ErrorCard message={error} />
         <TouchableOpacity style={styles.primaryButton} onPress={submit} disabled={loading}>
           <Text style={styles.primaryButtonText}>{loading ? 'Đang xử lý...' : signup ? 'Tạo tài khoản' : 'Đăng nhập'}</Text>
         </TouchableOpacity>
-        <Text style={styles.loginHint}>Cùng một tài khoản dùng trên Web và iPhone.</Text>
-        <Text style={styles.loginHint}>Backend: {API_BASE_URL}</Text>
+        <Text style={styles.loginHint}>Sinh viên dùng cùng tài khoản trên Web và iPhone.</Text>
+        <Text style={styles.loginAdminNote}>♜ Quản trị viên chỉ đăng nhập trên Web. Không có đăng ký Admin.</Text>
+        <Text style={styles.loginBackendHint}>Máy chủ: {API_BASE_URL}</Text>
       </View>
     </ScrollView>
   );
@@ -1575,7 +1603,7 @@ const styles = StyleSheet.create({
   page: { padding: 16, paddingBottom: 110, backgroundColor: '#F6F8FC' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 },
   title: { fontSize: 24, fontWeight: '800', color: '#17203A' },
-  subtitle: { marginTop: 5, fontSize: 13, color: '#7B849A' },
+  subtitle: { marginTop: 5, fontSize: 13, color: '#536689', lineHeight: 19 },
   avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#E8EAFE', alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: '#5965D8', fontWeight: '800' },
   heroCard: { backgroundColor: '#6567E8', borderRadius: 24, padding: 22, flexDirection: 'row', marginBottom: 24 },
@@ -1586,7 +1614,7 @@ const styles = StyleSheet.create({
   heroButtonText: { color: '#555DD0', fontWeight: '800' },
   robot: { width: 72, justifyContent: 'center', alignItems: 'center' },
   mobileStatusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: -8, marginBottom: 14 },
-  mobileStatusText: { flex: 1, color: '#8B93A7', fontSize: 10 },
+  mobileStatusText: { flex: 1, color: '#53668B', fontSize: 11 },
   logoutButton: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: '#EEF0FF' },
   logoutButtonText: { color: '#5965D8', fontSize: 11, fontWeight: '800' },
   fieldLabel: { fontSize: 13, fontWeight: '700', color: '#29324D', marginBottom: 8 },
@@ -1602,7 +1630,7 @@ const styles = StyleSheet.create({
   homeMetricsRow: { flexDirection: 'row', gap: 9, marginBottom: 16 },
   homeMetric: { flex: 1, backgroundColor: 'white', borderRadius: 15, padding: 13, borderWidth: 1, borderColor: '#E9ECF7' },
   homeMetricValue: { color: '#5965D8', fontSize: 21, fontWeight: '900' },
-  homeMetricLabel: { color: '#858DA2', fontSize: 11, marginTop: 4 },
+  homeMetricLabel: { color: '#526588', fontSize: 12, marginTop: 4, fontWeight: '600' },
   recommendCard: { padding: 17, borderRadius: 18, marginBottom: 15, backgroundColor: '#EDF0FF', borderWidth: 1, borderColor: '#CDD5FF', gap: 5 },
   loginScroll: { flex: 1, backgroundColor: '#F6F8FC' },
   sectionTitle: { fontSize: 17, fontWeight: '800', color: '#202943', marginBottom: 10, marginTop: 4 },
@@ -1611,22 +1639,22 @@ const styles = StyleSheet.create({
   subjectIcon: { width: 50, height: 50, borderRadius: 16, backgroundColor: '#F0F1FF', alignItems: 'center', justifyContent: 'center' },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   cardTitle: { fontSize: 15, fontWeight: '800', color: '#27304B' },
-  muted: { color: '#81899B', fontSize: 12, lineHeight: 18, marginTop: 4 },
+  muted: { color: '#53678B', fontSize: 13, lineHeight: 20, marginTop: 5 },
   time: { color: '#5965D8', fontWeight: '800', fontSize: 12 },
   percent: { color: '#5965D8', fontWeight: '800', fontSize: 15 },
   progressTrack: { height: 8, backgroundColor: '#EDEEFA', borderRadius: 999, marginTop: 13, overflow: 'hidden' },
   progressFill: { height: '100%', backgroundColor: '#6567E8', borderRadius: 999 },
-  weakText: { color: '#9A6B34', fontSize: 11, marginTop: 10 },
+  weakText: { color: '#855D28', fontSize: 12, lineHeight: 18, marginTop: 10 },
   pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 },
   pill: { backgroundColor: '#EEF0FF', borderRadius: 999, paddingHorizontal: 9, paddingVertical: 6 },
-  pillText: { color: '#6068C7', fontSize: 10, fontWeight: '700' },
+  pillText: { color: '#4B55B3', fontSize: 11, fontWeight: '700' },
   chatPage: { flex: 1, padding: 20, backgroundColor: '#F6F8FC' },
   contextStrip: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 12 },
   chatList: { flex: 1 },
   message: { maxWidth: '84%', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 10 },
   aiMessage: { alignSelf: 'flex-start', backgroundColor: 'white', borderWidth: 1, borderColor: '#EBEEF5' },
   userMessage: { alignSelf: 'flex-end', backgroundColor: '#6567E8' },
-  aiMessageText: { color: '#28314B', lineHeight: 20, fontSize: 13 },
+  aiMessageText: { color: '#283954', lineHeight: 21, fontSize: 14 },
   userMessageText: { color: 'white', lineHeight: 20, fontSize: 13 },
   composer: { flexDirection: 'row', gap: 9, paddingTop: 10 },
   input: { flex: 1, backgroundColor: 'white', borderWidth: 1, borderColor: '#E5E8F1', borderRadius: 16, paddingHorizontal: 14, height: 48, color: '#222A40' },
@@ -1636,15 +1664,15 @@ const styles = StyleSheet.create({
   quizQuestion: { fontSize: 19, lineHeight: 27, fontWeight: '800', color: '#202943', marginVertical: 14 },
   option: { borderWidth: 1, borderColor: '#E5E8F1', borderRadius: 14, padding: 13, marginBottom: 9, flexDirection: 'row', alignItems: 'center', gap: 10 },
   optionSelected: { borderColor: '#6567E8', backgroundColor: '#F1F2FF' },
-  optionLetter: { width: 26, height: 26, borderRadius: 13, backgroundColor: '#F0F2F7', textAlign: 'center', lineHeight: 26, color: '#747C90', fontWeight: '800' },
+  optionLetter: { width: 26, height: 26, borderRadius: 13, backgroundColor: '#F0F2F7', textAlign: 'center', lineHeight: 26, color: '#526487', fontWeight: '800' },
   optionLetterSelected: { backgroundColor: '#6567E8', color: 'white' },
-  optionText: { color: '#2A334D', fontSize: 13, fontWeight: '600' },
+  optionText: { color: '#293B5B', fontSize: 14, fontWeight: '600', flexShrink: 1, lineHeight: 21 },
   insightCard: { backgroundColor: '#FFF8E8', borderRadius: 18, padding: 16 },
   insightTitle: { color: '#8E632E', fontWeight: '800', marginBottom: 5 },
   profileCard: { backgroundColor: '#222C4D', borderRadius: 22, padding: 20, marginBottom: 20 },
   profileGrid: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 18 },
   metric: { color: 'white', fontSize: 21, fontWeight: '900' },
-  metricLabel: { color: '#BAC1D9', fontSize: 11, marginTop: 4 },
+  metricLabel: { color: '#E2E5F6', fontSize: 12, marginTop: 4 },
   timelineRow: { flexDirection: 'row', alignItems: 'stretch', marginBottom: 12, gap: 12 },
   timelineDot: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#6567E8', alignItems: 'center', justifyContent: 'center', marginTop: 9 },
   timelineIndex: { color: 'white', fontWeight: '900' },
@@ -1652,16 +1680,76 @@ const styles = StyleSheet.create({
   timelineDay: { color: '#6972D4', fontSize: 10, fontWeight: '900', marginBottom: 4, textTransform: 'uppercase' },
   bottomNav: { height: 78, backgroundColor: 'white', flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#E9ECF3', paddingTop: 10, paddingBottom: 8 },
   navItem: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  navIcon: { fontSize: 19, color: '#9AA1B2' },
-  navLabel: { fontSize: 9, color: '#9AA1B2', marginTop: 4, fontWeight: '700' },
+  navIcon: { fontSize: 19, color: '#637493' },
+  navLabel: { fontSize: 10, color: '#637493', marginTop: 4, fontWeight: '700' },
   navActive: { color: '#5E66D8' },
   loginSafe: { flex: 1, backgroundColor: '#F6F8FC', justifyContent: 'center' },
   loginWrap: { paddingHorizontal: 26, paddingTop: 80, paddingBottom: 80, alignItems: 'stretch' },
   logo: { alignSelf: 'center', width: 72, height: 72, borderRadius: 24, backgroundColor: '#EBEDFF', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
   loginTitle: { textAlign: 'center', color: '#202943', fontSize: 28, fontWeight: '900' },
-  loginSubtitle: { textAlign: 'center', color: '#838B9F', fontSize: 13, marginTop: 7, marginBottom: 28 },
+  loginSubtitle: { textAlign: 'center', color: '#53678B', fontSize: 14, marginTop: 7, marginBottom: 23 },
   loginInput: { height: 52, borderRadius: 15, backgroundColor: 'white', borderWidth: 1, borderColor: '#E4E7F0', paddingHorizontal: 15, marginBottom: 11, color: '#202943' },
   primaryButton: { height: 52, borderRadius: 15, backgroundColor: '#6567E8', alignItems: 'center', justifyContent: 'center', marginTop: 4 },
   primaryButtonText: { color: 'white', fontSize: 15, fontWeight: '900' },
-  loginHint: { color: '#989FAF', textAlign: 'center', fontSize: 11, marginTop: 18 },
+  loginHint: { color: '#516585', textAlign: 'center', fontSize: 12, marginTop: 18 },
+  loginAdminNote: { color: '#4D6290', textAlign: 'center', fontSize: 11.5, lineHeight: 18, marginTop: 11 },
+  loginBackendHint: { color: '#677899', textAlign: 'center', fontSize: 10, marginTop: 10 },
+  authSegment: { flexDirection: 'row', padding: 5, borderRadius: 15, backgroundColor: '#E9EEFA', marginBottom: 20, gap: 5 },
+  authSegmentButton: { flex: 1, paddingVertical: 13, borderRadius: 11, alignItems: 'center' },
+  authSegmentSelected: { backgroundColor: '#6567E8' },
+  authSegmentText: { color: '#405582', fontSize: 13, fontWeight: '700' },
+  authSegmentTextSelected: { color: 'white', fontWeight: '800' },
+  loginPasswordRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'white', borderWidth: 1, borderColor: '#D7DFF0', borderRadius: 15, marginBottom: 11 },
+  loginPasswordInput: { flex: 1, borderWidth: 0, marginBottom: 0, paddingRight: 3 },
+  loginEyeButton: { paddingHorizontal: 14, height: 51, justifyContent: 'center', alignItems: 'center' },
+  loginEyeText: { color: '#4B5ED0', fontWeight: '800', fontSize: 12 },
+  planToolbar: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16, marginTop: 12 },
+  planCalendarCard: { backgroundColor: 'white', padding: 15, borderRadius: 19, marginBottom: 13, borderColor: '#E0E7F5', borderWidth: 1 },
+  planSectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 10 },
+  planSectionTitle: { color: '#273B65', fontWeight: '800', fontSize: 15, flexShrink: 1 },
+  planSectionSubtitle: { color: '#53698E', fontSize: 11.5, lineHeight: 17, marginTop: 4 },
+  planViewTabs: { flexDirection: 'row', padding: 3, backgroundColor: '#E9EEFB', borderRadius: 11, gap: 3 },
+  planViewTab: { paddingVertical: 8, paddingHorizontal: 10, borderRadius: 9 },
+  planViewTabSelected: { backgroundColor: '#6265E8' },
+  planViewLabel: { fontSize: 11, fontWeight: '750', color: '#496087' },
+  planViewLabelSelected: { color: 'white' },
+  planCalendarNav: { flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 11 },
+  planArrow: { backgroundColor: '#E9EFFB', width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  planArrowText: { color: '#4E62B9', fontWeight: '800', fontSize: 21 },
+  planWeekRange: { fontSize: 13, fontWeight: '800', color: '#31446C' },
+  planTodayButton: { backgroundColor: '#E7EDFF', paddingHorizontal: 11, paddingVertical: 9, borderRadius: 10 },
+  planTodayText: { color: '#4E5ED4', fontSize: 11, fontWeight: '800' },
+  planWeekRow: { flexDirection: 'row', gap: 3 },
+  planDayCell: { flex: 1, minWidth: 0, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: '#ECF2FB', paddingVertical: 10, gap: 4 },
+  planDayCellActive: { backgroundColor: '#6567E8' },
+  planDayName: { fontWeight: '800', color: '#566A91', fontSize: 10 },
+  planDayDate: { color: '#354B73', fontSize: 12, fontWeight: '800' },
+  planDayCount: { color: '#65789B', fontSize: 9 },
+  planDayActiveText: { color: 'white' },
+  planEditButton: { borderRadius: 10, paddingVertical: 9, paddingHorizontal: 12, backgroundColor: '#E8ECFF' },
+  planEditButtonText: { color: '#4F5BC6', fontSize: 12, fontWeight: '800' },
+  planEmptyText: { color: '#53668A', fontSize: 13, lineHeight: 20, padding: 12, backgroundColor: '#F0F4FC', borderRadius: 12 },
+  planTaskRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start', backgroundColor: '#F1F5FC', padding: 12, borderRadius: 13, marginTop: 8 },
+  planTaskDone: { backgroundColor: '#F0F3FA' },
+  planTaskActions: { flexDirection: 'column', gap: 8 },
+  planCheck: { width: 27, height: 27, borderWidth: 1.5, borderColor: '#8A98C4', borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: 'white' },
+  planCheckDone: { borderColor: '#6567E8', backgroundColor: '#6567E8' },
+  planCheckText: { color: '#45578C', fontSize: 14, fontWeight: '900' },
+  planCheckTextDone: { color: 'white' },
+  planTaskTitle: { color: '#2B3F67', fontWeight: '800', fontSize: 13.5, lineHeight: 20 },
+  planDoneTitle: { color: '#526689', textDecorationLine: 'line-through' },
+  planTaskMeta: { color: '#51668A', fontSize: 11.5, lineHeight: 18, marginTop: 4 },
+  planTaskNote: { color: '#566C91', fontSize: 11.5, lineHeight: 17, marginTop: 5 },
+  planAdaptiveTag: { color: '#6C589A', fontWeight: '800', fontSize: 10.5, marginTop: 5 },
+  planIconAction: { backgroundColor: '#E6ECFA', width: 28, height: 28, borderRadius: 9, justifyContent: 'center', alignItems: 'center' },
+  planIconText: { color: '#5869BC', fontSize: 16, fontWeight: '800' },
+  planProgressCard: { backgroundColor: '#F0F2FF', borderWidth: 1, borderColor: '#D7DEFF', borderRadius: 18, padding: 17, marginBottom: 13 },
+  planProgressPercent: { color: '#5C5DDC', fontSize: 24, fontWeight: '900' },
+  planProgressHours: { color: '#53668A', fontSize: 12, lineHeight: 17, marginTop: 11 },
+  planReminderRow: { flexDirection: 'row', alignItems: 'center', gap: 9, borderBottomWidth: 1, borderBottomColor: '#E8EDF8', paddingVertical: 12 },
+  planReminderDone: { backgroundColor: '#F7F9FE' },
+  planReminderTitle: { color: '#2D4269', fontSize: 12.5, fontWeight: '800', lineHeight: 18 },
+  planReminderMeta: { color: '#54678A', fontSize: 10.5, lineHeight: 17, marginTop: 4 },
+  planCollapseButton: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 12, marginTop: 10, backgroundColor: '#E8EEFC', borderRadius: 12 },
+  planCollapseText: { color: '#4A5FA4', fontSize: 12, fontWeight: '800' },
 });
