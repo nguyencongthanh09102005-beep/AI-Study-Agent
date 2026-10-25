@@ -1,0 +1,170 @@
+/* AI Study Agent — accessible text contrast, ALL Web pages.
+   Loaded after legacy mockup/polish styles. Keep blue-violet buttons,
+   white-on-gradient labels, colorful status badges and existing layouts. */
+body.study-ui {
+  --muted: #52658b;
+  --ui-muted: #52658b;
+  color: #24365f;
+}
+
+/* Shared shell and navigation */
+body.study-ui .brand-copy small,
+body.study-ui .pro-card small,
+body.study-ui .user-copy small,
+body.study-ui .mock-page-head p {
+  color: #52658a;
+}
+body.study-ui .side-nav a:not(.active) {
+  color: #41577e !important;
+}
+body.study-ui .side-nav a.active {
+  color: #3855d4 !important;
+}
+body.study-ui .global-search input::placeholder,
+body.study-ui .page-search input::placeholder,
+body.study-ui .page-content input::placeholder,
+body.study-ui .page-content textarea::placeholder {
+  color: #687b9f;
+  opacity: 1;
+}
+body.study-ui .global-search input,
+body.study-ui .page-search input,
+body.study-ui .page-content input:not([type="checkbox"]):not([type="radio"]),
+body.study-ui .page-content textarea,
+body.study-ui .page-content select {
+  color: #263b67;
+}
+
+/* Headings and everyday informational text, not primary colored buttons. */
+body.study-ui .card-title-row h3,
+body.study-ui .document-section-head h3,
+body.study-ui .quiz-work-head h3,
+body.study-ui .chat-side-head h3,
+body.study-ui .chat-header h3 {
+  color: #20345e;
+}
+body.study-ui .card-title-row p,
+body.study-ui .empty-soft,
+body.study-ui .metric-copy em,
+body.study-ui .metric-copy small,
+body.study-ui .storage-head small,
+body.study-ui .storage-legend,
+body.study-ui .today-time,
+body.study-ui .today-row small,
+body.study-ui .recent-card small,
+body.study-ui .quick-card small,
+body.study-ui .proactive-agent-meta,
+body.study-ui .proactive-agent-kicker {
+  color: #52658b;
+}
+
+/* Subjects: course ID / status retain accent colors; descriptions are readable. */
+body.study-ui .course-desc,
+body.study-ui .course-meta small,
+body.study-ui .subject-progress-head,
+body.study-ui .subject-card-new .course-title small,
+body.study-ui .subject-toolbar-hint {
+  color: #4f6389;
+}
+body.study-ui .course-meta small,
+body.study-ui .metric-copy em { font-size: 10px; }
+
+/* Personal and shared document library. */
+body.study-ui .doc-meta,
+body.study-ui .doc-meta span,
+body.study-ui .doc-card-top small,
+body.study-ui .document-card-new .doc-title small,
+body.study-ui .dropzone-inner p,
+body.study-ui .upload-inline-controls small,
+body.study-ui .personal-document-notice p {
+  color: #51658b;
+}
+body.study-ui .doc-meta { font-size: 10.5px; }
+
+/* Quiz: do NOT overwrite the white text on gradient primary buttons. */
+body.study-ui .quiz-action-card:not(.primary-action) small,
+body.study-ui .quiz-create-tip,
+body.study-ui .quiz-mode-note,
+body.study-ui .quiz-picker small,
+body.study-ui .quiz-work-head small,
+body.study-ui .quiz-progress-text,
+body.study-ui .quiz-stats-grid small,
+body.study-ui .quiz-stats-grid em {
+  color: #53668c;
+}
+body.study-ui .quiz-create-tip,
+body.study-ui .quiz-mode-note { font-size: 10.5px; line-height: 1.55; }
+
+/* Chat: preserve separate bubble background/text contrast. */
+body.study-ui .history-text small,
+body.study-ui .chat-ai-info span,
+body.study-ui #chatContextStatus,
+body.study-ui .message-name,
+body.study-ui .chat-welcome-strip p,
+body.study-ui .chat-history-panel .empty-soft {
+  color: #52658a;
+}
+
+/* Administrator cards / forms. Status colors remain semantic. */
+body.study-ui.page-admin .admin-section-head p,
+body.study-ui.page-admin .admin-form-hint,
+body.study-ui.page-admin .admin-card-title small,
+body.study-ui.page-admin .admin-stat-card small,
+body.study-ui.page-admin .admin-table td small,
+body.study-ui.page-admin .admin-muted {
+  color: #506486;
+}
+body.study-ui.page-admin .admin-table th {
+  color: #41577f;
+}
+
+/* Shared form labels, muted meta and accessibility focus. */
+body.study-ui .page-content label:not(.admin-checkbox),
+body.study-ui .mock-form label,
+body.study-ui .planner-form label > span {
+  color: #40557e;
+}
+body.study-ui .page-content :is(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid #4e62ef;
+  outline-offset: 2px;
+}
+
+/* Study Plan — in this file because it must also remain legible with the
+   page-specific cleanup sheet loaded immediately afterward. */
+body.study-ui.page-study_plan .week-day:not(.active) b,
+body.study-ui.page-study_plan .week-day:not(.active) .week-date,
+body.study-ui.page-study_plan .week-day:not(.active) small,
+body.study-ui.page-study_plan .schedule-time,
+body.study-ui.page-study_plan .schedule-range,
+body.study-ui.page-study_plan .schedule-view-label,
+body.study-ui.page-study_plan .planner-progress-heading small,
+body.study-ui.page-study_plan .planner-progress-hours span,
+body.study-ui.page-study_plan .planner-insight p,
+body.study-ui.page-study_plan .planner-deadline-count {
+  color: #51648b;
+}
+body.study-ui.page-study_plan .week-day.active b,
+body.study-ui.page-study_plan .week-day.active .week-date,
+body.study-ui.page-study_plan .week-day.active small {
+  color: #fff;
+}
+body.study-ui.page-study_plan .schedule-copy strong,
+body.study-ui.page-study_plan .goal-list b {
+  color: #273b65;
+}
+body.study-ui.page-study_plan .schedule-copy small,
+body.study-ui.page-study_plan .goal-list small {
+  color: #50658a;
+}
+body.study-ui.page-study_plan .schedule-item-new.done {
+  opacity: 1;
+  background: #edf3fb;
+}
+body.study-ui.page-study_plan .schedule-item-new.done .schedule-copy strong {
+  color: #42577e;
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+body.study-ui.page-study_plan .deadline-item.completed {
+  opacity: 1;
+}
