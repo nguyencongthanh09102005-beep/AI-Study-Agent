@@ -54,6 +54,11 @@ jobs:
           node --check static/js/auth-password.js
           node --check mobile/src/api.js
 
+      - name: Mobile planner and student login UI regressions
+        run: |
+          node --check mobile/src/plan-utils.js
+          node tests/test_mobile_plan_ui.js
+
       - name: Password eye toggle tests
         run: node tests/test_auth_password.js
 
