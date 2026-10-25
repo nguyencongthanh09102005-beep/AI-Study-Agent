@@ -65,17 +65,52 @@
     </article>
 
     <article class="soft-card goal-card">
-      <div class="card-title-row"><h3>◎ &nbsp; Mục tiêu & deadline</h3><span class="planner-deadline-count">{{ reminders|length }} mục tiêu</span></div>
-      <div class="goal-list">
-        {% for r in reminders[:5] %}
-        <div class="deadline-item {{ 'completed' if r.done else '' }}" data-reminder-id="{{ r.id }}" data-reminder-title="{{ r.title|e }}" data-urgent="{{ 'true' if r.urgent else 'false' }}">
-          <form method="post" action="{{ url_for('toggle_plan_reminder', reminder_id=r.id) }}"><button type="submit" class="goal-check" aria-label="{{ 'Đánh dấu chưa hoàn thành' if r.done else 'Đánh dấu hoàn thành' }}: {{ r.title }}">{{ '✓' if r.done else '' }}</button></form>
-          <span><b>{{ r.title }}</b><small>{{ r.date_text }} {{ r.time_text }}</small></span>
-          <span class="deadline-badge {{ r.badge_class }}">{{ r.badge_text }}</span>
-          <button type="button" class="deadline-more edit-reminder-btn" title="Chỉnh sửa deadline" aria-label="Chỉnh sửa deadline: {{ r.title }}" data-id="{{ r.id }}" data-title="{{ r.title|e }}" data-due-at="{{ r.due_at_input }}">⋮</button>
-        </div>
-        {% else %}<div class="empty-soft">Chưa có mục tiêu hoặc deadline.</div>{% endfor %}
+      <div class="card-title-row">
+        <h3>◎ &nbsp; Mục tiêu & deadline</h3>
+        <span class="planner-deadline-count">{{ pending_reminders|length }} cần làm</span>
       </div>
+      {% macro deadline_row(r) %}
+      <div class="deadline-item {{ 'completed' if r.done else '' }}"
+           data-reminder-id="{{ r.id }}" data-reminder-title="{{ r.title|e }}"
+           data-urgent="{{ 'true' if r.urgent and not r.done else 'false' }}">
+        <form method="post" action="{{ url_for('toggle_plan_reminder', reminder_id=r.id) }}">
+          <button type="submit" class="goal-check"
+                  aria-label="{{ 'Đánh dấu chưa hoàn thành' if r.done else 'Đánh dấu hoàn thành' }}: {{ r.title }}">{{ '✓' if r.done else '' }}</button>
+        </form>
+        <span><b>{{ r.title }}</b><small>{{ r.date_text }} {{ r.time_text }}</small></span>
+        <span class="deadline-badge {{ r.badge_class }}">{{ r.badge_text }}</span>
+        <button type="button" class="deadline-more edit-reminder-btn" title="Chỉnh sửa deadline"
+                aria-label="Chỉnh sửa deadline: {{ r.title }}" data-id="{{ r.id }}"
+                data-title="{{ r.title|e }}" data-due-at="{{ r.due_at_input }}">⋮</button>
+      </div>
+      {% endmacro %}
+      <div class="goal-list" id="deadline-list">
+        {% for r in pending_reminders[:5] %}
+          {{ deadline_row(r) }}
+        {% else %}
+          {% if completed_reminders %}
+          <div class="planner-deadline-empty">✓ Không còn mục tiêu chưa hoàn thành.</div>
+          {% else %}
+          <div class="planner-deadline-empty">Chưa có mục tiêu hoặc deadline.</div>
+          {% endif %}
+        {% endfor %}
+      </div>
+      {% if pending_reminders|length > 5 %}
+      <details class="planner-deadline-details">
+        <summary><span>Xem thêm {{ pending_reminders|length - 5 }} deadline cần làm</span><span aria-hidden="true">⌄</span></summary>
+        <div class="goal-list">
+          {% for r in pending_reminders[5:] %}{{ deadline_row(r) }}{% endfor %}
+        </div>
+      </details>
+      {% endif %}
+      {% if completed_reminders %}
+      <details class="planner-deadline-details planner-completed-details">
+        <summary><span>✓ Đã hoàn thành ({{ completed_reminders|length }})</span><span aria-hidden="true">⌄</span></summary>
+        <div class="goal-list">
+          {% for r in completed_reminders %}{{ deadline_row(r) }}{% endfor %}
+        </div>
+      </details>
+      {% endif %}
     </article>
 
     <article class="soft-card planner-insight"><span class="planner-insight-icon" aria-hidden="true">✦</span><div><h3>Gợi ý từ Study Agent</h3><p>{{ agent_tip }}</p></div></article>
