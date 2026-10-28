@@ -29,6 +29,7 @@
         <div style="display:flex;gap:12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap">
           <div>
             <span style="color:#526be5;font-weight:700;font-size:13px">Buổi {{ lesson.session_id }} · Chương {{ lesson.unit_id }}</span>
+            <div style="margin-top:9px"><a href="{{ url_for('chapter_material.student_chapter', subject_id=subject.id, chapter_number=lesson.unit_id) }}" style="color:#435bc9;font-weight:700">📖 Mở bài học và học liệu Chương {{ lesson.unit_id }} →</a></div>
             <h3 style="color:#253c75;margin:8px 0">{{ lesson.title }}</h3>
           </div>
           <span style="background:#e6edff;padding:8px 12px;border-radius:10px;color:#314781;font-size:13px">{{ lesson.date }} · {{ lesson.time }} · {{ lesson.duration }} phút</span>
