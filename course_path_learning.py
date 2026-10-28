@@ -51,9 +51,10 @@ def _clean_bullet(line):
 
 def _boilerplate(line):
     low = line.casefold()
-    return (low.startswith(("ai study agent  /", "chỉ dùng kiểm thử",
+    # Repeated PDF page header/footer: never treat them as lesson content.
+    return (low.startswith(("ai study agent /", "chỉ dùng kiểm thử",
                             "tài liệu giả lập •", "kết thúc tài liệu giả lập"))
-            or bool(re.fullmatch(r"Trang \d+", line)))
+            or bool(re.fullmatch(r"trang\s+\d+(?:\s*/\s*\d+)?", low)))
 
 
 def _collect_value(bucket, value, limit=8):
