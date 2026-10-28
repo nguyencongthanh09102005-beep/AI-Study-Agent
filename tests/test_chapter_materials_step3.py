@@ -37,6 +37,23 @@ Chương 2. Danh sách liên kết: node head next.
 2.2. Thêm xóa node trên linked list và duyệt danh sách.
 Thuật toán độ phức tạp Big O cũng có thể áp dụng cho linked list.
 """
+    # Whole-chapter evidence retrieval must reach relevant text even when it
+    # appears past the first several thousand characters of an approved file.
+    from chapter_tutor import prepared_sources
+    long_document = (
+        ("Giới thiệu kiến thức mảng và truy cập theo chỉ số. " * 300)
+        + "\\nGiải thích node, head và con trỏ next trong danh sách liên kết. "
+        + "Mỗi node gồm dữ liệu và tham chiếu tới node kế tiếp."
+    )
+    extracted = prepared_sources([{
+        "id": 900, "original_name": "chuong2.txt",
+        "extracted_text": long_document
+    }], question="node head next")
+    assert extracted and any(
+        "Mỗi node gồm dữ liệu" in source["excerpt"]
+        for source in extracted
+    ), "Relevant chapter text after the file prefix was not retrieved."
+
     old_db, old_dir = project.DB_PATH, project.UPLOAD_DIR
     with tempfile.TemporaryDirectory() as folder:
         project.DB_PATH = Path(folder) / "db.sqlite"
