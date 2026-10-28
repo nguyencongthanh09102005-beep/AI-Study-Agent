@@ -205,6 +205,61 @@ def preparation_status(conn, project, uid, subject_id):
     return _progress(conn, project, uid, subject_id)
 
 
+
+def per_lesson_quiz_status(conn, project, uid, task_id):
+    """Public-safe status for one verified room, never question/answer payload.
+
+    Check the current syllabus and Admin-approved material every time. A
+    prepared quiz is NOT the same as an open quiz: only quiz_access decides
+    if the student may actually start or see questions.
+    """
+    ensure_quiz_runtime_schema(conn)
+    try:
+        context, preceding, count = context_for_task(project, conn, uid, task_id)
+    except LessonContextError as err:
+        return {"state": "blocked", "count": 0, "reason": err.message,
+                "quiz_id": None}
+    result = {
+        "state": "unprepared", "quiz_id": None, "count": count,
+        "is_final": bool(preceding), "reason": "",
+        "study_at": "", "ends_at": "", "can_start": False,
+        "attempt_count": 0, "best_score": None,
+    }
+    if not context.get("ready"):
+        result.update(state="blocked",
+                      reason=context.get("reason") or
+                      "Chưa đủ học liệu chung được duyệt.")
+        return result
+    quiz = saved_quiz(conn, uid, task_id, context["source_signature"])
+    if not quiz:
+        if preceding:
+            valid_parts = sum(
+                1 for i, c in enumerate(preceding)
+                if _part_valid(conn, uid, task_id, c,
+                               _quota(i, len(preceding)))
+            )
+            result["prepared_parts"] = valid_parts
+            result["total_parts"] = len(preceding)
+        return result
+
+    access = quiz_access(conn, project, uid, quiz["id"])
+    result.update(
+        quiz_id=int(quiz["id"]),
+        can_start=bool(access.get("can_start")),
+        study_at=access.get("study_at", ""),
+        ends_at=access.get("ends_at", ""),
+        reason=access.get("reason", ""),
+        state=("active" if access.get("allowed") else
+               "available" if access.get("can_start") else "locked"),
+    )
+    row = conn.execute("""
+        SELECT COUNT(*) AS attempts,MAX(score) AS best_score
+        FROM quiz_attempts WHERE quiz_id=? AND user_id=?
+    """, (quiz["id"], uid)).fetchone()
+    result["attempt_count"] = int(row["attempts"] or 0)
+    result["best_score"] = row["best_score"]
+    return result
+
 def prepare_step(project, conn, uid, subject_id):
     """Do at most one bounded AI operation; safe to resume after interruption."""
     tasks = ordered_tasks(conn, uid, subject_id)
