@@ -261,8 +261,25 @@ Thuật toán độ phức tạp Big O cũng có thể áp dụng cho linked lis
             assert 'name="chapter_number" value="2"' in html
             assert student.post(f"/subjects/{course}/chapters/2").status_code == 405
 
+            # UI stage 1: remove duplicated greeting, expose the new scoped
+            # stylesheet, and show human-readable subject names in Chat AI.
+            chat_view = student.get("/chat")
+            assert chat_view.status_code == 200
+            chat_html = chat_view.get_data(as_text=True)
+            assert "css/chat_stage1.css" in chat_html
+            assert "Xin chào! 👋" not in chat_html
+            assert "Thoát chế độ chương" not in chat_html
+            assert "chat-welcome-strip" not in chat_html
+            css_text = (Path(__file__).resolve().parents[1] /
+                        "static/css/chat_stage1.css").read_text(encoding="utf-8")
+            assert "max-width: min(100%, 1100px)" in css_text
+            assert "max-height: none !important" in css_text
+            assert "overflow-y: auto !important" in css_text
+
             chats = student.get("/api/chats").get_json()
             convo = next(item for item in chats if item["subject_id"] == course)
+            assert convo["title"] == "Cấu trúc dữ liệu"
+            assert convo["title"] != "CTDL999"
             assert convo["id"]
             lookup = (f"/api/chat/lesson-context?subject_id={course}"
                       "&chapter_number=2&topic_index=0")
