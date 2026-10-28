@@ -28,17 +28,19 @@
   }
 
   function inline(value) {
-    const codeTokens = [];
-    let safe = escapeHtml(value);
-    safe = safe.replace(/`([^`\n]+)`/g, (_match, code) => {
-      const marker = "\uE000" + codeTokens.length + "\uE001";
-      codeTokens.push("<code>" + code + "</code>");
-      return marker;
-    });
+    const tokens = [];
+    let raw = String(value == null ? "" : value)
+      .replace(/[\uE000\uE001]/g, "");
+    const reserve = html => "\uE000" + (tokens.push(html) - 1) + "\uE001";
+    raw = raw.replace(/`([^`\n]+)`/g,
+      (_m, code) => reserve("<code>" + escapeHtml(code) + "</code>"));
+    raw = raw.replace(/\\\((.+?)\\\)|(?<!\\)\$([^$\n]+)\$/g,
+      (_m, paren, dollar) => reserve(mathHtml(paren === undefined ? dollar : paren, false)));
+    let safe = escapeHtml(raw);
     safe = safe.replace(/\*\*([^*\n]+?)\*\*/g, "<strong>$1</strong>")
-               .replace(/__([^_\n]+?)__/g, "<strong>$1</strong>")
-               .replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, "<em>$1</em>");
-    return safe.replace(/\uE000(\d+)\uE001/g, (_match, i) => codeTokens[Number(i)]);
+      .replace(/__([^_\n]+?)__/g, "<strong>$1</strong>")
+      .replace(/(?<!\*)\*([^*\n]+?)\*(?!\*)/g, "<em>$1</em>");
+    return safe.replace(/\uE000(\d+)\uE001/g, (_m, i) => tokens[Number(i)] || "");
   }
 
   function tableRow(value) {
