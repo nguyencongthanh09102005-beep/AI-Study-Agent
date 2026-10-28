@@ -46,7 +46,8 @@
           <ul style="line-height:1.85">
           {% for doc in lesson.materials %}<li>
             {{ 'Tài liệu chung' if doc.kind == 'shared' else 'Tài liệu cá nhân' }}:
-            <strong>{{ doc.name }}</strong> <span style="color:#7383a2;font-size:12px">(gợi ý khớp nội dung, cần kiểm tra lại)</span>
+            <strong>{{ doc.name }}</strong>
+            {% if doc.approved %}<span style="color:#176945;font-size:12px">(✓ Admin đã duyệt cho chương này)</span> <a href="{{ url_for('shared_document_file', doc_id=doc.id) }}" target="_blank" rel="noopener" style="color:#465cc8">Mở file ↗</a>{% else %}<span style="color:#7383a2;font-size:12px">(gợi ý tài liệu cá nhân, cần kiểm tra)</span>{% endif %}
           </li>{% endfor %}</ul>
         {% else %}<p style="color:#8a6170">Chưa tìm được tài liệu của đúng môn có nội dung khớp chương này. Có thể bổ sung slide/giáo trình sau.</p>{% endif %}
         {% if lesson.source_material_hints %}
