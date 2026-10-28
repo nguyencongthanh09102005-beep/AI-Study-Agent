@@ -2544,7 +2544,7 @@ nhưng phải nằm bên trong chuỗi JSON escape đúng quy tắc. Cấu trúc
     )
 
 
-def build_quiz(text, question_count=10, focus_topics=None):
+def build_quiz(text, question_count=10, focus_topics=None, session_mode=False):
     """
     Tạo quiz 10 / 20 / 30 câu bằng Gemini.
 
@@ -2562,7 +2562,10 @@ def build_quiz(text, question_count=10, focus_topics=None):
     except (TypeError, ValueError):
         question_count = 10
 
-    if question_count not in (10, 20, 30):
+    if session_mode:
+        if question_count < 1 or question_count > 60:
+            return []
+    elif question_count not in (10, 20, 30):
         question_count = 10
 
     clean_text = (text or "").strip()
@@ -2606,6 +2609,17 @@ def build_quiz(text, question_count=10, focus_topics=None):
         )[:120]
 
         if not question:
+            return None
+
+        # Course metadata is not a learning outcome: the model often turns
+        # administrative syllabus fields into trivial memory questions.
+        if re.search(
+            r"(?:giảng viên|giáo viên|người dạy|mã học phần|mã môn học|"
+            r"mã môn|bao nhiêu tín chỉ|số tín chỉ|course code|lecturer|"
+            r"tên giảng viên|tên giáo viên|họ tên giáo viên|mã lớp|"
+            r"phòng học|lịch học|địa chỉ email|email giảng viên)",
+            question.casefold()
+        ):
             return None
 
         if (
@@ -2704,8 +2718,22 @@ def build_quiz(text, question_count=10, focus_topics=None):
             else ""
         )
 
+        focus_policy = (
+            "- Đây là BÀI KIỂM TRA KIẾN THỨC theo từng buổi, không phải "
+            "trắc nghiệm dữ liệu hành chính của đề cương. "
+            "Tập trung vào định nghĩa, nguyên lý, thuật toán, "
+            "bài tập vận dụng, phân tích tình huống và công thức. "
+            "KHÔNG hỏi tên giảng viên/giáo viên, mã môn/mã học phần, "
+            "số tín chỉ, lịch học, phòng học, email, trường/khoa. "
+            "Không dùng thông tin giới thiệu làm câu hỏi. "
+            "Câu hỏi phải được chứng minh từ NỘI DUNG KIẾN THỨC cung cấp; "
+            "không suy diễn từ tiêu đề hoặc tự bổ sung kiến thức."
+            if session_mode else ""
+        )
         prompt = f"""
 Bạn là AI Study Agent.
+
+{focus_policy}
 
 Nhiệm vụ:
 Tạo đúng {batch_size} câu hỏi trắc nghiệm bằng tiếng Việt
