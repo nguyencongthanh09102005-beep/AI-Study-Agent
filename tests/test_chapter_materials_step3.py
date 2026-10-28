@@ -293,7 +293,7 @@ Thuật toán độ phức tạp Big O cũng có thể áp dụng cho linked lis
             assert "rememberSelectedSubject(chat.subject_id)" in js_code
             assert "if (Number(currentChatId) !== Number(chatId)) return;" in js_code
             assert "mobileSubjectPicker" in js_code
-            # Stage 3: 2 modes and real course/chapter/topic selector, no
+            # Stage 3+: 2 modes and real course/chapter selector, no
             # duplicate chatbot or fake syllabus values in the UI.
             assert "css/chat_stage3.css" in chat_html
             assert "js/chat_format.js" in chat_html
@@ -301,7 +301,7 @@ Thuật toán độ phức tạp Big O cũng có thể áp dụng cho linked lis
             assert "id=\"chatModeChapter\"" in chat_html
             assert "id=\"chatCourseSelect\"" in chat_html
             assert "id=\"chatChapterSelect\"" in chat_html
-            assert "id=\"chatTopicSelect\"" in chat_html
+            assert "id=\"chatTopicSelect\"" not in chat_html
             assert "chat-mode-panel" in chat_html
             # Layout refinement: account/logout live at sidebar bottom,
             # the redundant V2 card is gone, and Chat can occupy viewport top.
@@ -326,6 +326,8 @@ Thuật toán độ phức tạp Big O cũng có thể áp dụng cho linked lis
 
             assert "window.ChatMarkdown?.render(message.content)" in js_code
             assert "api/chat/course-outline" in js_code
+            assert "topicSelector" not in js_code
+            assert "topic_index: lessonMode.topic_index" not in js_code
 
             outline_url = f"/api/chat/course-outline?subject_id={course}"
             outline_resp = student.get(outline_url)
@@ -355,6 +357,17 @@ Thuật toán độ phức tạp Big O cũng có thể áp dụng cho linked lis
             metadata = verified.get_json()
             assert metadata["chapter_number"] == 2
             assert "2.1. Danh sách liên kết đơn" in metadata["topic"]
+            # No chosen topic -> full chapter scope, with all syllabus topics.
+            chapter_only_lookup = (
+                f"/api/chat/lesson-context?subject_id={course}&chapter_number=2"
+            )
+            chapter_only = student.get(chapter_only_lookup)
+            assert chapter_only.status_code == 200
+            chapter_meta = chapter_only.get_json()
+            assert chapter_meta["topic_index"] is None
+            assert chapter_meta["chapter"] == "Chương 2. Danh sách liên kết"
+            assert len(chapter_meta["topics"]) == 2
+            assert chapter_meta["source_names"] == ["chapter2.txt"]
             assert metadata["source_names"] == ["chapter2.txt"]
             assert peer.get(lookup).status_code == 404
             assert student.get(
@@ -478,7 +491,52 @@ Thuật toán độ phức tạp Big O cũng có thể áp dụng cho linked lis
                     active["sources"]
                 )
                 assert not history_for_mode(conn, first, convo["id"], changed)
+                # A chapter-only request must naturally cover both 2.1
+                # and 2.2, without requiring the UI to choose a subtopic.
+                question_mang = "Giải thích thao tác trên mảng trong chương 2."
+                whole_lesson = {"chapter_number": 2}
+                chapter_answer = student.post("/api/chat", json={
+                    "conversation_id": convo["id"], "question": question_mang,
+                    "lesson": whole_lesson,
+                })
+                assert chapter_answer.status_code == 200
+                assert chapter_answer.get_json()["lesson"]["topic_index"] is None
+                assert "2.1. Danh sách liên kết đơn" in tutor_prompts[-1]
+                assert "2.2. Thêm xóa node" in tutor_prompts[-1]
+                assert "Chương một chỉ tập trung Big O" not in tutor_prompts[-1]
+                assert "Giải thích về node." not in tutor_prompts[-1]
+                chapter_followup = student.post("/api/chat", json={
+                    "conversation_id": convo["id"],
+                    "question": "Còn node và next trong chương này?",
+                    "lesson": whole_lesson,
+                })
+                assert chapter_followup.status_code == 200
+                assert question_mang in tutor_prompts[-1]
+                assert chapter_followup.get_json()["lesson"]["topic_index"] is None
+
+                conn = project.db()
+                chapter_a = resolve_lesson_context(
+                    project, conn, first, course, 2, question="mảng"
+                )
+                chapter_b = resolve_lesson_context(
+                    project, conn, first, course, 2, question="next"
+                )
+                assert chapter_a["source_signature"] == chapter_b["source_signature"]
+                assert chapter_a["topic_index"] is None
+                assert len(history_for_mode(
+                    conn, first, convo["id"], chapter_b
+                )) == 4
+                # Topic-scoped legacy data must stay visible, but not silently
+                # become chapter-only prompt memory.
+                assert question_mang not in "\n".join(
+                    row["content"] for row in history_for_mode(
+                        conn, first, convo["id"], active
+                    )
+                )
                 conn.close()
+                assert len(student.get(
+                    f'/api/chats/{convo["id"]}/messages'
+                ).get_json()) == 16
 
                 assert student.post("/api/chat", json={
                     **payload, "lesson": {"chapter_number": 2, "topic_index": 99}
@@ -500,7 +558,7 @@ Thuật toán độ phức tạp Big O cũng có thể áp dụng cho linked lis
                 )
                 assert len(student.get(
                     f'/api/chats/{convo["id"]}/messages'
-                ).get_json()) == 12
+                ).get_json()) == 16
 
                 # Admin can revoke an approved file while AI is generating.
                 # The answer must not be shown or saved if that happens.
@@ -523,7 +581,7 @@ Thuật toán độ phức tạp Big O cũng có thể áp dụng cho linked lis
                 assert "thay đổi" in stale_answer.get_json()["error"]
                 assert len(student.get(
                     f'/api/chats/{convo["id"]}/messages'
-                ).get_json()) == 12
+                ).get_json()) == 16
                 # Restore approval for the remaining existing regression cases.
                 assert administrator.post(
                     f"/admin/documents/{doc_id}/chapters",
