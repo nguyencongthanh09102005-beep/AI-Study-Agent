@@ -90,3 +90,17 @@
 .study-session-actions .study-session-finish{background:#147a5d}
 .study-session-note{margin:10px 0 0!important;font-size:11px!important;color:#60739d!important;line-height:1.6}
 @media(max-width:680px){.study-session-metrics>div{flex:1;min-width:125px}.study-session-timer .study-session-actions button{flex:1}}
+
+
+/* Per-lesson Quiz visibility: status is read-only and does not unlock questions. */
+.study-room-quiz{border-color:#d6e1fb}
+.study-room-quiz-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.study-room-quiz-heading h3{margin:0}
+.study-room-quiz-count{padding:6px 12px;border-radius:99px;background:#e7eeff;color:#354f91;font-weight:800;font-size:12px}
+.study-room-quiz-status{margin:13px 0 8px;font-weight:800;font-size:14px;color:#2b467e}
+.study-room-quiz-score{font-size:12px;font-weight:800;color:#256648;margin:9px 0}
+.study-room-quiz-actions{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin-top:14px}
+.study-room-quiz-primary{display:inline-flex;align-items:center;justify-content:center;padding:10px 15px;background:#435fbd;color:#fff!important;font-weight:800;border-radius:10px;text-decoration:none;font-size:13px}
+.study-room-quiz-primary:hover{background:#304ca8}
+.study-room-quiz-actions .study-room-link{margin:0}
+.study-room-quiz-hint{color:#73809a;font-size:11px;line-height:1.65;margin:12px 0 0}
