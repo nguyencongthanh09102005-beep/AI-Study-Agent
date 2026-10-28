@@ -7,14 +7,44 @@ document.addEventListener("DOMContentLoaded", () => {
   const navToggle = document.getElementById("chatNavToggle");
   const navToggleLabel = navToggle?.querySelector(".chat-nav-toggle-label");
 
-  // The sidebar stays fully navigable: on Chat AI the other pages start
-  // as compact icon shortcuts, and users may expand them at any time.
+  // Animate only transforms/opacity (FLIP). Animating flex-basis or max-width
+  // would repeatedly reflow every course card and visibly stutter.
+  let sidebarAnimations = [];
   navToggle?.addEventListener("click", () => {
+    sidebarAnimations.forEach(animation => animation.cancel());
+    sidebarAnimations = [];
+
+    const items = Array.from(sidebarNav?.querySelectorAll("a.chat-nav-secondary") || []);
+    const heading = document.querySelector(".sidebar-course-heading");
+    if (heading) items.push(heading);
+    const canAnimate = window.innerWidth > 980 &&
+      typeof items[0]?.animate === "function" &&
+      !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const previous = canAnimate
+      ? items.map(item => item.getBoundingClientRect())
+      : [];
+
     const expanded = !sidebarNav?.classList.contains("is-expanded");
     sidebarNav?.classList.toggle("is-expanded", expanded);
     navToggle.setAttribute("aria-expanded", String(expanded));
     if (navToggleLabel) navToggleLabel.textContent =
       expanded ? "Thu gọn chức năng" : "Hiện đầy đủ chức năng";
+
+    if (canAnimate) {
+      items.forEach((item, index) => {
+        const current = item.getBoundingClientRect();
+        const dx = previous[index].left - current.left;
+        const dy = previous[index].top - current.top;
+        if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+        sidebarAnimations.push(item.animate([
+          { transform: "translate(" + dx + "px," + dy + "px)", opacity: 0.82 },
+          { transform: "translate(0,0)", opacity: 1 }
+        ], {
+          duration: 190,
+          easing: "cubic-bezier(0.22, 1, 0.36, 1)"
+        }));
+      });
+    }
   });
   const mobileSubjectPicker = document.getElementById("chatMobileSubject");
   const subjectNameEl = document.getElementById("chatSubjectName");
