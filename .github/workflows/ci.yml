@@ -56,6 +56,8 @@ jobs:
           node tests/test_study_timetable_periods.js
           node tests/test_weekly_planner_navigation.js
           node --check static/js/chat.js
+          node --check static/js/study_session_chat.js
+          node tests/test_study_session_chat.js
           node --check static/js/document-summary.js
           node --check static/js/auth-password.js
           node --check mobile/src/api.js
@@ -95,6 +97,7 @@ jobs:
           python tests/test_study_plan_ui.py
           python tests/test_schedule_conflicts.py
           python tests/test_study_session_step631.py
+          python -m py_compile study_session_chat_context.py
 
       - name: Final roles and manual deadline data-integrity audit
         run: python tests/test_final_integrity_audit.py

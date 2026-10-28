@@ -163,6 +163,9 @@ def verify():
             assert "19:00" in body
             assert "Slide Node cá nhân.pdf" in body
             assert f"/uploads/private631.pdf" in body
+            assert 'data-chat-enabled="0"' in body
+            assert "Mở Chat AI thông thường của môn" in body
+            assert client.get(f"/api/study-plan/tasks/{task_id}/chat-history").status_code == 409
             assert "Mật của môn khác" not in body
             assert "Mật của sinh viên khác" not in body
             assert "Chưa duyệt" not in body
@@ -220,6 +223,73 @@ def verify():
             assert f"/shared-documents/{approved_id}/file" in shared_room
             assert "Tài liệu chưa duyệt" not in shared_room
             assert f"/shared-documents/{unapproved_id}/file" not in shared_room
+            assert 'data-chat-enabled="1"' in shared_room
+            assert "study_session_chat.js" in shared_room
+
+            # The room shares the existing subject conversation, but keeps
+            # the prompt and history scoped to the verified roadmap session.
+            chat_url = f"/api/study-plan/tasks/{task_id}/chat-history"
+            initial = client.get(chat_url)
+            assert initial.status_code == 200, initial.get_data(as_text=True)[:500]
+            initial_data = initial.get_json()
+            assert initial_data["messages"] == []
+            assert initial_data["source_names"] == ["Slide chương 1 được duyệt"]
+            conversation = initial_data["conversation_id"]
+            asked = []
+            original_generate = project.gemini_generate
+            def mock_tutor(prompt):
+                asked.append(prompt)
+                return (json.dumps({
+                    "explanation": "Một node là một thành phần trong danh sách liên kết.",
+                    "citations": [{"source_key": "T1",
+                                   "quote": "Cấu trúc node liên kết"}],
+                    "practice": "Bạn hãy nêu nhiệm vụ của con trỏ head."
+                }, ensure_ascii=False), None)
+            try:
+                project.gemini_generate = mock_tutor
+                payload = {
+                    "conversation_id": conversation,
+                    "question": "Giải thích node trong buổi này.",
+                    "lesson": {"chapter_number": 1, "task_id": task_id},
+                }
+                response = client.post("/api/chat", json=payload)
+                assert response.status_code == 200, response.get_data(as_text=True)[:500]
+                data = response.get_json()
+                assert data["source_mode"] == "chapter"
+                assert data["lesson"]["session_task_id"] == task_id
+                assert "Cấu trúc node liên kết" in data["answer"]
+                assert "NGỮ CẢNH BUỔI HỌC" in asked[-1]
+                assert "Mật của môn khác" not in asked[-1]
+                assert "Tài liệu chưa duyệt" not in asked[-1]
+                scoped_history = client.get(chat_url).get_json()["messages"]
+                assert [item["role"] for item in scoped_history] == ["user", "assistant"]
+                # Existing chapter mode remains distinct from the room's history.
+                full_chapter = client.post("/api/chat", json={
+                    "conversation_id": conversation, "question": "Hỏi cả chương.",
+                    "lesson": {"chapter_number": 1}
+                })
+                assert full_chapter.status_code == 200
+                assert "Hỏi cả chương." not in asked[-1].split("ĐỐI THOẠI GẦN ĐÂY")[1].split("YÊU CẦU CỦA SINH VIÊN")[0]
+                assert len(client.get(chat_url).get_json()["messages"]) == 2
+                # The task number cannot be used to forge a different chapter.
+                bad = client.post("/api/chat", json={
+                    **payload, "lesson": {"chapter_number": 2, "task_id": task_id}
+                })
+                assert bad.status_code in (400, 404)
+                assert client.post("/api/chat", json={
+                    **payload, "lesson": {"chapter_number": 1,
+                                          "task_id": manual}
+                }).status_code == 404
+                assert client.post("/api/chat", json={
+                    **payload, "lesson": {"chapter_number": 1,
+                                          "task_id": task_id, "topic_index": 0}
+                }).status_code == 400
+                login(client, outsider)
+                assert client.get(chat_url).status_code == 404
+                assert client.post("/api/chat", json=payload).status_code == 404
+                login(client, student)
+            finally:
+                project.gemini_generate = original_generate
 
             # Revoke mapping; no stale approved file must survive.
             db = project.db()
@@ -228,6 +298,10 @@ def verify():
             db.commit()
             db.close()
             assert "Slide chương 1 được duyệt" not in client.get(url).get_data(as_text=True)
+            assert 'data-chat-enabled="0"' in client.get(url).get_data(as_text=True)
+            assert client.get(chat_url).status_code == 409
+            # Approval revoked -> no AI answer or history leak.
+            assert client.post("/api/chat", json=payload).status_code == 409
 
             # Regenerating a lesson changes its signature; never mix old
             # schedule with new objective/topic under the same ID.
