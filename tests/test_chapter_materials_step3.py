@@ -255,6 +255,64 @@ Thuật toán độ phức tạp Big O cũng có thể áp dụng cho linked lis
             assert "chapter2.txt" in roadmap_html
             assert "Admin đã duyệt" in roadmap_html
             assert "wrong_course.txt" not in roadmap_html
+            # Chapter-specific AI tutor: a real source quote is required;
+            # invalid citation or another course's document cannot be used.
+            source_quote = "2.1. Danh sách liên kết đơn chứa node và con trỏ next."
+            original_ai_backend = project.gemini_generate
+            tutor_prompts = []
+            def fake_tutor(prompt):
+                tutor_prompts.append(prompt)
+                return (json.dumps({
+                    "explanation": "Danh sách liên kết đơn gồm các node nối nhau qua next.",
+                    "citations": [{"source_key": "T1", "quote": source_quote}],
+                    "practice": "Hãy mô tả quá trình chèn node vào đầu danh sách.",
+                }, ensure_ascii=False), None)
+            try:
+                project.gemini_generate = fake_tutor
+                lesson = student.post(
+                    f"/subjects/{course}/chapters/2",
+                    data={"csrf_token": student_token, "action": "teach",
+                          "topic_index": "0", "question": "Giải thích về node."},
+                )
+                assert lesson.status_code == 200, lesson.get_data(as_text=True)[:500]
+                lesson_html = lesson.get_data(as_text=True)
+                assert "Bài giảng AI" in lesson_html and source_quote in lesson_html
+                assert "chapter2.txt" in lesson_html
+                assert "wrong_course.txt" not in tutor_prompts[-1]
+                assert "2.1. Danh sách liên kết đơn" in tutor_prompts[-1]
+                assert "Giải thích về node." in tutor_prompts[-1]
+                assert student.post(
+                    f"/subjects/{course}/chapters/2",
+                    data={"action": "teach", "topic_index": "0"},
+                ).status_code == 403
+                assert student.post(
+                    f"/subjects/{course}/chapters/2",
+                    data={"csrf_token": student_token, "action": "teach",
+                          "topic_index": "99"},
+                ).status_code == 400
+                assert peer.post(
+                    f"/subjects/{course}/chapters/2",
+                    data={"csrf_token": student_token, "action": "teach",
+                          "topic_index": "0"},
+                ).status_code == 404
+
+                def fabricated_tutor(prompt):
+                    return (json.dumps({
+                        "explanation": "Một kiến thức không có trong bài.",
+                        "citations": [{"source_key": "T1",
+                                       "quote": "Trích dẫn này hoàn toàn do AI tự bịa."}],
+                        "practice": "Một bài tập bịa đặt.",
+                    }, ensure_ascii=False), None)
+                project.gemini_generate = fabricated_tutor
+                unsupported = student.post(
+                    f"/subjects/{course}/chapters/2",
+                    data={"csrf_token": student_token, "action": "teach",
+                          "topic_index": "0"},
+                ).get_data(as_text=True)
+                assert "chưa trả được bài giảng có dẫn chứng" in unsupported
+                assert "Một kiến thức không có trong bài" not in unsupported
+            finally:
+                project.gemini_generate = original_ai_backend
             assert student.get(f"/subjects/{course}/chapters/3").status_code == 404
             assert peer.get(f"/subjects/{course}/chapters/2").status_code == 404
             assert administrator.get(f"/subjects/{course}/chapters/2").status_code == 403
@@ -282,6 +340,13 @@ Thuật toán độ phức tạp Big O cũng có thể áp dụng cho linked lis
             html = student.get(f"/subjects/{course}/chapters/2").get_data(as_text=True)
             assert "chưa có học liệu chung" in html.lower()
             assert "chapter2.txt" not in html
+            # Revoked files are unavailable to the tutor on subsequent requests.
+            before_tutor = student.post(
+                f"/subjects/{course}/chapters/2",
+                data={"csrf_token": student_token, "action": "teach", "topic_index": "0"},
+            ).get_data(as_text=True)
+            assert "chưa có học liệu chung" in before_tutor.lower() or "chưa có học liệu chung" in html.lower()
+            assert "AI chưa thể giảng bài" in before_tutor
             # Revoked approval must disappear from an already persisted roadmap.
             roadmap_after_revocation = student.get(
                 f"/subjects/{course}/learning-path").get_data(as_text=True)
