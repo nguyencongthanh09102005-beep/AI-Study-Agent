@@ -10,7 +10,9 @@ import sys
 from flask import Blueprint, current_app, redirect, render_template, request, session, url_for
 
 from ai_chapter_suggestions import chapter_ai_prompt, validate_ai_suggestions
-from course_path_learning import match_course_materials, parse_chapter_details, _terms
+from course_path_learning import (
+    match_course_materials, parse_chapter_details, personal_course_documents, _terms,
+)
 from syllabus_learning import extract_syllabus_units, syllabus_hash
 from syllabus_routes import _source, ensure_syllabus_schema
 
@@ -322,20 +324,16 @@ def student_chapter(subject_id, chapter_number):
                     "excerpts": evidence_excerpt(row["extracted_text"], section),
                 })
         # Personal study notes stay private; suggest only if content matches.
-        personal_docs = conn.execute("""
-            SELECT id,original_name,extracted_text FROM documents
-            WHERE user_id=? AND subject_id=?
-              AND id!=COALESCE(?, -1) AND extracted_text != ''
-            ORDER BY id DESC LIMIT 25
-        """, (uid, subject_id, subject["personal_syllabus_document_id"])).fetchall()
+        private_docs = personal_course_documents(
+            conn, uid, subject_id,
+            subject["personal_syllabus_document_id"], source, limit=50
+        )
         private_candidates = []
-        for row in personal_docs:
-            d = {"id": row["id"], "name": row["original_name"],
-                 "text": row["extracted_text"], "kind": "personal"}
-            if match_course_materials(section, [d]):
+        for doc in private_docs:
+            if match_course_materials(section, [doc]):
                 private_candidates.append({
-                    "name": row["original_name"],
-                    "excerpts": evidence_excerpt(row["extracted_text"], section),
+                    "name": doc["name"],
+                    "excerpts": evidence_excerpt(doc["text"], section),
                 })
         return render_template(
             "student_chapter.html", page="subjects", subject=subject,
