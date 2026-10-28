@@ -20,6 +20,7 @@
 
   <div class="agent-subject-actions">
     <a class="soft-primary" href="{{ url_for('syllabus.review', subject_id=subject.id) }}">📑 Đề cương → Phân tích chương</a>
+    <a class="soft-primary" href="{{ url_for('course_path.learning_path', subject_id=subject.id) }}">📚 Lộ trình theo chương</a>
     <a class="soft-primary" href="{{ url_for('chat') }}?subject_id={{ subject.id }}">🤖 Hỏi Study Agent</a>
     <a class="ghost-action" href="{{ url_for('documents') }}">▤ Tài liệu</a>
     <a class="ghost-action" href="{{ url_for('study_plan', subject_id=subject.id) }}">▦ Kế hoạch học theo đề cương</a>
