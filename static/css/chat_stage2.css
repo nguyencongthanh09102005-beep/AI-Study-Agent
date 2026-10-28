@@ -1,0 +1,293 @@
+/* ============================================================
+   CHAT AI — STAGE 2: ONE SIDEBAR + 30% / 70% DESKTOP LAYOUT
+
+   Scoped to page-chat only so Dashboard, Quiz, Admin, etc. keep
+   their existing layout. Loaded after chat_stage1.css.
+   ============================================================ */
+
+body.page-chat .chat-mobile-subject {
+  display: none;
+}
+
+/* All course options belong to the primary app sidebar.
+   No second 340px history panel inside the chat anymore. */
+body.page-chat .sidebar-course-list {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  margin: 17px 0 12px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(134, 153, 201, 0.22);
+}
+
+body.page-chat .sidebar-course-heading {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 8px 10px;
+  color: #344d84;
+}
+
+body.page-chat .sidebar-course-heading strong {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+body.page-chat .sidebar-course-heading a {
+  display: grid;
+  place-items: center;
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  border: 1px solid #dce5fd;
+  border-radius: 10px;
+  background: #f3f6ff;
+  color: #5469ed;
+  font-size: 22px;
+  line-height: 1;
+  transition: background-color 180ms ease, transform 180ms ease;
+}
+
+body.page-chat .sidebar-course-heading a:hover {
+  transform: translateY(-1px);
+  background: #e8eeff;
+}
+
+body.page-chat .sidebar-course-list .chat-history-list {
+  display: flex !important;
+  flex: 1 1 auto !important;
+  flex-direction: column !important;
+  flex-wrap: nowrap !important;
+  gap: 5px !important;
+  min-height: 0 !important;
+  min-width: 0 !important;
+  padding: 2px 3px 12px !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+body.page-chat .sidebar-course-list .subject-chat-item {
+  width: 100% !important;
+  min-height: 51px !important;
+  height: auto !important;
+  flex: 0 0 auto !important;
+  padding: 9px 11px !important;
+  border: 1px solid transparent !important;
+  border-radius: 12px !important;
+  grid-template-columns: 31px minmax(0,1fr) !important;
+  gap: 10px !important;
+  color: #43577e !important;
+  transform: translateX(0);
+  transition: background-color 180ms ease,
+              color 180ms ease,
+              border-color 180ms ease,
+              transform 180ms ease,
+              box-shadow 180ms ease !important;
+}
+
+body.page-chat .sidebar-course-list .subject-chat-item:hover {
+  transform: translateX(3px);
+  background: rgba(230,236,255,.72) !important;
+}
+
+body.page-chat .sidebar-course-list .subject-chat-item.active {
+  background: linear-gradient(115deg,#e7edff,#f2f4ff) !important;
+  border-color: #dbe2ff !important;
+  box-shadow: inset 3px 0 0 #6875f4 !important;
+  color: #4055ac !important;
+}
+
+body.page-chat .sidebar-course-list .subject-chat-item:disabled {
+  opacity: 0.65;
+  cursor: progress;
+}
+
+body.page-chat .sidebar-course-list .history-icon {
+  width: 31px;
+  height: 31px;
+  border-radius: 9px;
+}
+
+body.page-chat .sidebar-course-list .history-text {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+body.page-chat .sidebar-course-list .history-text strong {
+  font-size: 12.5px !important;
+  line-height: 1.35;
+  white-space: normal !important;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  text-overflow: clip !important;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+body.page-chat .sidebar-course-list .history-text small {
+  color: #7483a4;
+  font-size: 10.5px !important;
+}
+
+/* Desktop: the left sidebar is 30% of the app viewport; Chat AI is 70%.
+   Keep all six navigation labels visible, just tighten vertical spacing. */
+@media (min-width: 981px) {
+  body.page-chat .app-shell {
+    display: grid !important;
+    grid-template-columns: 30% minmax(0,70%) !important;
+  }
+
+  body.page-chat .sidebar {
+    width: 30% !important;
+    max-width: none !important;
+    height: 100vh !important;
+    padding: 19px 22px !important;
+    overflow: hidden !important;
+  }
+
+  body.page-chat .side-nav {
+    margin-top: 18px !important;
+    gap: 3px !important;
+    flex: 0 0 auto;
+  }
+
+  body.page-chat .side-nav a {
+    min-height: 37px !important;
+    height: 38px !important;
+    padding: 0 12px !important;
+    gap: 13px !important;
+    border-radius: 12px !important;
+    font-size: 13px !important;
+  }
+
+  body.page-chat .side-nav a > span {
+    width: 24px !important;
+    font-size: 20px !important;
+  }
+
+  body.page-chat .pro-card {
+    flex: 0 0 auto;
+    margin-top: 0 !important;
+    padding: 12px 14px;
+  }
+
+  body.page-chat .app-main {
+    grid-column: 2 !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  body.page-chat .page-content {
+    padding: 12px 14px !important;
+  }
+
+  body.page-chat .chat-shell-new {
+    display: grid !important;
+    grid-template-columns: minmax(0,1fr) !important;
+    gap: 0 !important;
+    height: 100% !important;
+    min-height: 0 !important;
+  }
+
+  body.page-chat .chat-main-panel {
+    width: 100% !important;
+    height: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+  }
+}
+
+/* At tablet widths the app already uses bottom navigation.
+   Offer a compact course selector, so no sidebar content is lost. */
+@media (max-width: 980px) {
+  body.page-chat .sidebar-course-list {
+    display: none !important;
+  }
+
+  body.page-chat {
+    height: auto !important;
+    min-height: 100vh !important;
+    overflow-y: auto !important;
+  }
+
+  body.page-chat .app-shell {
+    display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
+  }
+
+  body.page-chat .app-main {
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    padding-bottom: 72px !important;
+  }
+
+  body.page-chat .page-content {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    padding: 12px 14px 20px !important;
+  }
+
+  body.page-chat .chat-shell-new {
+    display: grid !important;
+    grid-template-columns: minmax(0,1fr) !important;
+    gap: 0 !important;
+    min-height: 0 !important;
+  }
+
+  body.page-chat .chat-main-panel {
+    min-height: 480px !important;
+    height: clamp(480px, calc(100dvh - 200px), 800px) !important;
+  }
+
+  body.page-chat .chat-mobile-subject {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 12px;
+    margin: 0 12px;
+    padding: 10px 0;
+    min-width: 0;
+  }
+
+  body.page-chat .chat-mobile-subject label {
+    flex: 0 0 auto;
+    color: #50628b;
+    font-weight: 800;
+    font-size: 12px;
+  }
+
+  body.page-chat .chat-mobile-subject select {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #d7e0f5;
+    border-radius: 12px;
+    background: #f7f9ff;
+    color: #2b4478;
+    font-size: 13px;
+    font-weight: 700;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.page-chat .sidebar-course-list .subject-chat-item,
+  body.page-chat .sidebar-course-heading a {
+    transition: none !important;
+    transform: none !important;
+  }
+}
