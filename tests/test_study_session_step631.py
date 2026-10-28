@@ -191,6 +191,10 @@ def verify():
             db = project.db()
             shared = project.ensure_shared_subject_for_user_subject(db, student, subject)
             shared_id = shared["id"]
+            # The test inserted official files directly; model the real
+            # Admin-managed course state required by the chapter tutor.
+            db.execute("UPDATE shared_subjects SET admin_managed=1 WHERE id=?",
+                       (shared_id,))
             db.execute("""
                 INSERT INTO shared_documents
                 (shared_subject_id,original_name,stored_name,extracted_text,
