@@ -167,9 +167,16 @@ def learning_path(subject_id):
                 goal = f'Mục tiêu đạt {subject["target_score"]} điểm'
             if not goal:
                 goal = f'Hoàn thành nội dung môn {subject["name"]}'
+            credits = int(subject["credits"] or 0)
+            if credits <= 0:
+                return redirect(url_for(
+                    "course_path.learning_path", subject_id=subject_id,
+                    notice="Hãy chỉnh số tín chỉ của môn (từ 1 đến 12) trước khi lập lộ trình.",
+                ), code=303)
             preferences = {
                 "goal": goal, "daily_minutes": profile["daily_minutes"],
                 "preferred_time": profile["preferred_study_time"],
+                "credits": credits,
             }
             weak_rows = conn.execute("""
                 SELECT topic FROM learning_weaknesses
@@ -177,7 +184,13 @@ def learning_path(subject_id):
                 ORDER BY miss_count DESC LIMIT 10
             """, (uid, subject_id)).fetchall()
             weaknesses = [dict(row) for row in weak_rows]
-            sessions = build_course_roadmap(chapters, docs, preferences, weaknesses)
+            try:
+                sessions = build_course_roadmap(chapters, docs, preferences, weaknesses)
+            except ValueError as exc:
+                return redirect(url_for(
+                    "course_path.learning_path", subject_id=subject_id,
+                    notice=str(exc)[:380],
+                ), code=303)
             conn.execute("""
                 INSERT INTO course_roadmaps(user_id,subject_id,source_hash,units_hash,
                                             sessions_json,updated_at)
