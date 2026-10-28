@@ -32,6 +32,9 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 DB_PATH.parent.mkdir(exist_ok=True)
 
 app = Flask(__name__)
+
+from syllabus_routes import syllabus_bp
+app.register_blueprint(syllabus_bp)
 # Khi thiếu SECRET_KEY, dùng khóa ngẫu nhiên chỉ cho phiên chạy hiện tại.
 # Khi triển khai cần đặt SECRET_KEY bí mật, ổn định trong biến môi trường.
 app.secret_key = os.getenv("SECRET_KEY") or secrets.token_hex(32)
