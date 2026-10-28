@@ -16,6 +16,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const courseSelector = document.getElementById("chatCourseSelect");
   const chapterSelector = document.getElementById("chatChapterSelect");
   const topicSelector = document.getElementById("chatTopicSelect");
+  const lessonSummary = document.getElementById("chatLessonSummary");
+  const lessonSummaryTitle = document.getElementById("chatLessonSummaryTitle");
+  const lessonSummarySource = document.getElementById("chatLessonSummarySource");
+  const chapterEditButton = document.getElementById("chatChangeChapter");
 
   let chats = [];
   let currentChatId = null;
@@ -26,6 +30,8 @@ document.addEventListener("DOMContentLoaded", () => {
   let chapterOptions = [];
   let modeError = "";
   let modeSeq = 0;
+  let chapterEditorOpen = false;
+  let chapterEditorPinned = false;
 
   function updateLessonUI() {
     const current = getCurrentChat();
@@ -35,7 +41,22 @@ document.addEventListener("DOMContentLoaded", () => {
     modeChapterButton?.classList.toggle("active", chatMode === "chapter");
     modeFreeButton?.setAttribute("aria-pressed", String(chatMode === "free"));
     modeChapterButton?.setAttribute("aria-pressed", String(chatMode === "chapter"));
-    if (chapterControls) chapterControls.hidden = chatMode !== "chapter";
+    if (chapterControls) {
+      chapterControls.hidden = chatMode !== "chapter" ||
+        (!!active && !chapterEditorOpen);
+    }
+    if (lessonSummary) lessonSummary.hidden = !active;
+    if (active) {
+      if (lessonSummaryTitle) lessonSummaryTitle.textContent =
+        lessonMode.chapter + " · " + lessonMode.topic;
+      if (lessonSummarySource) lessonSummarySource.textContent =
+        "Nguồn đã duyệt: " + lessonMode.source_names.join(", ");
+    }
+    if (chapterEditButton) {
+      chapterEditButton.disabled = sending;
+      chapterEditButton.textContent = chapterEditorOpen ? "Thu gọn" : "Đổi nội dung";
+      chapterEditButton.setAttribute("aria-expanded", String(chapterEditorOpen));
+    }
     if (lessonBanner) lessonBanner.hidden = !active;
     if (active) {
       if (lessonTitle) lessonTitle.textContent =
@@ -65,6 +86,8 @@ document.addEventListener("DOMContentLoaded", () => {
     lessonMode = null;
     modeError = "";
     chapterOptions = [];
+    chapterEditorOpen = false;
+    chapterEditorPinned = false;
     const url = new URL(window.location.href);
     url.searchParams.delete("chapter_number");
     url.searchParams.delete("topic_index");
@@ -152,6 +175,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (seq !== modeSeq || chatMode !== "chapter" ||
           getCurrentChat()?.subject_id !== detail.subject_id) return;
       lessonMode = detail;
+      if (!chapterEditorPinned) chapterEditorOpen = false;
       updateLessonUrl();
       modeError = "";
     } catch (error) {
@@ -168,6 +192,8 @@ document.addEventListener("DOMContentLoaded", () => {
     lessonMode = null;
     chapterOptions = [];
     modeError = "";
+    chapterEditorOpen = true;
+    chapterEditorPinned = false;
     const seq = ++modeSeq;
     const current = getCurrentChat();
     updateChatHeader();
@@ -227,6 +253,12 @@ document.addEventListener("DOMContentLoaded", () => {
     validateSelectedLesson();
   });
   topicSelector?.addEventListener("change", validateSelectedLesson);
+  chapterEditButton?.addEventListener("click", () => {
+    if (sending || chatMode !== "chapter") return;
+    chapterEditorOpen = !chapterEditorOpen;
+    chapterEditorPinned = chapterEditorOpen;
+    updateLessonUI();
+  });
 
   async function api(url, options = {}) {
     const response = await fetch(url, options);
@@ -281,8 +313,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     if (lessonMode && Number(chat.subject_id) === Number(lessonMode.subject_id)) {
       if (contextStatusEl) {
-        contextStatusEl.textContent = "Đang học · " + lessonMode.chapter +
-          " · " + lessonMode.topic;
+        contextStatusEl.textContent = "Học theo chương · Học liệu đã xác nhận";
       }
       if (input) {
         input.disabled = false;
@@ -399,6 +430,8 @@ document.addEventListener("DOMContentLoaded", () => {
       lessonMode = null;
       chapterOptions = [];
       modeError = "";
+      chapterEditorOpen = true;
+      chapterEditorPinned = false;
       const url = new URL(window.location.href);
       url.searchParams.delete("chapter_number");
       url.searchParams.delete("topic_index");
