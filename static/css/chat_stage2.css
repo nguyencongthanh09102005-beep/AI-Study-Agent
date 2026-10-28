@@ -308,3 +308,138 @@ body.page-chat .chat-messages.chat-subject-enter {
     animation: none !important;
   }
 }
+
+/* Chat AI sidebar refinement: keep the five other pages available as
+   compact shortcuts, so the course list gets the vertical space. */
+body.page-chat .side-nav .chat-nav-toggle { display: none; }
+
+@media (min-width: 981px) {
+  body.page-chat .sidebar {
+    min-width: 0 !important;
+  }
+  body.page-chat .side-nav {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    align-content: flex-start;
+    align-items: center;
+    row-gap: 5px !important;
+    column-gap: 6px !important;
+    flex: 0 0 auto !important;
+    min-width: 0;
+  }
+  body.page-chat .side-nav a.chat-nav-primary {
+    flex: 0 0 100% !important;
+    order: -2;
+    min-width: 0;
+    justify-content: flex-start;
+  }
+  body.page-chat .side-nav .chat-nav-toggle {
+    display: flex !important;
+    flex: 0 0 100%;
+    order: -1;
+    align-items: center;
+    gap: 7px;
+    height: 27px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: #6a7b9f;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 750;
+    cursor: pointer;
+    transition: background-color 180ms ease, color 180ms ease;
+  }
+  body.page-chat .side-nav .chat-nav-toggle:hover,
+  body.page-chat .side-nav .chat-nav-toggle:focus-visible {
+    background: #e6edfe;
+    color: #495dd0;
+  }
+  body.page-chat .side-nav .chat-nav-toggle:focus-visible {
+    outline: 2px solid #7990e4;
+    outline-offset: 2px;
+  }
+  body.page-chat .side-nav .chat-nav-toggle-arrow {
+    display: inline-block;
+    font-size: 16px;
+    transform: rotate(0deg);
+    transition: transform 210ms ease;
+  }
+  body.page-chat .side-nav.is-expanded .chat-nav-toggle-arrow {
+    transform: rotate(180deg);
+  }
+  body.page-chat .side-nav a.chat-nav-secondary {
+    flex: 0 0 calc((100% - 24px) / 5);
+    order: 0;
+    justify-content: center !important;
+    min-width: 0 !important;
+    height: 39px !important;
+    min-height: 39px !important;
+    padding: 0 !important;
+    gap: 0 !important;
+    border-radius: 11px !important;
+    overflow: hidden;
+    background: rgba(232, 239, 255, .65) !important;
+    transition: flex-basis 230ms ease, padding 230ms ease,
+                background-color 180ms ease, transform 180ms ease !important;
+  }
+  body.page-chat .side-nav a.chat-nav-secondary:hover {
+    background: #dee8ff !important;
+  }
+  body.page-chat .side-nav a.chat-nav-secondary > span {
+    flex: 0 0 24px;
+    width: 24px !important;
+    font-size: 19px !important;
+    text-align: center;
+  }
+  body.page-chat .side-nav a.chat-nav-secondary b {
+    max-width: 0;
+    opacity: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    transition: max-width 240ms ease, opacity 170ms ease;
+  }
+  body.page-chat .side-nav.is-expanded a.chat-nav-secondary {
+    flex-basis: 100%;
+    justify-content: flex-start !important;
+    padding: 0 12px !important;
+    gap: 12px !important;
+    background: transparent !important;
+  }
+  body.page-chat .side-nav.is-expanded a.chat-nav-secondary b {
+    max-width: 210px;
+    opacity: 1;
+  }
+  body.page-chat .sidebar-course-list {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    margin-top: 11px !important;
+    padding-top: 12px !important;
+    visibility: visible !important;
+  }
+  body.page-chat .sidebar-course-list .chat-history-list.chat-courses-ready {
+    animation: chat-sidebar-course-reveal 260ms ease-out both;
+  }
+  body.page-chat .sidebar-course-list .chat-subject-loading {
+    margin: 12px 8px;
+    color: #6d7f9f;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+}
+@keyframes chat-sidebar-course-reveal {
+  from { opacity: .45; transform: translateY(7px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.page-chat .side-nav .chat-nav-toggle-arrow,
+  body.page-chat .side-nav a.chat-nav-secondary,
+  body.page-chat .side-nav a.chat-nav-secondary b {
+    transition: none !important;
+  }
+  body.page-chat .sidebar-course-list .chat-history-list.chat-courses-ready {
+    animation: none !important;
+  }
+}
