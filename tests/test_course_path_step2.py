@@ -129,7 +129,7 @@ Chương 6. Thuật toán sắp xếp
             conn.execute("""
                 INSERT INTO syllabus_reviews(user_id,subject_id,source_hash,source_kind,units_json,status,updated_at)
                 VALUES(?,?,?,?,?,'confirmed',?)
-            """, (student, course, syllabus_hash(example), "personal",
+            """, (student, course, syllabus_hash(example.strip()), "personal",
                   json.dumps(units, ensure_ascii=False), project.now()))
             conn.commit()
             conn.close()
