@@ -7,6 +7,14 @@ answers are never returned before the server grants an in-window attempt.
 import hashlib
 import json
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+
+STUDY_TIMEZONE = ZoneInfo("Asia/Ho_Chi_Minh")
+
+
+def study_now():
+    """The study planner stores naive Vietnam-local date/times."""
+    return datetime.now(STUDY_TIMEZONE).replace(tzinfo=None)
 
 from chapter_chat_context import LessonContextError
 from chapter_tutor import prepared_sources
@@ -358,7 +366,7 @@ def quiz_access(conn, project, uid, quiz_id, at=None):
             ctx["task_signature"] != link["session_signature"]):
         return {"linked": True, "allowed": False,
                 "reason": "Nguồn hoặc nội dung lộ trình đã thay đổi."}
-    at = at or datetime.now()
+    at = at or study_now()
     grant = conn.execute("""
         SELECT started_at,valid_until FROM quiz_session_grants
         WHERE quiz_id=? AND user_id=?
@@ -376,7 +384,7 @@ def quiz_access(conn, project, uid, quiz_id, at=None):
 
 
 def start_quiz(conn, project, uid, quiz_id, at=None):
-    at = at or datetime.now()
+    at = at or study_now()
     status = quiz_access(conn, project, uid, quiz_id, at)
     if not status["linked"]:
         raise LessonContextError("Đây không phải Quiz theo buổi.", 404)
