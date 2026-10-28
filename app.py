@@ -2387,8 +2387,11 @@ def gemini_subject_answer(
         else "Không có"
     )
 
+    from chat_output_style import FORMAT_POLICY
     prompt = f"""
 Bạn là AI Study Agent đang hỗ trợ môn học: {subject_name}.
+
+{FORMAT_POLICY}
 
 MỤC TIÊU:
 Trả lời câu hỏi của sinh viên bằng tiếng Việt, rõ ràng, dễ học và chính xác.
@@ -2432,7 +2435,9 @@ LỊCH SỬ TRÒ CHUYỆN GẦN ĐÂY:
 CÂU HỎI HIỆN TẠI:
 {question}
 
-CHỈ trả về JSON hợp lệ, không markdown, theo đúng cấu trúc:
+Chỉ trả về một JSON hợp lệ, không dùng code fence bao ngoài JSON.
+Trường "answer" ĐƯỢC dùng Markdown hoặc công thức toán để trình bày đẹp,
+nhưng phải nằm bên trong chuỗi JSON escape đúng quy tắc. Cấu trúc:
 {{
   "mode": "document", "shared" hoặc "general",
   "sources": ["ten_file_1.pdf"],
