@@ -1,0 +1,199 @@
+/* Chat AI stage 3: two modes, syllabus-aware selectors, readable Markdown.
+   Layout remains stage-2 30/70. */
+
+body.page-chat .chat-mode-panel {
+  flex: 0 0 auto !important;
+  min-width: 0;
+  margin: 8px 13px 0;
+  padding: 9px 12px 10px;
+  border: 1px solid #dce5f9;
+  border-radius: 14px;
+  background: #eef3ff;
+}
+
+body.page-chat .chat-mode-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+body.page-chat .chat-mode-switch button {
+  flex: 1 1 140px;
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  color: #4c6392;
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  transition: background-color 170ms ease, box-shadow 170ms ease,
+              border-color 170ms ease, color 170ms ease;
+}
+
+body.page-chat .chat-mode-switch button.active {
+  color: #4058d5;
+  border-color: #d5dfff;
+  background: #fff;
+  box-shadow: 0 3px 10px rgba(79,102,174,.10);
+}
+
+body.page-chat .chat-mode-switch button:disabled {
+  opacity: .55;
+  cursor: wait;
+}
+
+body.page-chat .chat-chapter-controls {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0,1fr));
+  gap: 9px;
+  margin-top: 9px;
+}
+
+body.page-chat .chat-chapter-controls[hidden],
+body.page-chat #lessonModeBanner[hidden],
+body.page-chat #chatModeNotice[hidden] {
+  display: none !important;
+}
+
+body.page-chat .chat-chapter-controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  color: #506594;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+body.page-chat .chat-chapter-controls select {
+  min-width: 0;
+  width: 100%;
+  height: 36px;
+  padding: 0 9px;
+  border: 1px solid #d6e0f6;
+  border-radius: 9px;
+  outline-color: #7586fb;
+  background: #fff;
+  color: #273d76;
+  font-size: 12px;
+}
+
+body.page-chat .chat-mode-notice,
+body.page-chat .chat-lesson-source {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+body.page-chat .chat-lesson-source {
+  background: #e9f5f1;
+  color: #356555;
+}
+
+body.page-chat .chat-mode-notice {
+  background: #fff4e8;
+  color: #955b21;
+}
+
+body.page-chat .chat-lesson-source span {
+  color: #637a70;
+}
+
+/* Render Markdown in AI replies only; user text keeps plain-text treatment.
+   Formatting is escaped by chat_format.js before any HTML is injected. */
+body.page-chat .chat-markdown {
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+  line-height: 1.73 !important;
+}
+
+body.page-chat .chat-markdown p {
+  margin: 0 0 10px;
+  white-space: pre-wrap;
+}
+
+body.page-chat .chat-markdown p:last-child {
+  margin-bottom: 0;
+}
+
+body.page-chat .chat-markdown strong {
+  font-weight: 800;
+  color: #263d76;
+}
+
+body.page-chat .chat-markdown h4 {
+  margin: 12px 0 7px;
+  color: #284474;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+body.page-chat .chat-markdown ul,
+body.page-chat .chat-markdown ol {
+  margin: 6px 0 12px;
+  padding-left: 23px;
+}
+
+body.page-chat .chat-markdown li {
+  margin-bottom: 6px;
+}
+
+body.page-chat .chat-markdown pre {
+  max-width: 100%;
+  margin: 10px 0;
+  padding: 14px;
+  border-radius: 11px;
+  overflow-x: auto;
+  background: #e6ecfa;
+  color: #24385c;
+  font-size: 12px;
+  white-space: pre !important;
+  scrollbar-width: thin;
+}
+
+body.page-chat .chat-markdown code {
+  padding: 2px 4px;
+  border-radius: 5px;
+  background: #e6ecfa;
+  font-size: .91em;
+}
+
+body.page-chat .chat-markdown pre code {
+  padding: 0;
+  background: transparent;
+}
+
+@media (max-width: 1120px) {
+  body.page-chat .chat-chapter-controls {
+    grid-template-columns: repeat(2, minmax(0,1fr));
+  }
+  body.page-chat .chat-chapter-controls label:first-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 620px) {
+  body.page-chat .chat-mode-panel {
+    margin: 7px 9px 0;
+    padding: 9px;
+  }
+  body.page-chat .chat-chapter-controls {
+    grid-template-columns: minmax(0,1fr);
+  }
+  body.page-chat .chat-chapter-controls label:first-child {
+    grid-column: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.page-chat .chat-mode-switch button {
+    transition: none !important;
+  }
+}
