@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block page_title %}Kế hoạch học tập{% endblock %}
 {% block page_desc %}Lên kế hoạch hôm nay, chạm tới ước mơ ngày mai{% endblock %}
-{% block page_styles %}<link rel="stylesheet" href="{{ url_for('static', filename='css/study_plan.css') }}">{% endblock %}
+{% block page_styles %}<link rel="stylesheet" href="{{ url_for('static', filename='css/study_plan.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='css/study_hour_timetable.css') }}">{% endblock %}
 
 {% block content %}
 <section class="mock-page-head">
@@ -22,6 +22,7 @@
     <span></span>
     <div class="segmented-filter" id="plannerViewTabs" role="tablist" aria-label="Kiểu hiển thị kế hoạch">
       <button class="active" type="button" data-view="week" role="tab" aria-selected="true">Tuần</button>
+      <button type="button" data-view="timetable" role="tab" aria-selected="false">Giờ</button>
       <button type="button" data-view="month" role="tab" aria-selected="false">Tháng</button>
       <button type="button" data-view="list" role="tab" aria-selected="false">Danh sách</button>
     </div>
@@ -30,6 +31,14 @@
 </section>
 
 <section class="planner-layout-new">
+  <section class="soft-card study-hour-timetable" id="plannerTimetable" hidden aria-label="Thời khóa biểu tự học theo giờ">
+    <header class="study-hour-heading">
+      <div><h3>Thời khóa biểu tự học</h3><p>Xem giờ, môn và nội dung từng buổi trong tuần. Chọn buổi để mở lịch ngày tương ứng.</p></div>
+      <span>Đợt 6.2.1 · Chỉ xem</span>
+    </header>
+    <div class="study-hour-scroll"><div class="study-hour-grid" id="plannerTimetableGrid"></div></div>
+    <p class="study-hour-empty" id="plannerTimetableEmpty" hidden>Tuần này chưa có buổi học. Hãy đưa lộ trình vào Kế hoạch học trước.</p>
+  </section>
   <article class="soft-card day-schedule-card">
     <div class="card-title-row planner-agenda-header">
       <div><h3 id="scheduleTitle">◷ &nbsp; Lịch học trong ngày</h3><small class="schedule-view-label" id="scheduleViewLabel">Hôm nay</small></div>
@@ -40,7 +49,7 @@
     </div>
     <div class="time-schedule">
       {% for task in tasks %}
-      <div class="schedule-item-new {{ 'done' if task.done else '' }} {{ 'overdue' if task.is_overdue else '' }}" data-searchable="{{ task.title|e }}" data-task-id="{{ task.id }}" data-task-date="{{ task.study_at_input[:10] }}" data-task-datetime="{{ task.study_at_input }}">
+      <div class="schedule-item-new {{ 'done' if task.done else '' }} {{ 'overdue' if task.is_overdue else '' }}" data-searchable="{{ task.title|e }}" data-task-id="{{ task.id }}" data-task-date="{{ task.study_at_input[:10] }}" data-task-datetime="{{ task.study_at_input }}" data-task-title="{{ task.title|e }}" data-subject-name="{{ (task.subject_name or 'Học tập')|e }}" data-task-duration="{{ task.duration }}" data-task-done="{{ 1 if task.done else 0 }}" data-task-source="{{ task.source or 'manual' }}">
         <span class="schedule-time">{{ task.time_text }}</span>
         <span class="schedule-color c{{ (loop.index0 % 4) + 1 }}"></span>
         <span class="schedule-copy"><strong>{{ task.title }}{% if task.source == 'adaptive' %} <em class="adaptive-task-badge">Adaptive</em>{% endif %}</strong><small>{{ task.subject_name or 'Học tập' }}{% if task.note %} · {{ task.note }}{% endif %}</small></span>

@@ -184,6 +184,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const scheduleViewLabel = document.getElementById("scheduleViewLabel");
   const emptyState = document.getElementById("scheduleFilterEmpty");
   const scheduleItems = [...document.querySelectorAll(".schedule-item-new[data-task-date]")];
+  const timetable = document.getElementById("plannerTimetable");
+  const timetableGrid = document.getElementById("plannerTimetableGrid");
+  const timetableEmpty = document.getElementById("plannerTimetableEmpty");
+  const agendaCard = document.querySelector(".day-schedule-card");
 
   if (!weekDays || !datePicker) return;
 
@@ -234,6 +238,81 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let selectedDate = fromIso(datePicker.value);
   let currentView = "week";
+
+  // Phase 6.2.1: read-only weekly hour timetable from the existing study_tasks DOM.
+  // No database writes and no second copy of the learning sessions.
+  function renderTimetable() {
+    if (!timetableGrid) return;
+    const start = startOfWeek(selectedDate);
+    const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
+    const keys = days.map(toIso);
+    const events = new Map();
+    let firstHour = 7;
+    let lastHour = 22;
+    let total = 0;
+
+    scheduleItems.forEach((item) => {
+      const dayIndex = keys.indexOf(item.dataset.taskDate);
+      if (dayIndex === -1) return;
+      const match = /T(\\d{2}):(\\d{2})/.exec(item.dataset.taskDatetime || "");
+      if (!match) return;
+      const hour = Number(match[1]);
+      const minute = Number(match[2]);
+      if (hour > 23 || minute > 59) return;
+      firstHour = Math.min(firstHour, hour);
+      lastHour = Math.max(lastHour, hour);
+      const key = dayIndex + ":" + hour;
+      if (!events.has(key)) events.set(key, []);
+      events.get(key).push({ item, hour, minute });
+      total += 1;
+    });
+    events.forEach((entries) => entries.sort((a, b) => a.minute - b.minute));
+    timetableGrid.replaceChildren();
+
+    const makeDiv = (cls, value) => {
+      const el = document.createElement("div");
+      el.className = cls;
+      if (value !== undefined) el.textContent = value;
+      return el;
+    };
+    timetableGrid.appendChild(makeDiv("study-hour-corner", "Giờ"));
+    days.forEach((day) => {
+      const header = makeDiv("study-hour-day");
+      header.appendChild(makeDiv("study-hour-dayname", ["CN", "T2", "T3", "T4", "T5", "T6", "T7"][day.getDay()]));
+      header.appendChild(makeDiv("study-hour-daydate", formatShort(day)));
+      if (toIso(day) === toIso(new Date())) header.classList.add("today");
+      timetableGrid.appendChild(header);
+    });
+
+    for (let hour = firstHour; hour <= lastHour; hour += 1) {
+      timetableGrid.appendChild(makeDiv("study-hour-label", pad(hour) + ":00"));
+      for (let dayIndex = 0; dayIndex < 7; dayIndex += 1) {
+        const cell = makeDiv("study-hour-cell");
+        const inCell = events.get(dayIndex + ":" + hour) || [];
+        inCell.forEach(({ item, minute }) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "study-hour-event";
+          if (item.dataset.taskDone === "1") button.classList.add("done");
+          button.dataset.date = item.dataset.taskDate;
+          const timeText = pad(hour) + ":" + pad(minute);
+          const subject = item.dataset.subjectName || "Học tập";
+          const title = item.dataset.taskTitle || "Buổi học";
+          const duration = item.dataset.taskDuration || "45";
+          button.appendChild(makeDiv("study-hour-event-time", timeText + " · " + duration + " phút"));
+          button.appendChild(makeDiv("study-hour-event-subject", subject));
+          button.appendChild(makeDiv("study-hour-event-title", title));
+          if (item.dataset.taskSource === "roadmap") button.appendChild(makeDiv("study-hour-event-tag", "Từ lộ trình"));
+          if (item.dataset.taskDone === "1") button.appendChild(makeDiv("study-hour-event-tag", "Đã hoàn thành"));
+          button.setAttribute("aria-label", timeText + ", " + subject + ", " + title + ". Mở lịch ngày.");
+          cell.appendChild(button);
+        });
+        timetableGrid.appendChild(cell);
+      }
+    }
+    if (timetableEmpty) timetableEmpty.hidden = total !== 0;
+  }
+
 
   function animateSurface() {
     const surfaces = [
@@ -369,10 +448,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (currentView === "week") renderWeek();
     if (currentView === "month") renderMonth();
-    if (currentView === "list") {
+    if (currentView === "list" || currentView === "timetable") {
       weekDays.hidden = true;
       weekDays.classList.remove("month-grid");
     }
+    const showTimetable = currentView === "timetable";
+    if (timetable) timetable.hidden = !showTimetable;
+    if (agendaCard) agendaCard.hidden = showTimetable;
+    if (showTimetable) renderTimetable();
 
     updateHeader();
     filterTasks();
@@ -404,6 +487,14 @@ document.addEventListener("DOMContentLoaded", () => {
     renderView();
   });
 
+  timetable?.addEventListener("click", (event) => {
+    const button = event.target.closest(".study-hour-event[data-date]");
+    if (!button) return;
+    selectedDate = fromIso(button.dataset.date);
+    currentView = "week";
+    renderView();
+  });
+
   todayButton?.addEventListener("click", () => {
     selectedDate = cloneDate(new Date());
     renderView();
@@ -416,7 +507,7 @@ document.addEventListener("DOMContentLoaded", () => {
         selectedDate.getMonth() - 1,
         Math.min(selectedDate.getDate(), 28)
       );
-    } else if (currentView === "week") {
+    } else if (currentView === "week" || currentView === "timetable") {
       selectedDate = addDays(selectedDate, -7);
     }
     renderView();
@@ -429,7 +520,7 @@ document.addEventListener("DOMContentLoaded", () => {
         selectedDate.getMonth() + 1,
         Math.min(selectedDate.getDate(), 28)
       );
-    } else if (currentView === "week") {
+    } else if (currentView === "week" || currentView === "timetable") {
       selectedDate = addDays(selectedDate, 7);
     }
     renderView();

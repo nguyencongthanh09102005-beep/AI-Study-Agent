@@ -53,6 +53,21 @@ def verify():
     html = res.get_data(as_text=True)
     assert 'id="weekDays"' in html
     assert 'id="plannerViewTabs"' in html
+    # Phase 6.2.1 only reads existing tasks; previous Week/Month/List stays intact.
+    assert 'data-view="timetable"' in html
+    assert 'data-view="week"' in html
+    assert 'data-view="month"' in html
+    assert 'data-view="list"' in html
+    assert 'id="plannerTimetable"' in html
+    assert 'id="plannerTimetableGrid"' in html
+    assert 'data-task-title="Ôn chương IaaS"' in html
+    assert 'data-subject-name="Điện toán đám mây"' in html
+    assert 'data-task-done="1"' in html
+    assert "study_hour_timetable.css" in html
+    timetable_js = (Path(__file__).resolve().parents[1] / "static/js/study_plan.js").read_text()
+    assert 'function renderTimetable()' in timetable_js
+    assert 'currentView === "timetable"' in timetable_js
+    assert 'timetableGrid.replaceChildren()' in timetable_js
     assert 'id="aiPlannerForm"' in html
     assert 'id="toggleEditPlan"' in html
     assert 'id="addTaskButton"' in html
