@@ -5429,9 +5429,11 @@ def api_chat():
 
     if lesson_context:
         from chapter_tutor import make_tutor_prompt, parse_tutor_answer
+        personal_context = get_personal_learning_context(uid, subject_id)
         prompt = make_tutor_prompt(
             subject_name, lesson_context["chapter"], lesson_context["topic"],
-            question, lesson_context["sources"], conversation_history
+            question, lesson_context["sources"], conversation_history,
+            profile=personal_context
         )
         raw, ai_error = gemini_generate(prompt)
         tutored = parse_tutor_answer(raw, lesson_context["sources"]) if raw else None
