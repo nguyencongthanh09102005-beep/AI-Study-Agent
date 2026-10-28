@@ -197,3 +197,141 @@ body.page-chat .chat-markdown pre code {
     transition: none !important;
   }
 }
+
+/* STAGE 3 REFINEMENT: remove the redundant global top search strip on Chat AI.
+   Keep the global search bar on Dashboard, Documents and other pages. */
+body.page-chat .topbar {
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+}
+
+@media (min-width: 981px) {
+  body.page-chat .page-content {
+    height: 100vh !important;
+    min-height: 0 !important;
+    padding: 8px 12px !important;
+    overflow: hidden !important;
+  }
+  body.page-chat .chat-shell-new,
+  body.page-chat .chat-main-panel {
+    height: 100% !important;
+    min-height: 0 !important;
+  }
+}
+
+body.page-chat .chat-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+body.page-chat .chat-mobile-logout { display: none; }
+
+/* The two modes take one thin row. When a chapter has been verified,
+   show its compact summary instead of permanently occupying 3 selection rows. */
+body.page-chat .chat-mode-panel {
+  margin: 6px 12px 0;
+  padding: 7px 10px;
+  border-radius: 12px;
+}
+body.page-chat .chat-mode-switch {
+  gap: 6px;
+}
+body.page-chat .chat-mode-switch button {
+  min-height: 32px;
+  padding: 6px 10px;
+}
+body.page-chat .chat-chapter-controls[hidden],
+body.page-chat .chat-lesson-summary[hidden] {
+  display: none !important;
+}
+body.page-chat .chat-lesson-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  margin-top: 7px;
+  padding: 6px 8px;
+  background: rgba(224,236,252,.75);
+  border-radius: 9px;
+}
+body.page-chat .chat-lesson-summary-text {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+}
+body.page-chat .chat-lesson-summary-text strong {
+  font-size: 11px;
+  font-weight: 750;
+  color: #344b78;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+body.page-chat .chat-lesson-summary-text small {
+  font-size: 10px;
+  color: #7285a7;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+body.page-chat .chat-change-chapter {
+  flex: 0 0 auto;
+  border: 1px solid #cad6f6;
+  border-radius: 8px;
+  padding: 5px 9px;
+  color: #435bd6;
+  font-size: 11px;
+  font-weight: 800;
+  background: white;
+  cursor: pointer;
+}
+body.page-chat .chat-change-chapter:hover {
+  background: #eef2ff;
+}
+body.page-chat #lessonModeBanner {
+  display: none !important; /* duplicated by the compact lesson summary */
+}
+body.page-chat .chat-chapter-controls {
+  margin-top: 7px;
+}
+body.page-chat .chat-chapter-controls select {
+  height: 33px;
+}
+
+@media (max-width: 980px) {
+  body.page-chat .page-content {
+    padding: 8px 10px 15px !important;
+  }
+  body.page-chat .chat-main-panel {
+    height: clamp(500px, calc(100dvh - 100px), 900px) !important;
+  }
+  body.page-chat .chat-header-actions .chat-mobile-logout {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border: 1px solid #dce5fa;
+    border-radius: 10px;
+    background: #f2f5ff;
+    color: #4b61a0;
+    font-size: 21px;
+  }
+}
+@media (max-width: 620px) {
+  body.page-chat .chat-lesson-summary-text small {
+    display: none;
+  }
+  body.page-chat .chat-lesson-summary-text strong {
+    max-width: 100%;
+  }
+  body.page-chat .chat-main-panel {
+    min-height: 450px !important;
+    height: clamp(450px, calc(100dvh - 92px), 770px) !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.page-chat .chat-change-chapter { transition: none; }
+}
