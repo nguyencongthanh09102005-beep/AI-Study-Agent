@@ -5793,6 +5793,25 @@ def quiz():
     # =====================================================
     # DỮ LIỆU TRANG QUIZ
     # =====================================================
+    from study_session_quiz import ensure_session_quiz_schema, get_session_quiz_context, public_session_quiz_context
+    from chapter_chat_context import LessonContextError
+    ensure_session_quiz_schema(conn)
+    session_quiz_context = None
+    requested_task = request.args.get('task_id')
+    if requested_task is not None:
+        try:
+            task_number = int(requested_task)
+            if task_number <= 0:
+                raise ValueError('Invalid session')
+        except (ValueError, TypeError):
+            conn.close()
+            return 'Mã buổi học không hợp lệ.', 400
+        try:
+            verified = get_session_quiz_context(sys.modules[__name__], conn, uid, task_number)
+            session_quiz_context = public_session_quiz_context(verified)
+        except LessonContextError as error:
+            conn.close()
+            return error.message, error.status
     docs = conn.execute(
         """
         SELECT d.*, s.name AS subject_name
@@ -5826,10 +5845,14 @@ def quiz():
         """
         SELECT
             q.*,
+            qsl.session_title AS linked_session_title,
+            qsl.chapter_number AS linked_chapter_number,
             COUNT(qa.id) AS attempt_count,
             MAX(qa.created_at) AS last_attempt_at,
             MAX(qa.score) AS best_score
         FROM quizzes q
+        LEFT JOIN quiz_session_links qsl
+          ON qsl.quiz_id=q.id AND qsl.user_id=q.user_id
         LEFT JOIN quiz_attempts qa
           ON qa.quiz_id=q.id
          AND qa.user_id=q.user_id
@@ -5863,6 +5886,8 @@ def quiz():
         )
         subject_check_conn.close()
 
+    if session_quiz_context:
+        selected_subject_id = session_quiz_context['subject_id']
     selected_quiz_mode = (request.args.get("mode") or "").strip().lower()
     if selected_quiz_mode not in {"subject", "document", "weakness"}:
         selected_quiz_mode = "document" if selected_document_id else "subject"
@@ -5876,6 +5901,7 @@ def quiz():
         selected_document_id=selected_document_id,
         selected_subject_id=selected_subject_id,
         selected_quiz_mode=selected_quiz_mode,
+        session_quiz_context=session_quiz_context,
         generation_error=request.args.get("generation_error", "").strip()[:240]
     )
 
