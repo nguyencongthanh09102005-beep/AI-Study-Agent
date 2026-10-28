@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+{% block title %}Đề cương · {{ subject.name }}{% endblock %}
+{% block page_title %}Đề cương chi tiết {{ subject.name }}{% endblock %}
+{% block page_desc %}Phân tích chương của đúng môn học trước khi tạo lộ trình{% endblock %}
+{% block content %}
+<section class="soft-card" style="padding:24px;max-width:1000px;margin:auto">
+  <a class="back-link" href="{{ url_for('subject_detail', subject_id=subject.id) }}">← Trở lại môn học</a>
+  <h2 style="color:#22376e;margin:10px 0">Đề cương chi tiết · {{ subject.name }}</h2>
+  <p style="color:#657598;line-height:1.7">Bước 1: sử dụng đề cương của đúng môn, trích xuất chương/bài và <strong>kiểm tra thủ công</strong> trước khi AI lập lộ trình. Đây chưa phải màn hình tạo lộ trình.</p>
+  {% if notice %}<p role="status" style="padding:12px;background:#e5f6ed;color:#176743;border-radius:10px">{{ notice }}</p>{% endif %}
+  {% if error %}<p role="alert" style="padding:12px;background:#fff0f0;color:#a02b3a;border-radius:10px">{{ error }}</p>{% endif %}
+  <div style="background:#f0f4fd;border-radius:12px;padding:15px;margin:15px 0">
+    <strong>Nguồn đang ưu tiên:</strong> {{ source_name }}
+    <div style="color:#617194;margin-top:6px;font-size:13px">
+      {% if source_kind == 'shared' %}
+      Đề cương chung do Admin quản lý. Sinh viên chỉ xác nhận cấu trúc học cho mình.
+      {% elif source_kind == 'personal' %}
+      Đề cương riêng, gắn với đúng môn này.
+      {% else %}
+      Chưa có đề cương. Hãy tải file cá nhân hoặc yêu cầu Admin bổ sung đề cương chung.
+      {% endif %}
+    </div>
+  </div>
+  <h3 style="color:#304777">Tải đề cương cá nhân (PDF/TXT/MD)</h3>
+  <form method="post" enctype="multipart/form-data" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="action" value="upload">
+    <input type="file" name="file" accept=".pdf,.txt,.md" required style="max-width:360px">
+    <button type="submit" class="soft-primary">Tải lên đúng môn</button>
+  </form>
+  <p style="color:#7a87a3;font-size:12px">Tối đa {{ upload_max_mb }} MB. PDF dạng ảnh chưa hỗ trợ OCR. Nếu có đề cương chung, bản chung được ưu tiên.</p>
+  <hr style="border:0;border-top:1px solid #e0e6f2;margin:22px 0">
+  {% if source_text %}
+    <form method="post" style="margin:12px 0">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="action" value="analyze">
+      <button type="submit" class="soft-primary">🤖 Phân tích chương/bài từ đề cương</button>
+    </form>
+    {% if is_stale %}<p role="alert" style="color:#a02b3a">Đề cương đã thay đổi. Kết quả trước không còn hiệu lực; hãy phân tích lại.</p>{% endif %}
+    {% if units %}
+      <h3 style="color:#304777">Danh sách chương/bài · {{ 'Đã xác nhận' if review_status == 'confirmed' else 'Chờ xác nhận' }}</h3>
+      <p style="color:#647597">Các dòng phải có bằng chứng trong đề cương. Có thể sửa tên hiển thị hoặc bỏ mục nhận diện sai.</p>
+      <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="action" value="confirm">
+        {% for unit in units %}
+          <div style="background:#f5f7fc;border-radius:12px;padding:13px;margin:10px 0">
+            {% if review_status == 'draft' %}
+              <label style="display:flex;gap:8px;align-items:center;color:#34456e">
+                <input type="checkbox" name="include_{{ loop.index0 }}" value="1" checked> Giữ chương {{ loop.index }}
+              </label>
+              <input type="text" name="title_{{ loop.index0 }}" value="{{ unit.title }}" maxlength="180" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid #cfd9eb;border-radius:8px;margin:7px 0">
+            {% else %}
+              <strong style="color:#314579">{{ loop.index }}. {{ unit.title }}</strong>
+            {% endif %}
+            <p style="color:#6d7e9b;font-size:12px;margin:4px 0">Dòng gốc: {{ unit.evidence }}</p>
+          </div>
+        {% endfor %}
+        {% if review_status == 'draft' %}<button class="soft-primary" type="submit">✓ Xác nhận danh sách chương</button>{% endif %}
+      </form>
+    {% else %}
+      <p style="color:#7180a2">Chưa có danh sách chương. Hãy phân tích sau khi kiểm tra đúng file đề cương.</p>
+    {% endif %}
+  {% else %}
+    <p style="color:#7180a2">Chưa thể phân tích vì chưa có nội dung đề cương.</p>
+  {% endif %}
+</section>
+{% endblock %}
