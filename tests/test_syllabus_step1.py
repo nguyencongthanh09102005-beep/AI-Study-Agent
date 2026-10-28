@@ -4,9 +4,11 @@ Runs with an isolated SQLite database; does not touch the user's demo data.
 """
 import io
 import os
+import sys
 import tempfile
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import app as project
 from syllabus_learning import extract_syllabus_units, syllabus_hash
 
