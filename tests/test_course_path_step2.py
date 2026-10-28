@@ -211,6 +211,16 @@ Quiz Chương 2: 10 câu lý thuyết.
                   project.now())).lastrowid
             conn.execute("UPDATE subjects SET personal_syllabus_document_id=? WHERE id=?",
                          (docid, course))
+            # The same complete syllabus may be uploaded several times.
+            # Copies must never be mistaken for slide/article references.
+            for idx in range(3):
+                conn.execute("""
+                    INSERT INTO documents(user_id,subject_id,original_name,stored_name,
+                                          extracted_text,created_at)
+                    VALUES(?,?,?,?,?,?)
+                """, (student, course, "DeCuongChiTiet_CTDL_TEST_GiaLap.pdf",
+                      f"copy_{idx}.pdf", example, project.now()))
+
             from syllabus_learning import syllabus_hash
             conn.execute("""
                 INSERT INTO syllabus_reviews(user_id,subject_id,source_hash,source_kind,units_json,status,updated_at)
@@ -247,14 +257,29 @@ Quiz Chương 2: 10 câu lý thuyết.
                        and x["kind"] == "personal"
                        for x in sessions[1]["materials"]), sessions[1]["materials"]
             assert not any(x["kind"] == "shared" for x in sessions[1]["materials"])
+            assert not any("DeCuongChiTiet_CTDL_TEST_GiaLap.pdf" == x["name"]
+                           for item in sessions for x in item["materials"])
             assert not any(x["name"] == "OOP không được trộn"
                            for item in sessions for x in item["materials"])
             assert not any(x["name"] == "Riêng của người khác"
                            for item in sessions for x in item["materials"])
             assert conn.execute("SELECT count(*) FROM study_tasks").fetchone()[0] == 0
             conn.close()
+            # Even an older cached plan containing a syllabus copy should be
+            # sanitized at render time rather than permanently shown.
+            conn = project.db()
+            cached = json.loads(plan["sessions_json"])
+            cached[0]["materials"].append({
+                "id": docid+1, "name": "DeCuongChiTiet_CTDL_TEST_GiaLap.pdf",
+                "kind": "personal"
+            })
+            conn.execute("UPDATE course_roadmaps SET sessions_json=? WHERE user_id=? AND subject_id=?",
+                         (json.dumps(cached, ensure_ascii=False), student, course))
+            conn.commit()
+            conn.close()
             loaded = client.get(f"/subjects/{course}/learning-path")
             assert loaded.status_code == 200 and "7 buổi học" in loaded.get_data(as_text=True)
+            assert "DeCuongChiTiet_CTDL_TEST_GiaLap.pdf" not in loaded.get_data(as_text=True)
             # Regression: parser updates must invalidate previously saved roadmaps
             # even when the source syllabus and approved chapters are identical.
             conn = project.db()
