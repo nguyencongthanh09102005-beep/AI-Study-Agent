@@ -283,7 +283,7 @@ Quiz Chương 2: 10 câu lý thuyết.
             conn.commit()
             conn.close()
             loaded = client.get(f"/subjects/{course}/learning-path")
-            assert loaded.status_code == 200 and "7 buổi học" in loaded.get_data(as_text=True)
+            assert loaded.status_code == 200 and "15 buổi học" in loaded.get_data(as_text=True)
             assert "DeCuongChiTiet_CTDL_TEST_GiaLap.pdf" not in loaded.get_data(as_text=True)
             # Regression: parser updates must invalidate previously saved roadmaps
             # even when the source syllabus and approved chapters are identical.
@@ -296,11 +296,11 @@ Quiz Chương 2: 10 câu lý thuyết.
             conn.close()
             outdated = client.get(f"/subjects/{course}/learning-path").get_data(as_text=True)
             assert "không còn hợp lệ" in outdated
-            assert "7 buổi học" not in outdated
+            assert "15 buổi học" not in outdated
             updated = client.post(f"/subjects/{course}/learning-path",
                                   data={"csrf_token": csrf, "action": "generate"})
             assert updated.status_code == 303
-            assert "7 buổi học" in client.get(
+            assert "15 buổi học" in client.get(
                 f"/subjects/{course}/learning-path").get_data(as_text=True)
 
             outsider = project.app.test_client()
