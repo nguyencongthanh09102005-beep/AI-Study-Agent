@@ -121,7 +121,7 @@ def run():
             conn.close()
 
             calls = []
-            def mock_build(text, count, focus_topics=None, session_mode=False):
+            def mock_build(text, count, focus_topics=None, session_mode=False, avoid_questions=None):
                 assert session_mode
                 assert "Giảng viên môn" not in text
                 calls.append(count)

@@ -275,7 +275,28 @@ def prepare_step(project, conn, uid, subject_id):
         conn.commit()
         try:
             source = source_content(conn, source_ctx)
-            questions = project.build_quiz(source, count, session_mode=True)
+            used_before = []
+            if prior:
+                for existing in conn.execute("""
+                    SELECT questions_json FROM quiz_preparation_parts
+                    WHERE task_id=? AND user_id=?
+                """, (task_id, uid)):
+                    try:
+                        used_before.extend(
+                            q.get("question", "") for q in
+                            json.loads(existing["questions_json"]) if isinstance(q, dict)
+                        )
+                    except (ValueError, TypeError):
+                        pass
+            questions = project.build_quiz(
+                source, count, session_mode=True,
+                avoid_questions=used_before
+            )
+            previous_keys = {" ".join(q.casefold().split()) for q in used_before}
+            if any(_question_key(q) in previous_keys for q in questions):
+                raise LessonContextError(
+                    "Câu hỏi bị trùng với buổi trước trong đề tổng hợp; "
+                    "hãy thử tạo lại phần này.", 409)
             if not _question_count_valid(questions, count):
                 raise LessonContextError(
                     "Gemini chưa tạo đủ câu hỏi kiến thức hợp lệ. "

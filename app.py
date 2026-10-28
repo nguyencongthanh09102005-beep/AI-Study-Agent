@@ -2546,7 +2546,7 @@ nhưng phải nằm bên trong chuỗi JSON escape đúng quy tắc. Cấu trúc
     )
 
 
-def build_quiz(text, question_count=10, focus_topics=None, session_mode=False):
+def build_quiz(text, question_count=10, focus_topics=None, session_mode=False, avoid_questions=None):
     """
     Tạo quiz 10 / 20 / 30 câu bằng Gemini.
 
@@ -2679,13 +2679,13 @@ def build_quiz(text, question_count=10, focus_topics=None, session_mode=False):
 
         avoid_text = ""
 
-        if existing_questions:
+        if existing_questions or avoid_questions:
             # Chỉ gửi phần câu hỏi để Gemini tránh lặp,
             # không cần gửi lại options/answer.
             avoid_lines = [
                 f"- {q['question']}"
                 for q in existing_questions[-25:]
-            ]
+            ] + ["- " + str(q)[:260] for q in (avoid_questions or [])[-80:]]
 
             avoid_text = (
                 "\\nCÁC CÂU ĐÃ TẠO - KHÔNG ĐƯỢC LẶP LẠI:\\n"
