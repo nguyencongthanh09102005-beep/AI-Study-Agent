@@ -402,6 +402,79 @@ Thuật toán độ phức tạp Big O cũng có thể áp dụng cho linked lis
                 assert len(history) == 4
                 assert history[-1]["role"] == "assistant"
 
+                # Stage 4: switching chapters does NOT feed the previous
+                # chapter's conversation turns to the AI as source context.
+                chapter_one = student.post("/api/chat", json={
+                    **payload,
+                    "question": "Chương một chỉ tập trung Big O",
+                    "lesson": {"chapter_number": 1, "topic_index": 0},
+                })
+                assert chapter_one.status_code == 200
+                assert "Chương 1. Tổng quan" in tutor_prompts[-1]
+                assert "Giải thích về node." not in tutor_prompts[-1]
+
+                back_to_two = student.post("/api/chat", json={
+                    **payload, "question": "Quay lại liên kết đơn"
+                })
+                assert back_to_two.status_code == 200
+                assert "Giải thích về node." in tutor_prompts[-1]
+                assert "Chương một chỉ tập trung Big O" not in tutor_prompts[-1]
+
+                # Free mode remains in the SAME thread but cannot become a
+                # source for the chapter-scoped AI prompt.
+                original_free_backend = project.gemini_subject_answer
+                free_histories = []
+                def fake_free_backend(name, question, personal, personal_files,
+                                      history, shared, profile, shared_files):
+                    free_histories.append(history)
+                    return "Trả lời tự do", [], "general"
+                try:
+                    project.gemini_subject_answer = fake_free_backend
+                    normal = student.post("/api/chat", json={
+                        "conversation_id": convo["id"],
+                        "question": "Hỏi đáp tự do về môn học."
+                    })
+                    assert normal.status_code == 200
+                    assert normal.get_json()["source_mode"] == "general"
+                    assert "Chương một chỉ tập trung Big O" not in free_histories[-1]
+                    assert "Giải thích về node." not in free_histories[-1]
+                finally:
+                    project.gemini_subject_answer = original_free_backend
+
+                after_free = student.post("/api/chat", json={
+                    **payload, "question": "Tiếp tục phần danh sách liên kết."
+                })
+                assert after_free.status_code == 200
+                assert "Giải thích về node." in tutor_prompts[-1]
+                assert "Hỏi đáp tự do về môn học." not in tutor_prompts[-1]
+                history = student.get(
+                    f'/api/chats/{convo["id"]}/messages'
+                ).get_json()
+                assert len(history) == 12
+                conn = project.db()
+                from chat_lesson_memory import (
+                    history_for_mode, approved_source_signature,
+                )
+                contexts = conn.execute("""
+                    SELECT mode,chapter_number,topic_index,source_signature
+                    FROM chat_message_contexts
+                    WHERE user_id=? AND conversation_id=? ORDER BY message_id
+                """, (first, convo["id"])).fetchall()
+                assert len(contexts) == 12
+                assert {x["mode"] for x in contexts} == {"chapter", "free"}
+                from chapter_chat_context import resolve_lesson_context
+                active = resolve_lesson_context(project, conn, first, course, 2, 0)
+                assert len(history_for_mode(
+                    conn, first, convo["id"], active
+                )) == 6
+                changed = dict(active)
+                changed["source_signature"] = approved_source_signature(
+                    "different-source-version",
+                    active["sources"]
+                )
+                assert not history_for_mode(conn, first, convo["id"], changed)
+                conn.close()
+
                 assert student.post("/api/chat", json={
                     **payload, "lesson": {"chapter_number": 2, "topic_index": 99}
                 }).status_code == 400
@@ -422,7 +495,7 @@ Thuật toán độ phức tạp Big O cũng có thể áp dụng cho linked lis
                 )
                 assert len(student.get(
                     f'/api/chats/{convo["id"]}/messages'
-                ).get_json()) == 4
+                ).get_json()) == 12
             finally:
                 project.gemini_generate = original_ai_backend
             assert student.get(f"/subjects/{course}/chapters/3").status_code == 404
