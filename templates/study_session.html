@@ -65,6 +65,57 @@
         {% else %}<p>Chưa có tiểu mục chi tiết; hãy đọc toàn bộ chương trong tài liệu nguồn.</p>{% endif %}
         {% if lesson.source_evidence %}<p class="study-room-muted">Căn cứ đề cương: {{ lesson.source_evidence }}</p>{% endif %}
       </section>
+      <section class="study-room-card study-room-quiz" id="studyRoomQuiz"
+               data-status-url="{{ url_for('study_session.learning_session_quiz_status', task_id=task.id) }}">
+        <div class="study-room-quiz-heading">
+          <h3>📝 Quiz của buổi học này</h3>
+          <span class="study-room-quiz-count">{{ quiz_status.count if quiz_status.count else ('60' if lesson.quiz and lesson.quiz.action == 'quiz_final' else '15') }} câu</span>
+        </div>
+        <p class="study-room-quiz-status" role="status" aria-live="polite" id="studyRoomQuizStatus">
+          {% if quiz_status.state == 'blocked' %}
+            ⚠ Chưa đủ điều kiện chuẩn bị Quiz.
+          {% elif quiz_status.state == 'unprepared' %}
+            ◷ Chưa chuẩn bị xong Quiz.
+          {% elif quiz_status.state == 'active' %}
+            ✓ Quiz đã mở và có thể làm bài.
+          {% elif quiz_status.state == 'available' %}
+            ✓ Đến giờ kiểm tra — có thể bắt đầu.
+          {% else %}
+            🔒 Quiz đã tạo sẵn, đang khóa theo thời khóa biểu.
+          {% endif %}
+        </p>
+        <p class="study-room-muted" id="studyRoomQuizDetail">
+          {% if quiz_status.state == 'blocked' %}
+            {{ quiz_status.reason }}
+          {% elif quiz_status.state == 'unprepared' %}
+            {% if quiz_status.total_parts %}
+              Bài tổng hợp đang chuẩn bị {{ quiz_status.prepared_parts }}/{{ quiz_status.total_parts }} phần.
+            {% else %}
+              Hãy mở Lộ trình theo chương và chọn Chuẩn bị / Tiếp tục tạo Quiz. Cần học liệu chung được Admin duyệt.
+            {% endif %}
+          {% elif quiz_status.state == 'active' or quiz_status.state == 'available' %}
+            Bài kiểm tra được mở theo giờ học hiện tại; chọn vào Quiz để bắt đầu hoặc tiếp tục làm.
+          {% else %}
+            Bài kiểm tra sẽ mở trong khung {{ start_text }}{% if end_text %}–{{ end_text }}{% endif %}. Nếu dời lịch học, thời gian mở Quiz cũng đổi theo.
+          {% endif %}
+        </p>
+        {% if quiz_status.attempt_count %}
+          <p class="study-room-quiz-score" id="studyRoomQuizScore">
+            Đã làm {{ quiz_status.attempt_count }} lượt · Điểm cao nhất {{ quiz_status.best_score|round(1) }}%
+          </p>
+        {% else %}
+          <p class="study-room-quiz-score" id="studyRoomQuizScore" hidden></p>
+        {% endif %}
+        <div class="study-room-quiz-actions">
+          <a class="study-room-quiz-primary" href="{{ url_for('quiz', task_id=task.id) }}" id="studyRoomQuizGo">
+            {% if quiz_status.state in ('active', 'available') %}▶ Làm Quiz theo buổi
+            {% elif quiz_status.state == 'locked' %}🔒 Xem lịch mở Quiz
+            {% else %}Xem ngữ cảnh Quiz{% endif %}
+          </a>
+          <a class="study-room-link" href="{{ url_for('course_path.learning_path', subject_id=subject.id) }}#quizPreparation">Chuẩn bị Quiz / Xem tiến độ →</a>
+        </div>
+        <p class="study-room-quiz-hint">Câu hỏi và đáp án không hiển thị trước khi mở khóa. Nếu vừa đến giờ học, trạng thái sẽ tự cập nhật.</p>
+      </section>
       <section class="study-room-card">
         <h3>✏️ Hoạt động học tập</h3>
         {% if lesson.activities %}
@@ -102,7 +153,7 @@
         <h3>Thông tin nguồn</h3>
         <p><strong>Đề cương:</strong> {{ syllabus_name }}</p>
         {% if lesson.clo_refs %}<p><strong>CLO:</strong> {{ lesson.clo_refs|join(', ') }}</p>{% endif %}
-        <p class="study-room-muted">Đợt 7.1 đã liên kết ngữ cảnh Quiz với buổi học và nguồn chung được duyệt; chức năng tự tạo câu hỏi theo buổi sẽ triển khai ở 7.2.</p>
+        <p class="study-room-muted">Quiz theo buổi được chuẩn bị trước từ học liệu Admin đã duyệt. Trạng thái Quiz và giờ mở được hiển thị ngay trong phần nội dung học bên trái.</p>
       </section>
     </aside>
   </div>
@@ -111,4 +162,5 @@
 {% endblock %}
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/study_session_timer.js') }}"></script>
+<script src="{{ url_for('static', filename='js/study_session_quiz_status.js') }}"></script>
 {% endblock %}
