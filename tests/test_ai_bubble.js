@@ -19,7 +19,7 @@ assert.match(js,/function (?:openPanel|closePanel)\(/);
 assert.match(js,/disabled \|\| busy/);
 assert.match(js,/canResume && !invalidated/);
 assert.match(js,/new URLSearchParams/);
-assert.match(js,/subjectId !== lesson\.subjectId/);
+assert.match(js,/data\.subject_id !== lesson\.subjectId/);
 assert.match(css,/position:fixed/);
 assert.match(css,/\.floating-ai-bubble/);
 assert.match(css,/\.floating-ai-panel/);
