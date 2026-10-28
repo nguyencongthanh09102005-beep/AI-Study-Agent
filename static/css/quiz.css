@@ -1542,3 +1542,22 @@
 body.modal-open {
   overflow: hidden;
 }
+
+
+/* Phase 7.1: verified session Quiz context, no change to legacy Quiz panels. */
+.session-quiz-context{padding:22px 25px;margin-bottom:18px;border:1px solid #d7e2fb}
+.session-quiz-context-head{display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:13px}
+.session-quiz-eyebrow{font-size:11px;letter-spacing:.055em;color:#5d73d5;font-weight:850}
+.session-quiz-context h2{margin:8px 0 6px;color:#2a427b;font-size:20px}
+.session-quiz-context-head p{margin:0;color:#506899;font-size:13px;font-weight:700}
+.session-quiz-ready{padding:8px 12px;border-radius:25px;background:#fff4de;color:#876022;font-size:11px;font-weight:850}
+.session-quiz-ready.ready{background:#e1f7ec;color:#246447}
+.session-quiz-details{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:18px 0}
+.session-quiz-details>div{padding:13px;background:#f4f7ff;border:1px solid #e0e7f9;border-radius:11px;min-width:0}
+.session-quiz-details h3{font-size:12px;color:#2f467a;margin:0 0 8px}
+.session-quiz-details ul{padding-left:18px;margin:0}
+.session-quiz-details li{font-size:12px;line-height:1.7;color:#566b92;overflow-wrap:anywhere}
+.session-quiz-description{font-size:12px;line-height:1.7;color:#4b618a}
+.session-quiz-description.warning{color:#93642d}
+.session-quiz-back{display:inline-block;margin-top:5px;text-decoration:none;font-weight:800;font-size:12px;color:#4b61c6}
+@media(max-width:850px){.session-quiz-details{grid-template-columns:1fr}}

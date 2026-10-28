@@ -10,6 +10,36 @@
 </div>
 {% endif %}
 
+{% if session_quiz_context %}
+<section class="soft-card session-quiz-context" id="sessionQuizContext" aria-label="Ngữ cảnh Quiz theo buổi">
+  <div class="session-quiz-context-head">
+    <div>
+      <span class="session-quiz-eyebrow">ĐỢT 7.1 · QUIZ THEO BUỔI HỌC</span>
+      <h2>{{ session_quiz_context.subject_name }}</h2>
+      <p>{{ session_quiz_context.chapter }} · {{ session_quiz_context.session_title }}</p>
+    </div>
+    <span class="session-quiz-ready {% if session_quiz_context.ready %}ready{% endif %}">{{ '✓ Nguồn đã xác thực' if session_quiz_context.ready else 'Chưa đủ nguồn được duyệt' }}</span>
+  </div>
+  <div class="session-quiz-details">
+    <div><h3>Mục tiêu buổi học</h3>
+      <ul>{% for item in session_quiz_context.objectives %}<li>{{ item }}</li>{% else %}<li>Đề cương chưa mô tả mục tiêu cụ thể.</li>{% endfor %}</ul>
+    </div>
+    <div><h3>Nội dung kiểm tra dự kiến</h3>
+      <ul>{% for item in session_quiz_context.topics %}<li>{{ item }}</li>{% else %}<li>Nội dung chương đã xác nhận.</li>{% endfor %}</ul>
+    </div>
+    <div><h3>Học liệu chung được Admin duyệt</h3>
+      <ul>{% for name in session_quiz_context.source_names %}<li>{{ name }}</li>{% else %}<li>Chưa có tài liệu chung phù hợp và đọc được.</li>{% endfor %}</ul>
+    </div>
+  </div>
+  {% if session_quiz_context.ready %}
+    <p class="session-quiz-description">Đã xác thực đúng môn, chương, buổi và nguồn học liệu. Đợt 7.2 sẽ thêm chức năng AI tạo Quiz theo mục tiêu buổi này. Các Quiz thông thường phía dưới vẫn hoạt động.</p>
+  {% else %}
+    <p class="session-quiz-description warning">{{ session_quiz_context.reason }} Không thể tạo Quiz có căn cứ theo buổi khi chưa có nguồn hợp lệ.</p>
+  {% endif %}
+  <a href="{{ url_for('study_session.learning_session', task_id=session_quiz_context.task_id) }}" class="session-quiz-back">← Quay lại Không gian học tập</a>
+</section>
+{% endif %}
+
 <section class="soft-card quiz-create-hub" id="quizCreateModes" data-initial-mode="{{ selected_quiz_mode or ('document' if selected_document_id else 'subject') }}">
   <div class="quiz-create-hub-head">
     <div class="quiz-create-title">
@@ -108,7 +138,7 @@
       {% for quiz in quizzes %}
       <button type="button" class="quiz-picker {% if loop.first %}active{% endif %}" data-quiz-target="quiz-work-{{ quiz.id }}" data-attempted="{{ 'true' if quiz.attempted else 'false' }}" data-recent-rank="{{ loop.index }}">
         <span class="mini-activity {{ ['blue','purple','green','orange'][loop.index0 % 4] }}">?</span>
-        <span><b>{{ quiz.title }}</b><small>{{ quiz.questions|length }} câu hỏi{% if quiz.attempted %} · Đã làm{% if quiz.best_score is not none %} · Cao nhất {{ quiz.best_score|round(0)|int }}%{% endif %}{% else %} · Chưa làm{% endif %}</small></span><em>›</em>
+        <span><b>{{ quiz.title }}</b><small>{% if quiz.linked_session_title %}Theo buổi · {{ quiz.linked_session_title }} · {% endif %}{{ quiz.questions|length }} câu hỏi{% if quiz.attempted %} · Đã làm{% if quiz.best_score is not none %} · Cao nhất {{ quiz.best_score|round(0)|int }}%{% endif %}{% else %} · Chưa làm{% endif %}</small></span><em>›</em>
       </button>
       {% else %}
       <div class="empty-soft">Chưa có quiz. Chọn tài liệu phía trên để tạo bài đầu tiên.</div>

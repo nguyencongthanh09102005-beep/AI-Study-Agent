@@ -10,6 +10,7 @@
     <a href="{{ url_for('study_plan', subject_id=subject.id) }}">← Kế hoạch học</a>
     <a href="{{ url_for('course_path.learning_path', subject_id=subject.id) }}">Xem lộ trình theo chương →</a>
     <button type="button" class="study-room-ai-open" data-open-floating-ai>💬 Hỏi AI về buổi này</button>
+    <a href="{{ url_for('quiz', task_id=task.id) }}">📝 Quiz theo buổi →</a>
   </nav>
   <header class="study-room-hero">
     <div>
@@ -101,7 +102,7 @@
         <h3>Thông tin nguồn</h3>
         <p><strong>Đề cương:</strong> {{ syllabus_name }}</p>
         {% if lesson.clo_refs %}<p><strong>CLO:</strong> {{ lesson.clo_refs|join(', ') }}</p>{% endif %}
-        <p class="study-room-muted">Quiz tự động cuối buổi chưa được tích hợp. Chat AI có dẫn nguồn chỉ dùng tài liệu chung của đúng chương đã được duyệt.</p>
+        <p class="study-room-muted">Đợt 7.1 đã liên kết ngữ cảnh Quiz với buổi học và nguồn chung được duyệt; chức năng tự tạo câu hỏi theo buổi sẽ triển khai ở 7.2.</p>
       </section>
     </aside>
   </div>
