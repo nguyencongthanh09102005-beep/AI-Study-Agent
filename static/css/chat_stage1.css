@@ -168,6 +168,8 @@ body.page-chat .composer-inner textarea {
   }
 
   body.page-chat .chat-history-panel {
+    display: flex !important;
+    flex-direction: column !important;
     height: auto !important;
     min-height: 0 !important;
     max-height: none !important;
