@@ -53,8 +53,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const progress = await request(base);
         report(progress);
         if (progress.done) break;
-        if (progress.items.some(item => item.status === "blocked")) {
-          label.textContent += " · Cần bổ sung/duyệt học liệu trước khi tiếp tục.";
+        const nextPending = progress.items.find(item => item.status !== "ready");
+        if (nextPending && nextPending.status === "blocked") {
+          label.textContent += " · Cần bổ sung/duyệt học liệu cho buổi tiếp theo.";
           break;
         }
         label.textContent = "Đang chuẩn bị theo từng bước... " + progress.ready +
