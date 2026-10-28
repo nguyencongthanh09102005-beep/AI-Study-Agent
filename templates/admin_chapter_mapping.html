@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% block title %}Duyệt học liệu theo chương · {{ document.subject_name }}{% endblock %}
+{% block page_title %}Phân loại học liệu theo chương{% endblock %}
+{% block page_desc %}Admin xác nhận chương sử dụng tài liệu trước khi công bố cho sinh viên{% endblock %}
+{% block content %}
+<section class="soft-card" style="max-width:980px;margin:0 auto;padding:26px">
+  <a class="back-link" href="{{ url_for('admin_shared_documents') }}">← Quản lý tài liệu dùng chung</a>
+  <h2 style="margin:16px 0 8px;color:#263d79">Gắn học liệu vào chương</h2>
+  <p style="color:#67799e;line-height:1.7"><strong>{{ document.subject_code }} · {{ document.subject_name }}</strong> — {{ document.original_name }}</p>
+  <div style="background:#f0f4fd;border-radius:12px;padding:15px;margin:14px 0">
+    <strong>Đề cương chuẩn:</strong> {{ source_name }}
+    <p style="color:#617397;font-size:13px;margin:8px 0 0">Chỉ các chương được trích từ đề cương chung của Admin mới có thể liên kết. Một tài liệu có thể thuộc nhiều chương.</p>
+  </div>
+  {% if notice %}<p role="status" style="color:#176945;padding:12px;background:#ebf8f0;border-radius:10px">{{ notice }}</p>{% endif %}
+  {% if error %}<p role="alert" style="color:#a34336;padding:12px;background:#fff2ec;border-radius:10px">{{ error }}</p>{% endif %}
+  {% if stale %}<p role="alert" style="color:#8e5312;padding:12px;background:#fff3e3;border-radius:10px">Đề cương chuẩn đã được thay đổi. Liên kết cũ không còn hiệu lực; vui lòng xác nhận lại.</p>{% endif %}
+  {% if not source_present %}
+    <div style="padding:20px;border:1px solid #e4e9f2;border-radius:12px">
+      <h3 style="margin:0 0 9px;color:#243d74">Chưa có đề cương chuẩn có thể phân tích</h3>
+      <p>Hãy trở về Quản lý tài liệu chung, tải file đề cương tổng của môn và đánh dấu <strong>Đặt làm đề cương chuẩn của môn</strong>. Sau đó mở lại trang này.</p>
+      <a class="soft-primary" href="{{ url_for('admin_shared_documents') }}">Quản lý tài liệu</a>
+    </div>
+  {% else %}
+    <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <h3 style="color:#284477">Chọn chương cho tài liệu này</h3>
+      <p style="color:#667b9d;font-size:14px">“Gợi ý tự động” chỉ là nhận diện từ khóa trong nội dung file, không phải kết quả đã duyệt. Admin phải kiểm tra trước khi chọn.</p>
+      {% for chapter in chapters %}
+      <label style="display:flex;align-items:flex-start;gap:12px;background:#f7f9fe;border:1px solid #e3e9f4;border-radius:12px;padding:15px;margin:10px 0;cursor:pointer">
+        <input type="checkbox" name="chapters" value="{{ chapter.key }}" {% if chapter.approved %}checked{% endif %} style="margin-top:5px;width:18px;height:18px">
+        <span style="flex:1">
+          <strong style="color:#273e73">{{ chapter.title }}</strong>
+          <span style="display:block;font-size:12px;color:#6a7f9c;margin-top:5px">
+          {% if chapter.approved %}✓ Đã được Admin duyệt{% elif chapter.suggested %}◌ Gợi ý tự động: có từ khóa liên quan — chưa được duyệt{% else %}Chưa có gợi ý, có thể tự chọn nếu nội dung thực tế phù hợp{% endif %}
+          </span>
+        </span>
+      </label>
+      {% endfor %}
+      <button class="soft-primary" type="submit" style="margin-top:15px">✓ Xác nhận liên kết học liệu</button>
+      <p style="font-size:12px;color:#687d9d;margin-top:12px">Bỏ tất cả dấu chọn rồi lưu sẽ hủy liên kết đã duyệt của tài liệu này. File gốc không bị xóa.</p>
+    </form>
+  {% endif %}
+</section>
+{% endblock %}
