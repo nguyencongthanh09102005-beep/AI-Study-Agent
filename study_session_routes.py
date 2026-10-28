@@ -150,7 +150,7 @@ def learning_session(task_id):
         # shared files. Personal documents stay available in the room but
         # are not silently reclassified as Admin-approved source material.
         chat_ready = bool(
-            kind == "shared" and shared_docs and
+            kind == "shared" and shared_docs and shared["admin_managed"] and
             prepared_sources(approved_document_rows(
                 conn, shared["id"],
                 chapter_key(units[chapter_index - 1].get("evidence", "")),
