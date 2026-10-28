@@ -10,6 +10,10 @@ from course_path_learning import (
     personal_course_documents,
 )
 from syllabus_learning import syllabus_hash
+from course_schedule_sync import (
+    ensure_session_schedule_schema, import_roadmap_lessons,
+    scheduled_lessons, session_signature,
+)
 from syllabus_routes import _source, ensure_syllabus_schema
 from chapter_material_routes import (
     approved_document_rows, chapter_key, ensure_chapter_material_schema, official_syllabus,
@@ -63,6 +67,7 @@ def learning_path(subject_id):
 
         ensure_syllabus_schema(conn)
         ensure_roadmap_schema(conn)
+        ensure_session_schedule_schema(conn)
         token = session.get("syllabus_csrf_token")
         if not token:
             token = secrets.token_hex(24)
@@ -91,7 +96,39 @@ def learning_path(subject_id):
         if request.method == "POST":
             if not secrets.compare_digest(request.form.get("csrf_token", ""), token):
                 return "Phiên biểu mẫu không hợp lệ.", 403
-            if request.form.get("action") != "generate":
+            action = request.form.get("action")
+            if action == "schedule":
+                # Import is explicit: creating a roadmap alone never creates
+                # or deletes Study Plan tasks, and old/stale plans are rejected.
+                if not fresh:
+                    return redirect(url_for(
+                        "course_path.learning_path", subject_id=subject_id,
+                        notice="Lộ trình chưa hợp lệ. Hãy phân tích/tạo lại trước khi đưa vào lịch.",
+                    ), code=303)
+                try:
+                    summary = import_roadmap_lessons(
+                        conn, uid, subject_id, saved_sessions, project.now()
+                    )
+                except ValueError as exc:
+                    return redirect(url_for(
+                        "course_path.learning_path", subject_id=subject_id,
+                        notice=str(exc),
+                    ), code=303)
+                conn.commit()
+                message = (
+                    f"Đã đưa {summary['created']} buổi mới vào Kế hoạch học; "
+                    f"{summary['existing']} buổi đã có được giữ nguyên."
+                )
+                if summary["changed"]:
+                    message += (
+                        f" Có {summary['changed']} buổi đã thay đổi nội dung; "
+                        "lịch cũ được giữ để bạn rà soát, không tự ghi đè."
+                    )
+                return redirect(url_for(
+                    "course_path.learning_path", subject_id=subject_id,
+                    notice=message,
+                ), code=303)
+            if action != "generate":
                 return "Thao tác không hợp lệ.", 400
             if not units:
                 return redirect(url_for("syllabus.review", subject_id=subject_id,
@@ -171,11 +208,21 @@ def learning_path(subject_id):
                         lesson["materials"] = [
                             doc for doc in existing if doc.get("kind") == "personal"
                         ] + confirmed
+        linked = scheduled_lessons(conn, uid, subject_id) if sessions else {}
+        schedule_status = {
+            int(lesson["session_id"]): (
+                "current" if linked[int(lesson["session_id"])]["roadmap_session_signature"]
+                == session_signature(lesson) else "changed"
+            )
+            for lesson in sessions
+            if int(lesson["session_id"]) in linked
+        }
         return render_template(
             "course_learning_path.html", page="subjects", subject=subject,
             syllabus_name=syllabus_name, units=units, sessions=sessions,
+            schedule_status=schedule_status,
             stale=bool(plan_row and not fresh),
-            notice=request.args.get("notice", ""), csrf_token=token,
+            notice=request.args.get("notice", "")[:400], csrf_token=token,
         )
     finally:
         conn.close()
