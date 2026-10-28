@@ -24,6 +24,13 @@
         <button id="chatModeFree" type="button" class="active" aria-pressed="true">💬 Hỏi đáp tự do</button>
         <button id="chatModeChapter" type="button" aria-pressed="false">📖 Học theo chương</button>
       </div>
+      <div id="chatLessonSummary" class="chat-lesson-summary" hidden>
+        <span class="chat-lesson-summary-text">
+          <strong id="chatLessonSummaryTitle"></strong>
+          <small id="chatLessonSummarySource"></small>
+        </span>
+        <button id="chatChangeChapter" class="chat-change-chapter" type="button" aria-controls="chatChapterControls" aria-expanded="false">Đổi nội dung</button>
+      </div>
       <div id="chatChapterControls" class="chat-chapter-controls" hidden>
         <label> Môn học
           <select id="chatCourseSelect" aria-label="Môn học trong chế độ học theo chương"></select>
