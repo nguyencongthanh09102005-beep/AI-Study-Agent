@@ -229,7 +229,8 @@ def verify():
                                 (old_quiz,)).fetchone()[0] == 0
             conn.close()
             linked_page = client.get("/quiz").get_data(as_text=True)
-            assert "Theo buổi ·" in linked_page
+            # 7.3: prepared session Quiz remains hidden until server unlock.
+            assert "Quiz theo buổi thử liên kết" not in linked_page
             assert "Quiz cũ" in linked_page
 
             # Revoked approval disables prospective session Quiz, never removes
