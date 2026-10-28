@@ -241,10 +241,12 @@ Quiz Chương 2: 10 câu lý thuyết.
             ]
             assert sessions[1]["topics"][0] == "2.1. Danh sách liên kết đơn"
             assert sessions[1]["quiz"]["available"] is False
-            # Shared materials must not be treated as Admin-approved by a
-            # text-only match in the roadmap. Explicit chapter review is required.
-            assert not any(x["name"] == "Slide Danh sách liên kết"
-                           for x in sessions[1]["materials"]), sessions[1]["materials"]
+            # Student-owned notes may be suggested privately without Admin review.
+            # They must NEVER be mislabeled as approved shared course materials.
+            assert any(x["name"] == "Slide Danh sách liên kết"
+                       and x["kind"] == "personal"
+                       for x in sessions[1]["materials"]), sessions[1]["materials"]
+            assert not any(x["kind"] == "shared" for x in sessions[1]["materials"])
             assert not any(x["name"] == "OOP không được trộn"
                            for item in sessions for x in item["materials"])
             assert not any(x["name"] == "Riêng của người khác"
