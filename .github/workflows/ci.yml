@@ -88,7 +88,9 @@ jobs:
         run: python tests/test_web_readability.py
 
       - name: Study Plan layout and task action regressions
-        run: python tests/test_study_plan_ui.py
+        run: |
+          python tests/test_study_plan_ui.py
+          python tests/test_schedule_conflicts.py
 
       - name: Final roles and manual deadline data-integrity audit
         run: python tests/test_final_integrity_audit.py

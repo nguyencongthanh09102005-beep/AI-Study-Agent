@@ -126,6 +126,26 @@ def learning_path(subject_id):
                         f" Có {summary['changed']} buổi đã thay đổi nội dung; "
                         "lịch cũ được giữ để bạn rà soát, không tự ghi đè."
                     )
+                # Detect collisions across all subjects after import, but do
+                # not automatically reschedule any existing lesson.
+                from study_schedule_conflicts import find_study_conflicts
+                conflicts = find_study_conflicts(conn.execute(
+                    "SELECT id,title,study_at,duration FROM study_tasks WHERE user_id=?",
+                    (uid,)
+                ).fetchall())
+                overlapping_roadmap = conn.execute(
+                    """SELECT id FROM study_tasks
+                       WHERE user_id=? AND subject_id=? AND source='roadmap'
+                         AND roadmap_session_id IS NOT NULL""",
+                    (uid, subject_id)
+                ).fetchall()
+                affected = sum(1 for item in overlapping_roadmap
+                               if item["id"] in conflicts)
+                if affected:
+                    message += (
+                        f" Cảnh báo: {affected} buổi từ lộ trình đang trùng giờ "
+                        "với lịch khác. Mở Kế hoạch học → Giờ để chọn giờ mới."
+                    )
                 return redirect(url_for(
                     "course_path.learning_path", subject_id=subject_id,
                     notice=message,

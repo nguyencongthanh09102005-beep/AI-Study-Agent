@@ -12,6 +12,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, send_from_directory
+from study_schedule_conflicts import find_study_conflicts
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from werkzeug.exceptions import RequestEntityTooLarge
@@ -6251,6 +6252,9 @@ def study_plan():
     today = datetime.now().date()
     now_dt = datetime.now()
 
+    schedule_conflicts = find_study_conflicts(task_rows)
+    conflict_task_count = len(schedule_conflicts)
+
     tasks = []
     completed_tasks = 0
     overdue_tasks = 0
@@ -6264,6 +6268,13 @@ def study_plan():
         item["date_text"] = study_dt.strftime("%d/%m")
         item["time_text"] = study_dt.strftime("%H:%M")
         item["study_at_input"] = study_dt.strftime("%Y-%m-%dT%H:%M")
+        collision = schedule_conflicts.get(item["id"], {})
+        item["schedule_conflict"] = bool(collision)
+        item["conflict_titles"] = ", ".join(collision.get("with_titles", []))
+        item["suggested_study_at"] = collision.get("suggested_at", "")
+        item["suggested_time_text"] = (
+            item["suggested_study_at"][11:16] if item["suggested_study_at"] else ""
+        )
         item["is_today"] = study_dt.date() == today
         item["_study_date"] = study_dt.date()
         item["is_overdue"] = (not row["done"]) and study_dt < now_dt
@@ -6405,6 +6416,7 @@ def study_plan():
         page="study_plan",
         subjects=subjects,
         tasks=tasks,
+        conflict_task_count=conflict_task_count,
         today_tasks=today_tasks,
         reminders=reminders,
         pending_reminders=pending_reminders,
