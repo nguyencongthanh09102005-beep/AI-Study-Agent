@@ -1,0 +1,91 @@
+/* Account controls replace the decorative "Study Agent V2" sidebar card.
+   On phones the navigation becomes a bottom bar, so account access stays
+   available in the compact header instead. */
+body.study-ui .sidebar-account-card {
+  margin-top: auto;
+  padding: 13px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  border-radius: 18px;
+  border: 1px solid #e4eafa;
+  background: linear-gradient(145deg,#e7edff,#f5f7ff);
+  box-shadow: 4px 5px 12px rgba(103,122,169,.13),-4px -4px 13px rgba(255,255,255,.72);
+}
+body.study-ui .sidebar-account-avatar,
+body.study-ui .topbar-mobile-avatar {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: linear-gradient(140deg,#7795ff,#655cff);
+  color: white;
+  font-weight: 800;
+  font-size: 16px;
+}
+body.study-ui .sidebar-account-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1 1 auto;
+  gap: 3px;
+}
+body.study-ui .sidebar-account-info strong {
+  font-size: 12px;
+  line-height: 1.35;
+  color: #293e71;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+body.study-ui .sidebar-account-info small {
+  color: #7d8caf;
+  font-size: 11px;
+}
+body.study-ui .sidebar-account-logout {
+  flex: 0 0 auto;
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  min-width: 48px;
+  padding: 7px 4px;
+  border-radius: 11px;
+  color: #5b6f9a;
+  font-size: 17px;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+body.study-ui .sidebar-account-logout:hover {
+  background: rgba(112,130,238,.13);
+  color: #4257d8;
+}
+body.study-ui .sidebar-logout-caption {
+  font-size: 9px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+body.study-ui .topbar-mobile-account { display: none !important; }
+@media (max-width: 900px) {
+  body.study-ui .sidebar-account-card { display: none !important; }
+  body.study-ui:not(.page-chat) .topbar-mobile-account {
+    display: flex !important;
+    align-items: center;
+    gap: 9px;
+  }
+  body.study-ui .topbar-mobile-avatar {
+    width: 32px;
+    height: 32px;
+    flex-basis: 32px;
+    font-size: 13px;
+  }
+  body.study-ui .topbar-mobile-logout {
+    padding: 8px;
+    font-size: 19px;
+    color: #465e96;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.study-ui .sidebar-account-logout { transition: none; }
+}
