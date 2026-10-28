@@ -8,7 +8,7 @@ import json
 import re
 from datetime import date, timedelta
 
-PLAN_VERSION = 3
+PLAN_VERSION = 4
 
 TOPIC_RE = re.compile(r"^(\d+(?:\.\d+){1,3})[.)]?\s+(.{3,200})$")
 CHAPTER_RE = re.compile(r"^(?:chương|chapter|bài|lesson|unit|module)\s+(\d+)\b", re.I)
