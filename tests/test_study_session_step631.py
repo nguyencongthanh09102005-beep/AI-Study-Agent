@@ -164,7 +164,11 @@ def verify():
             assert "Slide Node cá nhân.pdf" in body
             assert f"/uploads/private631.pdf" in body
             assert 'data-chat-enabled="0"' in body
-            assert "Mở Chat AI thông thường của môn" in body
+            assert 'id="floatingAiBubble"' in body
+            assert 'id="floatingAiPanel"' in body
+            assert "ai_bubble.js" in body
+            assert 'id="studyRoomChat"' not in body
+            assert "studyRoomChatForm" not in body
             assert client.get(f"/api/study-plan/tasks/{task_id}/chat-history").status_code == 409
             assert "Mật của môn khác" not in body
             assert "Mật của sinh viên khác" not in body
@@ -228,7 +232,9 @@ def verify():
             assert "Tài liệu chưa duyệt" not in shared_room
             assert f"/shared-documents/{unapproved_id}/file" not in shared_room
             assert 'data-chat-enabled="1"' in shared_room
-            assert "study_session_chat.js" in shared_room
+            assert "ai_bubble.js" in shared_room
+            assert 'id="studyRoomChat"' not in shared_room
+            assert "data-ai-approved-source" in shared_room
 
             # The room shares the existing subject conversation, but keeps
             # the prompt and history scoped to the verified roadmap session.

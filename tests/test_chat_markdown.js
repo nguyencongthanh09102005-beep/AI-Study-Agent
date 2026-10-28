@@ -64,4 +64,25 @@ const mathUnsafe = render("$\\frac{<img>}{2}$");
 assert.doesNotMatch(mathUnsafe, /<img>/);
 assert.match(mathUnsafe, /&lt;img&gt;/);
 
+// Regression for the exact Markdown/LaTeX symptoms users reported.
+const escapedBold = render("AI nói \\*\\*Danh sách liên kết\\*\\* là cấu trúc...");
+assert.match(escapedBold, /<strong>Danh sách liên kết<\/strong>/);
+assert.doesNotMatch(escapedBold, /\\\*\*/);
+const mathText = render("Biểu diễn: $\\text{head} \\rightarrow [5|\\text{next}]$.");
+assert.match(mathText, /chat-math-text/);
+assert.match(mathText, /head/);
+assert.match(mathText, /→/);
+assert.doesNotMatch(mathText, /\\text/);
+const comparison = render("| Cấu trúc | Độ phức tạp |\n| --- | --- |\n| **Mảng** | $O(1)$ |");
+assert.match(comparison, /<table class="chat-data-table">/);
+assert.match(comparison, /<strong>Mảng<\/strong>/);
+assert.match(comparison, /chat-formula-fallback/);
+assert.doesNotMatch(comparison, /<img\b/);
+const blockTex = render("$\n\\frac{1}{n}\n$");
+assert.match(blockTex, /chat-math-fraction/);
+assert.doesNotMatch(blockTex, /\\frac/);
+const adversarialMath = render("$\\text{<img src=x onerror=alert(1)>}$");
+assert.doesNotMatch(adversarialMath, /<img\b/);
+assert.match(adversarialMath, /&lt;img/);
+
 console.log("Chat output: responsive tables, safe math, code, lists, HTML escaping OK");

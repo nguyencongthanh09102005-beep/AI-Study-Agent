@@ -57,7 +57,10 @@ jobs:
           node tests/test_weekly_planner_navigation.js
           node --check static/js/chat.js
           node --check static/js/study_session_chat.js
+          node --check static/js/ai_bubble.js
           node tests/test_study_session_chat.js
+          node tests/test_ai_bubble.js
+          node tests/test_chat_markdown.js
           node --check static/js/document-summary.js
           node --check static/js/auth-password.js
           node --check mobile/src/api.js

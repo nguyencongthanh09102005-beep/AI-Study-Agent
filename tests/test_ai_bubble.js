@@ -1,0 +1,32 @@
+/* Browser-independent sanity checks for shared floating AI bubble.
+   Visual pointer/focus behavior is separately smoke-tested in Chrome. */
+"use strict";
+const assert=require("node:assert/strict");
+const fs=require("node:fs");
+const path=require("node:path");
+const root=path.resolve(__dirname,"..");
+const js=fs.readFileSync(path.join(root,"static/js/ai_bubble.js"),"utf8");
+const css=fs.readFileSync(path.join(root,"static/css/ai_bubble.css"),"utf8");
+const base=fs.readFileSync(path.join(root,"templates/base.html"),"utf8");
+const room=fs.readFileSync(path.join(root,"templates/study_session.html"),"utf8");
+assert.match(js,/pointerdown/);
+assert.match(js,/pointermove/);
+assert.match(js,/pointerup/);
+assert.match(js,/pointercancel/);
+assert.match(js,/Math\.hypot\(dx,dy\)>6/);
+assert.match(js,/sessionStorage\.setItem\(STORAGE_KEY/);
+assert.match(js,/function (?:openPanel|closePanel)\(/);
+assert.match(js,/disabled \|\| busy/);
+assert.match(js,/canResume && !invalidated/);
+assert.match(js,/new URLSearchParams/);
+assert.match(js,/subjectId !== lesson\.subjectId/);
+assert.match(css,/position:fixed/);
+assert.match(css,/\.floating-ai-bubble/);
+assert.match(css,/\.floating-ai-panel/);
+assert.match(css,/@media\(max-width:600px\)/);
+assert.match(css,/overflow-x:auto/);
+assert.match(base,/id="floatingAiFullChat"/);
+assert.match(room,/data-ai-approved-source/);
+assert.match(room,/data-open-floating-ai/);
+assert.doesNotMatch(room,/studyRoomChatMessages/);
+console.log("6.3.3 floating AI bubble drag, persistence, view scope and responsive markup OK");

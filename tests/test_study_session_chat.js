@@ -1,18 +1,33 @@
-/* Embedded tutor must only reuse verified lesson mode, with no HTML injection. */
+/* A single floating assistant replaces the old room chat; the server still
+   checks user/subject/lesson/source on every question. */
+"use strict";
+const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const assert = require("node:assert/strict");
 const root = path.resolve(__dirname, "..");
-const js = fs.readFileSync(path.join(root,"static/js/study_session_chat.js"),"utf8");
-const room = fs.readFileSync(path.join(root,"templates/study_session.html"),"utf8");
+const bubble = fs.readFileSync(path.join(root, "static/js/ai_bubble.js"), "utf8");
+const room = fs.readFileSync(path.join(root, "templates/study_session.html"), "utf8");
+const base = fs.readFileSync(path.join(root, "templates/base.html"), "utf8");
+assert.match(room,/id="studyRoomAiContext" hidden/);
 assert.match(room,/data-chat-enabled="{{ '1' if chat_ready else '0' }}"/);
-assert.match(room,/studyRoomChatForm/);
-assert.match(room,/{% block scripts %}/);
-assert.match(js,/\/api\/study-plan\/tasks\/.*\/chat-history/);
-assert.match(js,/\/api\/chat/);
-assert.match(js,/lesson: \{chapter_number: chapterNumber, task_id: taskId\}/);
-assert.match(js,/body\.textContent/);
-assert.doesNotMatch(js,/innerHTML|outerHTML|insertAdjacentHTML/);
-assert.doesNotMatch(js,/\/api\/mobile\/chat/);
-assert.match(room,/Mở Chat AI thông thường/);
-console.log("6.3.2 embedded verified chat frontend checks OK");
+assert.match(room,/data-open-floating-ai/);
+assert.doesNotMatch(room,/id="studyRoomChat"/);
+assert.doesNotMatch(room,/studyRoomChatForm/);
+assert.doesNotMatch(room,/study_session_chat\.js/);
+assert.match(base,/id="floatingAiBubble"/);
+assert.match(base,/id="floatingAiPanel"/);
+assert.match(base,/id="floatingAiForm"/);
+assert.match(base,/page not in \['chat', 'admin'\]/);
+assert.match(base,/chat_format\.js/);
+assert.match(base,/ai_bubble\.js/);
+assert.match(bubble,/\/api\/study-plan\/tasks\/.*\/chat-history/);
+assert.match(bubble,/\/api\/chats\/.*\/messages/);
+assert.match(bubble,/\/api\/chat/);
+assert.match(bubble,/lesson:\{chapter_number:lesson.chapter,task_id:lesson.taskId\}/);
+assert.match(bubble,/data\.lesson\?\.session_task_id !== lesson\.taskId/);
+assert.match(bubble,/data\.source_mode!=="chapter"/);
+assert.match(bubble,/ChatMarkdown\.render/);
+assert.match(bubble,/body\.textContent = String\(value \|\| ""\)/);
+assert.match(bubble,/body\.innerHTML = window\.ChatMarkdown\.render/);
+assert.doesNotMatch(bubble,/body\.innerHTML = (?:value|data\.answer|item\.content)/);
+console.log("6.3.3 verified floating chat integration and room replacement OK");
