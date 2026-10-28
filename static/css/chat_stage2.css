@@ -382,14 +382,9 @@ body.page-chat .side-nav .chat-nav-toggle { display: none; }
     border-radius: 11px !important;
     overflow: hidden;
     background: rgba(232, 239, 255, .65) !important;
-    transition: flex-basis 230ms ease, padding 230ms ease,
-                background-color 180ms ease, transform 180ms ease !important;
-  }
-  body.page-chat .side-nav:not(.is-expanded) a.chat-nav-secondary {
-    animation: chat-sidebar-shortcuts-collapse 330ms ease-out both;
-  }
-  body.page-chat .side-nav:not(.is-expanded) a.chat-nav-secondary b {
-    animation: chat-sidebar-label-collapse 280ms ease-out both;
+    /* The flex-basis and padding jump ONCE. Animating either would force
+       layout of every course item on every frame (visible jank). */
+    transition: background-color 160ms ease, color 160ms ease !important;
   }
   body.page-chat .side-nav a.chat-nav-secondary:hover {
     background: #dee8ff !important;
@@ -405,7 +400,8 @@ body.page-chat .side-nav .chat-nav-toggle { display: none; }
     opacity: 0;
     overflow: hidden;
     white-space: nowrap;
-    transition: max-width 240ms ease, opacity 170ms ease;
+    /* Label size updates once; fade is handled by a compositor animation. */
+    transition: opacity 140ms ease;
   }
   body.page-chat .side-nav.is-expanded a.chat-nav-secondary {
     flex-basis: 100%;
@@ -435,14 +431,6 @@ body.page-chat .side-nav .chat-nav-toggle { display: none; }
     line-height: 1.6;
   }
 }
-@keyframes chat-sidebar-shortcuts-collapse {
-  from { flex-basis: 100%; opacity: .75; }
-  to { flex-basis: calc((100% - 24px) / 5); opacity: 1; }
-}
-@keyframes chat-sidebar-label-collapse {
-  from { max-width: 190px; opacity: 1; }
-  to { max-width: 0; opacity: 0; }
-}
 @keyframes chat-sidebar-course-reveal {
   from { opacity: .45; transform: translateY(7px); }
   to { opacity: 1; transform: translateY(0); }
@@ -456,5 +444,24 @@ body.page-chat .side-nav .chat-nav-toggle { display: none; }
   }
   body.page-chat .sidebar-course-list .chat-history-list.chat-courses-ready {
     animation: none !important;
+  }
+}
+
+/* Avoid a viewport-sized GPU blur during navigation on lower-end laptops.
+   The opaque tint matches the previous frosted sidebar closely. */
+@media (min-width: 981px) {
+  body.page-chat .sidebar {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: #f0f5ff !important;
+  }
+  body.page-chat .chat-header,
+  body.page-chat .chat-composer {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+  body.page-chat .side-nav a.chat-nav-secondary:focus-visible {
+    outline: 2px solid #8295e7;
+    outline-offset: 2px;
   }
 }
