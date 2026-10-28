@@ -44,6 +44,16 @@
       {% endif %}
     </nav>
 
+    {% if page == 'chat' %}
+    <section class="sidebar-course-list" aria-label="Danh sách môn học trong Chat AI">
+      <div class="sidebar-course-heading">
+        <strong>Danh sách môn học</strong>
+        <a href="{{ url_for('subjects') }}" title="Thêm môn học" aria-label="Thêm môn học">＋</a>
+      </div>
+      <div class="chat-history-list" aria-live="polite"></div>
+    </section>
+    {% endif %}
+
     <div class="pro-card">
       <span class="pro-crown">✦</span>
       <div><strong>Study Agent V2</strong><small>{% if page == 'admin' %}Quản trị kiến thức dùng chung{% else %}Kiến thức chung + dữ liệu<br>học tập cá nhân{% endif %}</small></div>
