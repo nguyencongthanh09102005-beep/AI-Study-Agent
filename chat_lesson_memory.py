@@ -52,14 +52,21 @@ def history_for_mode(conn, user_id, conversation_id, lesson=None, limit=10):
     """Return only on-topic history, never from another mode or source version."""
     ensure_chat_memory_schema(conn)
     if lesson:
-        clause = """ctx.mode='chapter'
-                AND ctx.chapter_number=? AND ctx.topic_index=?
-                AND ctx.source_signature=?"""
-        params = (
-            user_id, conversation_id,
-            lesson["chapter_number"], lesson["topic_index"],
-            lesson["source_signature"], limit,
-        )
+        if lesson["topic_index"] is None:
+            clause = """ctx.mode='chapter' AND ctx.chapter_number=?
+                    AND ctx.topic_index IS NULL AND ctx.source_signature=?"""
+            params = (
+                user_id, conversation_id, lesson["chapter_number"],
+                lesson["source_signature"], limit,
+            )
+        else:
+            # Older chapter links can still opt into a concrete topic.
+            clause = """ctx.mode='chapter' AND ctx.chapter_number=?
+                    AND ctx.topic_index=? AND ctx.source_signature=?"""
+            params = (
+                user_id, conversation_id, lesson["chapter_number"],
+                lesson["topic_index"], lesson["source_signature"], limit,
+            )
     else:
         # Legacy chat rows have no context record and belong to Free mode.
         clause = "(ctx.mode='free' OR ctx.message_id IS NULL)"
