@@ -10,6 +10,9 @@ from course_path_learning import (
 )
 from syllabus_learning import syllabus_hash
 from syllabus_routes import _source, ensure_syllabus_schema
+from chapter_material_routes import (
+    approved_document_rows, chapter_key, ensure_chapter_material_schema, official_syllabus,
+)
 
 course_path_bp = Blueprint("course_path", __name__)
 
@@ -45,18 +48,9 @@ def _course_documents(project, conn, user_id, subject_id, shared_subject, syllab
                 "id": row["id"], "name": row["original_name"],
                 "text": row["extracted_text"], "kind": "personal",
             })
-    if shared_subject:
-        shared = conn.execute("""
-            SELECT id,original_name,extracted_text FROM shared_documents
-            WHERE shared_subject_id=? AND is_syllabus=0
-            ORDER BY id DESC LIMIT 30
-        """, (shared_subject["id"],)).fetchall()
-        for row in shared:
-            if (row["extracted_text"] or "").strip():
-                docs.append({
-                    "id": row["id"], "name": row["original_name"],
-                    "text": row["extracted_text"], "kind": "shared",
-                })
+    # The course-specific reader only recommends Admin-confirmed chapter materials.
+    # Shared documents are added live to the roadmap after Admin approval below;
+    # otherwise a lexical hit could be mistaken for reviewed academic evidence.
     return docs
 
 
@@ -86,7 +80,7 @@ def learning_path(subject_id):
             token = secrets.token_hex(24)
             session["syllabus_csrf_token"] = token
 
-        _, text, syllabus_name = _source(project, conn, uid, subject_id)
+        source_kind, text, syllabus_name = _source(project, conn, uid, subject_id)
         fingerprint = syllabus_hash(text) if text else ""
         review_row = conn.execute("""
             SELECT * FROM syllabus_reviews WHERE user_id=? AND subject_id=?
@@ -151,6 +145,31 @@ def learning_path(subject_id):
                                     notice="Đã xây dựng lộ trình từ đề cương đã xác nhận."), code=303)
 
         sessions = saved_sessions if fresh else []
+        # Show confirmed shared materials live, even when Admin approves/revokes
+        # a document after the student's roadmap was generated.
+        if sessions and source_kind == "shared":
+            shared = project.ensure_shared_subject_for_user_subject(conn, uid, subject_id)
+            if shared:
+                official_text, official_hash, _ = official_syllabus(conn, shared["id"])
+                if official_text and official_hash == fingerprint:
+                    ensure_chapter_material_schema(conn)
+                    linked_by_chapter = {}
+                    for index, unit in enumerate(units):
+                        key = chapter_key(unit["evidence"])
+                        if key:
+                            linked_by_chapter[index + 1] = [
+                                {"id": row["id"], "name": row["original_name"],
+                                 "kind": "shared", "approved": True}
+                                for row in approved_document_rows(
+                                    conn, shared["id"], key, fingerprint)
+                            ]
+                    for lesson in sessions:
+                        existing = lesson.get("materials") or []
+                        confirmed = linked_by_chapter.get(lesson["unit_id"], [])
+                        # Only personal suggestions plus explicitly reviewed shared files.
+                        lesson["materials"] = [
+                            doc for doc in existing if doc.get("kind") == "personal"
+                        ] + confirmed
         return render_template(
             "course_learning_path.html", page="subjects", subject=subject,
             syllabus_name=syllabus_name, units=units, sessions=sessions,
