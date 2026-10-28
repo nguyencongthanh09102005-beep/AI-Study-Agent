@@ -327,6 +327,8 @@ document.addEventListener("DOMContentLoaded", () => {
     e.preventDefault();
     const question = input.value.trim();
     if (busy || disabled || !number(conversationId) || !question) return;
+    const canResume = !disabled;
+    let invalidated = false;
     busy = true; enable(false);
     const conversation = conversationId;
     const sentFor = subjectId;
@@ -355,12 +357,12 @@ document.addEventListener("DOMContentLoaded", () => {
       appendMessage("error",error.message);
       setStatus("Không gửi được câu hỏi");
       if (isLesson && /nguồn|thay đổi|đề cương|học liệu|chương/i.test(error.message)) {
-        disabled = true;
+        invalidated = true;
         setMode("Nguồn học liệu có thể đã thay đổi. Hãy tải lại phòng học.",true);
       }
     } finally {
       busy=false;
-      enable(!disabled);
+      enable(canResume && !invalidated);
       if (!input.disabled && !panel.hidden) input.focus({preventScroll:true});
     }
   });
