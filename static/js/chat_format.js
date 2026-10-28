@@ -77,7 +77,15 @@
       if (list) out.push("</" + list + ">");
       list = "";
     };
-    for (const row of String(value || "").split("\n")) {
+    const lines = String(value || "").split("\n");
+    for (let index = 0; index < lines.length; index += 1) {
+      const row = lines[index];
+      const table = tableBlock(lines, index);
+      if (table) {
+        flush(); closeList(); out.push(table.html);
+        index = table.next - 1;
+        continue;
+      }
       const text = row.trim();
       if (!text) { flush(); closeList(); continue; }
       const title = text.match(/^#{1,4}\s+(.+)$/);
