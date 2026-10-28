@@ -218,8 +218,12 @@ Quiz Chương 2: 10 câu lý thuyết.
                 source_row = conn.execute("SELECT status,source_hash,units_json FROM syllabus_reviews WHERE user_id=? AND subject_id=?", (student, course)).fetchone()
                 raise AssertionError(f"No plan: redirect={result.headers.get('Location')}, source={extracted[0]}, length={len(extracted[1])}, hash={syllabus_hash(extracted[1])}, saved={dict(source_row) if source_row else None}")
             sessions = json.loads(plan["sessions_json"])
-            assert len(sessions) == 6, len(sessions)
-            assert [x["unit_id"] for x in sessions] == list(range(1, 7))
+            assert len(sessions) == 7, len(sessions)
+            assert [x["unit_id"] for x in sessions] == [1, 2, 3, 3, 4, 5, 6]
+            assert [x["topics"] for x in sessions if x["unit_id"] == 3] == [
+                ["3.1. Ngăn xếp Stack", "3.2. Hàng đợi Queue"],
+                ["3.3. Thao tác push pop"],
+            ]
             assert sessions[1]["topics"][0] == "2.1. Danh sách liên kết đơn"
             assert sessions[1]["quiz"]["available"] is False
             assert any(x["name"] == "Slide Danh sách liên kết"
@@ -231,7 +235,7 @@ Quiz Chương 2: 10 câu lý thuyết.
             assert conn.execute("SELECT count(*) FROM study_tasks").fetchone()[0] == 0
             conn.close()
             loaded = client.get(f"/subjects/{course}/learning-path")
-            assert loaded.status_code == 200 and "6 buổi học" in loaded.get_data(as_text=True)
+            assert loaded.status_code == 200 and "7 buổi học" in loaded.get_data(as_text=True)
 
             outsider = project.app.test_client()
             with outsider.session_transaction() as sess:
