@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/polish.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/mockup.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/readability.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/sidebar_account.css') }}">
   {% if page == 'chat' %}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/chat_stage1.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/chat_stage2.css') }}">
@@ -55,10 +56,14 @@
     </section>
     {% endif %}
 
-    <div class="pro-card">
-      <span class="pro-crown">✦</span>
-      <div><strong>Study Agent V2</strong><small>{% if page == 'admin' %}Quản trị kiến thức dùng chung{% else %}Kiến thức chung + dữ liệu<br>học tập cá nhân{% endif %}</small></div>
-    </div>
+    <section class="sidebar-account-card" aria-label="Tài khoản đang đăng nhập">
+      <span class="sidebar-account-avatar" aria-hidden="true">{{ (session.get('user_name') or 'N')[0]|upper }}</span>
+      <div class="sidebar-account-info">
+        <strong title="{{ session.get('user_name','Tài khoản') }}">{{ session.get('user_name','Tài khoản') }}</strong>
+        <small>{{ 'Quản trị viên' if page == 'admin' else 'Sinh viên' }}</small>
+      </div>
+      <a class="sidebar-account-logout" href="{{ url_for('logout') }}" title="Đăng xuất" aria-label="Đăng xuất"><span aria-hidden="true">↪</span><span class="sidebar-logout-caption">Đăng xuất</span></a>
+    </section>
   </aside>
 
   <main class="app-main">
@@ -67,12 +72,9 @@
         <span>⌕</span>
         <input id="globalSearch" type="search" placeholder="Tìm kiếm môn học, tài liệu, câu hỏi..." autocomplete="off">
       </label>
-      <div class="topbar-actions">
-        <div class="user-chip">
-          <span class="user-avatar">{{ session.get('user_name','N')[0]|upper }}</span>
-          <span class="user-copy"><strong>{{ session.get('user_name','Nguyễn Hoàng') }}</strong><small>{{ 'Quản trị viên' if page == 'admin' else 'Sinh viên' }}</small></span>
-          <a class="logout-mini" href="{{ url_for('logout') }}" title="Đăng xuất">↗</a>
-        </div>
+      <div class="topbar-actions topbar-mobile-account">
+        <span class="topbar-mobile-avatar" title="{{ session.get('user_name','Tài khoản') }}">{{ (session.get('user_name') or 'N')[0]|upper }}</span>
+        <a class="topbar-mobile-logout" href="{{ url_for('logout') }}" aria-label="Đăng xuất" title="Đăng xuất">↪</a>
       </div>
     </header>
 
