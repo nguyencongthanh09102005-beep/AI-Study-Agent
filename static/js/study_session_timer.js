@@ -107,7 +107,7 @@ document.addEventListener("DOMContentLoaded", () => {
       notice.textContent = error.message;
       // If the server detected a stale timer or changed syllabus, do not
       // keep displaying an optimistic running timer.
-      if (action !== "heartbeat") await syncStatusAfterError();
+      await syncStatusAfterError();
     } finally {
       inFlight = false;
       render();
