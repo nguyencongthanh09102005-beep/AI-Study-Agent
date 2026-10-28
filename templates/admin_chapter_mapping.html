@@ -21,17 +21,49 @@
       <a class="soft-primary" href="{{ url_for('admin_shared_documents') }}">Quản lý tài liệu</a>
     </div>
   {% else %}
+    <div style="background:#f0f4fd;border-radius:12px;padding:16px;margin:16px 0">
+      <h3 style="color:#29427a;margin:0 0 9px">🤖 AI phân tích học liệu</h3>
+      <p style="color:#60769b;font-size:14px;line-height:1.7">
+        AI đọc nội dung đã trích từ file, đối chiếu với các chương/tiểu mục trong đề cương
+        và chỉ đưa ra gợi ý nếu có <strong>dẫn chứng trích từ tài liệu</strong>.
+        Gợi ý không tự được duyệt; Admin có quyền kiểm tra hoặc bỏ qua.
+      </p>
+      <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="action" value="analyze_ai">
+        <button type="submit" class="soft-primary">🤖 {{ 'Phân tích lại bằng AI' if ai_analyzed else 'Phân tích bằng AI' }}</button>
+      </form>
+      {% if ai_analyzed %}
+        <p style="font-size:13px;color:#526a88;margin:10px 0 0">
+          {% if ai_by_key %}
+            Đã có {{ ai_by_key|length }} chương được AI đề xuất kèm dẫn chứng. Hãy kiểm tra trước khi xác nhận.
+          {% else %}
+            AI đã phân tích nhưng không tìm được dẫn chứng đủ tin cậy để đề xuất chương.
+          {% endif %}
+        </p>
+      {% endif %}
+      <p style="font-size:12px;color:#8392ab;margin:10px 0 0">
+        Phân tích AI được thực hiện khi bấm nút. Kết quả chỉ phục vụ Admin duyệt, không tự công bố cho sinh viên.
+      </p>
+    </div>
     <form method="post">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="action" value="save">
       <h3 style="color:#284477">Chọn chương cho tài liệu này</h3>
-      <p style="color:#667b9d;font-size:14px">“Gợi ý tự động” chỉ là nhận diện từ khóa trong nội dung file, không phải kết quả đã duyệt. Admin phải kiểm tra trước khi chọn.</p>
+      <p style="color:#667b9d;font-size:14px">AI phân tích nội dung; “so khớp từ khóa” là gợi ý đơn giản khi chưa chạy AI. Cả hai đều chưa được duyệt cho tới khi Admin xác nhận.</p>
       {% for chapter in chapters %}
       <label style="display:flex;align-items:flex-start;gap:12px;background:#f7f9fe;border:1px solid #e3e9f4;border-radius:12px;padding:15px;margin:10px 0;cursor:pointer">
         <input type="checkbox" name="chapters" value="{{ chapter.key }}" {% if chapter.approved %}checked{% endif %} style="margin-top:5px;width:18px;height:18px">
         <span style="flex:1">
           <strong style="color:#273e73">{{ chapter.title }}</strong>
           <span style="display:block;font-size:12px;color:#6a7f9c;margin-top:5px">
-          {% if chapter.approved %}✓ Đã được Admin duyệt{% elif chapter.suggested %}◌ Gợi ý tự động: có từ khóa liên quan — chưa được duyệt{% else %}Chưa có gợi ý, có thể tự chọn nếu nội dung thực tế phù hợp{% endif %}
+          {% if chapter.approved %}✓ Đã được Admin duyệt{% elif ai_by_key.get(chapter.key) %}🤖 AI đề xuất từ nội dung tài liệu — chờ Admin xác nhận{% elif chapter.suggested %}◌ So khớp từ khóa — chưa được duyệt{% else %}Chưa có gợi ý, có thể tự chọn nếu nội dung thực tế phù hợp{% endif %}
+          {% if ai_by_key.get(chapter.key) %}
+            <span style="display:block;background:#eef3ff;padding:11px;border-radius:9px;color:#36578f;font-size:13px;line-height:1.65;margin-top:10px">
+              <strong>Bằng chứng AI trích từ file:</strong> “{{ ai_by_key[chapter.key] }}”
+              <small style="display:block;color:#6a7d9c;margin-top:6px">Trích nguyên văn được đối chiếu với file gốc; Admin cần xác minh mức độ liên quan.</small>
+            </span>
+          {% endif %}
           </span>
         </span>
       </label>
