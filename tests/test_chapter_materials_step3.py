@@ -4,10 +4,24 @@ import json
 import sys
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import app as project
 from chapter_material_routes import evidence_excerpt
+
+
+def analyze_syllabus_offline(client, subject_id, csrf_token):
+    """Regression tests should never call Gemini or depend on network/API keys.
+
+    Disable the key *only* during these syllabus-analysis test requests.
+    The production application keeps its normal Gemini integration.
+    """
+    with patch.dict(project.os.environ, {"GEMINI_API_KEY": ""}):
+        return client.post(
+            f"/subjects/{subject_id}/syllabus",
+            data={"csrf_token": csrf_token, "action": "analyze"},
+        )
 
 
 def check():
@@ -250,10 +264,7 @@ Thuật toán độ phức tạp Big O cũng có thể áp dụng cho linked lis
             assert page.status_code == 200
             with student.session_transaction() as sess:
                 student_token = sess["syllabus_csrf_token"]
-            assert student.post(
-                f"/subjects/{course}/syllabus",
-                data={"csrf_token": student_token, "action": "analyze"},
-            ).status_code == 303
+            assert analyze_syllabus_offline(student, course, student_token).status_code == 303
             assert student.post(
                 f"/subjects/{course}/syllabus",
                 data={"csrf_token": student_token, "action": "confirm",
@@ -672,8 +683,7 @@ Thuật toán độ phức tạp Big O cũng có thể áp dụng cho linked lis
             peer.get(f"/subjects/{same_course}/syllabus")
             with peer.session_transaction() as sess:
                 peer_token = sess["syllabus_csrf_token"]
-            peer.post(f"/subjects/{same_course}/syllabus",
-                      data={"csrf_token": peer_token, "action": "analyze"})
+            assert analyze_syllabus_offline(peer, same_course, peer_token).status_code == 303
             peer.post(f"/subjects/{same_course}/syllabus",
                       data={"csrf_token": peer_token, "action": "confirm",
                             "include_0": "1", "title_0": "Chương 1. Tổng quan và giải thuật",
@@ -718,8 +728,7 @@ Thuật toán độ phức tạp Big O cũng có thể áp dụng cho linked lis
 
             # Confirming new syllabus still must NOT automatically restore approvals
             # created against the old hash.
-            student.post(f"/subjects/{course}/syllabus",
-                         data={"csrf_token": student_token, "action": "analyze"})
+            assert analyze_syllabus_offline(student, course, student_token).status_code == 303
             student.post(f"/subjects/{course}/syllabus",
                          data={"csrf_token": student_token, "action": "confirm",
                                "include_0": "1", "title_0": "Chương 1. Tổng quan và giải thuật",
