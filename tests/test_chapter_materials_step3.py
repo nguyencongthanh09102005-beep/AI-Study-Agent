@@ -335,6 +335,12 @@ Thuật toán độ phức tạp Big O cũng có thể áp dụng cho linked lis
             assert 'let hasRevealedInitialCourses = false' in js_code
             assert 'if (firstCourseReveal)' in js_code
             assert 'item.classList.add("chat-course-enter")' in js_code
+            # Assigning className after classList.add would silently erase the
+            # entrance animation class. Lock in the correct order.
+            first_render = js_code.index("const firstCourseReveal")
+            assert js_code.index("item.className =", first_render) < js_code.index(
+                'item.classList.add("chat-course-enter")', first_render
+            )
             assert 'Math.min(index, 7)' in js_code
             # The old flex-basis keyframes caused layout thrashing in the
             # user's screen recording. FLIP animates only transforms/opacity.
