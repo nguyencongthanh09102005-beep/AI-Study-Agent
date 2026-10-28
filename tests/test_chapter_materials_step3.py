@@ -314,6 +314,7 @@ Thuật toán độ phức tạp Big O cũng có thể áp dụng cho linked lis
             assert 'chat-nav-primary' in chat_html
             assert chat_html.count('chat-nav-secondary') == 5
             assert 'Đang tải danh sách môn học...' in chat_html
+            assert 'aria-busy="true"' in chat_html
             assert 'class="soft-card chat-history-panel"' not in chat_html
             assert 'id="chatMobileSubject"' in chat_html
             ui_css = (Path(__file__).resolve().parents[1] /
@@ -330,6 +331,11 @@ Thuật toán độ phức tạp Big O cũng có thể áp dụng cho linked lis
             assert 'sidebarNav?.classList.toggle("is-expanded", expanded)' in js_code
             assert 'navToggle.setAttribute("aria-expanded", String(expanded))' in js_code
             assert 'historyList.classList.add("chat-courses-ready")' in js_code
+            assert 'historyList.setAttribute("aria-busy", "false")' in js_code
+            assert 'let hasRevealedInitialCourses = false' in js_code
+            assert 'if (firstCourseReveal)' in js_code
+            assert 'item.classList.add("chat-course-enter")' in js_code
+            assert 'Math.min(index, 7)' in js_code
             # The old flex-basis keyframes caused layout thrashing in the
             # user's screen recording. FLIP animates only transforms/opacity.
             assert 'chat-sidebar-shortcuts-collapse' not in ui_css
@@ -341,6 +347,12 @@ Thuật toán độ phức tạp Big O cũng có thể áp dụng cho linked lis
             assert 'item.animate([' in js_code
             assert 'prefers-reduced-motion: reduce' in js_code
             assert 'chat-sidebar-course-reveal' in ui_css
+            assert 'chat-sidebar-panel-enter' in ui_css
+            assert 'chat-sidebar-shortcut-enter' in ui_css
+            assert 'chat-sidebar-item-enter' in ui_css
+            assert 'animation-delay: calc(40ms + var(--course-enter-index, 0) * 38ms)' in ui_css
+            assert 'animation: none !important' in ui_css
+            assert 'transition: flex-basis' not in ui_css
             navigation_css = (Path(__file__).resolve().parents[1] /
                               "static/css/readability.css").read_text(encoding="utf-8")
             assert '@view-transition' in navigation_css
