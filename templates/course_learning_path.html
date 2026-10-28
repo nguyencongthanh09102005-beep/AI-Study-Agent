@@ -55,7 +55,10 @@
         {% if lesson.quiz %}
           <div style="margin-top:14px;border-top:1px solid #e2e7f1;padding-top:12px">
             <strong style="color:#314a81">📝 Điểm kiểm tra cuối chương: {{ lesson.quiz.recommended_questions }} câu</strong>
-            <p style="margin:6px 0;color:#647897;font-size:13px">Đề xuất phạm vi: {{ lesson.quiz.scope }}. Chức năng tạo Quiz theo mã chương và đánh giá năng lực sẽ được nối ở bước kế tiếp; hiện tại chưa có nút Quiz theo chương để tránh kiểm tra sai phạm vi.</p>
+            <p style="margin:6px 0;color:#647897;font-size:13px">Phạm vi: {{ lesson.quiz.scope }}. {{ 'Số câu lấy từ đề cương.' if lesson.quiz.question_count_from_syllabus else 'Số câu gợi ý do hệ thống đặt.' }}</p>
+            {% if lesson.quiz.description %}<p style="margin:6px 0;font-size:13px;color:#485d87"><strong>Mô tả kiểm tra trong đề cương:</strong> {{ lesson.quiz.description|join('; ') }}</p>{% endif %}
+            {% if lesson.quiz.passing_criteria %}<p style="margin:6px 0;font-size:13px;color:#485d87"><strong>Tiêu chí chuyển tiếp trong đề cương (tham khảo):</strong> {{ lesson.quiz.passing_criteria|join('; ') }}</p>{% endif %}
+            <p style="margin:6px 0;color:#647897;font-size:13px">Chức năng Quiz theo chương và đánh giá năng lực sẽ được kết nối ở bước tiếp theo; hiện chưa có nút làm Quiz để tránh kiểm tra sai phạm vi.</p>
           </div>
         {% endif %}
       </article>
