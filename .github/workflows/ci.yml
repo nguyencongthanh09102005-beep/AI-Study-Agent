@@ -76,6 +76,7 @@ jobs:
         run: |
           python -m py_compile course_path_learning.py course_path_routes.py
           python tests/test_course_path_step2.py
+          python tests/test_course_schedule_sync.py
 
       - name: Admin recovery and student data preservation
         run: python tests/test_admin_recovery.py
