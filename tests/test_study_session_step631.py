@@ -155,7 +155,7 @@ def verify():
             page = client.get(url)
             assert page.status_code == 200
             body = page.get_data(as_text=True)
-            assert "Không gian học tập" in body
+            assert "KHÔNG GIAN HỌC TẬP" in body
             assert "Cấu trúc dữ liệu" in body
             assert "Cấu trúc node" in body
             assert "Mục tiêu buổi học" in body
