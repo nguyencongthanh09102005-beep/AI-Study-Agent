@@ -159,9 +159,9 @@ Quiz Chương 2: 10 câu lý thuyết.
                 VALUES(?,?,?,?,?)
             """, ("Sinh viên 2", "s2@step2.test", "hash", "student", project.now())).lastrowid
             course = conn.execute("""
-                INSERT INTO subjects(user_id,name,code,created_at)
-                VALUES(?,?,?,?)
-            """, (student, "Cấu trúc dữ liệu", "CTDL_STEP2", project.now())).lastrowid
+                INSERT INTO subjects(user_id,name,code,credits,created_at)
+                VALUES(?,?,?,?,?)
+            """, (student, "Cấu trúc dữ liệu", "CTDL_STEP2", 3, project.now())).lastrowid
             other_course = conn.execute("""
                 INSERT INTO subjects(user_id,name,code,created_at)
                 VALUES(?,?,?,?)
@@ -243,20 +243,24 @@ Quiz Chương 2: 10 câu lý thuyết.
                 source_row = conn.execute("SELECT status,source_hash,units_json FROM syllabus_reviews WHERE user_id=? AND subject_id=?", (student, course)).fetchone()
                 raise AssertionError(f"No plan: redirect={result.headers.get('Location')}, source={extracted[0]}, length={len(extracted[1])}, hash={syllabus_hash(extracted[1])}, saved={dict(source_row) if source_row else None}")
             sessions = json.loads(plan["sessions_json"])
-            assert len(sessions) == 7, len(sessions)
-            assert [x["unit_id"] for x in sessions] == [1, 2, 3, 3, 4, 5, 6]
-            assert [x["topics"] for x in sessions if x["unit_id"] == 3] == [
-                ["3.1. Ngăn xếp Stack", "3.2. Hàng đợi Queue"],
-                ["3.3. Thao tác push pop"],
+            assert len(sessions) == 15, len(sessions)
+            assert [x["session_id"] for x in sessions] == list(range(1, 16))
+            assert {s["unit_id"] for s in sessions[:-1]} == set(range(1, 7))
+            assert sessions[-1]["quiz"]["recommended_questions"] == 60
+            assert sessions[-1]["title"] == "Ôn tập tổng hợp và kiểm tra cuối môn"
+            assert sessions[-1]["topics"] == []
+            assert "3.3. Thao tác push pop" in [
+                t for lesson in sessions[:-1] if lesson["unit_id"] == 3
+                for t in lesson["topics"]
             ]
-            assert sessions[1]["topics"][0] == "2.1. Danh sách liên kết đơn"
-            assert sessions[1]["quiz"]["available"] is False
-            # Student-owned notes may be suggested privately without Admin review.
-            # They must NEVER be mislabeled as approved shared course materials.
+            chapter_two = next(x for x in sessions if x["unit_id"] == 2)
+            assert chapter_two["topics"][0] == "2.1. Danh sách liên kết đơn"
+            assert chapter_two["quiz"]["available"] is False
+            # Personal notes must never be mislabeled as Admin-approved.
             assert any(x["name"] == "Slide Danh sách liên kết"
                        and x["kind"] == "personal"
-                       for x in sessions[1]["materials"]), sessions[1]["materials"]
-            assert not any(x["kind"] == "shared" for x in sessions[1]["materials"])
+                       for x in chapter_two["materials"]), chapter_two["materials"]
+            assert not any(x["kind"] == "shared" for x in chapter_two["materials"])
             assert not any("DeCuongChiTiet_CTDL_TEST_GiaLap.pdf" == x["name"]
                            for item in sessions for x in item["materials"])
             assert not any(x["name"] == "OOP không được trộn"
