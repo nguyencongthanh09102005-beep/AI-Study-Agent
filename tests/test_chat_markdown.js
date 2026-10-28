@@ -37,4 +37,29 @@ const preexisting = render("# Chương 2\n\n**Mục tiêu:** Hiểu node và nex
 assert.match(preexisting, /<h4>Chương 2<\/h4>/);
 assert.match(preexisting, /<strong>Mục tiêu:<\/strong>/);
 
-console.log("Chat Markdown: safe bold, code, lists, headings and escaped HTML OK");
+const table = render("| Cấu trúc | Truy cập | Chèn giữa |\n| --- | --- | --- |\n| **Mảng** | O(1) | O(n) |\n| Linked list | O(n) | O(1)* |");
+assert.match(table, /<table class="chat-data-table">/);
+assert.match(table, /<th>Cấu trúc<\/th>/);
+assert.match(table, /<td><strong>Mảng<\/strong><\/td>/);
+assert.match(table, /<td>O\(1\)<\/td>/);
+assert.doesNotMatch(table, /\|\s*---\s*\|/);
+
+const safeTable = render("| Nội dung | Kiểm thử |\n| --- | --- |\n| <svg onload=alert(1)> | \`a|b\` |");
+assert.doesNotMatch(safeTable, /<svg\b/);
+assert.match(safeTable, /&lt;svg onload/);
+assert.match(safeTable, /<code>a\|b<\/code>/);
+
+const nonTable = render("Mảng | Danh sách\nTruy cập | Thao tác");
+assert.doesNotMatch(nonTable, /<table\b/);
+
+const mathInline = render("Độ phức tạp $O(n^2)$ và chỉ số \\(a_i\\).");
+assert.match(mathInline, /<sup>2<\/sup>/);
+assert.match(mathInline, /<sub>i<\/sub>/);
+const mathBlock = render("$\n\\frac{1}{n}\n$");
+assert.match(mathBlock, /chat-math-block/);
+assert.match(mathBlock, /chat-math-fraction/);
+const mathUnsafe = render("$\\frac{<img>}{2}$");
+assert.doesNotMatch(mathUnsafe, /<img>/);
+assert.match(mathUnsafe, /&lt;img&gt;/);
+
+console.log("Chat output: responsive tables, safe math, code, lists, HTML escaping OK");
