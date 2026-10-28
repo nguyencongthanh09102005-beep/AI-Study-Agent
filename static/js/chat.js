@@ -5,11 +5,78 @@ document.addEventListener("DOMContentLoaded", () => {
   const historyList = document.querySelector(".chat-history-list");
   const subjectNameEl = document.getElementById("chatSubjectName");
   const contextStatusEl = document.getElementById("chatContextStatus");
+  const lessonBanner = document.getElementById("lessonModeBanner");
+  const lessonTitle = document.getElementById("lessonModeTitle");
+  const lessonSources = document.getElementById("lessonModeSources");
+  const exitLessonButton = document.getElementById("exitLessonMode");
 
   let chats = [];
   let currentChatId = null;
   let currentMessages = [];
   let sending = false;
+  let lessonMode = null;
+
+  function updateLessonUI() {
+    const current = getCurrentChat();
+    const active = lessonMode && current &&
+      Number(current.subject_id) === Number(lessonMode.subject_id);
+    if (lessonBanner) lessonBanner.hidden = !active;
+    if (active) {
+      if (lessonTitle) {
+        lessonTitle.textContent = lessonMode.chapter + " · " + lessonMode.topic;
+      }
+      if (lessonSources) {
+        lessonSources.textContent =
+          "Nguồn đã được Admin duyệt: " + lessonMode.source_names.join(", ");
+      }
+    }
+  }
+
+  function clearLessonMode() {
+    lessonMode = null;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("chapter_number");
+    url.searchParams.delete("topic_index");
+    window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+    updateLessonUI();
+    updateChatHeader();
+  }
+
+  async function initLessonMode() {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has("chapter_number")) return;
+    const chat = getCurrentChat();
+    if (!chat) return;
+    const subjectId = params.get("subject_id") || "";
+    const chapterNumber = params.get("chapter_number") || "";
+    const topicIndex = params.get("topic_index") || "0";
+    const query = new URLSearchParams({
+      subject_id: subjectId,
+      chapter_number: chapterNumber,
+      topic_index: topicIndex
+    });
+    try {
+      const detail = await api("/api/chat/lesson-context?" + query.toString());
+      if (Number(detail.subject_id) !== Number(chat.subject_id)) {
+        throw new Error("Bạn đang mở cuộc trò chuyện không đúng môn học.");
+      }
+      lessonMode = detail;
+      updateLessonUI();
+      updateChatHeader();
+      focusInputWithoutScroll();
+    } catch (error) {
+      clearLessonMode();
+      if (lessonBanner) {
+        lessonBanner.hidden = false;
+        if (lessonTitle) lessonTitle.textContent = error.message;
+        if (lessonSources) lessonSources.textContent =
+          "Chưa thể học theo chương. Hãy kiểm tra đề cương và tài liệu Admin duyệt.";
+      }
+    }
+  }
+
+  exitLessonButton?.addEventListener("click", clearLessonMode);
+
 
   async function api(url, options = {}) {
     const response = await fetch(url, options);
@@ -60,6 +127,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (subjectNameEl) {
       subjectNameEl.textContent = `AI Chat · ${chat.title}`;
+    }
+    if (lessonMode && Number(chat.subject_id) === Number(lessonMode.subject_id)) {
+      if (contextStatusEl) {
+        contextStatusEl.textContent = "Đang học · " + lessonMode.chapter +
+          " · " + lessonMode.topic;
+      }
+      if (input) {
+        input.disabled = false;
+        input.placeholder = "Hỏi tiếp về " + lessonMode.topic + "...";
+      }
+      if (sendBtn) sendBtn.disabled = false;
+      updateLessonUI();
+      return;
     }
 
     if (contextStatusEl) {
@@ -175,6 +255,8 @@ document.addEventListener("DOMContentLoaded", () => {
       `;
 
       item.addEventListener("click", async () => {
+        const switchingSubject = getCurrentChat()?.subject_id !== chat.subject_id;
+        if (switchingSubject && lessonMode) clearLessonMode();
         currentChatId = chat.id;
         renderSubjectChats();
         updateChatHeader();
@@ -274,7 +356,13 @@ document.addEventListener("DOMContentLoaded", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           conversation_id: currentChatId,
-          question: text
+          question: text,
+          ...(lessonMode ? {
+            lesson: {
+              chapter_number: lessonMode.chapter_number,
+              topic_index: lessonMode.topic_index
+            }
+          } : {})
         })
       });
 
@@ -350,6 +438,7 @@ document.addEventListener("DOMContentLoaded", () => {
   (async function initChat() {
     try {
       await loadChats();
+      await initLessonMode();
     } catch (error) {
       console.error("Không tải được Chat theo môn:", error);
 
