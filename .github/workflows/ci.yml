@@ -103,6 +103,8 @@ jobs:
           python tests/test_schedule_conflicts.py
           python tests/test_study_session_step631.py
           python tests/test_study_session_tracking.py
+          python tests/test_study_session_quiz_step71.py
+          python -m py_compile study_session_quiz.py
           python -m py_compile study_session_tracking.py study_session_routes.py study_session_chat_context.py
 
       - name: Final roles and manual deadline data-integrity audit
