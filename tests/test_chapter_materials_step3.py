@@ -303,6 +303,27 @@ Thuật toán độ phức tạp Big O cũng có thể áp dụng cho linked lis
             assert "id=\"chatChapterSelect\"" in chat_html
             assert "id=\"chatTopicSelect\"" in chat_html
             assert "chat-mode-panel" in chat_html
+            # Layout refinement: account/logout live at sidebar bottom,
+            # the redundant V2 card is gone, and Chat can occupy viewport top.
+            assert "sidebar-account-card" in chat_html
+            assert "Study Agent V2" not in chat_html
+            assert 'class="user-chip"' not in chat_html
+            assert "css/sidebar_account.css" in chat_html
+            assert 'id="chatLessonSummary"' in chat_html
+            assert 'id="chatChangeChapter"' in chat_html
+            assert "chat-mobile-logout" in chat_html
+            stage3_css = (Path(__file__).resolve().parents[1] /
+                          "static/css/chat_stage3.css").read_text(encoding="utf-8")
+            assert "body.page-chat .topbar" in stage3_css
+            assert "display: none !important" in stage3_css
+            assert "height: 100vh !important" in stage3_css
+            assert "chat-lesson-summary[hidden]" in stage3_css
+            assert "chatLessonSummaryTitle" in js_code
+            assert "chapterEditorOpen" in js_code
+            account_css = (Path(__file__).resolve().parents[1] /
+                           "static/css/sidebar_account.css").read_text(encoding="utf-8")
+            assert ".sidebar-account-card" in account_css
+
             assert "window.ChatMarkdown?.render(message.content)" in js_code
             assert "api/chat/course-outline" in js_code
 
