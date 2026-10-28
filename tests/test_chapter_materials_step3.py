@@ -306,6 +306,14 @@ Thuật toán độ phức tạp Big O cũng có thể áp dụng cho linked lis
             assert "css/chat_stage2.css" in chat_html
             assert 'class="sidebar-course-list"' in chat_html
             assert chat_html.count('class="chat-history-list"') == 1
+            # Stage 6: in Chat AI, other pages compact to five icon shortcuts
+            # while course list is exposed. All links remain accessible.
+            assert 'id="chatNavToggle"' in chat_html
+            assert 'id="chatSidebarNav"' in chat_html
+            assert 'aria-expanded="false"' in chat_html
+            assert 'chat-nav-primary' in chat_html
+            assert chat_html.count('chat-nav-secondary') == 5
+            assert 'Đang tải danh sách môn học...' in chat_html
             assert 'class="soft-card chat-history-panel"' not in chat_html
             assert 'id="chatMobileSubject"' in chat_html
             ui_css = (Path(__file__).resolve().parents[1] /
@@ -319,6 +327,13 @@ Thuật toán độ phức tạp Big O cũng có thể áp dụng cho linked lis
             assert "rememberSelectedSubject(chat.subject_id)" in js_code
             assert "if (Number(currentChatId) !== Number(chatId)) return;" in js_code
             assert "mobileSubjectPicker" in js_code
+            assert 'sidebarNav?.classList.toggle("is-expanded", expanded)' in js_code
+            assert 'navToggle.setAttribute("aria-expanded", String(expanded))' in js_code
+            assert 'historyList.classList.add("chat-courses-ready")' in js_code
+            assert '.side-nav:not(.is-expanded) a.chat-nav-secondary' in ui_css
+            assert 'chat-sidebar-shortcuts-collapse' in ui_css
+            assert 'chat-sidebar-course-reveal' in ui_css
+            assert 'body.page-chat .side-nav .chat-nav-toggle { display: none; }' in ui_css
             # Stage 3+: 2 modes and real course/chapter selector, no
             # duplicate chatbot or fake syllabus values in the UI.
             assert "css/chat_stage3.css" in chat_html
