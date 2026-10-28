@@ -32,17 +32,22 @@
       </span>
     </a>
 
-    <nav class="side-nav" aria-label="Điều hướng chính">
+    <nav class="side-nav" id="chatSidebarNav" aria-label="Điều hướng chính">
       {% if page == 'admin' %}
       <a href="{{ url_for('admin_dashboard') }}" class="{{ 'active' if admin_view != 'documents' else '' }}"><span>▱</span><b>Quản lý môn học</b></a>
       <a href="{{ url_for('admin_shared_documents') }}" class="{{ 'active' if admin_view == 'documents' else '' }}"><span>▤</span><b>Tài liệu dùng chung</b></a>
       {% else %}
-      <a class="{{ 'active' if page=='dashboard' else '' }}" href="{{ url_for('dashboard') }}"><span>⌂</span><b>Tổng quan</b></a>
-      <a class="{{ 'active' if page=='subjects' else '' }}" href="{{ url_for('subjects') }}"><span>▱</span><b>Môn học</b></a>
-      <a class="{{ 'active' if page=='documents' else '' }}" href="{{ url_for('documents') }}"><span>▤</span><b>Tài liệu</b></a>
-      <a class="{{ 'active' if page=='quiz' else '' }}" href="{{ url_for('quiz') }}"><span>?</span><b>Quiz</b></a>
-      <a class="{{ 'active' if page=='study_plan' else '' }}" href="{{ url_for('study_plan') }}"><span>▦</span><b>Kế hoạch học</b></a>
-      <a class="{{ 'active' if page=='chat' else '' }}" href="{{ url_for('chat') }}"><span>◯</span><b>Chat AI</b></a>
+      <a class="{{ 'active' if page=='dashboard' else '' }}{{ ' chat-nav-secondary' if page == 'chat' else '' }}" href="{{ url_for('dashboard') }}" title="Tổng quan"><span>⌂</span><b>Tổng quan</b></a>
+      <a class="{{ 'active' if page=='subjects' else '' }}{{ ' chat-nav-secondary' if page == 'chat' else '' }}" href="{{ url_for('subjects') }}" title="Môn học"><span>▱</span><b>Môn học</b></a>
+      <a class="{{ 'active' if page=='documents' else '' }}{{ ' chat-nav-secondary' if page == 'chat' else '' }}" href="{{ url_for('documents') }}" title="Tài liệu"><span>▤</span><b>Tài liệu</b></a>
+      <a class="{{ 'active' if page=='quiz' else '' }}{{ ' chat-nav-secondary' if page == 'chat' else '' }}" href="{{ url_for('quiz') }}" title="Quiz"><span>?</span><b>Quiz</b></a>
+      <a class="{{ 'active' if page=='study_plan' else '' }}{{ ' chat-nav-secondary' if page == 'chat' else '' }}" href="{{ url_for('study_plan') }}" title="Kế hoạch học"><span>▦</span><b>Kế hoạch học</b></a>
+      <a class="{{ 'active' if page=='chat' else '' }}{{ ' chat-nav-primary' if page == 'chat' else '' }}" href="{{ url_for('chat') }}"><span>◯</span><b>Chat AI</b></a>
+      {% if page == 'chat' %}
+      <button type="button" id="chatNavToggle" class="chat-nav-toggle" aria-controls="chatSidebarNav" aria-expanded="false">
+        <span class="chat-nav-toggle-arrow" aria-hidden="true">⌄</span><span class="chat-nav-toggle-label">Hiện đầy đủ chức năng</span>
+      </button>
+      {% endif %}
       {% endif %}
     </nav>
 
@@ -52,7 +57,7 @@
         <strong>Danh sách môn học</strong>
         <a href="{{ url_for('subjects') }}" title="Thêm môn học" aria-label="Thêm môn học">＋</a>
       </div>
-      <div class="chat-history-list" aria-live="polite"></div>
+      <div class="chat-history-list" aria-live="polite"><p class="chat-subject-loading" role="status">Đang tải danh sách môn học...</p></div>
     </section>
     {% endif %}
 
