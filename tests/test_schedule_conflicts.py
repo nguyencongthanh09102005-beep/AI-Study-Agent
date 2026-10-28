@@ -23,8 +23,9 @@ def verify_logic():
     assert set(collisions) == {1, 2}
     assert collisions[1]["with_ids"] == [2]
     # 19:30-20:15 blocks 19:00-19:45; allow a break until 20:30.
-    assert collisions[1]["suggested_at"] == "2026-11-02T20:30"
-    assert collisions[2]["suggested_at"] == "2026-11-02T20:00"
+    # A third lesson (20:15-21:00) also blocks the first suggested gap.
+    assert collisions[1]["suggested_at"] == "2026-11-02T21:15"
+    assert collisions[2]["suggested_at"] == "2026-11-02T21:15"
     assert not find_study_conflicts([_row(1, "2026-11-02T19:00"),
                                      _row(2, "2026-11-02T19:45")])
     # Midnight crossing, not just matching the YYYY-MM-DD substring.
@@ -78,6 +79,9 @@ def verify_web():
             assert "2 buổi học đang trùng giờ" in body
             assert 'data-task-conflict="1"' in body
             assert "20:30" in body
+            assert "Gợi ý giờ trống" in body
+            assert 'id="taskScheduleWarning"' in body
+            assert 'id="suggestTimeButton"' in body
             assert "study_schedule_conflicts.css" in body
             assert "Kiểm tra 3" not in body
             # The edit endpoint remains user-controlled; detect, don't auto-shift.

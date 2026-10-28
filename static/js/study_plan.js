@@ -16,6 +16,71 @@ document.addEventListener("DOMContentLoaded", () => {
   const taskDuration = document.getElementById("taskDuration");
   const taskNote = document.getElementById("taskNote");
 
+  // Conflict preview for create/edit/move; data is read from the current page.
+  // Never modifies tasks unless the student chooses to save the form.
+  const conflictNotice = document.getElementById("taskScheduleWarning");
+  const conflictText = document.getElementById("taskScheduleWarningText");
+  const suggestButton = document.getElementById("suggestTimeButton");
+  function inspectTime() {
+    const at = new Date(taskStudyAt?.value || "");
+    const dur = Number(taskDuration?.value);
+    if (!Number.isFinite(at.getTime()) || !Number.isFinite(dur) || dur < 1)
+      return { conflicts: [], suggestion: "" };
+    const currentId = /\/tasks\/(\d+)\/update$/.exec(taskForm?.action || "")?.[1] || "";
+    const all = [...document.querySelectorAll(".schedule-item-new[data-task-datetime]")]
+      .map((el) => ({
+        id: el.dataset.taskId,
+        title: el.dataset.taskTitle || "Buổi học",
+        start: new Date(el.dataset.taskDatetime).getTime(),
+        duration: Number(el.dataset.taskDuration || 45)
+      }))
+      .filter((x) => x.id !== currentId && Number.isFinite(x.start) && x.duration > 0)
+      .map((x) => ({...x, end: x.start + x.duration * 60000}));
+    const begin = at.getTime(), end = begin + dur * 60000;
+    const conflicts = all.filter((x) => begin < x.end && x.start < end);
+    if (!conflicts.length) return {conflicts, suggestion: ""};
+    let candidate = begin, suggestion = "";
+    const tomorrow = new Date(at.getFullYear(), at.getMonth(), at.getDate() + 1).getTime();
+    for (let n = 0; n < 200 && candidate + dur * 60000 <= tomorrow; n++) {
+      const colliding = all.filter((x) => candidate < x.end && x.start < candidate + dur * 60000);
+      if (!colliding.length) {
+        const d = new Date(candidate), pad = x => String(x).padStart(2, "0");
+        suggestion = d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" +
+          pad(d.getDate()) + "T" + pad(d.getHours()) + ":" + pad(d.getMinutes());
+        break;
+      }
+      candidate = Math.ceil((Math.max(...colliding.map(x => x.end)) + 900000) / 900000) * 900000;
+    }
+    return {conflicts, suggestion};
+  }
+  function showConflictNotice() {
+    if (!conflictNotice || !conflictText || !suggestButton) return;
+    const {conflicts, suggestion} = inspectTime();
+    conflictNotice.hidden = conflicts.length === 0;
+    suggestButton.hidden = !suggestion;
+    suggestButton.dataset.value = suggestion;
+    if (conflicts.length) {
+      conflictText.textContent = "⚠ Giờ này trùng với " + conflicts.length +
+        " buổi: " + conflicts.slice(0,3).map(x => x.title).join(", ") +
+        ". Bạn có thể đổi giờ hoặc giữ giờ hiện tại nếu cố ý.";
+      if (suggestion) suggestButton.textContent = "Chọn giờ trống gợi ý: " + suggestion.slice(11);
+    }
+  }
+  taskStudyAt?.addEventListener("input", showConflictNotice);
+  taskDuration?.addEventListener("input", showConflictNotice);
+  suggestButton?.addEventListener("click", () => {
+    if (!suggestButton.dataset.value) return;
+    taskStudyAt.value = suggestButton.dataset.value;
+    showConflictNotice();
+    taskStudyAt.focus();
+  });
+  taskForm?.addEventListener("submit", (event) => {
+    const {conflicts} = inspectTime();
+    if (conflicts.length && !window.confirm("Có " + conflicts.length +
+      " buổi bị trùng giờ. Bạn có chắc muốn giữ khung giờ này?")) event.preventDefault();
+  });
+
+
   const reminderModal = document.getElementById("reminderModal");
   const reminderForm = document.getElementById("reminderForm");
   const reminderTitle = document.getElementById("reminderTitle");
@@ -105,6 +170,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     taskStudyAt.value = localDateTimeValue(date);
+    showConflictNotice();
     openModal(taskModal);
   });
 
@@ -118,6 +184,7 @@ document.addEventListener("DOMContentLoaded", () => {
       taskStudyAt.value = button.dataset.studyAt || "";
       taskDuration.value = button.dataset.duration || "45";
       taskNote.value = button.dataset.note || "";
+      showConflictNotice();
       openModal(taskModal);
     });
   });
@@ -303,6 +370,10 @@ document.addEventListener("DOMContentLoaded", () => {
           button.appendChild(makeDiv("study-hour-event-subject", subject));
           button.appendChild(makeDiv("study-hour-event-title", title));
           if (item.dataset.taskSource === "roadmap") button.appendChild(makeDiv("study-hour-event-tag", "Từ lộ trình"));
+          if (item.dataset.taskConflict === "1") {
+            button.classList.add("conflict");
+            button.appendChild(makeDiv("study-hour-event-conflict", "⚠ Trùng giờ · chọn để đổi lịch"));
+          }
           if (item.dataset.taskDone === "1") button.appendChild(makeDiv("study-hour-event-tag", "Đã hoàn thành"));
           button.setAttribute("aria-label", timeText + ", " + subject + ", " + title + ". Mở lịch ngày.");
           cell.appendChild(button);
@@ -563,6 +634,7 @@ document.addEventListener("DOMContentLoaded", () => {
       studyAt.value = button.dataset.studyAt || "";
       duration.value = button.dataset.duration || "45";
       note.value = button.dataset.note || "";
+      showConflictNotice();
 
       modal.classList.add("show");
       modal.setAttribute("aria-hidden", "false");

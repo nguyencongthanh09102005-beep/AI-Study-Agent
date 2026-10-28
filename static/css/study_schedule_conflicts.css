@@ -1,0 +1,16 @@
+/* Phase 6.2.2: user-controlled rescheduling. No automatic edits. */
+.page-study_plan .study-conflict-banner {margin:0 0 15px;padding:14px 16px;background:#fff7e9;border:1px solid #ecc28d;border-radius:13px;color:#6f4a1d}
+.page-study_plan .study-conflict-banner strong {font-size:14px;font-weight:800}
+.page-study_plan .study-conflict-banner p {margin:6px 0 0;font-size:12px;line-height:1.6}
+.page-study_plan .study-hour-event.conflict {border-color:#e5ae66;background:#fff1df;color:#68411e}
+.page-study_plan .study-hour-event-conflict {font-size:10px;font-weight:800;color:#a55e13}
+.page-study_plan .study-hour-event.conflict:hover,.page-study_plan .study-hour-event.conflict:focus-visible {background:#ffe8c5;outline:2px solid #ba8139;outline-offset:1px}
+.page-study_plan .schedule-item-new.study-task-conflict {border-color:#e8bd84;background:#fff8ee}
+.page-study_plan .study-conflict-inline {display:block;margin-top:7px;font-size:11px;font-weight:800;color:#915912}
+.page-study_plan .study-conflict-suggest {display:inline-flex;margin-top:7px;border:1px solid #e2b880;background:#fff2d8;border-radius:9px;padding:8px 10px;font-size:11px;font-weight:800;color:#795016;cursor:pointer;text-align:left}
+.page-study_plan .study-conflict-suggest:hover {background:#ffe7b8}
+.page-study_plan .study-conflict-suggest:focus-visible {outline:2px solid #aa712c;outline-offset:2px}
+.page-study_plan #taskScheduleWarning[hidden],.page-study_plan #suggestTimeButton[hidden] {display:none!important}
+.page-study_plan #taskScheduleWarning {border:1px solid #eac08c;background:#fff5e5;border-radius:11px;padding:12px;color:#7b4d1d}
+.page-study_plan #taskScheduleWarning p {margin:0;font-size:12px;line-height:1.6}
+.page-study_plan #suggestTimeButton {margin-top:9px;border-radius:9px;border:1px solid #dbac6a;background:#ffebc9;color:#71491a;padding:8px 11px;font-size:11px;font-weight:800;cursor:pointer}
