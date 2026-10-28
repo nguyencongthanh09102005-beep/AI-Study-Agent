@@ -36,6 +36,27 @@
   {% else %}
     <p class="session-quiz-description warning">{{ session_quiz_context.reason }} Không thể tạo Quiz có căn cứ theo buổi khi chưa có nguồn hợp lệ.</p>
   {% endif %}
+
+  {% if session_quiz_status and session_quiz_status.quiz_id %}
+    <div class="session-quiz-launch">
+      <strong>{{ session_quiz_status.count }} câu đã chuẩn bị sẵn</strong>
+      {% if session_quiz_status.allowed %}
+        <p>Quiz đang được mở. Chọn bài trong danh sách bên dưới để làm và nộp kết quả.</p>
+        <a href="#quiz-work-{{ session_quiz_status.quiz_id }}" class="session-quiz-back">↓ Đến bài kiểm tra</a>
+      {% elif session_quiz_status.can_start %}
+        <p>Đã đến khung giờ kiểm tra. Hãy bắt đầu để mở câu hỏi.</p>
+        <form method="post" action="{{ url_for('session_quiz.open_quiz', quiz_id=session_quiz_status.quiz_id) }}">
+          <input type="hidden" name="csrf_token" value="{{ session_quiz_csrf }}">
+          <button type="submit" class="quiz-create-submit">▶ Bắt đầu Quiz {{ session_quiz_status.count }} câu</button>
+        </form>
+      {% else %}
+        <p>🔒 {{ session_quiz_status.reason }}</p>
+        <p>Giờ hiện tại trong Kế hoạch học: {{ session_quiz_status.study_at }} – {{ session_quiz_status.ends_at }}. Nếu bạn dời lịch trước khi bắt đầu, giờ mở khóa sẽ tự cập nhật.</p>
+      {% endif %}
+    </div>
+  {% else %}
+    <p class="session-quiz-description">Chưa chuẩn bị xong Quiz của buổi này. Mở Lộ trình theo chương để bắt đầu/tiếp tục chuẩn bị trước.</p>
+  {% endif %}
   <a href="{{ url_for('study_session.learning_session', task_id=session_quiz_context.task_id) }}" class="session-quiz-back">← Quay lại Không gian học tập</a>
 </section>
 {% endif %}

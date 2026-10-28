@@ -68,6 +68,8 @@ def learning_path(subject_id):
         ensure_syllabus_schema(conn)
         ensure_roadmap_schema(conn)
         ensure_session_schedule_schema(conn)
+        if not session.get("session_quiz_csrf"):
+            session["session_quiz_csrf"] = secrets.token_hex(24)
         token = session.get("syllabus_csrf_token")
         if not token:
             token = secrets.token_hex(24)
@@ -148,7 +150,7 @@ def learning_path(subject_id):
                     )
                 return redirect(url_for(
                     "course_path.learning_path", subject_id=subject_id,
-                    notice=message,
+                    notice=message, prepare_quizzes=1,
                 ), code=303)
             if action != "generate":
                 return "Thao tác không hợp lệ.", 400
@@ -245,6 +247,8 @@ def learning_path(subject_id):
             schedule_status=schedule_status,
             stale=bool(plan_row and not fresh),
             notice=request.args.get("notice", "")[:400], csrf_token=token,
+            prepare_quizzes=request.args.get("prepare_quizzes") == "1",
+            session_quiz_csrf=session.get("session_quiz_csrf", ""),
         )
     finally:
         conn.close()

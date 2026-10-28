@@ -1,5 +1,8 @@
 {% extends 'base.html' %}
 {% block title %}Lộ trình theo chương · {{ subject.name }}{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/quiz_preparation.js') }}"></script>
+{% endblock %}
 {% block page_title %}Lộ trình học theo đề cương{% endblock %}
 {% block page_desc %}Học theo từng chương, tiểu mục và nguồn tài liệu của đúng môn học{% endblock %}
 {% block content %}
@@ -34,6 +37,18 @@
         </form>
         <a href="{{ url_for('study_plan', subject_id=subject.id) }}" style="display:inline-block;margin-left:12px;color:#415bc6;font-weight:700">Xem Kế hoạch học →</a>
       </div>
+      {% if schedule_status %}
+      <section id="quizPreparation" data-subject-id="{{ subject.id }}"
+               data-csrf="{{ session_quiz_csrf }}"
+               data-auto="{{ '1' if prepare_quizzes else '0' }}"
+               style="margin:14px 0;padding:17px;border:1px solid #cddbf5;background:#f4f7ff;border-radius:14px">
+        <strong style="color:#283f7a">📝 Chuẩn bị sẵn Quiz theo lịch học</strong>
+        <p style="font-size:12px;color:#5e7198;line-height:1.65">Các buổi thường: 15 câu; buổi cuối: 60 câu tổng hợp từ những buổi trước. Tạo theo từng bước, lưu tiến độ, không đợi đến giờ học. Cần học liệu chung đúng chương đã được Admin duyệt và đọc được.</p>
+        <p id="quizPreparationStatus" role="status" style="font-size:13px;font-weight:750;color:#496396">Đang kiểm tra trạng thái...</p>
+        <button type="button" id="quizPreparationStart" class="soft-primary">✦ Chuẩn bị / Tiếp tục tạo Quiz</button>
+        <button type="button" id="quizPreparationStop" hidden style="border:1px solid #ccd7f4;background:#fff;padding:10px;border-radius:9px">Tạm dừng chuẩn bị</button>
+      </section>
+      {% endif %}
       {% for lesson in sessions %}
       <article style="background:#f6f8fe;border:1px solid #e1e8f4;border-radius:14px;padding:20px;margin:15px 0">
         <div style="display:flex;gap:12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap">
@@ -71,11 +86,11 @@
         {% if lesson.clo_refs %}<p style="font-size:13px;color:#5c6f90">CLO được nhắc trong chương: {{ lesson.clo_refs|join(', ') }}</p>{% else %}<p style="font-size:12px;color:#8490a8">Chưa xác định ánh xạ CLO trực tiếp cho buổi này.</p>{% endif %}
         {% if lesson.quiz %}
           <div style="margin-top:14px;border-top:1px solid #e2e7f1;padding-top:12px">
-            <strong style="color:#314a81">📝 Điểm kiểm tra cuối chương: {{ lesson.quiz.recommended_questions }} câu</strong>
+            <strong style="color:#314a81">📝 Thông tin kiểm tra theo đề cương: {{ lesson.quiz.recommended_questions }} câu (tham khảo)</strong>
             <p style="margin:6px 0;color:#647897;font-size:13px">Phạm vi: {{ lesson.quiz.scope }}. {{ 'Số câu lấy từ đề cương.' if lesson.quiz.question_count_from_syllabus else 'Số câu gợi ý do hệ thống đặt.' }}</p>
             {% if lesson.quiz.description %}<p style="margin:6px 0;font-size:13px;color:#485d87"><strong>Mô tả kiểm tra trong đề cương:</strong> {{ lesson.quiz.description|join('; ') }}</p>{% endif %}
             {% if lesson.quiz.passing_criteria %}<p style="margin:6px 0;font-size:13px;color:#485d87"><strong>Tiêu chí chuyển tiếp trong đề cương (tham khảo):</strong> {{ lesson.quiz.passing_criteria|join('; ') }}</p>{% endif %}
-            <p style="margin:6px 0;color:#647897;font-size:13px">Chức năng Quiz theo chương và đánh giá năng lực sẽ được kết nối ở bước tiếp theo; hiện chưa có nút làm Quiz để tránh kiểm tra sai phạm vi.</p>
+            <p style="margin:6px 0;color:#647897;font-size:13px">Quiz theo buổi dùng quy tắc 15 câu mỗi buổi, 60 câu tổng hợp ở buổi cuối. Số câu gợi ý trong đề cương chỉ để tham khảo.</p>
           </div>
         {% endif %}
       </article>
