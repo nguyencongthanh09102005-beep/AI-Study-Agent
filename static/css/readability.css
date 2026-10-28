@@ -197,3 +197,30 @@ body.mock-auth-page .auth-divider {
 body.mock-auth-page .auth-tabs button:not(.active) {
   color: #455b87;
 }
+
+/* Progressive enhancement for the full-page links shown in the recording.
+   Same-origin navigation cross-fades using compositor opacity only; page
+   navigation and accessibility remain functional without API support. */
+@view-transition {
+  navigation: auto;
+}
+::view-transition-old(root) {
+  animation: 90ms ease-in both study-page-fade-out;
+}
+::view-transition-new(root) {
+  animation: 150ms ease-out both study-page-fade-in;
+}
+@keyframes study-page-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes study-page-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  @view-transition { navigation: none; }
+  ::view-transition-old(root), ::view-transition-new(root) {
+    animation: none !important;
+  }
+}
