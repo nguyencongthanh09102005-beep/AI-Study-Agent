@@ -169,6 +169,10 @@ def learning_session(task_id):
         if not study_csrf:
             study_csrf = secrets.token_hex(24)
             session["study_session_csrf"] = study_csrf
+        from study_session_quiz_runtime import per_lesson_quiz_status
+        quiz_status = per_lesson_quiz_status(conn, project, uid, task_id)
+        if not session.get("session_quiz_csrf"):
+            session["session_quiz_csrf"] = secrets.token_hex(24)
         start_text, end_text = _schedule_display(task["study_at"], task["duration"])
         return render_template(
             "study_session.html", page="study_plan",
@@ -176,6 +180,7 @@ def learning_session(task_id):
             syllabus_name=syllabus_name, private_docs=private_docs,
             shared_docs=shared_docs, start_text=start_text, end_text=end_text,
             chat_ready=chat_ready, study_state=study_state, study_csrf=study_csrf,
+            quiz_status=quiz_status, quiz_csrf=session["session_quiz_csrf"],
         )
     finally:
         conn.close()
