@@ -178,7 +178,11 @@
     return sections.map(part => {
       const code = part.match(/^```[^\n]*\n([\s\S]*?)^```\s*$/m);
       if (code) {
-        return "<pre><code>" + escapeHtml(code[1]).replace(/\n$/, "") + "</code></pre>";
+        const label = part.split("\n")[0].slice(3).trim().toLowerCase();
+        const language = /^[a-z0-9+#._-]{1,24}$/.test(label) ? label : "";
+        return '<div class="chat-code-wrap"><div class="chat-code-title">' +
+          escapeHtml(language || "Code") + '</div><pre><code>' +
+          escapeHtml(code[1]).replace(/\n$/, "") + '</code></pre></div>';
       }
       return prose(part);
     }).join("");
