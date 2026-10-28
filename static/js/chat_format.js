@@ -23,8 +23,27 @@
         // Keep the source expression visible when a symbol is unsupported.
       }
     }
-    const fallback = display ? "\\[" + tex + "\\]" : "\\(" + tex + "\\)";
-    return '<span class="chat-formula-fallback">' + escapeHtml(fallback) + "</span>";
+    // Lightweight local fallback: support common math even without KaTeX.
+    // Everything is escaped before adding our own fixed safe markup.
+    let content = escapeHtml(tex);
+    content = content.replace(/\\frac\{([^{}]+)\}\{([^{}]+)\}/g,
+      (_m, top, bottom) => '<span class="chat-math-fraction"><span>' +
+        top + '</span><span>' + bottom + '</span></span>');
+    content = content.replace(/\\sqrt\{([^{}]+)\}/g,
+      (_m, inner) => '√<span class="chat-math-root">' + inner + '</span>');
+    const symbols = {
+      alpha: "α", beta: "β", gamma: "γ", delta: "δ", theta: "θ",
+      lambda: "λ", pi: "π", sigma: "σ", sum: "∑", prod: "∏",
+      infty: "∞", times: "×", cdot: "·", leq: "≤", geq: "≥",
+      neq: "≠", approx: "≈", rightarrow: "→", to: "→", in: "∈"
+    };
+    content = content.replace(/\\([A-Za-z]+)\b/g, (_m, name) =>
+      symbols[name] || "\\" + name);
+    content = content.replace(/\^\{([^{}]{1,32})\}/g, "<sup>$1</sup>")
+      .replace(/\^([a-zA-Z0-9+-])/g, "<sup>$1</sup>")
+      .replace(/_\{([^{}]{1,32})\}/g, "<sub>$1</sub>")
+      .replace(/_([a-zA-Z0-9])/g, "<sub>$1</sub>");
+    return '<span class="chat-formula-fallback">' + content + "</span>";
   }
 
   function inline(value) {
