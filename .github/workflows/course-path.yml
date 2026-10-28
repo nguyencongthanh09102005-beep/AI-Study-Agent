@@ -22,7 +22,7 @@ jobs:
           pip install -r requirements.txt
       - name: Validate parser, routes and schemas
         run: |
-          python -m py_compile app.py syllabus_learning.py syllabus_routes.py course_path_learning.py course_path_routes.py chapter_material_routes.py ai_chapter_suggestions.py chapter_tutor.py
+          python -m py_compile app.py syllabus_learning.py syllabus_routes.py course_path_learning.py course_path_routes.py chapter_material_routes.py ai_chapter_suggestions.py chapter_tutor.py chapter_chat_context.py
           python tests/test_syllabus_step1.py
           python tests/test_course_path_step2.py
           python tests/test_chapter_materials_step3.py
