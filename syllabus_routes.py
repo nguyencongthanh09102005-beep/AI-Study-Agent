@@ -5,8 +5,9 @@ This first stage does not replace or silently modify the old study planner.
 import json
 import os
 import secrets
+import sys
 
-from flask import Blueprint, render_template, request, redirect, url_for, session
+from flask import Blueprint, current_app, render_template, request, redirect, url_for, session
 from werkzeug.utils import secure_filename
 
 from syllabus_learning import extract_syllabus_units, syllabus_hash, syllabus_llm_prompt
@@ -52,8 +53,8 @@ def _back(subject_id, **kwargs):
 
 @syllabus_bp.route("/subjects/<int:subject_id>/syllabus", methods=["GET", "POST"])
 def review(subject_id):
-    # Lazy import avoids a circular import with the existing large Flask app.
-    import app as project
+    # Resolve the actual running app even when launched as python app.py.
+    project = sys.modules[current_app.import_name]
 
     uid = session.get("user_id")
     if not uid:
