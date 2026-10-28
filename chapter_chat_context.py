@@ -11,6 +11,7 @@ from chapter_material_routes import (
     official_syllabus,
 )
 from chapter_tutor import prepared_sources
+from chat_lesson_memory import approved_source_signature
 from course_path_learning import parse_chapter_details
 from syllabus_learning import syllabus_hash
 from syllabus_routes import _source, ensure_syllabus_schema
@@ -146,5 +147,6 @@ def resolve_lesson_context(project, conn, uid, subject_id, chapter_number, topic
         "topic_index": topic_index,
         "topic": topics[topic_index] if topics else section["chapter"],
         "source_name": source_name,
+        "source_signature": approved_source_signature(fingerprint, sources),
         "sources": sources,
     }
