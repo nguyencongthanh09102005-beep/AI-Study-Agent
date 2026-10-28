@@ -37,6 +37,7 @@
       <button type="submit" class="soft-primary">🤖 Phân tích chương/bài từ đề cương</button>
     </form>
     {% if is_stale %}<p role="alert" style="color:#a02b3a">Đề cương đã thay đổi. Kết quả trước không còn hiệu lực; hãy phân tích lại.</p>{% endif %}
+    {% if review_status == 'confirmed' %}<p><a class="soft-primary" href="{{ url_for('course_path.learning_path', subject_id=subject.id) }}">📚 Xem / tạo lộ trình theo từng chương →</a></p>{% endif %}
     {% if units %}
       <h3 style="color:#304777">Danh sách chương/bài · {{ 'Đã xác nhận' if review_status == 'confirmed' else 'Chờ xác nhận' }}</h3>
       <p style="color:#647597">Các dòng phải có bằng chứng trong đề cương. Có thể sửa tên hiển thị hoặc bỏ mục nhận diện sai.</p>
