@@ -255,7 +255,8 @@ Quiz Chương 2: 10 câu lý thuyết.
             ]
             chapter_two = next(x for x in sessions if x["unit_id"] == 2)
             assert chapter_two["topics"][0] == "2.1. Danh sách liên kết đơn"
-            assert chapter_two["quiz"]["available"] is False
+            last_chapter_two = [x for x in sessions if x["unit_id"] == 2][-1]
+            assert last_chapter_two["quiz"]["available"] is False
             # Personal notes must never be mislabeled as Admin-approved.
             assert any(x["name"] == "Slide Danh sách liên kết"
                        and x["kind"] == "personal"
