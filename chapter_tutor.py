@@ -129,7 +129,7 @@ def make_tutor_prompt(subject, chapter, topic, question, sources, history="", pr
         '{"explanation":"giải thích bằng tiếng Việt",'
         '"citations":[{"source_key":"T1","quote":"trích nguyên văn từ T1"}],'
         '"practice":"một câu hỏi hoặc bài tập tự luyện dựa trên nguồn"}.\n\n'
-        FORMAT_POLICY + "\n\n" +
+        + FORMAT_POLICY + "\n\n" +
         "MÔN HỌC: " + subject[:180] + "\n"
         "CHƯƠNG ĐÃ XÁC NHẬN: " + chapter[:240] + "\n"
         "CÁC TIỂU MỤC THEO ĐỀ CƯƠNG (không phải những tiểu mục "
