@@ -385,6 +385,12 @@ body.page-chat .side-nav .chat-nav-toggle { display: none; }
     transition: flex-basis 230ms ease, padding 230ms ease,
                 background-color 180ms ease, transform 180ms ease !important;
   }
+  body.page-chat .side-nav:not(.is-expanded) a.chat-nav-secondary {
+    animation: chat-sidebar-shortcuts-collapse 330ms ease-out both;
+  }
+  body.page-chat .side-nav:not(.is-expanded) a.chat-nav-secondary b {
+    animation: chat-sidebar-label-collapse 280ms ease-out both;
+  }
   body.page-chat .side-nav a.chat-nav-secondary:hover {
     background: #dee8ff !important;
   }
@@ -429,6 +435,14 @@ body.page-chat .side-nav .chat-nav-toggle { display: none; }
     line-height: 1.6;
   }
 }
+@keyframes chat-sidebar-shortcuts-collapse {
+  from { flex-basis: 100%; opacity: .75; }
+  to { flex-basis: calc((100% - 24px) / 5); opacity: 1; }
+}
+@keyframes chat-sidebar-label-collapse {
+  from { max-width: 190px; opacity: 1; }
+  to { max-width: 0; opacity: 0; }
+}
 @keyframes chat-sidebar-course-reveal {
   from { opacity: .45; transform: translateY(7px); }
   to { opacity: 1; transform: translateY(0); }
@@ -438,6 +452,7 @@ body.page-chat .side-nav .chat-nav-toggle { display: none; }
   body.page-chat .side-nav a.chat-nav-secondary,
   body.page-chat .side-nav a.chat-nav-secondary b {
     transition: none !important;
+    animation: none !important;
   }
   body.page-chat .sidebar-course-list .chat-history-list.chat-courses-ready {
     animation: none !important;
