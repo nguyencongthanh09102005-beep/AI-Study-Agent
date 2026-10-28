@@ -24,6 +24,8 @@ assert.doesNotMatch(literalCode, /<strong>đừng định dạng<\/strong>/);
 
 const codeBlock = render(ticks.repeat(3) + "js\nconst a = '<script>';\n" +
   ticks.repeat(3));
+assert.match(codeBlock, /chat-code-title/);
+assert.match(codeBlock, />js<\/div>/);
 assert.match(codeBlock, /<pre><code>/);
 assert.match(codeBlock, /&lt;script&gt;/);
 assert.doesNotMatch(codeBlock, /<script>/);
