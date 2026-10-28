@@ -56,42 +56,28 @@
     {% endfor %}
   {% endif %}
   <section style="margin:24px 0;padding:20px;background:#f0f4ff;border:1px solid #dce5f7;border-radius:15px">
-    <h3 style="color:#293f75;margin-top:0">🤖 AI giảng bài theo chương</h3>
-    <p style="color:#5b7096;font-size:14px;line-height:1.7">Chọn tiểu mục và hỏi AI. Hệ thống chỉ gửi học liệu chung <strong>đã được Admin xác nhận cho đúng chương này</strong>, rồi kiểm tra câu trích dẫn do AI trả về. Đây là trợ giảng theo nguồn, không phải Chat AI hỏi đáp chung.</p>
-    <form method="post" action="{{ url_for('chapter_material.student_chapter', subject_id=subject.id, chapter_number=chapter_number) }}">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-      <input type="hidden" name="action" value="teach">
+    <h3 style="color:#293f75;margin-top:0">🤖 Học cùng AI trong Chat AI</h3>
+    <p style="color:#5b7096;font-size:14px;line-height:1.7">
+      Chọn tiểu mục rồi mở Chat AI để học và hỏi đáp liên tục. Chat AI sử dụng lịch sử của đúng môn,
+      nhưng khi học theo chương chỉ tham chiếu <strong>học liệu đã được Admin duyệt cho chương này</strong>.
+      Không tạo một cuộc trò chuyện AI thứ hai.
+    </p>
+    <form method="get" action="{{ url_for('chat') }}">
+      <input type="hidden" name="subject_id" value="{{ subject.id }}">
+      <input type="hidden" name="chapter_number" value="{{ chapter_number }}">
       <label for="topic_index" style="display:block;font-weight:700;color:#344b7c;margin:10px 0 6px">Tiểu mục muốn học</label>
       <select id="topic_index" name="topic_index" style="width:100%;max-width:680px;border:1px solid #ccd8f1;padding:12px;border-radius:10px;background:white;color:#314674">
         {% if chapter.topics %}
           {% for topic in chapter.topics %}
-            <option value="{{ loop.index0 }}" {% if loop.index0 == selected_topic_index %}selected{% endif %}>{{ topic }}</option>
+            <option value="{{ loop.index0 }}">{{ topic }}</option>
           {% endfor %}
-        {% else %}<option value="0">{{ chapter.chapter }}</option>{% endif %}
+        {% else %}
+          <option value="0">{{ chapter.chapter }}</option>
+        {% endif %}
       </select>
-      <label for="study_question" style="display:block;font-weight:700;color:#344b7c;margin:14px 0 6px">Câu hỏi của bạn (có thể để trống để AI giảng từ đầu)</label>
-      <textarea id="study_question" name="question" maxlength="500" rows="3" placeholder="Ví dụ: Phân biệt mảng và danh sách liên kết, cho một ví dụ thực tế." style="width:100%;box-sizing:border-box;border:1px solid #ccd8f1;padding:12px;border-radius:10px;background:white;color:#314674;font:inherit">{{ question }}</textarea>
-      <button type="submit" class="soft-primary" style="margin-top:12px" {% if not materials %}disabled title="Cần học liệu chung đã được Admin duyệt"{% endif %}>🤖 AI giảng bài theo tiểu mục</button>
-      {% if not materials %}<p style="color:#96611d;font-size:13px">Chưa có học liệu đã duyệt cho chương; chưa thể gọi AI giảng bài theo nguồn.</p>{% endif %}
+      <button type="submit" class="soft-primary" style="margin-top:12px" {% if not materials %}disabled title="Cần học liệu chung đã được Admin duyệt"{% endif %}>💬 Học cùng AI trong Chat AI →</button>
+      {% if not materials %}<p style="color:#96611d;font-size:13px">Chưa có học liệu chung đã duyệt, nên chưa thể mở chế độ giảng bài có nguồn. Chat AI thông thường vẫn dùng được từ thanh menu.</p>{% endif %}
     </form>
-    {% if tutor_error %}
-      <p role="alert" style="background:#fff2e8;color:#924f25;padding:13px;border-radius:10px;margin-top:14px">{{ tutor_error }}</p>
-    {% endif %}
-    {% if tutor_answer %}
-      <article style="background:white;border:1px solid #d9e4f6;border-radius:12px;padding:17px;margin-top:17px">
-        <h4 style="color:#294578;margin-top:0">Bài giảng AI</h4>
-        <p style="white-space:pre-wrap;line-height:1.85;color:#35476d">{{ tutor_answer.explanation }}</p>
-        {% if tutor_answer.practice %}<h4 style="color:#294578">Tự luyện tập</h4><p style="white-space:pre-wrap;line-height:1.8">{{ tutor_answer.practice }}</p>{% endif %}
-        <h4 style="color:#294578">Dẫn chứng có thật trong tài liệu</h4>
-        <ul style="line-height:1.8">
-        {% for citation in tutor_answer.citations %}
-          <li style="margin:10px 0"><strong>{{ citation.source_name }}</strong> — “{{ citation.quote }}”
-          <a href="{{ url_for('shared_document_file', doc_id=citation.source_id) }}" target="_blank" rel="noopener">Đọc file gốc</a></li>
-        {% endfor %}
-        </ul>
-        <p style="font-size:12px;color:#7484a0">Trích dẫn đã được đối chiếu với nội dung được gửi cho AI. Câu giải thích do AI tạo vẫn cần được người học kiểm chứng với file gốc.</p>
-      </article>
-    {% endif %}
   </section>
   <h3 style="color:#293f75">Bài tập và đánh giá theo đề cương</h3>
   {% if chapter.exercises %}
