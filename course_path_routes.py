@@ -6,7 +6,7 @@ import sys
 from flask import Blueprint, current_app, redirect, render_template, request, session, url_for
 
 from course_path_learning import (
-    build_course_roadmap, parse_chapter_details, unit_fingerprint,
+    PLAN_VERSION, build_course_roadmap, parse_chapter_details, unit_fingerprint,
 )
 from syllabus_learning import syllabus_hash
 from syllabus_routes import _source, ensure_syllabus_schema
@@ -100,9 +100,11 @@ def learning_path(subject_id):
         plan_row = conn.execute("""
             SELECT * FROM course_roadmaps WHERE user_id=? AND subject_id=?
         """, (uid, subject_id)).fetchone()
-        fresh = bool(plan_row and units
+        saved_sessions = json.loads(plan_row["sessions_json"]) if plan_row else []
+        fresh = bool(plan_row and units and saved_sessions
                      and plan_row["source_hash"] == fingerprint
-                     and plan_row["units_hash"] == unit_hash)
+                     and plan_row["units_hash"] == unit_hash
+                     and saved_sessions[0].get("planner_version") == PLAN_VERSION)
 
         if request.method == "POST":
             if not secrets.compare_digest(request.form.get("csrf_token", ""), token):
@@ -148,7 +150,7 @@ def learning_path(subject_id):
             return redirect(url_for("course_path.learning_path", subject_id=subject_id,
                                     notice="Đã xây dựng lộ trình từ đề cương đã xác nhận."), code=303)
 
-        sessions = json.loads(plan_row["sessions_json"]) if fresh else []
+        sessions = saved_sessions if fresh else []
         return render_template(
             "course_learning_path.html", page="subjects", subject=subject,
             syllabus_name=syllabus_name, units=units, sessions=sessions,
