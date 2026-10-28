@@ -634,7 +634,8 @@ document.addEventListener("DOMContentLoaded", () => {
       studyAt.value = button.dataset.studyAt || "";
       duration.value = button.dataset.duration || "45";
       note.value = button.dataset.note || "";
-      showConflictNotice();
+      // Second DOMContentLoaded handler: notify the first handler via input event.
+      studyAt.dispatchEvent(new Event("input", { bubbles: true }));
 
       modal.classList.add("show");
       modal.setAttribute("aria-hidden", "false");
