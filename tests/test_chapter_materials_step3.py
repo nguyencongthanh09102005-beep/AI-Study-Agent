@@ -275,6 +275,24 @@ Thuật toán độ phức tạp Big O cũng có thể áp dụng cho linked lis
             assert "max-width: min(100%, 1100px)" in css_text
             assert "max-height: none !important" in css_text
             assert "overflow-y: auto !important" in css_text
+            # UI stage 2: single sidebar course list and exact 30/70 split.
+            # Do not reintroduce a redundant chat-history column.
+            assert "css/chat_stage2.css" in chat_html
+            assert 'class="sidebar-course-list"' in chat_html
+            assert chat_html.count('class="chat-history-list"') == 1
+            assert 'class="soft-card chat-history-panel"' not in chat_html
+            assert 'id="chatMobileSubject"' in chat_html
+            ui_css = (Path(__file__).resolve().parents[1] /
+                      "static/css/chat_stage2.css").read_text(encoding="utf-8")
+            assert "grid-template-columns: 30% minmax(0,70%)" in ui_css
+            assert "width: 30% !important" in ui_css
+            assert "grid-template-columns: minmax(0,1fr)" in ui_css
+            assert "prefers-reduced-motion: reduce" in ui_css
+            js_code = (Path(__file__).resolve().parents[1] /
+                       "static/js/chat.js").read_text(encoding="utf-8")
+            assert "rememberSelectedSubject(chat.subject_id)" in js_code
+            assert "if (Number(currentChatId) !== Number(chatId)) return;" in js_code
+            assert "mobileSubjectPicker" in js_code
 
             chats = student.get("/api/chats").get_json()
             convo = next(item for item in chats if item["subject_id"] == course)
