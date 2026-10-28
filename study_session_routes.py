@@ -1,0 +1,156 @@
+"""Phase 6.3.1: read-only, per-roadmap-lesson learning space.
+
+Access is per student and subject. Viewing does not mark a task started/done,
+alter progress, call an LLM, or generate a quiz.
+"""
+import json
+import sys
+from datetime import datetime, timedelta
+from flask import Blueprint, current_app, render_template, session, redirect, url_for
+
+from course_path_learning import PLAN_VERSION, unit_fingerprint
+from course_path_routes import ensure_roadmap_schema
+from course_schedule_sync import ensure_session_schedule_schema, session_signature
+from syllabus_learning import syllabus_hash
+from syllabus_routes import _source, ensure_syllabus_schema
+from chapter_material_routes import (
+    approved_document_rows, chapter_key, ensure_chapter_material_schema,
+    official_syllabus,
+)
+
+study_session_bp = Blueprint("study_session", __name__)
+
+
+def _unavailable(subject, message):
+    return render_template("study_session_unavailable.html",
+                           page="study_plan", subject=subject, message=message), 409
+
+
+def _schedule_display(value, minutes):
+    try:
+        start = datetime.fromisoformat(value)
+        end = start + timedelta(minutes=int(minutes))
+        return start.strftime("%d/%m/%Y · %H:%M"), end.strftime("%H:%M")
+    except (TypeError, ValueError, OverflowError):
+        return value or "", ""
+
+
+@study_session_bp.route("/study-plan/tasks/<int:task_id>/learn")
+def learning_session(task_id):
+    project = sys.modules[current_app.import_name]
+    uid = session.get("user_id")
+    if not uid:
+        return redirect(url_for("login", tab="login"))
+    conn = project.db()
+    try:
+        user = conn.execute("SELECT role FROM users WHERE id=?", (uid,)).fetchone()
+        if not user or user["role"] != "student":
+            return "Chỉ sinh viên có quyền mở Không gian học tập.", 403
+
+        ensure_session_schedule_schema(conn)
+        task = conn.execute("""
+            SELECT t.*,s.name AS subject_name,s.code AS subject_code,
+                   s.personal_syllabus_document_id
+            FROM study_tasks t
+            JOIN subjects s ON s.id=t.subject_id AND s.user_id=t.user_id
+            WHERE t.id=? AND t.user_id=? AND t.source='roadmap'
+              AND t.roadmap_session_id IS NOT NULL
+        """, (task_id, uid)).fetchone()
+        if not task:
+            return "Không tìm thấy buổi học từ lộ trình của bạn.", 404
+
+        subject = {"id": task["subject_id"], "name": task["subject_name"],
+                   "code": task["subject_code"]}
+        ensure_syllabus_schema(conn)
+        ensure_roadmap_schema(conn)
+        kind, syllabus_text, syllabus_name = _source(
+            project, conn, uid, task["subject_id"]
+        )
+        fingerprint = syllabus_hash(syllabus_text) if syllabus_text else ""
+        review = conn.execute("""
+            SELECT status,source_hash,units_json FROM syllabus_reviews
+            WHERE user_id=? AND subject_id=?
+        """, (uid, task["subject_id"])).fetchone()
+        roadmap = conn.execute("""
+            SELECT source_hash,units_hash,sessions_json FROM course_roadmaps
+            WHERE user_id=? AND subject_id=?
+        """, (uid, task["subject_id"])).fetchone()
+        if not review or review["status"] != "confirmed" or not syllabus_text or \
+                review["source_hash"] != fingerprint or not roadmap:
+            return _unavailable(subject,
+                "Đề cương chưa được xác nhận hoặc đã thay đổi. Hãy rà soát lại trước khi học.")
+        try:
+            units = json.loads(review["units_json"])
+            sessions = json.loads(roadmap["sessions_json"])
+            if not isinstance(units, list) or not isinstance(sessions, list):
+                raise ValueError("Invalid saved structure")
+            fresh = (bool(sessions)
+                     and all(isinstance(x, dict) for x in sessions)
+                     and sessions[0].get("planner_version") == PLAN_VERSION
+                     and roadmap["source_hash"] == fingerprint
+                     and roadmap["units_hash"] == unit_fingerprint(units))
+            lesson = next((item for item in sessions
+                           if item.get("session_id") == task["roadmap_session_id"]), None)
+        except (ValueError, KeyError, TypeError, AttributeError):
+            return _unavailable(subject, "Lộ trình không đọc được. Hãy tạo lại từ đề cương đã xác nhận.")
+        if not fresh or not lesson or \
+                session_signature(lesson) != task["roadmap_session_signature"]:
+            return _unavailable(subject,
+                "Nội dung lộ trình khác buổi đã lưu. Hãy rà soát lại lộ trình; giờ và tiến độ cũ vẫn được giữ.")
+
+        # Saved roadmap hints are not authorization: resolve private documents
+        # from the current user's CURRENT subject on every page request.
+        private_docs = []
+        seen = set()
+        for item in lesson.get("materials") or []:
+            if not isinstance(item, dict) or item.get("kind") != "personal":
+                continue
+            try:
+                doc_id = int(item.get("id"))
+            except (ValueError, TypeError):
+                continue
+            if doc_id in seen:
+                continue
+            row = conn.execute("""
+                SELECT id,original_name,stored_name FROM documents
+                WHERE id=? AND user_id=? AND subject_id=? AND id!=COALESCE(?, -1)
+            """, (doc_id, uid, task["subject_id"],
+                  task["personal_syllabus_document_id"])).fetchone()
+            if row:
+                private_docs.append({
+                    "name": row["original_name"],
+                    "link": url_for("uploaded_file", filename=row["stored_name"]),
+                })
+                seen.add(doc_id)
+
+        # Only currently Admin-approved shared documents mapped to the CURRENT
+        # official syllabus chapter; ignore shared IDs embedded in saved JSON.
+        shared_docs = []
+        if kind == "shared":
+            shared = project.ensure_shared_subject_for_user_subject(
+                conn, uid, task["subject_id"]
+            )
+            if shared:
+                official, official_hash, _ = official_syllabus(conn, shared["id"])
+                chapter_index = lesson.get("unit_id")
+                if (official and official_hash == fingerprint
+                        and isinstance(chapter_index, int)
+                        and 1 <= chapter_index <= len(units)):
+                    ensure_chapter_material_schema(conn)
+                    key = chapter_key(units[chapter_index - 1].get("evidence", ""))
+                    for row in approved_document_rows(
+                            conn, shared["id"], key, fingerprint):
+                        shared_docs.append({
+                            "name": row["original_name"],
+                            "link": url_for("shared_document_file", doc_id=row["id"]),
+                        })
+
+        start_text, end_text = _schedule_display(task["study_at"], task["duration"])
+        return render_template(
+            "study_session.html", page="study_plan",
+            subject=subject, task=task, lesson=lesson,
+            syllabus_name=syllabus_name, private_docs=private_docs,
+            shared_docs=shared_docs, start_text=start_text, end_text=end_text,
+        )
+    finally:
+        conn.close()

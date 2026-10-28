@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Không gian học · {{ subject.name }}{% endblock %}
+{% block page_title %}Không gian học · {{ subject.name }}{% endblock %}
+{% block page_desc %}Học theo từng buổi từ đề cương đã xác nhận{% endblock %}
+{% block page_styles %}<link rel="stylesheet" href="{{ url_for('static', filename='css/study_session.css') }}">{% endblock %}
+{% block content %}
+<div class="study-room">
+  <nav class="study-room-nav" aria-label="Điều hướng buổi học">
+    <a href="{{ url_for('study_plan', subject_id=subject.id) }}">← Kế hoạch học</a>
+    <a href="{{ url_for('course_path.learning_path', subject_id=subject.id) }}">Xem lộ trình theo chương →</a>
+  </nav>
+  <header class="study-room-hero">
+    <div>
+      <span class="study-room-eyebrow">KHÔNG GIAN HỌC TẬP · ĐỢT 6.3.1</span>
+      <h2>{{ subject.name }}</h2>
+      <p>{{ lesson.title }}</p>
+      <div class="study-room-meta">
+        <span>📚 {{ subject.code or 'Môn học' }}</span>
+        <span>🕒 {{ start_text }}{% if end_text %}–{{ end_text }}{% endif %} · {{ task.duration }} phút</span>
+        <span>{{ '✓ Đã hoàn thành' if task.done else 'Chưa hoàn thành' }}</span>
+      </div>
+    </div>
+    <span class="study-room-icon" aria-hidden="true">📖</span>
+  </header>
+  <p class="study-room-note" role="note">Mở trang này không tự tính là đã học. Chức năng bắt đầu, tạm dừng, tiếp tục và ghi nhận thời gian thực tế sẽ được làm ở Đợt 6.4.</p>
+  <div class="study-room-columns">
+    <main class="study-room-main">
+      <section class="study-room-card">
+        <h3>🎯 Mục tiêu buổi học</h3>
+        {% if lesson.objectives %}
+          <ul>{% for objective in lesson.objectives %}<li>{{ objective }}</li>{% endfor %}</ul>
+        {% else %}<p>Đề cương chưa mô tả mục tiêu cụ thể cho buổi này.</p>{% endif %}
+      </section>
+      <section class="study-room-card">
+        <h3>📋 Nội dung cần học</h3>
+        <p>Chương: <strong>{{ lesson.chapter }}</strong></p>
+        {% if lesson.topics %}
+          <ol>{% for topic in lesson.topics %}<li>{{ topic }}</li>{% endfor %}</ol>
+        {% else %}<p>Chưa có tiểu mục chi tiết; hãy đọc toàn bộ chương trong tài liệu nguồn.</p>{% endif %}
+        {% if lesson.source_evidence %}<p class="study-room-muted">Căn cứ đề cương: {{ lesson.source_evidence }}</p>{% endif %}
+      </section>
+      <section class="study-room-card">
+        <h3>✏️ Hoạt động học tập</h3>
+        {% if lesson.activities %}
+          <ul>{% for activity in lesson.activities %}<li>{{ activity }}</li>{% endfor %}</ul>
+        {% else %}<p>Chưa có hoạt động học được lập cho buổi này.</p>{% endif %}
+      </section>
+    </main>
+    <aside class="study-room-aside">
+      <section class="study-room-card">
+        <h3>📁 Tài liệu buổi học</h3>
+        {% if shared_docs %}
+          <h4>Học liệu chung · Admin đã duyệt cho chương</h4>
+          <div class="study-room-files">{% for doc in shared_docs %}
+            <a href="{{ doc.link }}" target="_blank" rel="noopener noreferrer"><span>📘 {{ doc.name }}</span><small>Mở file ↗</small></a>
+          {% endfor %}</div>
+        {% endif %}
+        {% if private_docs %}
+          <h4>Học liệu cá nhân · Gợi ý từ lộ trình</h4>
+          <div class="study-room-files">{% for doc in private_docs %}
+            <a href="{{ doc.link }}" target="_blank" rel="noopener noreferrer"><span>📄 {{ doc.name }}</span><small>Mở file ↗</small></a>
+          {% endfor %}</div>
+          <p class="study-room-muted">Tài liệu cá nhân được gợi ý theo nội dung, bạn nên kiểm tra phần phù hợp.</p>
+        {% endif %}
+        {% if not shared_docs and not private_docs %}
+          <p>Chưa tìm được tài liệu phù hợp hoặc được duyệt cho buổi này. Bạn có thể tiếp tục theo đề cương và bổ sung tài liệu sau.</p>
+        {% endif %}
+        {% if lesson.source_material_hints %}
+          <h4>Đề cương gợi ý tài liệu</h4>
+          <ul>{% for hint in lesson.source_material_hints %}<li>{{ hint }}</li>{% endfor %}</ul>
+        {% endif %}
+        <a class="study-room-link" href="{{ url_for('chapter_material.student_chapter', subject_id=subject.id, chapter_number=lesson.unit_id) }}">Xem học liệu của toàn chương →</a>
+        <a class="study-room-link" href="{{ url_for('documents') }}">Quản lý tài liệu môn học →</a>
+      </section>
+      <section class="study-room-card">
+        <h3>Thông tin nguồn</h3>
+        <p><strong>Đề cương:</strong> {{ syllabus_name }}</p>
+        {% if lesson.clo_refs %}<p><strong>CLO:</strong> {{ lesson.clo_refs|join(', ') }}</p>{% endif %}
+        <p class="study-room-muted">Chưa tích hợp Chat AI và Quiz cuối buổi trong Đợt 6.3.1.</p>
+      </section>
+    </aside>
+  </div>
+</div>
+{% endblock %}
