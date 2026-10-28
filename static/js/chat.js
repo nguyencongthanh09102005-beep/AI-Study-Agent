@@ -2,7 +2,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const messagesBox = document.getElementById("chatMessages");
   const input = document.getElementById("chatInput");
   const sendBtn = document.getElementById("chatSendButton");
-  const historyList = document.querySelector(".chat-history-list");
+  const historyList = document.querySelector(".sidebar-course-list .chat-history-list");
+  const mobileSubjectPicker = document.getElementById("chatMobileSubject");
   const subjectNameEl = document.getElementById("chatSubjectName");
   const contextStatusEl = document.getElementById("chatContextStatus");
   const lessonBanner = document.getElementById("lessonModeBanner");
@@ -213,15 +214,62 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function loadMessages(chatId) {
-    currentMessages = await api(`/api/chats/${chatId}/messages`);
+    const messages = await api(`/api/chats/${chatId}/messages`);
+    if (Number(currentChatId) !== Number(chatId)) return;
+    currentMessages = messages;
     renderCurrentChat();
   }
+
+  function rememberSelectedSubject(subjectId) {
+    const url = new URL(window.location.href);
+    url.searchParams.set("subject_id", String(subjectId));
+    window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+  }
+
+  async function switchToChat(chat) {
+    if (!chat || sending) return;
+    if (getCurrentChat()?.subject_id !== chat.subject_id && lessonMode) {
+      clearLessonMode();
+    }
+    currentChatId = chat.id;
+    rememberSelectedSubject(chat.subject_id);
+    renderSubjectChats();
+    updateChatHeader();
+    await loadMessages(chat.id);
+    focusInputWithoutScroll();
+  }
+
+  function renderMobileSubjectPicker() {
+    if (!mobileSubjectPicker) return;
+    mobileSubjectPicker.replaceChildren();
+    for (const chat of chats) {
+      const option = document.createElement("option");
+      option.value = String(chat.id);
+      option.textContent = chat.title;
+      mobileSubjectPicker.appendChild(option);
+    }
+    if (currentChatId != null) {
+      mobileSubjectPicker.value = String(currentChatId);
+    }
+    mobileSubjectPicker.disabled = !chats.length || sending;
+  }
+
+  mobileSubjectPicker?.addEventListener("change", async () => {
+    const chat = chats.find(item => item.id === Number(mobileSubjectPicker.value));
+    try {
+      await switchToChat(chat);
+    } catch (error) {
+      console.error("Không chuyển được môn Chat AI:", error);
+      renderMobileSubjectPicker();
+    }
+  });
 
   function renderSubjectChats() {
     if (!historyList) return;
     historyList.innerHTML = "";
 
     if (!chats.length) {
+      renderMobileSubjectPicker();
       historyList.innerHTML = `
         <div class="subject-chat-empty">
           <span>📘</span>
@@ -252,17 +300,16 @@ document.addEventListener("DOMContentLoaded", () => {
       `;
 
       item.addEventListener("click", async () => {
-        const switchingSubject = getCurrentChat()?.subject_id !== chat.subject_id;
-        if (switchingSubject && lessonMode) clearLessonMode();
-        currentChatId = chat.id;
-        renderSubjectChats();
-        updateChatHeader();
-        await loadMessages(chat.id);
-        focusInputWithoutScroll();
+        try {
+          await switchToChat(chat);
+        } catch (error) {
+          console.error("Không chuyển được môn Chat AI:", error);
+        }
       });
 
       historyList.appendChild(item);
     });
+    renderMobileSubjectPicker();
   }
 
   function renderCurrentChat() {
@@ -339,6 +386,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     sending = true;
     if (sendBtn) sendBtn.disabled = true;
+    if (mobileSubjectPicker) mobileSubjectPicker.disabled = true;
+    historyList?.querySelectorAll("button.subject-chat-item").forEach(button => {
+      button.disabled = true;
+    });
 
     input.value = "";
     input.style.height = "auto";
@@ -386,6 +437,7 @@ document.addEventListener("DOMContentLoaded", () => {
     } finally {
       sending = false;
       if (sendBtn && currentChatId) sendBtn.disabled = false;
+      renderSubjectChats();
       focusInputWithoutScroll();
     }
   }
