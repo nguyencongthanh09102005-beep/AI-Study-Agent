@@ -106,7 +106,8 @@ jobs:
           python tests/test_study_session_tracking.py
           python tests/test_study_session_quiz_step71.py
           python tests/test_study_session_quiz_step7234.py
-          python -m py_compile study_session_quiz.py study_session_quiz_runtime.py study_session_quiz_routes.py
+          python tests/test_delete_subject_session_quiz.py
+          python -m py_compile study_session_quiz.py study_session_quiz_runtime.py study_session_quiz_routes.py subject_course_cleanup.py
           python -m py_compile study_session_tracking.py study_session_routes.py study_session_chat_context.py
 
       - name: Final roles and manual deadline data-integrity audit
