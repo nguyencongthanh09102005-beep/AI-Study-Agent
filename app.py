@@ -4305,6 +4305,9 @@ def delete_subject(subject_id):
     ).fetchone()
 
     if subject:
+        # Keep old unclassified documents/Quiz/tasks + new session metadata.
+        from subject_course_cleanup import detach_subject_learning_records
+        detach_subject_learning_records(conn, uid, subject_id)
         # Chat gắn 1-1 với môn học: xóa môn thì xóa luôn lịch sử Chat của môn.
         chat_rows = conn.execute(
             """
@@ -7342,7 +7345,10 @@ def api_mobile_modify_subject(subject_id):
         return jsonify({"subject": dict(updated)})
 
     # Same deletion semantics as Web: preserve personal documents/quizzes/tasks
-    # as unclassified, remove course-specific chat and reminders.
+    # and safely archive per-session tracking and locked Quiz metadata.
+    from subject_course_cleanup import detach_subject_learning_records
+    detach_subject_learning_records(conn, uid, subject_id)
+    # Remove course-specific chat and reminders.
     convs = conn.execute(
         "SELECT id FROM chat_conversations WHERE user_id=? AND subject_id=?",
         (uid, subject_id)
