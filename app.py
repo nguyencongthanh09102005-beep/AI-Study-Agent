@@ -4551,12 +4551,22 @@ def admin_add_document():
             from syllabus_learning import extract_syllabus_units
             chapters = extract_syllabus_units(extracted)
             distinct_chapters = {item["evidence"].casefold() for item in chapters}
-            if len(distinct_chapters) < 2:
+            # Older subjects may legitimately use a short, unstructured
+            # outline (e.g. "Đề cương Điện toán đám mây: ..."). Do not break
+            # this established upload contract merely because no numbered
+            # chapter headings exist. Still reject chapter-only lecture slides.
+            is_course_outline = bool(re.search(
+                r"(?i)\b(?:đề cương(?: chi tiết)?|mục tiêu học phần|"
+                r"chuẩn đầu ra(?: học phần)?|course syllabus|course outline)\b",
+                extracted
+            ))
+            if len(distinct_chapters) < 2 and not is_course_outline:
                 target.unlink(missing_ok=True)
                 return redirect(url_for(
                     "admin_shared_documents",
                     error=(
-                        "File này chưa có ít nhất 2 tiêu đề chương/bài có thể nhận diện. "
+                        "File này chưa có ít nhất 2 tiêu đề chương/bài có thể nhận diện "
+                        "hoặc nội dung thể hiện đây là đề cương học phần. "
                         "Không thay thế đề cương chuẩn. Nếu đây là slide/bài tập một chương, "
                         "hãy upload không đánh dấu 'Đặt làm đề cương chuẩn của môn'."
                     )
