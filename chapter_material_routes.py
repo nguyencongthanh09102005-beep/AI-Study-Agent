@@ -9,6 +9,7 @@ import sys
 
 from flask import Blueprint, current_app, redirect, render_template, request, session, url_for
 
+from ai_chapter_suggestions import chapter_ai_prompt, validate_ai_suggestions
 from course_path_learning import match_course_materials, parse_chapter_details, _terms
 from syllabus_learning import extract_syllabus_units, syllabus_hash
 from syllabus_routes import _source, ensure_syllabus_schema
@@ -41,6 +42,18 @@ def ensure_chapter_material_schema(conn):
     conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_shared_document_chapters_lookup
         ON shared_document_chapters(shared_subject_id, chapter_key, syllabus_hash)
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS shared_document_ai_suggestions (
+            document_id INTEGER PRIMARY KEY,
+            shared_subject_id INTEGER NOT NULL,
+            source_hash TEXT NOT NULL,
+            document_hash TEXT NOT NULL,
+            suggestions_json TEXT NOT NULL,
+            analyzed_at TEXT NOT NULL,
+            FOREIGN KEY (document_id) REFERENCES shared_documents(id) ON DELETE CASCADE,
+            FOREIGN KEY (shared_subject_id) REFERENCES shared_subjects(id) ON DELETE CASCADE
+        )
     """)
     conn.commit()
 
@@ -137,12 +150,65 @@ def admin_chapter_mapping(document_id):
         selected = {row["chapter_key"] for row in saved
                     if row["syllabus_hash"] == source_hash}
 
+        # Enrich official chapter titles with genuine syllabus subtopics.
+        sections = parse_chapter_details(source_text, list(valid.values())) if valid else []
+        for unit, section in zip(valid.values(), sections):
+            unit["topics"] = section["topics"][:8]
+
         if request.method == "POST":
             if not project.admin_csrf_valid():
                 return "Phiên biểu mẫu không hợp lệ.", 403
             if not source_hash or not valid:
                 return redirect(url_for("chapter_material.admin_chapter_mapping",
                                         document_id=document_id, error="Chưa có đề cương chuẩn hợp lệ."), code=303)
+            action = request.form.get("action", "save")
+            if action == "analyze_ai":
+                prompt = chapter_ai_prompt(
+                    document["extracted_text"] or "", valid, document["subject_code"]
+                )
+                generated, api_error = project.gemini_generate(prompt)
+                if not generated:
+                    return redirect(url_for(
+                        "chapter_material.admin_chapter_mapping",
+                        document_id=document_id,
+                        error="AI chưa phản hồi. Kiểm tra cấu hình API và kết nối mạng của máy chủ.",
+                    ), code=303)
+                result = validate_ai_suggestions(
+                    generated, valid, document["extracted_text"] or ""
+                )
+                if result is None:
+                    return redirect(url_for(
+                        "chapter_material.admin_chapter_mapping",
+                        document_id=document_id,
+                        error="AI trả về dữ liệu không đúng định dạng. Chưa lưu gợi ý.",
+                    ), code=303)
+                conn.execute("""
+                    INSERT INTO shared_document_ai_suggestions(
+                        document_id,shared_subject_id,source_hash,document_hash,
+                        suggestions_json,analyzed_at
+                    ) VALUES(?,?,?,?,?,?)
+                    ON CONFLICT(document_id) DO UPDATE SET
+                        shared_subject_id=excluded.shared_subject_id,
+                        source_hash=excluded.source_hash,
+                        document_hash=excluded.document_hash,
+                        suggestions_json=excluded.suggestions_json,
+                        analyzed_at=excluded.analyzed_at
+                """, (
+                    document_id, document["shared_subject_id"], source_hash,
+                    syllabus_hash(document["extracted_text"] or ""),
+                    json.dumps(result, ensure_ascii=False), project.now(),
+                ))
+                conn.commit()
+                return redirect(url_for(
+                    "chapter_material.admin_chapter_mapping",
+                    document_id=document_id,
+                    notice=(
+                        f"AI đề xuất {len(result)} chương có bằng chứng nguyên văn. "
+                        "Vui lòng kiểm tra trước khi duyệt."
+                    ),
+                ), code=303)
+            if action != "save":
+                return "Thao tác không hợp lệ.", 400
             chosen = request.form.getlist("chapters")
             if len(chosen) > 40 or len(set(chosen)) != len(chosen) or any(
                 key not in valid for key in chosen
@@ -173,6 +239,21 @@ def admin_chapter_mapping(document_id):
             if match_course_materials(section, [doc_value]):
                 suggested.add(chapter_key(unit["evidence"]))
 
+        ai_record = conn.execute("""
+            SELECT source_hash,document_hash,suggestions_json
+            FROM shared_document_ai_suggestions WHERE document_id=?
+        """, (document_id,)).fetchone()
+        ai_valid = bool(
+            ai_record
+            and ai_record["source_hash"] == source_hash
+            and ai_record["document_hash"] ==
+                syllabus_hash(document["extracted_text"] or "")
+        )
+        ai_suggestions = (
+            json.loads(ai_record["suggestions_json"]) if ai_valid else []
+        )
+        ai_by_key = {entry["key"]: entry["evidence"] for entry in ai_suggestions}
+
         chapters = [
             {"key": key, "title": unit["title"],
              "approved": key in selected, "suggested": key in suggested}
@@ -182,6 +263,7 @@ def admin_chapter_mapping(document_id):
             "admin_chapter_mapping.html", page="admin", document=document,
             source_name=source_name, chapters=chapters,
             source_present=bool(source_hash and valid),
+            ai_by_key=ai_by_key, ai_analyzed=ai_valid,
             stale=bool(saved and not selected and any(row["syllabus_hash"] != source_hash
                                                       for row in saved)),
             csrf_token=project.admin_form_token(),
