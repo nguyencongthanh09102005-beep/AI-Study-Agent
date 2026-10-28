@@ -32,7 +32,7 @@
     </div>
   </div>
   {% if session_quiz_context.ready %}
-    <p class="session-quiz-description">Đã xác thực đúng môn, chương, buổi và nguồn học liệu. Đợt 7.2 sẽ thêm chức năng AI tạo Quiz theo mục tiêu buổi này. Các Quiz thông thường phía dưới vẫn hoạt động.</p>
+    <p class="session-quiz-description">Đã xác thực nguồn học liệu phù hợp. Quiz theo buổi được chuẩn bị ở trang Lộ trình theo chương, khóa theo lịch học hiện tại và mở khi đến giờ. Quiz luyện tập thông thường bên dưới vẫn hoạt động riêng.</p>
   {% else %}
     <p class="session-quiz-description warning">{{ session_quiz_context.reason }} Không thể tạo Quiz có căn cứ theo buổi khi chưa có nguồn hợp lệ.</p>
   {% endif %}
