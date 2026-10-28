@@ -8,7 +8,7 @@ import json
 import re
 from datetime import date, timedelta
 
-PLAN_VERSION = 4
+PLAN_VERSION = 5
 
 TOPIC_RE = re.compile(r"^(\d+(?:\.\d+){1,3})[.)]?\s+(.{3,200})$")
 CHAPTER_RE = re.compile(r"^(?:chương|chapter|bài|lesson|unit|module)\s+(\d+)\b", re.I)
@@ -231,6 +231,50 @@ def match_course_materials(section, documents):
     return [item for _, item in ranked[:3]]
 
 
+def _credit_session_allocations(chapters, learning_slots):
+    """Assign every confirmed chapter at least one evidence-backed learning slot.
+
+    Distribute additional practice using available subtopics and teaching
+    periods, not by splitting every two subheadings into a new date.
+    """
+    if learning_slots < len(chapters):
+        raise ValueError(
+            f"Lộ trình có {len(chapters)} chương nhưng chỉ có "
+            f"{learning_slots} buổi học nội dung (đã dành 1 buổi kiểm tra "
+            "cuối môn). Không thể bỏ sót chương; hãy kiểm tra lại tín chỉ "
+            "hoặc đề cương."
+        )
+    weights = [
+        max(1, len(chapter.get("topics") or []),
+            (int(chapter.get("teaching_periods") or 0) + 2) // 3)
+        for chapter in chapters
+    ]
+    allocations = [1] * len(chapters)
+    for _ in range(learning_slots - len(chapters)):
+        index = max(
+            range(len(chapters)),
+            key=lambda i: (weights[i] / (allocations[i] + 1), -i)
+        )
+        allocations[index] += 1
+    return allocations
+
+
+def _learning_chunks(topics, slots):
+    """Every slot has real chapter content; extra slots explicitly review it."""
+    if not topics:
+        return [[] for _ in range(slots)]
+    if len(topics) >= slots:
+        base, extra = divmod(len(topics), slots)
+        sizes = [base + (1 if i < extra else 0) for i in range(slots)]
+        result, offset = [], 0
+        for size in sizes:
+            result.append(topics[offset:offset + size])
+            offset += size
+        return result
+    return [[topic] for topic in topics] + [topics[:] for _ in
+                                                range(slots - len(topics))]
+
+
 def build_course_roadmap(chapters, documents, profile, weaknesses=None, start_date=None):
     """Schedule concrete syllabus units in verified order; quiz is only a suggestion."""
     if not chapters:
@@ -243,13 +287,32 @@ def build_course_roadmap(chapters, documents, profile, weaknesses=None, start_da
     base_date = start_date or date.today()
     weaknesses = weaknesses or []
     sessions = []
-    # Less time means a smaller verified topic chunk, not a fixed 1 session/chapter.
-    chunk_size = (1 if daily_minutes < 35 else 2 if daily_minutes < 75
-                  else 3 if daily_minutes < 120 else 4)
-    for chapter in chapters:
+    # When the course has an explicit credit count, the university-sized
+    # roadmap has exactly 5 sessions per credit INCLUDING the final exam.
+    # Legacy direct callers without credits keep their old chunking behavior.
+    has_credits = "credits" in profile
+    if has_credits:
+        try:
+            credits = int(profile["credits"])
+        except (TypeError, ValueError) as error:
+            raise ValueError("Số tín chỉ phải là số nguyên hợp lệ.") from error
+        if not 1 <= credits <= 12:
+            raise ValueError("Số tín chỉ để lập lộ trình phải từ 1 đến 12.")
+        target_sessions = credits * 5
+        allocations = _credit_session_allocations(chapters, target_sessions - 1)
+    else:
+        chunk_size = (1 if daily_minutes < 35 else 2 if daily_minutes < 75
+                      else 3 if daily_minutes < 120 else 4)
+        allocations = [
+            max(1, (len(chapter["topics"]) + chunk_size - 1) // chunk_size)
+            for chapter in chapters
+        ]
+    for chapter, slots in zip(chapters, allocations):
         topic_items = chapter["topics"]
-        topic_chunks = [topic_items[i:i+chunk_size]
-                        for i in range(0, len(topic_items), chunk_size)] or [[]]
+        topic_chunks = _learning_chunks(topic_items, slots) if has_credits else (
+            [topic_items[i:i+chunk_size]
+             for i in range(0, len(topic_items), chunk_size)] or [[]]
+        )
         materials = match_course_materials(chapter, documents)
         relevant_weaknesses = [
             w["topic"][:140] for w in weaknesses
@@ -264,7 +327,10 @@ def build_course_roadmap(chapters, documents, profile, weaknesses=None, start_da
                 ["Đọc toàn bộ nội dung chương theo đề cương."]
             )
             activities = []
-            if chunk:
+            if has_credits and topic_items and index >= len(topic_items):
+                activities.append("Củng cố và vận dụng lại các tiểu mục: " +
+                                  "; ".join(chunk))
+            elif chunk:
                 activities.append("Đọc và thực hành các tiểu mục: " + "; ".join(chunk))
             else:
                 activities.append("Đề cương không tách rõ tiểu mục; cần xem chương gốc.")
@@ -308,4 +374,40 @@ def build_course_roadmap(chapters, documents, profile, weaknesses=None, start_da
                 "goal": goal,
                 "clo_refs": chapter["clo_refs"],
             })
+    if has_credits:
+        # The last slot is a review/exam slot, NOT a new knowledge chapter.
+        # Keep unit_id bound to a confirmed chapter for existing room/ACL
+        # checks; the final Quiz engine obtains sources from ALL prior slots.
+        last = chapters[-1]
+        sessions.append({
+            "planner_version": PLAN_VERSION,
+            "session_id": len(sessions) + 1,
+            "unit_id": last["unit_id"],
+            "chapter": last["chapter"],
+            "source_evidence": last["evidence"],
+            "date": (base_date + timedelta(days=len(sessions))).isoformat(),
+            "time": preferred_time,
+            "duration": max(daily_minutes, 90),
+            "title": "Ôn tập tổng hợp và kiểm tra cuối môn",
+            "topics": [],
+            "objectives": ["Hệ thống hóa kiến thức đã học từ tất cả các chương."],
+            "activities": ["Ôn tập kiến thức các buổi trước.",
+                           "Làm bài kiểm tra tổng hợp 60 câu."],
+            "materials": [],
+            "source_material_hints": [],
+            "quiz": {
+                "recommended_questions": 60,
+                "question_count_from_syllabus": False,
+                "description": [],
+                "passing_criteria": [],
+                "passing_percent_from_syllabus": None,
+                "scope": "Tất cả các buổi học trước",
+                "action": "quiz_final",
+                "available": False,
+            },
+            "weaknesses": [],
+            "goal": goal,
+            "clo_refs": [],
+        })
+        assert len(sessions) == target_sessions
     return sessions
