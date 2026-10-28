@@ -81,8 +81,9 @@ def list_chapter_options(project, conn, uid, subject_id):
     return {"subject_id": subject_id, "subject_name": subject["name"], "chapters": options}
 
 
-def resolve_lesson_context(project, conn, uid, subject_id, chapter_number, topic_index):
-    """Resolve and authorize an exact chapter/topic, with current approved sources."""
+def resolve_lesson_context(project, conn, uid, subject_id, chapter_number,
+                           topic_index=None, question=""):
+    """Authorize a whole confirmed chapter, or legacy explicit topic context."""
     subject = conn.execute(
         "SELECT * FROM subjects WHERE id=? AND user_id=?",
         (subject_id, uid)
@@ -119,9 +120,10 @@ def resolve_lesson_context(project, conn, uid, subject_id, chapter_number, topic
 
     section = parse_chapter_details(text, units)[chapter_number - 1]
     topics = section["topics"]
-    if (isinstance(topic_index, bool) or
-        not isinstance(topic_index, int) or
-        topic_index < 0 or topic_index >= max(1, len(topics))):
+    if topic_index is not None and (
+        isinstance(topic_index, bool) or not isinstance(topic_index, int)
+        or topic_index < 0 or topic_index >= max(1, len(topics))
+    ):
         raise LessonContextError("Tiểu mục không thuộc chương đã xác nhận.", 400)
 
     shared = project.ensure_shared_subject_for_user_subject(conn, uid, subject_id)
@@ -133,11 +135,20 @@ def resolve_lesson_context(project, conn, uid, subject_id, chapter_number, topic
 
     key = chapter_key(section["evidence"])
     rows = approved_document_rows(conn, shared["id"], key, fingerprint)
-    sources = prepared_sources(rows)
+    sources = prepared_sources(rows, question=question)
     if not sources:
         raise LessonContextError(
             "Chương này chưa có học liệu được Admin duyệt và đọc được nội dung.", 409
         )
+
+    # Hash *all* approved source texts, not just the question-specific chunks.
+    # Selecting 2.1 then 2.2 keeps one chapter memory unless Admin changes
+    # the syllabus, approved documents, or their actual extracted content.
+    full_source_signature = approved_source_signature(fingerprint, [
+        {"id": row["id"], "name": row["original_name"],
+         "excerpt": row["extracted_text"] or ""}
+        for row in rows if (row["extracted_text"] or "").strip()
+    ])
 
     return {
         "subject_id": subject_id,
@@ -145,8 +156,10 @@ def resolve_lesson_context(project, conn, uid, subject_id, chapter_number, topic
         "chapter_number": chapter_number,
         "chapter": section["chapter"],
         "topic_index": topic_index,
-        "topic": topics[topic_index] if topics else section["chapter"],
+        "topic": (topics[topic_index] if topics else section["chapter"])
+                 if topic_index is not None else section["chapter"],
+        "topics": topics,
         "source_name": source_name,
-        "source_signature": approved_source_signature(fingerprint, sources),
+        "source_signature": full_source_signature,
         "sources": sources,
     }
