@@ -186,6 +186,19 @@ Thuật toán độ phức tạp Big O cũng có thể áp dụng cho linked lis
             assert "BT02:" in html
             assert "wrong_course.txt" not in html
             assert f"/shared-documents/{wrong_doc['id']}/file" not in html
+            # A roadmap generated BEFORE an Admin's later approval still shows
+            # approved files dynamically without mixing other-course documents.
+            plan_post = student.post(
+                f"/subjects/{course}/learning-path",
+                data={"csrf_token": student_token, "action": "generate"},
+            )
+            assert plan_post.status_code == 303
+            roadmap = student.get(f"/subjects/{course}/learning-path")
+            assert roadmap.status_code == 200
+            roadmap_html = roadmap.get_data(as_text=True)
+            assert "chapter2.txt" in roadmap_html
+            assert "Admin đã duyệt" in roadmap_html
+            assert "wrong_course.txt" not in roadmap_html
             assert student.get(f"/subjects/{course}/chapters/3").status_code == 404
             assert peer.get(f"/subjects/{course}/chapters/2").status_code == 404
             assert administrator.get(f"/subjects/{course}/chapters/2").status_code == 403
@@ -213,6 +226,10 @@ Thuật toán độ phức tạp Big O cũng có thể áp dụng cho linked lis
             html = student.get(f"/subjects/{course}/chapters/2").get_data(as_text=True)
             assert "chưa có học liệu chung" in html.lower()
             assert "chapter2.txt" not in html
+            # Revoked approval must disappear from an already persisted roadmap.
+            roadmap_after_revocation = student.get(
+                f"/subjects/{course}/learning-path").get_data(as_text=True)
+            assert "chapter2.txt" not in roadmap_after_revocation
 
             # Approving and then changing the official syllabus invalidates approval.
             assert administrator.post(
