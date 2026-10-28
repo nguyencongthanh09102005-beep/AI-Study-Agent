@@ -7,6 +7,7 @@ from flask import Blueprint, current_app, redirect, render_template, request, se
 
 from course_path_learning import (
     PLAN_VERSION, build_course_roadmap, parse_chapter_details, unit_fingerprint,
+    personal_course_documents,
 )
 from syllabus_learning import syllabus_hash
 from syllabus_routes import _source, ensure_syllabus_schema
@@ -34,25 +35,12 @@ def ensure_roadmap_schema(conn):
     conn.commit()
 
 
-def _course_documents(project, conn, user_id, subject_id, shared_subject, syllabus_id):
-    """Only this student's documents or the matching course's shared documents."""
-    docs = []
-    personal = conn.execute("""
-        SELECT id,original_name,extracted_text FROM documents
-        WHERE user_id=? AND subject_id=? AND id!=COALESCE(?, -1)
-        ORDER BY id DESC LIMIT 30
-    """, (user_id, subject_id, syllabus_id)).fetchall()
-    for row in personal:
-        if (row["extracted_text"] or "").strip():
-            docs.append({
-                "id": row["id"], "name": row["original_name"],
-                "text": row["extracted_text"], "kind": "personal",
-            })
-    # The course-specific reader only recommends Admin-confirmed chapter materials.
-    # Shared documents are added live to the roadmap after Admin approval below;
-    # otherwise a lexical hit could be mistaken for reviewed academic evidence.
-    return docs
-
+def _course_documents(project, conn, user_id, subject_id, shared_subject,
+                      syllabus_id, source_text):
+    """Only unique private study documents; never offer the syllabus as a slide."""
+    return personal_course_documents(
+        conn, user_id, subject_id, syllabus_id, source_text
+    )
 
 @course_path_bp.route("/subjects/<int:subject_id>/learning-path", methods=["GET", "POST"])
 def learning_path(subject_id):
@@ -111,7 +99,7 @@ def learning_path(subject_id):
             chapters = parse_chapter_details(text, units)
             shared = project.ensure_shared_subject_for_user_subject(conn, uid, subject_id)
             docs = _course_documents(project, conn, uid, subject_id, shared,
-                                     subject["personal_syllabus_document_id"])
+                                     subject["personal_syllabus_document_id"], text)
             profile = project.ensure_learning_profile(conn, uid)
             goal = (profile["goals"] or "").strip()
             if not goal and subject["target_score"]:
@@ -145,6 +133,19 @@ def learning_path(subject_id):
                                     notice="Đã xây dựng lộ trình từ đề cương đã xác nhận."), code=303)
 
         sessions = saved_sessions if fresh else []
+        # Filter older saved plans dynamically, without deleting the user's PDFs.
+        if sessions:
+            valid_private = {
+                d["id"] for d in personal_course_documents(
+                    conn, uid, subject_id,
+                    subject["personal_syllabus_document_id"], text
+                )
+            }
+            for lesson in sessions:
+                lesson["materials"] = [
+                    doc for doc in lesson.get("materials", [])
+                    if doc.get("kind") != "personal" or doc.get("id") in valid_private
+                ]
         # Show confirmed shared materials live, even when Admin approves/revokes
         # a document after the student's roadmap was generated.
         if sessions and source_kind == "shared":
