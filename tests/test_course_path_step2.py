@@ -141,6 +141,11 @@ Chương 6. Thuật toán sắp xếp
             plan = conn.execute(
                 "SELECT * FROM course_roadmaps WHERE user_id=? AND subject_id=?",
                 (student, course)).fetchone()
+            if plan is None:
+                from syllabus_routes import _source
+                extracted = _source(project, conn, student, course)
+                source_row = conn.execute("SELECT status,source_hash,units_json FROM syllabus_reviews WHERE user_id=? AND subject_id=?", (student, course)).fetchone()
+                raise AssertionError(f"No plan: redirect={result.headers.get('Location')}, source={extracted[0]}, length={len(extracted[1])}, hash={syllabus_hash(extracted[1])}, saved={dict(source_row) if source_row else None}")
             sessions = json.loads(plan["sessions_json"])
             assert len(sessions) == 6, len(sessions)
             assert [x["unit_id"] for x in sessions] == list(range(1, 7))
