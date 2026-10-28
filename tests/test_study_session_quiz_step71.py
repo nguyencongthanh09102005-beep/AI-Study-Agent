@@ -195,7 +195,8 @@ def verify():
             html = ready_page.get_data(as_text=True)
             assert "Nguồn đã xác thực" in html
             assert "Slide chương 1 đã duyệt" in html
-            assert "Đợt 7.2" in html
+            assert "Quiz theo buổi được chuẩn bị" not in html
+            assert "Lộ trình theo chương" in html
             assert "Quiz cũ" in html
             room = client.get(f"/study-plan/tasks/{task}/learn")
             assert room.status_code == 200
