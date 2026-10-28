@@ -379,6 +379,11 @@ Thuật toán độ phức tạp Big O cũng có thể áp dụng cho linked lis
             }
             try:
                 project.gemini_generate = fake_tutor
+                overlong = student.post("/api/chat", json={
+                    **payload, "question": "x" * 501
+                })
+                assert overlong.status_code == 400
+                assert "500 ký tự" in overlong.get_json()["error"]
                 tutored = student.post("/api/chat", json=payload)
                 assert tutored.status_code == 200, tutored.get_data(as_text=True)[:700]
                 response = tutored.get_json()
@@ -496,6 +501,34 @@ Thuật toán độ phức tạp Big O cũng có thể áp dụng cho linked lis
                 assert len(student.get(
                     f'/api/chats/{convo["id"]}/messages'
                 ).get_json()) == 12
+
+                # Admin can revoke an approved file while AI is generating.
+                # The answer must not be shown or saved if that happens.
+                def revoke_during_ai(prompt):
+                    db_conn = project.db()
+                    db_conn.execute(
+                        "DELETE FROM shared_document_chapters WHERE document_id=?",
+                        (doc_id,)
+                    )
+                    db_conn.commit()
+                    db_conn.close()
+                    return (json.dumps({
+                        "explanation": "Bài giảng bị thu hồi trước khi lưu.",
+                        "citations": [{"source_key": "T1", "quote": source_quote}],
+                        "practice": "Không được gửi."
+                    }, ensure_ascii=False), None)
+                project.gemini_generate = revoke_during_ai
+                stale_answer = student.post("/api/chat", json=payload)
+                assert stale_answer.status_code == 409
+                assert "thay đổi" in stale_answer.get_json()["error"]
+                assert len(student.get(
+                    f'/api/chats/{convo["id"]}/messages'
+                ).get_json()) == 12
+                # Restore approval for the remaining existing regression cases.
+                assert administrator.post(
+                    f"/admin/documents/{doc_id}/chapters",
+                    data={"csrf_token": admin_token, "chapters": ["1", "2"]},
+                ).status_code == 303
             finally:
                 project.gemini_generate = original_ai_backend
             assert student.get(f"/subjects/{course}/chapters/3").status_code == 404
