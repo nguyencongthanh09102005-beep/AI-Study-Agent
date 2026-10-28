@@ -422,7 +422,7 @@ body.page-chat .side-nav .chat-nav-toggle { display: none; }
     visibility: visible !important;
   }
   body.page-chat .sidebar-course-list .chat-history-list.chat-courses-ready {
-    animation: chat-sidebar-course-reveal 260ms ease-out both;
+    animation: chat-sidebar-course-reveal 340ms cubic-bezier(.22, 1, .36, 1) both;
   }
   body.page-chat .sidebar-course-list .chat-subject-loading {
     margin: 12px 8px;
@@ -432,7 +432,7 @@ body.page-chat .side-nav .chat-nav-toggle { display: none; }
   }
 }
 @keyframes chat-sidebar-course-reveal {
-  from { opacity: .45; transform: translateY(7px); }
+  from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -463,5 +463,61 @@ body.page-chat .side-nav .chat-nav-toggle { display: none; }
   body.page-chat .side-nav a.chat-nav-secondary:focus-visible {
     outline: 2px solid #8295e7;
     outline-offset: 2px;
+  }
+}
+
+/* Entrance choreography on full-page navigation to Chat AI:
+   1. Compact navigation settles
+   2. Course section eases in
+   3. Individual course rows cascade only on initial API load
+   Everything animated here is composited opacity/transform, never flex
+   sizes, height, grid rows, backdrop blur or item layout. */
+@media (min-width: 981px) {
+  body.page-chat .side-nav a.chat-nav-primary {
+    animation: chat-sidebar-nav-enter 190ms cubic-bezier(.22,1,.36,1) both;
+  }
+  body.page-chat .side-nav a.chat-nav-secondary {
+    animation: chat-sidebar-shortcut-enter 230ms cubic-bezier(.22,1,.36,1) both;
+    animation-delay: 35ms;
+  }
+  body.page-chat .side-nav .chat-nav-toggle {
+    animation: chat-sidebar-nav-enter 180ms ease-out 115ms both;
+  }
+  body.page-chat .sidebar-course-list {
+    animation: chat-sidebar-panel-enter 410ms cubic-bezier(.22,1,.36,1) 215ms both;
+  }
+  body.page-chat .sidebar-course-list .subject-chat-item.chat-course-enter {
+    animation: chat-sidebar-item-enter 280ms cubic-bezier(.22,1,.36,1) both;
+    animation-delay: calc(40ms + var(--course-enter-index, 0) * 38ms);
+  }
+  body.page-chat .sidebar-course-list .chat-history-list[aria-busy="true"] {
+    min-height: 32px;
+  }
+}
+@keyframes chat-sidebar-nav-enter {
+  from { opacity: .55; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes chat-sidebar-shortcut-enter {
+  from { opacity: 0; transform: translateY(10px) scale(.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes chat-sidebar-panel-enter {
+  from { opacity: 0; transform: translateY(15px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes chat-sidebar-item-enter {
+  from { opacity: 0; transform: translateY(9px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.page-chat .side-nav a.chat-nav-primary,
+  body.page-chat .side-nav a.chat-nav-secondary,
+  body.page-chat .side-nav .chat-nav-toggle,
+  body.page-chat .sidebar-course-list,
+  body.page-chat .sidebar-course-list .subject-chat-item.chat-course-enter {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
   }
 }
