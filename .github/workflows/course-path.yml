@@ -1,0 +1,27 @@
+name: Course syllabus and roadmap checks
+
+on:
+  push:
+    branches:
+      - feature/course-learning
+  workflow_dispatch:
+
+jobs:
+  course-path:
+    runs-on: ubuntu-latest
+    env:
+      DEMO_ACCOUNT_ENABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Validate parser, routes and schemas
+        run: |
+          python -m py_compile app.py syllabus_learning.py syllabus_routes.py course_path_learning.py course_path_routes.py
+          python tests/test_syllabus_step1.py
+          python tests/test_course_path_step2.py
