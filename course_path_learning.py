@@ -1,21 +1,33 @@
-"""Course-first study path derived from approved syllabus chapters.
+"""Course-first study sessions grounded in the student's confirmed syllabus.
 
-This module never invents chapters, pages, CLO relationships or document content.
-Only actual subject-owned/shared materials may be suggested.
+The PDF parser accepts common bullet and standalone-heading layouts.
+It never invents academic chapters, specific exercise requirements or file access.
 """
 import hashlib
 import json
 import re
 from datetime import date, timedelta
 
+PLAN_VERSION = 2
+
 TOPIC_RE = re.compile(r"^(\d+(?:\.\d+){1,3})[.)]?\s+(.{3,200})$")
 CHAPTER_RE = re.compile(r"^(?:chương|chapter|bài|lesson|unit|module)\s+(\d+)\b", re.I)
-OBJECTIVE_RE = re.compile(r"^(?:mục tiêu(?: chương| bài)?|yêu cầu cần đạt)\s*[:：]\s*(.+)", re.I)
-EXERCISE_RE = re.compile(r"^(?:bài tập|thực hành|bài thực hành)\s*[:：]\s*(.+)", re.I)
-RESOURCE_RE = re.compile(r"^(?:tài liệu|học liệu|slide|giáo trình)\s*[:：]\s*(.+)", re.I)
 CLO_RE = re.compile(r"\bCLO\s*[-:]?\s*\d+\b", re.I)
-NON_TOPICS = {"mục tiêu", "đánh giá", "tài liệu", "tham khảo", "chuẩn đầu ra"}
-
+BULLET_RE = re.compile(r"^[•●▪◦*+\-–—]\s*")
+COURSE_END_RE = re.compile(
+    r"^\d+\.\s+(?:KẾ HOẠCH GIẢNG DẠY|PHƯƠNG PHÁP GIẢNG DẠY|"
+    r"PHƯƠNG PHÁP ĐÁNH GIÁ|TÀI LIỆU HỌC TẬP|TÀI LIỆU THAM KHẢO|"
+    r"HƯỚNG DẪN SỬ DỤNG|CƠ CẤU ĐÁNH GIÁ)\b", re.I
+)
+SECTION_PATTERNS = (
+    ("objectives", re.compile(r"^(?:mục tiêu(?: sau chương| chương| bài)?|yêu cầu cần đạt)\s*(?::\s*(.+))?$", re.I)),
+    ("topics", re.compile(r"^(?:nội dung kiến thức|nội dung học|kiến thức trọng tâm)\s*(?::\s*(.+))?$", re.I)),
+    ("resource_hints", re.compile(r"^(?:học liệu tham chiếu|tài liệu tham chiếu|tài liệu học tập|học liệu)\s*(?::\s*(.+))?$", re.I)),
+    ("activities", re.compile(r"^(?:hoạt động học tập(?: đề xuất)?|hoạt động trên lớp)\s*(?::\s*(.+))?$", re.I)),
+    ("exercises", re.compile(r"^(?:bài tập(?: thực hành)?|bài thực hành|thực hành)\s*(?::\s*(.+))?$", re.I)),
+    ("quiz", re.compile(r"^(?:tự kiểm tra theo chương|kiểm tra cuối chương|quiz theo chương)\s*(?::\s*(.+))?$", re.I)),
+    ("criteria", re.compile(r"^(?:tiêu chí(?: gợi ý)? để chuyển tiếp|tiêu chí đạt|yêu cầu đánh giá)\s*(?::\s*(.+))?$", re.I)),
+)
 STOPWORDS = {
     "chương", "bài", "môn", "học", "các", "một", "theo", "nội", "dung",
     "với", "trong", "được", "những", "của", "phần", "và", "từ", "cho",
@@ -33,13 +45,29 @@ def unit_fingerprint(units):
     return hashlib.sha256(compact.encode("utf-8")).hexdigest()
 
 
+def _clean_bullet(line):
+    return BULLET_RE.sub("", line).strip()
+
+
+def _boilerplate(line):
+    low = line.casefold()
+    return (low.startswith(("ai study agent  /", "chỉ dùng kiểm thử",
+                            "tài liệu giả lập •", "kết thúc tài liệu giả lập"))
+            or bool(re.fullmatch(r"Trang \d+", line)))
+
+
+def _collect_value(bucket, value, limit=8):
+    value = value.strip(" \t;")[:350]
+    if value and value not in bucket and len(bucket) < limit:
+        bucket.append(value)
+
+
 def parse_chapter_details(text, units):
-    """Extract sections ONLY between approved source-evidence headings."""
+    """Extract only evidence-backed subtopics and learning activities per chapter."""
     lines = normalized_lines(text)
-    cursor = 0
-    sections = []
+    cursor, sections = 0, []
     for unit in units:
-        evidence = " ".join(str(unit.get("evidence", "")).split())
+        evidence = " ".join(str(unit.get("evidence") or "").split())
         position = next((i for i in range(cursor, len(lines))
                          if lines[i].casefold() == evidence.casefold()), -1)
         if position < 0:
@@ -53,40 +81,76 @@ def parse_chapter_details(text, units):
         body = lines[section["start"]+1:end]
         chapter_match = CHAPTER_RE.match(section["evidence"])
         chapter_num = chapter_match.group(1) if chapter_match else ""
-        topics, seen = [], set()
-        objectives, exercises, resource_hints, clos = [], [], [], []
-        for line in body:
+        values = {name: [] for name, _ in SECTION_PATTERNS}
+        clos = []
+        lesson_periods = 0
+        current = None
+        for raw in body:
+            line = _clean_bullet(raw)
+            if not line or _boilerplate(line):
+                continue
+            if COURSE_END_RE.match(line):
+                break
+            # A different chapter heading is a hard boundary, even if not approved.
+            if CHAPTER_RE.match(line):
+                break
+
+            if line.casefold().startswith("thời lượng:"):
+                period = re.search(r"(\d+)\s*tiết", line, re.I)
+                lesson_periods = int(period.group(1)) if period else 0
+                for clo in CLO_RE.findall(line):
+                    label = re.sub(r"[\s:-]+", "", clo.upper())
+                    if label not in clos:
+                        clos.append(label)
+                current = None
+                continue
+
+            matched_section = None
+            for name, pattern in SECTION_PATTERNS:
+                m = pattern.fullmatch(line)
+                if m:
+                    matched_section = name
+                    current = name
+                    if m.group(1):
+                        _collect_value(values[name], m.group(1))
+                    break
+            if matched_section:
+                continue
+
             topic = TOPIC_RE.match(line)
             if topic and chapter_num and topic.group(1).startswith(chapter_num + "."):
-                label = line[:220]
-                if label.casefold() not in seen:
-                    topics.append(label)
-                    seen.add(label.casefold())
+                _collect_value(values["topics"], line, limit=48)
+                current = "topics"
                 continue
-            # Stop considering administrative sections, but do not expand to other chapters.
-            if re.match(r"^\d+\.\s+(?:phương pháp|tài liệu tham khảo|đánh giá|kế hoạch giảng dạy)\b", line, re.I):
-                break
-            objective = OBJECTIVE_RE.match(line)
-            exercise = EXERCISE_RE.match(line)
-            resource = RESOURCE_RE.match(line)
-            if objective:
-                objectives.append(objective.group(1)[:280])
-            elif exercise:
-                exercises.append(exercise.group(1)[:280])
-            elif resource:
-                resource_hints.append(resource.group(1)[:240])
-            for clo in CLO_RE.findall(line):
-                label = re.sub(r"\s+", "", clo.upper()).replace("-", "").replace(":", "")
-                if label not in clos:
-                    clos.append(label)
+
+            if current in values:
+                # Do not turn an unrelated numbered administrative section into a lesson.
+                if re.match(r"^\d+\.\s+", line):
+                    current = None
+                    continue
+                _collect_value(values[current], line, limit=20)
+
+        # Source metadata is descriptive; no learning evidence may be hallucinated.
+        quiz_text = " ".join(values["quiz"])
+        count_match = re.search(r"(\d{1,2})\s*câu", quiz_text, re.I)
+        quiz_count = int(count_match.group(1)) if count_match else None
+        criterion_text = " ".join(values["criteria"])
+        passing_match = re.search(r"(\d{1,3})\s*%", criterion_text)
+        passing_pct = int(passing_match.group(1)) if passing_match else None
         result.append({
             "unit_id": index + 1,
             "chapter": section["title"],
             "evidence": section["evidence"],
-            "topics": topics[:36],
-            "objectives": objectives[:6],
-            "exercises": exercises[:10],
-            "resource_hints": resource_hints[:10],
+            "topics": values["topics"][:36],
+            "objectives": values["objectives"][:6],
+            "exercises": values["exercises"][:10],
+            "resource_hints": values["resource_hints"][:10],
+            "class_activities": values["activities"][:10],
+            "quiz_description": values["quiz"][:5],
+            "passing_criteria": values["criteria"][:5],
+            "quiz_count_from_syllabus": quiz_count if quiz_count and 1 <= quiz_count <= 30 else None,
+            "passing_percent_from_syllabus": passing_pct if passing_pct and 1 <= passing_pct <= 100 else None,
+            "teaching_periods": lesson_periods,
             "clo_refs": clos[:12],
         })
     return result
@@ -100,19 +164,17 @@ def _terms(value):
 
 
 def match_course_materials(section, documents):
-    """Return only subject-scoped documents with topical evidence; do not fabricate a match."""
+    """Only return genuinely subject-scoped files with topical text evidence."""
     search_terms = _terms(section["chapter"] + " " + " ".join(section["topics"][:8]))
     ranked = []
     for document in documents:
         content = (document.get("text") or "")[:18000]
         name = document.get("name") or ""
-        # Require content-based evidence, not just a misleading filename.
         matches = search_terms & _terms(content)
         if len(matches) < 2:
             continue
         title_matches = search_terms & _terms(name)
-        score = len(matches) + len(title_matches) * 2
-        ranked.append((score, {
+        ranked.append((len(matches) + 2 * len(title_matches), {
             "id": document["id"],
             "name": name[:180],
             "kind": document["kind"],
@@ -123,7 +185,7 @@ def match_course_materials(section, documents):
 
 
 def build_course_roadmap(chapters, documents, profile, weaknesses=None, start_date=None):
-    """Produce independently verifiable, course-scoped sessions in syllabus order."""
+    """Schedule concrete syllabus units in verified order; quiz is only a suggestion."""
     if not chapters:
         raise ValueError("Đề cương chưa có chương hợp lệ.")
     goal = (profile.get("goal") or "").strip()[:160]
@@ -134,53 +196,67 @@ def build_course_roadmap(chapters, documents, profile, weaknesses=None, start_da
     base_date = start_date or date.today()
     weaknesses = weaknesses or []
     sessions = []
+    # Less time means a smaller verified topic chunk, not a fixed 1 session/chapter.
+    chunk_size = (1 if daily_minutes < 35 else 2 if daily_minutes < 75
+                  else 3 if daily_minutes < 120 else 4)
     for chapter in chapters:
         topic_items = chapter["topics"]
-        # Split large chapters into manageable chunks, no artificial topic invention.
-        topic_chunks = [topic_items[i:i+3] for i in range(0, len(topic_items), 3)] or [[]]
+        topic_chunks = [topic_items[i:i+chunk_size]
+                        for i in range(0, len(topic_items), chunk_size)] or [[]]
         materials = match_course_materials(chapter, documents)
         relevant_weaknesses = [
             w["topic"][:140] for w in weaknesses
             if _terms(w.get("topic", "")) and
-            len(_terms(w.get("topic", "")) & _terms(chapter["chapter"] + " " + " ".join(topic_items))) >= 2
+            len(_terms(w.get("topic", "")) & _terms(
+                chapter["chapter"] + " " + " ".join(topic_items))) >= 2
         ][:3]
-        for offset, chunk in enumerate(topic_chunks):
-            chapter_last = offset == len(topic_chunks) - 1
-            title = f'{chapter["chapter"]} — Buổi {offset + 1}/{len(topic_chunks)}'
-            notes = chapter["objectives"][:2] if chapter["objectives"] else []
-            if not notes:
-                notes = [f"Nắm được: {x}" for x in chunk] if chunk else [f"Tìm hiểu nội dung {chapter['chapter']} từ đề cương."]
+        for index, chunk in enumerate(topic_chunks):
+            chapter_last = index == len(topic_chunks) - 1
+            objectives = chapter["objectives"][:2] or (
+                ["Nắm được: " + "; ".join(chunk)] if chunk else
+                ["Đọc toàn bộ nội dung chương theo đề cương."]
+            )
             activities = []
             if chunk:
-                activities.append("Đọc các mục: " + "; ".join(chunk))
+                activities.append("Đọc và thực hành các tiểu mục: " + "; ".join(chunk))
             else:
-                activities.append("Đọc và ghi chú nội dung chương trong đề cương.")
-            if chapter["exercises"] and chapter_last:
-                activities.append("Bài tập trong đề cương: " + "; ".join(chapter["exercises"][:2]))
+                activities.append("Đề cương không tách rõ tiểu mục; cần xem chương gốc.")
+            if chapter_last and chapter["exercises"]:
+                activities.extend("Bài tập từ đề cương: " + entry
+                                  for entry in chapter["exercises"][:3])
+            elif chapter["class_activities"]:
+                activities.append("Hoạt động từ đề cương: "
+                                  + chapter["class_activities"][0])
             else:
-                activities.append("Gợi ý của hệ thống: viết tóm tắt và tự giải thích các khái niệm vừa học.")
+                activities.append("Gợi ý của hệ thống: giải thích lại các khái niệm vừa học.")
             if relevant_weaknesses:
                 activities.append("Ưu tiên ôn: " + "; ".join(relevant_weaknesses))
+            quiz_count = chapter["quiz_count_from_syllabus"] or 10
             sessions.append({
-                "session_id": len(sessions)+1,
+                "planner_version": PLAN_VERSION,
+                "session_id": len(sessions) + 1,
                 "unit_id": chapter["unit_id"],
                 "chapter": chapter["chapter"],
                 "source_evidence": chapter["evidence"],
                 "date": (base_date + timedelta(days=len(sessions))).isoformat(),
                 "time": preferred_time,
                 "duration": daily_minutes,
-                "title": title[:180],
+                "title": (f'{chapter["chapter"]} — Buổi {index+1}/{len(topic_chunks)}')[:180],
                 "topics": chunk,
-                "objectives": notes,
+                "objectives": objectives,
                 "activities": activities,
                 "materials": materials,
                 "source_material_hints": chapter["resource_hints"],
-                "quiz": {
-                    "recommended_questions": 10,
+                "quiz": ({
+                    "recommended_questions": quiz_count,
+                    "question_count_from_syllabus": bool(chapter["quiz_count_from_syllabus"]),
+                    "description": chapter["quiz_description"],
+                    "passing_criteria": chapter["passing_criteria"],
+                    "passing_percent_from_syllabus": chapter["passing_percent_from_syllabus"],
                     "scope": chapter["chapter"],
                     "action": "quiz_chapter",
-                    "available": False,  # Actual chapter-scoped Quiz is a later milestone.
-                } if chapter_last else None,
+                    "available": False,
+                } if chapter_last else None),
                 "weaknesses": relevant_weaknesses,
                 "goal": goal,
                 "clo_refs": chapter["clo_refs"],
