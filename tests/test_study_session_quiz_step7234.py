@@ -138,8 +138,8 @@ def run():
             try:
                 import re
                 def mixed_ai(prompt):
-                    n = int(re.search(r"Tạo đúng (\\d+) câu", prompt).group(1))
-                    batch = int(re.search(r"cho NHÓM (\\d+)", prompt).group(1))
+                    n = int(re.search(r"Tạo đúng (\d+) câu", prompt).group(1))
+                    batch = int(re.search(r"cho NHÓM (\d+)", prompt).group(1))
                     questions = []
                     for i in range(n):
                         is_admin = i % 2 == 0
