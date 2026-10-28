@@ -377,6 +377,11 @@ def quiz_access(conn, project, uid, quiz_id, at=None):
     """, (quiz_id, uid)).fetchone()
     if not link:
         return {"linked": False, "allowed": True}
+    # A deleted subject retains Quiz answers/scores as private archives.
+    # Keep those answers locked even after its subject/task is unclassified.
+    if link["subject_id"] is None:
+        return {"linked": True, "allowed": False,
+                "reason": "Quiz thuộc môn học đã xóa và được lưu trữ an toàn."}
     if link["task_id"] is None:
         return {"linked": True, "allowed": False, "reason": "Buổi học đã bị xóa."}
     try:
