@@ -4,9 +4,10 @@ Access is per student and subject. Viewing does not mark a task started/done,
 alter progress, call an LLM, or generate a quiz.
 """
 import json
+import secrets
 import sys
 from datetime import datetime, timedelta
-from flask import Blueprint, current_app, render_template, session, redirect, url_for, jsonify
+from flask import Blueprint, current_app, render_template, session, redirect, url_for, jsonify, request
 
 from course_path_learning import PLAN_VERSION, unit_fingerprint
 from course_path_routes import ensure_roadmap_schema
@@ -18,6 +19,8 @@ from chapter_material_routes import (
     official_syllabus,
 )
 from chapter_tutor import prepared_sources
+from study_session_tracking import (ensure_tracking_schema, verified_roadmap_task,
+                                    read_state, apply_action, StudyTrackingError)
 
 study_session_bp = Blueprint("study_session", __name__)
 
@@ -158,13 +161,19 @@ def learning_session(task_id):
             ))
         ) if kind == "shared" and shared_docs else False
 
+        ensure_tracking_schema(conn)
+        study_state = read_state(conn, task, uid)
+        study_csrf = session.get("study_session_csrf")
+        if not study_csrf:
+            study_csrf = secrets.token_hex(24)
+            session["study_session_csrf"] = study_csrf
         start_text, end_text = _schedule_display(task["study_at"], task["duration"])
         return render_template(
             "study_session.html", page="study_plan",
             subject=subject, task=task, lesson=lesson,
             syllabus_name=syllabus_name, private_docs=private_docs,
             shared_docs=shared_docs, start_text=start_text, end_text=end_text,
-            chat_ready=chat_ready,
+            chat_ready=chat_ready, study_state=study_state, study_csrf=study_csrf,
         )
     finally:
         conn.close()
@@ -209,5 +218,56 @@ def learning_session_chat_history(task_id):
                 item["name"] for item in context["sources"]
             )),
         })
+    finally:
+        conn.close()
+
+
+@study_session_bp.route("/api/study-plan/tasks/<int:task_id>/study-session",
+                        methods=["GET", "POST"])
+def learning_session_tracking(task_id):
+    """Student-only, source-verified timer. GET reads; POST commits one transition."""
+    project = sys.modules[current_app.import_name]
+    uid = session.get("user_id")
+    if not uid:
+        return jsonify({"error": "Hãy đăng nhập để ghi nhận thời gian học."}), 401
+    if request.method == "POST":
+        token = session.get("study_session_csrf") or ""
+        supplied = request.headers.get("X-Study-CSRF", "")
+        if not token or not secrets.compare_digest(token, supplied):
+            return jsonify({"error": "Phiên xác nhận không hợp lệ. Hãy tải lại trang học."}), 403
+        if not request.is_json:
+            return jsonify({"error": "Yêu cầu phải có định dạng JSON."}), 415
+        body = request.get_json(silent=True)
+        if not isinstance(body, dict) or not isinstance(body.get("action"), str):
+            return jsonify({"error": "Thiếu thao tác phiên học."}), 400
+        action = body["action"]
+    else:
+        action = None
+    conn = project.db()
+    try:
+        ensure_tracking_schema(conn)
+        task = verified_roadmap_task(project, conn, uid, task_id)
+        if request.method == "GET":
+            return jsonify(read_state(conn, task, uid))
+        # Schema helpers above may commit. Lock after validation and check
+        # ownership and the saved roadmap signature again under the write lock.
+        conn.execute("BEGIN IMMEDIATE")
+        locked = conn.execute("""
+            SELECT t.* FROM study_tasks t JOIN subjects s
+              ON s.id=t.subject_id AND s.user_id=t.user_id
+            WHERE t.id=? AND t.user_id=? AND t.source='roadmap'
+              AND t.roadmap_session_id=?
+              AND t.roadmap_session_signature=? AND s.id=?
+        """, (task_id, uid, task["roadmap_session_id"],
+              task["roadmap_session_signature"], task["subject_id"])).fetchone()
+        if not locked:
+            conn.rollback()
+            return jsonify({"error": "Buổi học vừa thay đổi. Hãy tải lại trang."}), 409
+        state = apply_action(project, conn, locked, uid, action)
+        conn.commit()
+        return jsonify(state)
+    except StudyTrackingError as error:
+        conn.rollback()
+        return jsonify({"error": error.message}), error.status
     finally:
         conn.close()
