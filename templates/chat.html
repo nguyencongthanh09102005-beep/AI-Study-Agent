@@ -11,7 +11,10 @@
         <div class="chat-ai-avatar"><img src="{{ url_for('static', filename='images/ai-robot.svg') }}" alt=""></div>
         <div><strong id="chatSubjectName">AI Study Agent</strong><span id="chatContextStatus"><i></i>Chọn một môn học để bắt đầu</span></div>
       </div>
-      <a class="chat-documents-link" href="{{ url_for('documents') }}">▤ Tài liệu</a>
+      <div class="chat-header-actions">
+        <a class="chat-documents-link" href="{{ url_for('documents') }}">▤ Tài liệu</a>
+        <a class="chat-mobile-logout" href="{{ url_for('logout') }}" aria-label="Đăng xuất" title="Đăng xuất">↪</a>
+      </div>
     </header>
 
     <div class="chat-mobile-subject">
