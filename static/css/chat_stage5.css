@@ -79,3 +79,15 @@ body.page-chat .chat-markdown .chat-math-root {
 }
 body.page-chat .chat-markdown .chat-formula-fallback sup,
 body.page-chat .chat-markdown .chat-formula-fallback sub { font-size: .7em; }
+
+body.page-chat .chat-markdown .chat-code-wrap {
+  max-width: 100%; overflow: hidden; margin: 11px 0;
+  border-radius: 11px; border: 1px solid #d6e0f5; background: #e8eefb;
+}
+body.page-chat .chat-markdown .chat-code-title {
+  padding: 7px 12px; border-bottom: 1px solid #d1ddf3;
+  color: #4c6395; font-size: 11px; font-weight: 800;
+}
+body.page-chat .chat-markdown .chat-code-wrap pre {
+  border: 0; border-radius: 0; margin: 0; box-shadow: none;
+}
