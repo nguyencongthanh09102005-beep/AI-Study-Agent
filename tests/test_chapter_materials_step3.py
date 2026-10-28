@@ -114,6 +114,23 @@ Thuật toán độ phức tạp Big O cũng có thể áp dụng cho linked lis
             conn.close()
 
             assert admin_upload("official.txt", syllabus, True).status_code in (302, 303)
+            # Accidental "official syllabus" checkbox on a chapter-only slide
+            # must never replace an already accepted full-course outline.
+            blocked = admin_upload("wrongly_marked_syllabus.txt", slide_text, True)
+            assert blocked.status_code in (302, 303)
+            assert "chưa có ít nhất 2" in administrator.get(
+                blocked.headers["Location"]).get_data(as_text=True)
+            conn = project.db()
+            official = conn.execute(
+                "SELECT original_name FROM shared_documents WHERE shared_subject_id=? AND is_syllabus=1",
+                (shared_id,),
+            ).fetchone()
+            assert official["original_name"] == "official.txt"
+            assert conn.execute(
+                "SELECT COUNT(*) FROM shared_documents WHERE original_name=?",
+                ("wrongly_marked_syllabus.txt",),
+            ).fetchone()[0] == 0
+            conn.close()
             assert admin_upload("chapter2.txt", slide_text).status_code in (302, 303)
             assert admin_upload("wrong_course.txt", slide_text, subject_id=wrong_shared_id).status_code in (302, 303)
             conn = project.db()
