@@ -221,9 +221,12 @@ def run():
             assert client.get("/quiz").status_code == 200
             # Still locked in the real current wall clock, because the test's
             # future planned window has not actually started.
-            assert client.post("/api/quiz/submit", json={
+            later_attempt = client.post("/api/quiz/submit", json={
                 "quiz_id": first_quiz, "answers": [0]*15
-            }).status_code == 409
+            })
+            assert later_attempt.status_code == 409, (
+                later_attempt.status_code, later_attempt.get_data(as_text=True)[:600]
+            )
 
             # Approval revoked => neither quiz nor answer keys leak, even with
             # the previous grant; historical quiz and answers are preserved.
