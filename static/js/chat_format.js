@@ -9,6 +9,24 @@
       .replace(/'/g, "&#39;");
   }
 
+  function mathHtml(expression, display) {
+    const tex = String(expression || "").trim();
+    if (!tex || tex.length > 2000) return escapeHtml(expression);
+    if (global.katex && typeof global.katex.renderToString === "function") {
+      try {
+        return '<span class="chat-formula">' +
+          global.katex.renderToString(tex, {
+            displayMode: !!display, throwOnError: false, trust: false,
+            strict: "ignore", maxExpand: 400, maxSize: 8
+          }) + "</span>";
+      } catch (_error) {
+        // Keep the source expression visible when a symbol is unsupported.
+      }
+    }
+    const fallback = display ? "\\[" + tex + "\\]" : "\\(" + tex + "\\)";
+    return '<span class="chat-formula-fallback">' + escapeHtml(fallback) + "</span>";
+  }
+
   function inline(value) {
     const codeTokens = [];
     let safe = escapeHtml(value);
