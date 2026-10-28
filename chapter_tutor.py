@@ -70,9 +70,26 @@ def prepared_sources(approved_rows, question=""):
             score = sum(1 for term in terms if term in words)
             # Prefer variety only when relevance is equivalent.
             candidate.append((score, row_index, chunk_index, row, body))
-    candidate.sort(key=lambda item: (-item[0], item[2], item[1]))
+    # A chapter overview should sample its beginning, middle and end,
+    # rather than repeatedly taking only the first pages of a long PDF.
+    is_overview = any(phrase in str(question).casefold() for phrase in (
+        "tóm tắt", "tổng quan", "toàn bộ chương", "ôn tập chương",
+        "bao quát chương", "những nội dung chính"
+    ))
+    if len(candidate) > MAX_SOURCES and (
+        is_overview or not any(score for score, *_ in candidate)
+    ):
+        sample_indices = [
+            round(index * (len(candidate) - 1) / (MAX_SOURCES - 1))
+            for index in range(MAX_SOURCES)
+        ]
+        chosen = [candidate[index] for index in sample_indices]
+    else:
+        candidate.sort(key=lambda item: (-item[0], item[2], item[1]))
+        chosen = candidate[:MAX_SOURCES]
+
     result = []
-    for _, _, _, row, body in candidate[:MAX_SOURCES]:
+    for _, _, _, row, body in chosen:
         result.append({
             "key": "T" + str(len(result) + 1),
             "id": row["id"],
