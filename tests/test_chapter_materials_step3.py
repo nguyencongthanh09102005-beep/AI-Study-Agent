@@ -255,8 +255,29 @@ Thuật toán độ phức tạp Big O cũng có thể áp dụng cho linked lis
             assert "chapter2.txt" in roadmap_html
             assert "Admin đã duyệt" in roadmap_html
             assert "wrong_course.txt" not in roadmap_html
-            # Chapter-specific AI tutor: a real source quote is required;
-            # invalid citation or another course's document cannot be used.
+            # Existing Chat AI is the ONLY tutor entrypoint. Link from chapter
+            # selects this same per-course conversation with a scoped context.
+            assert "Học cùng AI trong Chat AI" in html
+            assert 'name="chapter_number" value="2"' in html
+            assert student.post(f"/subjects/{course}/chapters/2").status_code == 405
+
+            chats = student.get("/api/chats").get_json()
+            convo = next(item for item in chats if item["subject_id"] == course)
+            assert convo["id"]
+            lookup = (f"/api/chat/lesson-context?subject_id={course}"
+                      "&chapter_number=2&topic_index=0")
+            verified = student.get(lookup)
+            assert verified.status_code == 200, verified.get_data(as_text=True)[:600]
+            metadata = verified.get_json()
+            assert metadata["chapter_number"] == 2
+            assert "2.1. Danh sách liên kết đơn" in metadata["topic"]
+            assert metadata["source_names"] == ["chapter2.txt"]
+            assert peer.get(lookup).status_code == 404
+            assert student.get(
+                f"/api/chat/lesson-context?subject_id={course}"
+                "&chapter_number=99&topic_index=0"
+            ).status_code == 400
+
             source_quote = "2.1. Danh sách liên kết đơn chứa node và con trỏ next."
             original_ai_backend = project.gemini_generate
             tutor_prompts = []
@@ -267,34 +288,40 @@ Thuật toán độ phức tạp Big O cũng có thể áp dụng cho linked lis
                     "citations": [{"source_key": "T1", "quote": source_quote}],
                     "practice": "Hãy mô tả quá trình chèn node vào đầu danh sách.",
                 }, ensure_ascii=False), None)
+            payload = {
+                "conversation_id": convo["id"],
+                "question": "Giải thích về node.",
+                "lesson": {"chapter_number": 2, "topic_index": 0},
+            }
             try:
                 project.gemini_generate = fake_tutor
-                lesson = student.post(
-                    f"/subjects/{course}/chapters/2",
-                    data={"csrf_token": student_token, "action": "teach",
-                          "topic_index": "0", "question": "Giải thích về node."},
-                )
-                assert lesson.status_code == 200, lesson.get_data(as_text=True)[:500]
-                lesson_html = lesson.get_data(as_text=True)
-                assert "Bài giảng AI" in lesson_html and source_quote in lesson_html
-                assert "chapter2.txt" in lesson_html
-                assert "wrong_course.txt" not in tutor_prompts[-1]
+                tutored = student.post("/api/chat", json=payload)
+                assert tutored.status_code == 200, tutored.get_data(as_text=True)[:700]
+                response = tutored.get_json()
+                assert response["source_mode"] == "chapter"
+                assert "chapter2.txt" in response["sources"]
+                assert source_quote in response["answer"]
+                assert response["lesson"]["chapter_number"] == 2
                 assert "2.1. Danh sách liên kết đơn" in tutor_prompts[-1]
+                assert "wrong_course.txt" not in tutor_prompts[-1]
                 assert "Giải thích về node." in tutor_prompts[-1]
-                assert student.post(
-                    f"/subjects/{course}/chapters/2",
-                    data={"action": "teach", "topic_index": "0"},
-                ).status_code == 403
-                assert student.post(
-                    f"/subjects/{course}/chapters/2",
-                    data={"csrf_token": student_token, "action": "teach",
-                          "topic_index": "99"},
-                ).status_code == 400
-                assert peer.post(
-                    f"/subjects/{course}/chapters/2",
-                    data={"csrf_token": student_token, "action": "teach",
-                          "topic_index": "0"},
-                ).status_code == 404
+
+                # Follow-up uses the SAME chat conversation and its history.
+                followup = student.post("/api/chat", json={
+                    **payload, "question": "Còn phần next thì sao?"
+                })
+                assert followup.status_code == 200
+                assert "Giải thích về node." in tutor_prompts[-1]
+                history = student.get(
+                    f'/api/chats/{convo["id"]}/messages'
+                ).get_json()
+                assert len(history) == 4
+                assert history[-1]["role"] == "assistant"
+
+                assert student.post("/api/chat", json={
+                    **payload, "lesson": {"chapter_number": 2, "topic_index": 99}
+                }).status_code == 400
+                assert peer.post("/api/chat", json=payload).status_code == 404
 
                 def fabricated_tutor(prompt):
                     return (json.dumps({
@@ -304,13 +331,14 @@ Thuật toán độ phức tạp Big O cũng có thể áp dụng cho linked lis
                         "practice": "Một bài tập bịa đặt.",
                     }, ensure_ascii=False), None)
                 project.gemini_generate = fabricated_tutor
-                unsupported = student.post(
-                    f"/subjects/{course}/chapters/2",
-                    data={"csrf_token": student_token, "action": "teach",
-                          "topic_index": "0"},
-                ).get_data(as_text=True)
-                assert "chưa trả được bài giảng có dẫn chứng" in unsupported
-                assert "Một kiến thức không có trong bài" not in unsupported
+                unsupported = student.post("/api/chat", json=payload)
+                assert unsupported.status_code == 502
+                assert "Một kiến thức không có trong bài" not in str(
+                    unsupported.get_json()
+                )
+                assert len(student.get(
+                    f'/api/chats/{convo["id"]}/messages'
+                ).get_json()) == 4
             finally:
                 project.gemini_generate = original_ai_backend
             assert student.get(f"/subjects/{course}/chapters/3").status_code == 404
@@ -340,13 +368,11 @@ Thuật toán độ phức tạp Big O cũng có thể áp dụng cho linked lis
             html = student.get(f"/subjects/{course}/chapters/2").get_data(as_text=True)
             assert "chưa có học liệu chung" in html.lower()
             assert "chapter2.txt" not in html
-            # Revoked files are unavailable to the tutor on subsequent requests.
-            before_tutor = student.post(
-                f"/subjects/{course}/chapters/2",
-                data={"csrf_token": student_token, "action": "teach", "topic_index": "0"},
-            ).get_data(as_text=True)
-            assert "chưa có học liệu chung" in before_tutor.lower() or "chưa có học liệu chung" in html.lower()
-            assert "AI chưa thể giảng bài" in before_tutor
+            # Revoked files must disappear from Chat AI's chapter context.
+            unavailable = student.get(lookup)
+            assert unavailable.status_code == 409
+            blocked = student.post("/api/chat", json=payload)
+            assert blocked.status_code == 409
             # Revoked approval must disappear from an already persisted roadmap.
             roadmap_after_revocation = student.get(
                 f"/subjects/{course}/learning-path").get_data(as_text=True)
@@ -365,6 +391,7 @@ Thuật toán độ phức tạp Big O cũng có thể áp dụng cho linked lis
             conn.commit()
             conn.close()
             assert student.get(f"/subjects/{course}/chapters/2").status_code == 303
+            assert student.get(lookup).status_code == 409
 
             # Confirming new syllabus still must NOT automatically restore approvals
             # created against the old hash.
