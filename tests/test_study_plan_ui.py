@@ -64,7 +64,7 @@ def verify():
     assert 'data-subject-name="Điện toán đám mây"' in html
     assert 'data-task-done="1"' in html
     assert "study_hour_timetable.css" in html
-    timetable_js = (Path(__file__).resolve().parents[1] / "static/js/study_plan.js").read_text()
+    timetable_js = (Path(__file__).resolve().parents[1] / "static/js/study_plan.js").read_text(encoding="utf-8")
     assert 'function renderTimetable()' in timetable_js
     assert 'currentView === "timetable"' in timetable_js
     assert 'timetableGrid.replaceChildren()' in timetable_js
