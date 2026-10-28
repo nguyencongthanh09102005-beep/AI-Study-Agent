@@ -53,6 +53,15 @@ Thuật toán độ phức tạp Big O cũng có thể áp dụng cho linked lis
         "Mỗi node gồm dữ liệu" in source["excerpt"]
         for source in extracted
     ), "Relevant chapter text after the file prefix was not retrieved."
+    broad = prepared_sources([{
+        "id": 901, "original_name": "decuong_chuong_dai.txt",
+        "extracted_text": (
+            "ĐẦU CHƯƠNG. " + "Giới thiệu thuật toán. " * 4000
+            + "CUỐI CHƯƠNG. Các kiến thức tổng kết."
+        )
+    }], question="Tóm tắt toàn bộ chương này")
+    assert any("ĐẦU CHƯƠNG." in item["excerpt"] for item in broad)
+    assert any("CUỐI CHƯƠNG." in item["excerpt"] for item in broad)
 
     old_db, old_dir = project.DB_PATH, project.UPLOAD_DIR
     with tempfile.TemporaryDirectory() as folder:
