@@ -142,7 +142,7 @@ def run():
                     batch = int(re.search(r"cho NHÓM (\d+)", prompt).group(1))
                     questions = []
                     for i in range(n):
-                        is_admin = i % 2 == 0
+                        is_admin = i == 0 and n > 1
                         questions.append({
                             "question": (
                                 f"Mã học phần của môn này là gì? Nhóm {batch}, mục {i}"
