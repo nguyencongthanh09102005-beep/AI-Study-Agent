@@ -119,7 +119,8 @@ document.addEventListener("DOMContentLoaded", () => {
   async function loadLesson() {
     courseLabel.hidden = true;
     scope.textContent = lesson.title + " · Chương " + lesson.chapter;
-    fullChatFor(lesson.subjectId, lesson.chapter);
+    // If chapter sources are unavailable, the full Chat link opens free mode.
+    fullChatFor(lesson.subjectId, lesson.ready ? lesson.chapter : null);
     if (!lesson.ready) {
       enable(false);
       setMode("Chưa đủ học liệu chung được Admin duyệt. Chat theo buổi không khả dụng; có thể mở Chat AI đầy đủ.", true);
