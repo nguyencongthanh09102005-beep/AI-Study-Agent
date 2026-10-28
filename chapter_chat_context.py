@@ -76,7 +76,9 @@ def list_chapter_options(project, conn, uid, subject_id):
             "title": section["chapter"],
             "topics": section["topics"] if section["topics"] else [section["chapter"]],
             "available": bool(ready),
-            "source_names": [item["name"] for item in ready],
+            "source_names": list(dict.fromkeys(
+                item["name"] for item in ready
+            )),
         })
     return {"subject_id": subject_id, "subject_name": subject["name"], "chapters": options}
 
