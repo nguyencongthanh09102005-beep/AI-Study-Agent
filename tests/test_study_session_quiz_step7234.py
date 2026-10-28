@@ -132,6 +132,38 @@ def run():
                      "answer": i % 4}
                     for i in range(count)
                 ]
+            # Verify the real Gemini parser rejects administrative trivia
+            # even when AI includes it among otherwise valid academic items.
+            original_gemini = project.gemini_generate
+            try:
+                import re
+                def mixed_ai(prompt):
+                    n = int(re.search(r"Tạo đúng (\\d+) câu", prompt).group(1))
+                    batch = int(re.search(r"cho NHÓM (\\d+)", prompt).group(1))
+                    questions = []
+                    for i in range(n):
+                        is_admin = i % 2 == 0
+                        questions.append({
+                            "question": (
+                                f"Mã học phần của môn này là gì? Nhóm {batch}, mục {i}"
+                                if is_admin else
+                                f"Đặc điểm của node liên kết trong nhóm {batch}, mục {i} là gì?"
+                            ),
+                            "topic": "Cấu trúc node", "chapter": "Chương 1",
+                            "options": ["Chứa dữ liệu", "Chứa bộ nhớ GPU",
+                                        "Chỉ chứa âm thanh", "Chỉ chứa ảnh"],
+                            "answer": 0,
+                        })
+                    return json.dumps(questions, ensure_ascii=False), None
+                project.gemini_generate = mixed_ai
+                academic = prev_builder(
+                    "Node có dữ liệu và con trỏ next để duyệt danh sách đơn.",
+                    15, session_mode=True
+                )
+                assert len(academic) == 15
+                assert all("Mã học phần" not in q["question"] for q in academic)
+            finally:
+                project.gemini_generate = original_gemini
             project.build_quiz = mock_build
             client = project.app.test_client()
             endpoint = f"/api/subjects/{subject}/quiz-preparation"
