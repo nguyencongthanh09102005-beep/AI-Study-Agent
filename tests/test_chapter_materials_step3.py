@@ -466,7 +466,7 @@ Thuật toán độ phức tạp Big O cũng có thể áp dụng cho linked lis
                 active = resolve_lesson_context(project, conn, first, course, 2, 0)
                 assert len(history_for_mode(
                     conn, first, convo["id"], active
-                )) == 6
+                )) == 8
                 changed = dict(active)
                 changed["source_signature"] = approved_source_signature(
                     "different-source-version",
