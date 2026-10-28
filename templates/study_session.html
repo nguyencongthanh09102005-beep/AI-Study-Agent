@@ -8,10 +8,11 @@
   <nav class="study-room-nav" aria-label="Điều hướng buổi học">
     <a href="{{ url_for('study_plan', subject_id=subject.id) }}">← Kế hoạch học</a>
     <a href="{{ url_for('course_path.learning_path', subject_id=subject.id) }}">Xem lộ trình theo chương →</a>
+    <a href="#studyRoomChat">💬 Hỏi AI về buổi này ↓</a>
   </nav>
   <header class="study-room-hero">
     <div>
-      <span class="study-room-eyebrow">KHÔNG GIAN HỌC TẬP · ĐỢT 6.3.1</span>
+      <span class="study-room-eyebrow">KHÔNG GIAN HỌC TẬP · ĐỢT 6.3.2</span>
       <h2>{{ subject.name }}</h2>
       <p>{{ lesson.title }}</p>
       <div class="study-room-meta">
@@ -76,9 +77,48 @@
         <h3>Thông tin nguồn</h3>
         <p><strong>Đề cương:</strong> {{ syllabus_name }}</p>
         {% if lesson.clo_refs %}<p><strong>CLO:</strong> {{ lesson.clo_refs|join(', ') }}</p>{% endif %}
-        <p class="study-room-muted">Chưa tích hợp Chat AI và Quiz cuối buổi trong Đợt 6.3.1.</p>
+        <p class="study-room-muted">Quiz tự động cuối buổi chưa được tích hợp. Chat AI có dẫn nguồn chỉ dùng tài liệu chung của đúng chương đã được duyệt.</p>
       </section>
     </aside>
   </div>
+  <section class="study-room-card study-room-chat" id="studyRoomChat"
+           data-task-id="{{ task.id }}" data-subject-id="{{ subject.id }}"
+           data-chapter-number="{{ lesson.unit_id }}"
+           data-chat-enabled="{{ '1' if chat_ready else '0' }}"
+           aria-label="Chat AI hỗ trợ buổi học">
+    <div class="study-room-chat-heading">
+      <div>
+        <h3>💬 Chat AI hỗ trợ buổi học</h3>
+        <p class="study-room-chat-subtitle">{{ lesson.title }}</p>
+      </div>
+      <span class="study-room-chat-status" id="studyRoomChatStatus" role="status" aria-live="polite">
+        {{ 'Đang xác thực học liệu...' if chat_ready else 'Chưa có nguồn được duyệt' }}
+      </span>
+    </div>
+    {% if chat_ready %}
+      <p class="study-room-chat-info">AI chỉ dùng tài liệu chung <strong>đã được Admin duyệt</strong> cho Chương {{ lesson.unit_id }}, và tập trung vào các tiểu mục của buổi này. Câu trả lời phải có trích dẫn từ nguồn.</p>
+      <div class="study-room-chat-messages" id="studyRoomChatMessages" role="log" aria-live="polite">
+        <p class="study-room-chat-empty">Đang tải hội thoại của riêng buổi này...</p>
+      </div>
+      <form id="studyRoomChatForm" class="study-room-chat-form">
+        <label for="studyRoomChatQuestion">Câu hỏi về nội dung buổi học</label>
+        <textarea id="studyRoomChatQuestion" rows="3" maxlength="500"
+                  placeholder="Ví dụ: Giải thích tiểu mục đầu tiên trong buổi này..." required disabled></textarea>
+        <div class="study-room-chat-actions">
+          <small>Tối đa 500 ký tự · Có lưu vào lịch sử Chat AI của môn, nhưng tách ngữ cảnh theo buổi.</small>
+          <button type="submit" id="studyRoomChatSend" disabled>Gửi câu hỏi →</button>
+        </div>
+      </form>
+    {% else %}
+      <div class="study-room-chat-unavailable" role="note">
+        Chưa thể bật Chat theo buổi có trích dẫn vì chương này chưa có <strong>tài liệu chung có nội dung đọc được được Admin duyệt</strong>.
+        Tài liệu cá nhân vẫn mở được ở trên nhưng không tự động trở thành nguồn đã duyệt.
+      </div>
+      <a class="study-room-chat-free" href="{{ url_for('chat', subject_id=subject.id) }}">Mở Chat AI thông thường của môn (không xác thực nguồn theo buổi) →</a>
+    {% endif %}
+  </section>
 </div>
+{% endblock %}
+{% block page_scripts %}
+<script src="{{ url_for('static', filename='js/study_session_chat.js') }}"></script>
 {% endblock %}

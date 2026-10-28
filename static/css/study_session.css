@@ -39,3 +39,31 @@
 .page-study_plan .study-hour-launch:hover {background:#ceddff}
 @media(max-width:1000px){.study-room-columns{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:680px){.study-room-hero{padding:19px}.study-room-icon{display:none}.study-room-card{padding:17px}.study-room-nav{gap:12px}}
+
+
+/* Phase 6.3.2: source-verified, session-scoped reuse of Chat AI. */
+.page-study_plan .study-room-chat{margin-top:18px;scroll-margin-top:25px}
+.page-study_plan .study-room-chat-heading{display:flex;justify-content:space-between;gap:14px;align-items:start;flex-wrap:wrap}
+.page-study_plan .study-room-chat-heading h3{margin:0 0 5px;font-size:17px}
+.page-study_plan .study-room-chat-subtitle{margin:0;font-size:12px;color:#536c98}
+.page-study_plan .study-room-chat-status{padding:7px 11px;border:1px solid #dce4f9;border-radius:20px;background:#eff3ff;color:#5269ab;font-weight:800;font-size:11px}
+.page-study_plan .study-room-chat-info{font-size:12px;line-height:1.65;color:#596d94}
+.page-study_plan .study-room-chat-messages{border:1px solid #dce5f7;border-radius:14px;background:#f5f7fe;min-height:140px;max-height:430px;overflow-y:auto;padding:17px;display:flex;flex-direction:column;gap:12px}
+.page-study_plan .study-room-chat-empty{margin:auto;color:#6c7e9f;font-size:12px;line-height:1.6;text-align:center}
+.page-study_plan .study-room-chat-bubble{max-width:min(90%,720px);padding:12px 15px;border:1px solid #dce3f6;border-radius:14px;background:#fff;line-height:1.6;color:#334c81;font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}
+.page-study_plan .study-room-chat-bubble.user{align-self:flex-end;background:#e6edff;border-color:#c5d2f8}
+.page-study_plan .study-room-chat-bubble.assistant{align-self:flex-start}
+.page-study_plan .study-room-chat-bubble.error{border-color:#e9c591;background:#fff4e6;color:#815323}
+.page-study_plan .study-room-chat-bubble strong{display:block;margin-bottom:7px;font-size:11px;color:#5369a2}
+.page-study_plan .study-room-chat-form{display:grid;gap:9px;margin-top:16px}
+.page-study_plan .study-room-chat-form label{font-size:12px;font-weight:800;color:#344f86}
+.page-study_plan #studyRoomChatQuestion{display:block;resize:vertical;width:100%;box-sizing:border-box;border-radius:12px;border:1px solid #cad7f3;padding:13px 14px;min-height:92px;background:#fff;color:#263e74;font-size:13px;line-height:1.6;font-family:inherit}
+.page-study_plan #studyRoomChatQuestion:focus{outline:2px solid #889cf0;outline-offset:2px}
+.page-study_plan .study-room-chat-actions{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.page-study_plan .study-room-chat-actions small{color:#7687a7;font-size:11px;line-height:1.5}
+.page-study_plan .study-room-chat-actions button{cursor:pointer;background:#596bdb;color:#fff;border:0;border-radius:11px;padding:11px 17px;font-weight:800;font-size:12px}
+.page-study_plan .study-room-chat-actions button:disabled{opacity:.5;cursor:not-allowed}
+.page-study_plan .study-room-chat-unavailable{padding:16px;background:#fff7e9;border:1px solid #f0d1a4;border-radius:12px;color:#785524;font-size:13px;line-height:1.7;margin-top:14px}
+.page-study_plan .study-room-chat-free{display:inline-block;color:#445dc9;font-size:12px;font-weight:800;text-decoration:none;margin-top:15px}
+.page-study_plan .study-room-chat-free:hover{text-decoration:underline}
+@media(max-width:680px){.page-study_plan .study-room-chat-bubble{max-width:100%}.page-study_plan .study-room-chat-actions button{width:100%}}
