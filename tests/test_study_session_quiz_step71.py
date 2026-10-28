@@ -142,7 +142,7 @@ def verify():
             assert before["source_names"] == []
             assert "Private secret only" not in unready.get_data(as_text=True)
             page_before = client.get(page).get_data(as_text=True)
-            assert "Quiz theo buổi học" in page_before
+            assert "QUIZ THEO BUỔI HỌC" in page_before
             assert "Chưa đủ nguồn được duyệt" in page_before
             assert "Quiz cũ" in page_before
 
