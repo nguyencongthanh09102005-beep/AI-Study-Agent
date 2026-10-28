@@ -148,7 +148,46 @@ Thuật toán độ phức tạp Big O cũng có thể áp dụng cho linked lis
             assert admin_view.status_code == 200
             page = admin_view.get_data(as_text=True)
             assert "Chương 2. Danh sách liên kết" in page
-            assert "Gợi ý tự động" in page  # Hint, never auto-approval.
+            assert "Phân tích bằng AI" in page
+            assert "So khớp từ khóa" in page  # Lexical fallback is not AI.
+            # Mock the existing external AI call; tests must never spend tokens
+            # or require an actual API key. Invalid and fabricated quotes are dropped.
+            original_ai_backend = project.gemini_generate
+            ai_called = []
+            def fake_ai_response(prompt):
+                ai_called.append(prompt)
+                return (json.dumps({"suggestions": [
+                    {"chapter_key": "2", "evidence":
+                     "2.1. Danh sách liên kết đơn chứa node và con trỏ next."},
+                    {"chapter_key": "1", "evidence": "Không có câu này trong file."},
+                    {"chapter_key": "99", "evidence":
+                     "2.1. Danh sách liên kết đơn chứa node và con trỏ next."}
+                ]}, ensure_ascii=False), None)
+            try:
+                project.gemini_generate = fake_ai_response
+                analyzed = administrator.post(
+                    f"/admin/documents/{doc_id}/chapters",
+                    data={"csrf_token": admin_token, "action": "analyze_ai"},
+                )
+                assert analyzed.status_code == 303
+            finally:
+                project.gemini_generate = original_ai_backend
+            assert ai_called and "Danh sách liên kết" in ai_called[0]
+            ai_html = administrator.get(
+                f"/admin/documents/{doc_id}/chapters").get_data(as_text=True)
+            assert "AI đề xuất từ nội dung tài liệu" in ai_html
+            assert "Bằng chứng AI trích từ file" in ai_html
+            assert "Không có câu này trong file" not in ai_html
+            conn = project.db()
+            stored_ai = conn.execute(
+                "SELECT suggestions_json FROM shared_document_ai_suggestions WHERE document_id=?",
+                (doc_id,),
+            ).fetchone()
+            assert stored_ai and len(json.loads(stored_ai["suggestions_json"])) == 1
+            assert conn.execute(
+                "SELECT COUNT(*) FROM shared_document_chapters",
+            ).fetchone()[0] == 0  # AI must not approve automatically.
+            conn.close()
             assert student.get(f"/admin/documents/{doc_id}/chapters").status_code == 403
             assert administrator.post(
                 f"/admin/documents/{doc_id}/chapters",
