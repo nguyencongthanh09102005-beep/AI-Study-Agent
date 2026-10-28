@@ -23,12 +23,27 @@
       <button type="submit" class="soft-primary">📚 {{ 'Tạo lại lộ trình theo đề cương' if sessions else 'Xây dựng lộ trình từng chương' }}</button>
     </form>
     {% if sessions %}
-      <p style="color:#62779d"><strong>{{ sessions|length }} buổi học</strong> · xếp theo thứ tự đề cương · ngày học dự kiến từ thời điểm tạo. Đây là lộ trình riêng trong môn, chưa tự động thêm vào Kế hoạch học toàn cục.</p>
+      <p style="color:#62779d"><strong>{{ sessions|length }} buổi học</strong> · xếp theo thứ tự đề cương · ngày học dự kiến từ thời điểm tạo.</p>
+      <div style="background:#edf3ff;border:1px solid #cbd8fb;border-radius:14px;padding:16px;margin:14px 0">
+        <strong style="color:#293f7c">Đợt 6.1 · Kết nối với Kế hoạch học</strong>
+        <p style="color:#455b87;font-size:13px;line-height:1.7">Bấm một lần để thêm các buổi chưa có vào Kế hoạch học. Bấm lại sẽ không nhân đôi; các buổi đã đổi lịch hoặc đánh dấu hoàn thành được giữ nguyên. Ngày/giờ hiện tại là gợi ý, bạn có thể sửa trên trang Kế hoạch học. Đồng bộ hai chiều và thời khóa biểu theo giờ sẽ làm ở phần tiếp theo.</p>
+        <form method="post" style="margin:10px 0;display:inline-block">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="action" value="schedule">
+          <button type="submit" class="soft-primary">📅 Đưa các buổi vào Kế hoạch học</button>
+        </form>
+        <a href="{{ url_for('study_plan', subject_id=subject.id) }}" style="display:inline-block;margin-left:12px;color:#415bc6;font-weight:700">Xem Kế hoạch học →</a>
+      </div>
       {% for lesson in sessions %}
       <article style="background:#f6f8fe;border:1px solid #e1e8f4;border-radius:14px;padding:20px;margin:15px 0">
         <div style="display:flex;gap:12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap">
           <div>
             <span style="color:#526be5;font-weight:700;font-size:13px">Buổi {{ lesson.session_id }} · Chương {{ lesson.unit_id }}</span>
+            {% if schedule_status.get(lesson.session_id) == 'current' %}
+              <span style="display:inline-block;background:#def5e8;border-radius:9px;padding:4px 8px;color:#186747;font-size:12px;margin-left:7px">✓ Đã đưa vào Kế hoạch học</span>
+            {% elif schedule_status.get(lesson.session_id) == 'changed' %}
+              <span style="display:inline-block;background:#fff0dc;border-radius:9px;padding:4px 8px;color:#96521a;font-size:12px;margin-left:7px">Lộ trình mới khác lịch đã lưu — cần rà soát</span>
+            {% endif %}
             <div style="margin-top:9px"><a href="{{ url_for('chapter_material.student_chapter', subject_id=subject.id, chapter_number=lesson.unit_id) }}" style="color:#435bc9;font-weight:700">📖 Mở bài học và học liệu Chương {{ lesson.unit_id }} →</a></div>
             <h3 style="color:#253c75;margin:8px 0">{{ lesson.title }}</h3>
           </div>
