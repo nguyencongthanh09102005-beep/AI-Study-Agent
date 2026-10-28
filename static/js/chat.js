@@ -522,14 +522,14 @@ document.addEventListener("DOMContentLoaded", () => {
     const firstCourseReveal = !hasRevealedInitialCourses;
     chats.forEach((chat, index) => {
       const item = document.createElement("button");
-      if (firstCourseReveal) {
-        item.classList.add("chat-course-enter");
-        item.style.setProperty("--course-enter-index", String(Math.min(index, 7)));
-      }
       item.type = "button";
       item.className =
         "chat-history-item subject-chat-item" +
         (chat.id === Number(currentChatId) ? " active" : "");
+      if (firstCourseReveal) {
+        item.classList.add("chat-course-enter");
+        item.style.setProperty("--course-enter-index", String(Math.min(index, 7)));
+      }
 
       item.innerHTML = `
         <span class="history-icon">📘</span>
