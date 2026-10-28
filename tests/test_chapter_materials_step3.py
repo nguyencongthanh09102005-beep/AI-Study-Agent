@@ -98,8 +98,8 @@ Thuật toán độ phức tạp Big O cũng có thể áp dụng cho linked lis
                 ("Student 2", "s2@chapter.test", "hash", "student", project.now()),
             ).lastrowid
             course = conn.execute(
-                "INSERT INTO subjects(user_id,name,code,created_at) VALUES(?,?,?,?)",
-                (first, "Cấu trúc dữ liệu", "CTDL999", project.now()),
+                "INSERT INTO subjects(user_id,name,code,credits,created_at) VALUES(?,?,?,?,?)",
+                (first, "Cấu trúc dữ liệu", "CTDL999", 3, project.now()),
             ).lastrowid
             same_course = conn.execute(
                 "INSERT INTO subjects(user_id,name,code,created_at) VALUES(?,?,?,?)",
