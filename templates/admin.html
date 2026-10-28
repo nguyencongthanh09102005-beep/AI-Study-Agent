@@ -107,6 +107,7 @@
             <td>{% if item.is_syllabus %}<span class="admin-success">✓ Đề cương</span>{% else %}<span class="admin-success">✓ Đã đọc</span>{% endif %}</td>
             <td><div class="admin-actions">
               <a href="{{ url_for('shared_document_file', doc_id=item.id) }}" target="_blank" rel="noopener">Xem</a>
+              {% if not item.is_syllabus %}<a href="{{ url_for('chapter_material.admin_chapter_mapping', document_id=item.id) }}">Gắn chương</a>{% endif %}
               <form method="post" action="{{ url_for('admin_delete_document', doc_id=item.id) }}" onsubmit="return confirm('Xóa tài liệu chung này khỏi tất cả sinh viên?');"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit">Xóa</button></form>
             </div></td>
           </tr>
