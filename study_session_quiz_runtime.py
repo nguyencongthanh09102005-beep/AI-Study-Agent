@@ -360,10 +360,11 @@ def quiz_access(conn, project, uid, quiz_id, at=None):
                 "reason": "Nguồn hoặc nội dung lộ trình đã thay đổi."}
     at = at or datetime.now()
     grant = conn.execute("""
-        SELECT valid_until FROM quiz_session_grants
+        SELECT started_at,valid_until FROM quiz_session_grants
         WHERE quiz_id=? AND user_id=?
     """, (quiz_id, uid)).fetchone()
-    if grant and at < datetime.fromisoformat(grant["valid_until"]):
+    if (grant and datetime.fromisoformat(grant["started_at"]) <= at
+            < datetime.fromisoformat(grant["valid_until"])):
         return {"linked": True, "allowed": True, "count": count}
     start, end = _lesson_window(conn, uid, link["task_id"])
     return {"linked": True, "allowed": False, "count": count,
