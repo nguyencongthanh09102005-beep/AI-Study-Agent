@@ -100,6 +100,26 @@
     const lines = String(value || "").split("\n");
     for (let index = 0; index < lines.length; index += 1) {
       const row = lines[index];
+      const trimmed = row.trim();
+      if (trimmed === "$" || trimmed === "\\[") {
+        flush(); closeList();
+        const close = trimmed === "$" ? "$" : "\\]";
+        const mathLines = [];
+        index += 1;
+        while (index < lines.length && lines[index].trim() !== close) {
+          mathLines.push(lines[index]); index += 1;
+        }
+        out.push('<div class="chat-math-block">' +
+          mathHtml(mathLines.join("\n"), true) + "</div>");
+        continue;
+      }
+      const sameLine = trimmed.match(/^\$\$(.+)\$\$/) ||
+        trimmed.match(/^\\\[(.+)\\\]$/);
+      if (sameLine) {
+        flush(); closeList();
+        out.push('<div class="chat-math-block">' + mathHtml(sameLine[1], true) + "</div>");
+        continue;
+      }
       const table = tableBlock(lines, index);
       if (table) {
         flush(); closeList(); out.push(table.html);
