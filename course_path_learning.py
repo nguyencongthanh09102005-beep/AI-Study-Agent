@@ -8,7 +8,7 @@ import json
 import re
 from datetime import date, timedelta
 
-PLAN_VERSION = 2
+PLAN_VERSION = 3
 
 TOPIC_RE = re.compile(r"^(\d+(?:\.\d+){1,3})[.)]?\s+(.{3,200})$")
 CHAPTER_RE = re.compile(r"^(?:chương|chapter|bài|lesson|unit|module)\s+(\d+)\b", re.I)
@@ -36,8 +36,22 @@ STOPWORDS = {
 }
 
 
+# Repeated headers in the sample PDF can be standalone or appended after a
+# valid sentence by a PDF text extractor. Strip only the known test-page marker,
+# preserving the academic text on the same line.
+TEST_PDF_HEADER_RE = re.compile(
+    r"AI\s+STUDY\s+AGENT\s*/\s*ĐỀ\s+CƯƠNG\s+CHI\s+TIẾT\s+GIẢ\s+LẬP",
+    re.I,
+)
+
+
 def normalized_lines(text):
-    return [" ".join(line.split()) for line in (text or "").replace("\r", "\n").split("\n") if line.strip()]
+    cleaned = []
+    for source in (text or "").replace("\r", "\n").split("\n"):
+        line = " ".join(TEST_PDF_HEADER_RE.sub("", source).split()).strip(" ;")
+        if line:
+            cleaned.append(line)
+    return cleaned
 
 
 def unit_fingerprint(units):
