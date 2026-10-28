@@ -5414,6 +5414,12 @@ def api_chat():
         if not isinstance(requested_lesson, dict):
             conn.close()
             return jsonify({"error": "Ngữ cảnh chương không hợp lệ."}), 400
+        from chapter_tutor import MAX_QUESTION_CHARS
+        if len(question) > MAX_QUESTION_CHARS:
+            conn.close()
+            return jsonify({
+                "error": f"Câu hỏi học theo chương không được quá {MAX_QUESTION_CHARS} ký tự."
+            }), 400
         try:
             chapter_number = int(requested_lesson.get("chapter_number"))
             topic_index = int(requested_lesson.get("topic_index"))
@@ -5486,6 +5492,25 @@ def api_chat():
         )
 
     conn = db()
+    if lesson_context:
+        # Admin may revoke/replace a source while the AI is generating.
+        # Never persist or return a chapter answer for an outdated approval.
+        from chapter_chat_context import LessonContextError, resolve_lesson_context
+        try:
+            live = resolve_lesson_context(
+                sys.modules[__name__], conn, uid, subject_id,
+                lesson_context["chapter_number"], lesson_context["topic_index"]
+            )
+        except LessonContextError:
+            conn.close()
+            return jsonify({
+                "error": "Học liệu hoặc đề cương đã thay đổi. Hãy tải lại chương trước khi hỏi tiếp."
+            }), 409
+        if live["source_signature"] != lesson_context["source_signature"]:
+            conn.close()
+            return jsonify({
+                "error": "Học liệu chương đã được cập nhật. Hãy tải lại trước khi tiếp tục."
+            }), 409
     created_at = now()
 
     user_message = conn.execute(
