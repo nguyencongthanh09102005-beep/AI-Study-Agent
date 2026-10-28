@@ -9,72 +9,224 @@ document.addEventListener("DOMContentLoaded", () => {
   const lessonBanner = document.getElementById("lessonModeBanner");
   const lessonTitle = document.getElementById("lessonModeTitle");
   const lessonSources = document.getElementById("lessonModeSources");
+  const modeFreeButton = document.getElementById("chatModeFree");
+  const modeChapterButton = document.getElementById("chatModeChapter");
+  const chapterControls = document.getElementById("chatChapterControls");
+  const modeNotice = document.getElementById("chatModeNotice");
+  const courseSelector = document.getElementById("chatCourseSelect");
+  const chapterSelector = document.getElementById("chatChapterSelect");
+  const topicSelector = document.getElementById("chatTopicSelect");
 
   let chats = [];
   let currentChatId = null;
   let currentMessages = [];
   let sending = false;
   let lessonMode = null;
+  let chatMode = "free";
+  let chapterOptions = [];
+  let modeError = "";
+  let modeSeq = 0;
 
   function updateLessonUI() {
     const current = getCurrentChat();
-    const active = lessonMode && current &&
+    const active = chatMode === "chapter" && lessonMode && current &&
       Number(current.subject_id) === Number(lessonMode.subject_id);
+    modeFreeButton?.classList.toggle("active", chatMode === "free");
+    modeChapterButton?.classList.toggle("active", chatMode === "chapter");
+    modeFreeButton?.setAttribute("aria-pressed", String(chatMode === "free"));
+    modeChapterButton?.setAttribute("aria-pressed", String(chatMode === "chapter"));
+    if (chapterControls) chapterControls.hidden = chatMode !== "chapter";
     if (lessonBanner) lessonBanner.hidden = !active;
     if (active) {
-      if (lessonTitle) {
-        lessonTitle.textContent = lessonMode.chapter + " · " + lessonMode.topic;
-      }
-      if (lessonSources) {
-        lessonSources.textContent =
-          "Nguồn đã được Admin duyệt: " + lessonMode.source_names.join(", ");
-      }
+      if (lessonTitle) lessonTitle.textContent =
+        lessonMode.chapter + " · " + lessonMode.topic;
+      if (lessonSources) lessonSources.textContent =
+        "Học liệu đã duyệt: " + lessonMode.source_names.join(", ");
+    }
+    if (modeNotice) {
+      modeNotice.hidden = chatMode !== "chapter" || !modeError;
+      modeNotice.textContent = modeError;
+    }
+    if (modeFreeButton) modeFreeButton.disabled = sending;
+    if (modeChapterButton) modeChapterButton.disabled = sending;
+    for (const selector of [courseSelector,chapterSelector,topicSelector]) {
+      if (selector) selector.disabled = sending ||
+        (selector !== courseSelector && !chapterOptions.length);
+    }
+    if (chatMode === "chapter" && !active) {
+      if (input) input.disabled = true;
+      if (sendBtn) sendBtn.disabled = true;
     }
   }
 
   function clearLessonMode() {
+    modeSeq += 1;
+    chatMode = "free";
     lessonMode = null;
+    modeError = "";
+    chapterOptions = [];
     const url = new URL(window.location.href);
     url.searchParams.delete("chapter_number");
     url.searchParams.delete("topic_index");
     window.history.replaceState(null, "", url.pathname + url.search + url.hash);
-    updateLessonUI();
     updateChatHeader();
+    updateLessonUI();
+  }
+
+  function updateLessonUrl() {
+    if (!lessonMode) return;
+    const url = new URL(window.location.href);
+    url.searchParams.set("subject_id", String(lessonMode.subject_id));
+    url.searchParams.set("chapter_number", String(lessonMode.chapter_number));
+    url.searchParams.set("topic_index", String(lessonMode.topic_index));
+    window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+  }
+
+  function fillSelect(selector, items, selected) {
+    if (!selector) return;
+    selector.replaceChildren();
+    items.forEach(item => {
+      const option = document.createElement("option");
+      option.value = String(item.value);
+      option.textContent = item.label;
+      selector.appendChild(option);
+    });
+    if (selected != null && items.some(x => String(x.value) === String(selected))) {
+      selector.value = String(selected);
+    }
+  }
+
+  function renderModeCourses() {
+    fillSelect(courseSelector, chats.map(item => ({
+      value: item.id, label: item.title
+    })), currentChatId);
+  }
+
+  function renderChapterOptions(requested) {
+    const chapters = chapterOptions;
+    const chosen = chapters.find(x => x.chapter_number === Number(requested)) ||
+      chapters.find(x => x.available) || chapters[0];
+    fillSelect(chapterSelector, chapters.map(c => ({
+      value: c.chapter_number,
+      label: c.title + (c.available ? "" : " · Chưa có học liệu")
+    })), chosen?.chapter_number);
+    return chosen;
+  }
+
+  function renderTopicOptions(requested) {
+    const chapter = chapterOptions.find(
+      item => item.chapter_number === Number(chapterSelector?.value)
+    );
+    const topics = chapter?.topics || [];
+    fillSelect(topicSelector, topics.map((title, i) => ({
+      value: i, label: title
+    })), requested);
+  }
+
+  async function validateSelectedLesson() {
+    if (chatMode !== "chapter" || sending) return;
+    const seq = ++modeSeq;
+    lessonMode = null;
+    modeError = "";
+    const current = getCurrentChat();
+    const chapterNumber = Number(chapterSelector?.value);
+    const topicIndex = Number(topicSelector?.value);
+    const chosen = chapterOptions.find(c => c.chapter_number === chapterNumber);
+    if (!current || !chosen) {
+      modeError = "Môn này chưa có chương đã xác nhận.";
+      updateChatHeader(); updateLessonUI();
+      return;
+    }
+    if (!chosen.available) {
+      modeError = "Chương này chưa có học liệu được Admin duyệt. Hãy chọn chương khác hoặc yêu cầu Admin bổ sung.";
+      updateChatHeader(); updateLessonUI();
+      return;
+    }
+    const params = new URLSearchParams({
+      subject_id: String(current.subject_id),
+      chapter_number: String(chapterNumber),
+      topic_index: String(topicIndex)
+    });
+    try {
+      const detail = await api("/api/chat/lesson-context?" + params.toString());
+      if (seq !== modeSeq || chatMode !== "chapter" ||
+          getCurrentChat()?.subject_id !== detail.subject_id) return;
+      lessonMode = detail;
+      updateLessonUrl();
+      modeError = "";
+    } catch (error) {
+      if (seq !== modeSeq) return;
+      modeError = error.message;
+    }
+    updateChatHeader();
+    updateLessonUI();
+  }
+
+  async function enterChapterMode(requestedChapter = null, requestedTopic = 0) {
+    if (sending) return;
+    chatMode = "chapter";
+    lessonMode = null;
+    chapterOptions = [];
+    modeError = "";
+    const seq = ++modeSeq;
+    const current = getCurrentChat();
+    updateChatHeader();
+    updateLessonUI();
+    if (!current) {
+      modeError = "Hãy tạo hoặc chọn một môn học trước.";
+      updateLessonUI();
+      return;
+    }
+    renderModeCourses();
+    try {
+      const data = await api("/api/chat/course-outline?subject_id=" +
+        encodeURIComponent(current.subject_id));
+      if (seq !== modeSeq || chatMode !== "chapter" ||
+          getCurrentChat()?.subject_id !== data.subject_id) return;
+      chapterOptions = data.chapters || [];
+      renderChapterOptions(requestedChapter);
+      renderTopicOptions(requestedTopic);
+      await validateSelectedLesson();
+    } catch (error) {
+      if (seq !== modeSeq) return;
+      modeError = error.message;
+      updateChatHeader(); updateLessonUI();
+    }
   }
 
   async function initLessonMode() {
     const params = new URLSearchParams(window.location.search);
-    if (!params.has("chapter_number")) return;
-    const chat = getCurrentChat();
-    if (!chat) return;
-    const subjectId = params.get("subject_id") || "";
-    const chapterNumber = params.get("chapter_number") || "";
-    const topicIndex = params.get("topic_index") || "0";
-    const query = new URLSearchParams({
-      subject_id: subjectId,
-      chapter_number: chapterNumber,
-      topic_index: topicIndex
-    });
-    try {
-      const detail = await api("/api/chat/lesson-context?" + query.toString());
-      if (Number(detail.subject_id) !== Number(chat.subject_id)) {
-        throw new Error("Bạn đang mở cuộc trò chuyện không đúng môn học.");
-      }
-      lessonMode = detail;
+    if (!params.has("chapter_number")) {
       updateLessonUI();
-      updateChatHeader();
-      focusInputWithoutScroll();
-    } catch (error) {
-      clearLessonMode();
-      if (lessonBanner) {
-        lessonBanner.hidden = false;
-        if (lessonTitle) lessonTitle.textContent = error.message;
-        if (lessonSources) lessonSources.textContent =
-          "Chưa thể học theo chương. Hãy kiểm tra đề cương và tài liệu Admin duyệt.";
-      }
+      return;
     }
+    await enterChapterMode(
+      Number(params.get("chapter_number")),
+      Number(params.get("topic_index") || 0)
+    );
   }
 
+  modeFreeButton?.addEventListener("click", () => {
+    if (!sending) clearLessonMode();
+  });
+  modeChapterButton?.addEventListener("click", () => {
+    if (!sending) enterChapterMode();
+  });
+  courseSelector?.addEventListener("change", async () => {
+    const choice = chats.find(item => item.id === Number(courseSelector.value));
+    if (!choice) return;
+    try {
+      await switchToChat(choice);
+    } catch (error) {
+      modeError = error.message;
+      updateLessonUI();
+    }
+  });
+  chapterSelector?.addEventListener("change", () => {
+    renderTopicOptions(0);
+    validateSelectedLesson();
+  });
+  topicSelector?.addEventListener("change", validateSelectedLesson);
 
   async function api(url, options = {}) {
     const response = await fetch(url, options);
@@ -120,6 +272,7 @@ document.addEventListener("DOMContentLoaded", () => {
         input.placeholder = "Chưa có môn học để trò chuyện...";
       }
       if (sendBtn) sendBtn.disabled = true;
+      updateLessonUI();
       return;
     }
 
@@ -140,6 +293,15 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    if (chatMode === "chapter") {
+      if (contextStatusEl) contextStatusEl.textContent =
+        "Học theo chương · Chọn chương và tiểu mục";
+      if (input) input.disabled = true;
+      if (sendBtn) sendBtn.disabled = true;
+      updateLessonUI();
+      return;
+    }
+
     if (contextStatusEl) {
       if (chat.document_count > 0) {
         contextStatusEl.innerHTML =
@@ -156,6 +318,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (sendBtn) sendBtn.disabled = false;
+    updateLessonUI();
   }
 
   function welcomeForCurrentSubject() {
@@ -203,6 +366,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     renderSubjectChats();
+    renderModeCourses();
     updateChatHeader();
 
     if (currentChatId) {
@@ -228,8 +392,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function switchToChat(chat) {
     if (!chat || sending) return;
-    if (getCurrentChat()?.subject_id !== chat.subject_id && lessonMode) {
-      clearLessonMode();
+    const moving = getCurrentChat()?.subject_id !== chat.subject_id;
+    const preserveChapterMode = chatMode === "chapter";
+    if (moving) {
+      modeSeq += 1;
+      lessonMode = null;
+      chapterOptions = [];
+      modeError = "";
+      const url = new URL(window.location.href);
+      url.searchParams.delete("chapter_number");
+      url.searchParams.delete("topic_index");
+      window.history.replaceState(null, "", url.pathname + url.search + url.hash);
     }
     currentChatId = chat.id;
     rememberSelectedSubject(chat.subject_id);
@@ -240,6 +413,8 @@ document.addEventListener("DOMContentLoaded", () => {
     if (getCurrentChat()?.id === chat.id) {
       messagesBox?.classList.add("chat-subject-enter");
     }
+    if (preserveChapterMode && moving) await enterChapterMode();
+    else renderModeCourses();
     focusInputWithoutScroll();
   }
 
@@ -314,6 +489,7 @@ document.addEventListener("DOMContentLoaded", () => {
       historyList.appendChild(item);
     });
     renderMobileSubjectPicker();
+    renderModeCourses();
   }
 
   function renderCurrentChat() {
@@ -342,7 +518,7 @@ document.addEventListener("DOMContentLoaded", () => {
           <div class="message-avatar">🤖</div>
           <div class="message-body">
             <div class="message-name">AI Study Agent</div>
-            <div class="message-bubble">${escapeHtml(message.content)}</div>
+            <div class="message-bubble chat-markdown">${window.ChatMarkdown?.render(message.content) ?? escapeHtml(message.content)}</div>
             ${currentMessages.length ? `
               <div class="message-tools">
                 <button type="button" class="copy-message">📋 Sao chép</button>
@@ -391,6 +567,7 @@ document.addEventListener("DOMContentLoaded", () => {
     sending = true;
     if (sendBtn) sendBtn.disabled = true;
     if (mobileSubjectPicker) mobileSubjectPicker.disabled = true;
+    updateLessonUI();
     historyList?.querySelectorAll("button.subject-chat-item").forEach(button => {
       button.disabled = true;
     });
@@ -442,6 +619,8 @@ document.addEventListener("DOMContentLoaded", () => {
       sending = false;
       if (sendBtn && currentChatId) sendBtn.disabled = false;
       renderSubjectChats();
+      updateChatHeader();
+      updateLessonUI();
       focusInputWithoutScroll();
     }
   }
