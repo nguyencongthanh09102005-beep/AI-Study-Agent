@@ -346,3 +346,17 @@ body.page-chat .chat-composer .composer-inner:focus-within {
 body.page-chat .chat-composer .composer-inner textarea:focus {
   outline: none !important;
 }
+
+/* Chapter-only learning: the student chooses course + chapter, and the AI
+   identifies relevant syllabus subtopics inside the selected chapter. */
+body.page-chat .chat-chapter-controls {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+body.page-chat .chat-chapter-controls label:first-child {
+  grid-column: auto !important;
+}
+@media (max-width: 620px) {
+  body.page-chat .chat-chapter-controls {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
