@@ -1,6 +1,6 @@
 
 /* Stage 5 academic answer styles live in one scoped stylesheet. */
-@import url('/static/css/chat_stage5.css');
+@import url('chat_stage5.css');
 /* Chat AI stage 3: two modes, syllabus-aware selectors, readable Markdown.
    Layout remains stage-2 30/70. */
 
