@@ -4544,6 +4544,23 @@ def admin_add_document():
                 "admin_shared_documents",
                 error="Tệp không trích xuất được chữ. PDF scan ảnh cần OCR trước khi tải."
             ))
+        if is_syllabus:
+            # Do not let a per-chapter slide replace the whole shared syllabus.
+            # Academic modules vary, so this is a minimum safety heuristic, not
+            # a claim that all valid academic syllabi have the same format.
+            from syllabus_learning import extract_syllabus_units
+            chapters = extract_syllabus_units(extracted)
+            distinct_chapters = {item["evidence"].casefold() for item in chapters}
+            if len(distinct_chapters) < 2:
+                target.unlink(missing_ok=True)
+                return redirect(url_for(
+                    "admin_shared_documents",
+                    error=(
+                        "File này chưa có ít nhất 2 tiêu đề chương/bài có thể nhận diện. "
+                        "Không thay thế đề cương chuẩn. Nếu đây là slide/bài tập một chương, "
+                        "hãy upload không đánh dấu 'Đặt làm đề cương chuẩn của môn'."
+                    )
+                ))
         timestamp = now()
         cur = conn.execute(
             """INSERT INTO shared_knowledge(
