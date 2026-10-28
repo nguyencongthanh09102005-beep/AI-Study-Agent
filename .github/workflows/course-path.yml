@@ -34,7 +34,7 @@ jobs:
           node --check static/js/quiz_preparation.js
       - name: Validate parser, routes and schemas
         run: |
-          python -m py_compile app.py syllabus_learning.py syllabus_routes.py course_path_learning.py course_path_routes.py course_schedule_sync.py study_schedule_conflicts.py study_session_routes.py study_session_tracking.py study_session_quiz.py study_session_quiz_runtime.py study_session_quiz_routes.py study_session_chat_context.py chapter_material_routes.py ai_chapter_suggestions.py chapter_tutor.py chapter_chat_context.py chat_lesson_memory.py chat_output_style.py
+          python -m py_compile app.py syllabus_learning.py syllabus_routes.py course_path_learning.py course_path_routes.py course_schedule_sync.py study_schedule_conflicts.py study_session_routes.py study_session_tracking.py study_session_quiz.py study_session_quiz_runtime.py study_session_quiz_routes.py subject_course_cleanup.py study_session_chat_context.py chapter_material_routes.py ai_chapter_suggestions.py chapter_tutor.py chapter_chat_context.py chat_lesson_memory.py chat_output_style.py
           python tests/test_syllabus_step1.py
           python tests/test_course_path_step2.py
           python tests/test_course_schedule_sync.py
@@ -42,6 +42,7 @@ jobs:
           python tests/test_study_session_tracking.py
           python tests/test_study_session_quiz_step71.py
           python tests/test_study_session_quiz_step7234.py
+          python tests/test_delete_subject_session_quiz.py
           python tests/test_schedule_conflicts.py
           python tests/test_chapter_materials_step3.py
           python tests/test_chat_output_style.py
