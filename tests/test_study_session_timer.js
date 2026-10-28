@@ -1,0 +1,30 @@
+"use strict";
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+const root = path.resolve(__dirname, "..");
+const read = file => fs.readFileSync(path.join(root, file), "utf8");
+const js = read("static/js/study_session_timer.js");
+const room = read("templates/study_session.html");
+const routes = read("study_session_routes.py");
+const backend = read("study_session_tracking.py");
+assert.match(room, /id="studySessionTimer"/);
+assert.match(room, /data-csrf="{{ study_csrf }}"/);
+assert.match(room, /study_session_timer\.js/);
+for (const name of ["Start", "Pause", "Resume", "Finish"]) {
+  assert.match(room, new RegExp('id="studySession' + name + '"'));
+}
+assert.match(js, /"X-Study-CSRF": csrf/);
+assert.match(js, /"heartbeat"/);
+assert.match(js, /document.hidden/);
+assert.match(js, /window.confirm/);
+assert.match(js, /Number\.isFinite\(data.elapsed_seconds\)/);
+assert.match(routes, /verified_roadmap_task/);
+assert.match(routes, /BEGIN IMMEDIATE/);
+assert.match(routes, /secrets.compare_digest/);
+assert.match(backend, /HEARTBEAT_CAP = 45/);
+assert.match(backend, /STALE_AFTER = 90/);
+assert.match(backend, /recalculate_subject_progress/);
+assert.match(backend, /WHERE id=\? AND user_id=\? AND done=0/);
+assert.doesNotMatch(js, /elapsed_seconds\s*:/);
+console.log("Phase 6.4 study timer frontend and API invariants OK");
