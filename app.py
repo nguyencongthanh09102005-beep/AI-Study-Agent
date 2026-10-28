@@ -5307,6 +5307,38 @@ def api_chat_messages(conversation_id):
     ])
 
 
+@app.route("/api/chat/lesson-context", methods=["GET"])
+@login_required
+def api_chat_lesson_context():
+    """Validate chapter launch parameters before displaying lesson mode."""
+    from chapter_chat_context import LessonContextError, resolve_lesson_context
+    try:
+        subject_id = int(request.args.get("subject_id"))
+        chapter_number = int(request.args.get("chapter_number"))
+        topic_index = int(request.args.get("topic_index"))
+    except (ValueError, TypeError):
+        return jsonify({"error": "Thiếu mã môn, chương hoặc tiểu mục."}), 400
+    conn = db()
+    try:
+        context = resolve_lesson_context(
+            sys.modules[__name__], conn, session["user_id"],
+            subject_id, chapter_number, topic_index
+        )
+    except LessonContextError as exc:
+        return jsonify({"error": exc.message}), exc.status
+    finally:
+        conn.close()
+    return jsonify({
+        "subject_id": context["subject_id"],
+        "subject_name": context["subject_name"],
+        "chapter_number": context["chapter_number"],
+        "chapter": context["chapter"],
+        "topic_index": context["topic_index"],
+        "topic": context["topic"],
+        "source_names": [src["name"] for src in context["sources"]]
+    })
+
+
 @app.route("/api/chat", methods=["POST"])
 @login_required
 def api_chat():
@@ -5366,34 +5398,73 @@ def api_chat():
 
     subject_id = conversation["subject_id"]
     subject_name = conversation["subject_name"]
+    lesson_context = None
+    personal_context = ""
+    shared_sources = []
 
+    # A lesson launch is still the EXISTING per-subject Chat AI conversation,
+    # but its source scope must be enforced server-side on every message.
+    requested_lesson = payload.get("lesson")
+    if requested_lesson is not None:
+        if not isinstance(requested_lesson, dict):
+            conn.close()
+            return jsonify({"error": "Ngữ cảnh chương không hợp lệ."}), 400
+        try:
+            chapter_number = int(requested_lesson.get("chapter_number"))
+            topic_index = int(requested_lesson.get("topic_index"))
+        except (TypeError, ValueError):
+            conn.close()
+            return jsonify({"error": "Chương hoặc tiểu mục không hợp lệ."}), 400
+        from chapter_chat_context import LessonContextError, resolve_lesson_context
+        try:
+            lesson_context = resolve_lesson_context(
+                sys.modules[__name__], conn, uid, subject_id,
+                chapter_number, topic_index
+            )
+        except LessonContextError as exc:
+            conn.close()
+            return jsonify({"error": exc.message}), exc.status
     conn.close()
 
-    context, candidate_sources = get_subject_context(
-        uid,
-        subject_id,
-        question
-    )
-    shared_context, shared_sources = get_shared_subject_context(
-        uid,
-        subject_id,
-        question
-    )
-    personal_context = get_personal_learning_context(
-        uid,
-        subject_id
-    )
-
-    answer, used_sources, source_mode = gemini_subject_answer(
-        subject_name,
-        question,
-        context,
-        candidate_sources,
-        conversation_history,
-        shared_context,
-        personal_context,
-        shared_sources
-    )
+    if lesson_context:
+        from chapter_tutor import make_tutor_prompt, parse_tutor_answer
+        prompt = make_tutor_prompt(
+            subject_name, lesson_context["chapter"], lesson_context["topic"],
+            question, lesson_context["sources"], conversation_history
+        )
+        raw, ai_error = gemini_generate(prompt)
+        tutored = parse_tutor_answer(raw, lesson_context["sources"]) if raw else None
+        if not tutored:
+            return jsonify({
+                "error": ("AI chưa trả được câu trả lời có dẫn chứng kiểm chứng "
+                          "được trong học liệu đã duyệt. Hãy thử hỏi lại.")
+            }), 502
+        # Persist a readable, sourced response in the EXISTING chat history.
+        quotes = "\n".join(
+            f'[{item["source_key"]}] {item["source_name"]}: “{item["quote"]}”'
+            for item in tutored["citations"]
+        )
+        answer = tutored["explanation"]
+        if tutored["practice"]:
+            answer += "\n\nTự luyện: " + tutored["practice"]
+        answer += "\n\nDẫn chứng từ học liệu đã duyệt:\n" + quotes
+        used_sources = list(dict.fromkeys(
+            item["source_name"] for item in tutored["citations"]
+        ))
+        source_mode = "chapter"
+    else:
+        context, candidate_sources = get_subject_context(
+            uid, subject_id, question
+        )
+        shared_context, shared_sources = get_shared_subject_context(
+            uid, subject_id, question
+        )
+        personal_context = get_personal_learning_context(uid, subject_id)
+        answer, used_sources, source_mode = gemini_subject_answer(
+            subject_name, question, context, candidate_sources,
+            conversation_history, shared_context, personal_context,
+            shared_sources
+        )
 
     conn = db()
     created_at = now()
@@ -5442,6 +5513,12 @@ def api_chat():
         "sources": used_sources,
         "shared_sources": shared_sources,
         "personalized": bool(personal_context),
+        "lesson": ({
+            "chapter_number": lesson_context["chapter_number"],
+            "topic_index": lesson_context["topic_index"],
+            "chapter": lesson_context["chapter"],
+            "topic": lesson_context["topic"],
+        } if lesson_context else None),
         "updated_at": updated_at
     })
 
