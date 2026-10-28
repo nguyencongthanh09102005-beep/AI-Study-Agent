@@ -5,15 +5,11 @@ is supplementary evidence, never a substitute for confirmed syllabus headings.
 """
 import json
 import re
-import secrets
 import sys
 
 from flask import Blueprint, current_app, redirect, render_template, request, session, url_for
 
 from ai_chapter_suggestions import chapter_ai_prompt, validate_ai_suggestions
-from chapter_tutor import (
-    MAX_QUESTION_CHARS, make_tutor_prompt, parse_tutor_answer, prepared_sources,
-)
 from course_path_learning import (
     match_course_materials, parse_chapter_details, personal_course_documents, _terms,
 )
@@ -280,7 +276,7 @@ def admin_chapter_mapping(document_id):
         conn.close()
 
 
-@chapter_material_bp.route("/subjects/<int:subject_id>/chapters/<int:chapter_number>", methods=["GET", "POST"])
+@chapter_material_bp.route("/subjects/<int:subject_id>/chapters/<int:chapter_number>")
 def student_chapter(subject_id, chapter_number):
     project = sys.modules[current_app.import_name]
     uid = session.get("user_id")
@@ -316,14 +312,12 @@ def student_chapter(subject_id, chapter_number):
         shared = project.ensure_shared_subject_for_user_subject(conn, uid, subject_id)
         mapping_allowed = False
         materials = []
-        approved_rows = []
         if shared and kind == "shared":
             official_text, official_hash, _ = official_syllabus(conn, shared["id"])
             mapping_allowed = bool(official_text and official_hash == fingerprint)
         if mapping_allowed:
             key = chapter_key(section["evidence"])
             for row in approved_document_rows(conn, shared["id"], key, fingerprint):
-                approved_rows.append(row)
                 materials.append({
                     "id": row["id"], "name": row["original_name"],
                     "kind": "shared",
@@ -341,65 +335,12 @@ def student_chapter(subject_id, chapter_number):
                     "name": doc["name"],
                     "excerpts": evidence_excerpt(doc["text"], section),
                 })
-        # Each AI interaction is a lesson scoped to ONE confirmed chapter.
-        # Do not substitute the general chat, which can use other course sources.
-        token = session.get("syllabus_csrf_token")
-        if not token:
-            token = secrets.token_hex(24)
-            session["syllabus_csrf_token"] = token
-        selected_topic_index = 0
-        question = ""
-        tutor_answer = None
-        tutor_error = ""
-        if request.method == "POST":
-            if not secrets.compare_digest(
-                request.form.get("csrf_token") or "", token
-            ):
-                return "Phiên biểu mẫu không hợp lệ.", 403
-            if request.form.get("action") != "teach":
-                return "Thao tác không hợp lệ.", 400
-            try:
-                selected_topic_index = int(request.form.get("topic_index", "0"))
-            except (TypeError, ValueError):
-                return "Tiểu mục không hợp lệ.", 400
-            if selected_topic_index < 0 or selected_topic_index >= max(
-                1, len(section["topics"])
-            ):
-                return "Tiểu mục không thuộc chương được xác nhận.", 400
-            question = (request.form.get("question") or "").strip()
-            if len(question) > MAX_QUESTION_CHARS:
-                return "Câu hỏi vượt giới hạn 500 ký tự.", 400
-            source_docs = prepared_sources(approved_rows)
-            if not source_docs:
-                tutor_error = (
-                    "Chương này chưa có học liệu chung đã được Admin duyệt "
-                    "và trích xuất được chữ. AI chưa thể giảng bài có dẫn chứng."
-                )
-            else:
-                topic = (
-                    section["topics"][selected_topic_index]
-                    if section["topics"] else section["chapter"]
-                )
-                prompt = make_tutor_prompt(
-                    subject["name"], section["chapter"],
-                    topic, question, source_docs,
-                )
-                raw, api_error = project.gemini_generate(prompt)
-                tutor_answer = parse_tutor_answer(raw, source_docs) if raw else None
-                if tutor_answer is None:
-                    tutor_error = (
-                        "AI chưa trả được bài giảng có dẫn chứng kiểm chứng được "
-                        "từ học liệu của chương. Kiểm tra kết nối AI hoặc "
-                        "thử chọn tiểu mục khác; không sử dụng nội dung chưa xác minh."
-                    )
         return render_template(
             "student_chapter.html", page="subjects", subject=subject,
             chapter=section, chapter_number=chapter_number, total_chapters=len(units),
             materials=materials, personal_materials=private_candidates[:5],
             source_name=source_name, source_kind=kind,
             mapping_allowed=mapping_allowed,
-            csrf_token=token, selected_topic_index=selected_topic_index,
-            question=question, tutor_answer=tutor_answer, tutor_error=tutor_error,
         )
     finally:
         conn.close()
