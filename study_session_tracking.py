@@ -31,7 +31,7 @@ def ensure_tracking_schema(conn):
         CREATE TABLE IF NOT EXISTS study_session_tracking (
             task_id INTEGER PRIMARY KEY,
             user_id INTEGER NOT NULL,
-            subject_id INTEGER NOT NULL,
+            subject_id INTEGER,
             status TEXT NOT NULL DEFAULT 'paused'
                 CHECK(status IN ('running','paused','completed')),
             started_at TEXT NOT NULL,
@@ -42,7 +42,7 @@ def ensure_tracking_schema(conn):
             updated_at TEXT NOT NULL,
             FOREIGN KEY(task_id) REFERENCES study_tasks(id) ON DELETE CASCADE,
             FOREIGN KEY(user_id) REFERENCES users(id),
-            FOREIGN KEY(subject_id) REFERENCES subjects(id)
+            FOREIGN KEY(subject_id) REFERENCES subjects(id) ON DELETE SET NULL
         )
     """)
     conn.execute("""
