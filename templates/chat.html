@@ -19,16 +19,28 @@
       <select id="chatMobileSubject" aria-label="Chuyển môn học trong Chat AI"></select>
     </div>
 
-    <div id="lessonModeBanner" role="status" aria-live="polite" hidden
-         style="margin:14px 18px 4px;padding:15px 18px;background:#eef3ff;border:1px solid #d5e1f8;border-radius:14px;color:#304b83">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-        <div style="display:grid;gap:5px">
-          <strong>📘 Chat AI · Chế độ học theo chương</strong>
-          <span id="lessonModeTitle" style="font-size:14px"></span>
-          <span id="lessonModeSources" style="font-size:12px;color:#687ca0"></span>
-        </div>
+    <section class="chat-mode-panel" aria-label="Chọn chế độ Chat AI">
+      <div class="chat-mode-switch" role="group" aria-label="Chế độ trợ lý">
+        <button id="chatModeFree" type="button" class="active" aria-pressed="true">💬 Hỏi đáp tự do</button>
+        <button id="chatModeChapter" type="button" aria-pressed="false">📖 Học theo chương</button>
       </div>
-    </div>
+      <div id="chatChapterControls" class="chat-chapter-controls" hidden>
+        <label> Môn học
+          <select id="chatCourseSelect" aria-label="Môn học trong chế độ học theo chương"></select>
+        </label>
+        <label> Chương
+          <select id="chatChapterSelect" aria-label="Chọn chương học"></select>
+        </label>
+        <label> Tiểu mục
+          <select id="chatTopicSelect" aria-label="Chọn tiểu mục học"></select>
+        </label>
+      </div>
+      <div id="chatModeNotice" class="chat-mode-notice" aria-live="polite" hidden></div>
+      <div id="lessonModeBanner" class="chat-lesson-source" role="status" aria-live="polite" hidden>
+        <strong id="lessonModeTitle"></strong>
+        <span id="lessonModeSources"></span>
+      </div>
+    </section>
     <div class="chat-messages" id="chatMessages"></div>
 
     <div class="chat-suggest-row">
