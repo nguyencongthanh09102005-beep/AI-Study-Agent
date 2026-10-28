@@ -293,6 +293,34 @@ Thuật toán độ phức tạp Big O cũng có thể áp dụng cho linked lis
             assert "rememberSelectedSubject(chat.subject_id)" in js_code
             assert "if (Number(currentChatId) !== Number(chatId)) return;" in js_code
             assert "mobileSubjectPicker" in js_code
+            # Stage 3: 2 modes and real course/chapter/topic selector, no
+            # duplicate chatbot or fake syllabus values in the UI.
+            assert "css/chat_stage3.css" in chat_html
+            assert "js/chat_format.js" in chat_html
+            assert "id=\"chatModeFree\"" in chat_html
+            assert "id=\"chatModeChapter\"" in chat_html
+            assert "id=\"chatCourseSelect\"" in chat_html
+            assert "id=\"chatChapterSelect\"" in chat_html
+            assert "id=\"chatTopicSelect\"" in chat_html
+            assert "chat-mode-panel" in chat_html
+            assert "window.ChatMarkdown?.render(message.content)" in js_code
+            assert "api/chat/course-outline" in js_code
+
+            outline_url = f"/api/chat/course-outline?subject_id={course}"
+            outline_resp = student.get(outline_url)
+            assert outline_resp.status_code == 200, outline_resp.get_data(as_text=True)
+            outline = outline_resp.get_json()
+            assert outline["subject_name"] == "Cấu trúc dữ liệu"
+            assert len(outline["chapters"]) == 2
+            assert outline["chapters"][0]["available"] is True
+            assert outline["chapters"][1]["available"] is True
+            assert "2.1. Danh sách liên kết đơn" in outline["chapters"][1]["topics"]
+            assert outline["chapters"][1]["source_names"] == ["chapter2.txt"]
+            assert peer.get(outline_url).status_code == 404
+            assert student.get(
+                f"/api/chat/course-outline?subject_id={other_course}"
+            ).status_code == 404
+            assert student.get("/api/chat/course-outline?subject_id=abc").status_code == 400
 
             chats = student.get("/api/chats").get_json()
             convo = next(item for item in chats if item["subject_id"] == course)
