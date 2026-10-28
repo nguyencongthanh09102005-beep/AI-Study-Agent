@@ -6,6 +6,7 @@ Never infer that a model citation proves every explanatory sentence true.
 """
 import json
 import re
+import unicodedata
 
 MAX_QUESTION_CHARS = 500
 MAX_SNIPPET_CHARS = 5600
@@ -16,13 +17,62 @@ def normalize(value):
     return " ".join(str(value or "").split())
 
 
-def prepared_sources(approved_rows):
-    """Generate stable per-request source IDs with actual extracted text."""
+_RETRIEVAL_STOP_WORDS = {
+    "chương", "phần", "môn", "cái", "một", "những", "được", "trong",
+    "như", "nào", "làm", "sao", "giúp", "mình", "giải", "thích", "cho",
+    "và", "của", "với", "các", "từ", "tại", "đâu", "khi", "theo",
+}
+
+
+def _terms(text):
+    return {
+        term for term in re.findall(r"\w+", unicodedata.normalize("NFC", text).casefold())
+        if len(term) >= 2 and term not in _RETRIEVAL_STOP_WORDS
+    }
+
+
+def _passages(text):
+    """Split long approved chapter documents with overlap, not just first pages."""
+    value = str(text or "").strip()
+    if not value:
+        return []
+    if len(value) <= MAX_SNIPPET_CHARS:
+        return [value]
     result = []
-    for row in approved_rows[:MAX_SOURCES]:
-        body = (row["extracted_text"] or "").strip()[:MAX_SNIPPET_CHARS]
-        if not body:
-            continue
+    position = 0
+    step = MAX_SNIPPET_CHARS - 450
+    while position < len(value):
+        if position == 0:
+            start = 0
+        else:
+            start = position
+        chunk = value[start:start + MAX_SNIPPET_CHARS]
+        result.append(chunk)
+        if start + MAX_SNIPPET_CHARS >= len(value):
+            break
+        position += step
+    return result
+
+
+def prepared_sources(approved_rows, question=""):
+    """Select relevant, evidence-checkable passages across the *whole chapter*.
+
+    Chapter files can be much longer than the model prompt budget. Rank
+    overlapping passages from all Admin-approved files using query terms,
+    preserving original verbatim text for citation verification. A broad/no
+    query gets representative passages across documents.
+    """
+    candidate = []
+    terms = _terms(question)
+    for row_index, row in enumerate(approved_rows):
+        for chunk_index, body in enumerate(_passages(row["extracted_text"])):
+            words = _terms(body)
+            score = sum(1 for term in terms if term in words)
+            # Prefer variety only when relevance is equivalent.
+            candidate.append((score, row_index, chunk_index, row, body))
+    candidate.sort(key=lambda item: (-item[0], item[2], item[1]))
+    result = []
+    for _, _, _, row, body in candidate[:MAX_SOURCES]:
         result.append({
             "key": "T" + str(len(result) + 1),
             "id": row["id"],
@@ -31,14 +81,13 @@ def prepared_sources(approved_rows):
         })
     return result
 
-
 def make_tutor_prompt(subject, chapter, topic, question, sources, history="", profile=""):
     passages = "\n\n".join(
         "NGUỒN " + src["key"] + " (" + src["name"][:150] + "):\n" + src["excerpt"]
         for src in sources
     )
     goal = (question or "").strip() or (
-        "Giảng giải tiểu mục này như một giáo viên, kèm một ví dụ dễ hiểu."
+        "Giảng giải chương này như một giáo viên, kèm ví dụ dễ hiểu."
     )
     return (
         "Bạn là AI Study Agent giúp sinh viên học một chương cụ thể, "
@@ -46,7 +95,11 @@ def make_tutor_prompt(subject, chapter, topic, question, sources, history="", pr
         "Chỉ dựa trên các nguồn học liệu Admin đã phê duyệt bên dưới. "
         "Không dùng kiến thức ngoài nguồn như thể nguồn đã xác nhận. "
         "Nếu nguồn chưa đủ, nói rõ giới hạn và không bịa thông tin. "
-        "Giải thích dễ hiểu, theo thứ tự: khái niệm, ví dụ, cách tự kiểm tra. "
+        "Chỉ trả lời về Chương đã chọn. Chủ động xác định tiểu mục "
+        "phù hợp từ câu hỏi; nếu yêu cầu tổng quan thì bao quát nhiều tiểu mục "
+        "có trong học liệu. Ưu tiên trả lời trực tiếp, nêu rõ công thức, "
+        "độ phức tạp hoặc con số nếu tài liệu hỗ trợ, sau đó mới đưa ví dụ. "
+        "Không áp một mẫu khái niệm-ví dụ-tự kiểm tra máy móc vào mọi câu. "
         "Mỗi câu trả lời PHẢI dẫn ít nhất một trích dẫn NGUYÊN VĂN có trong "
         "một nguồn đã cung cấp. Không tạo tên nguồn hoặc mã nguồn mới. "
         "Chọn câu trích dẫn đủ đặc trưng, tối thiểu 20 ký tự. "
@@ -59,7 +112,9 @@ def make_tutor_prompt(subject, chapter, topic, question, sources, history="", pr
         '"practice":"một câu hỏi hoặc bài tập tự luyện dựa trên nguồn"}.\n\n'
         "MÔN HỌC: " + subject[:180] + "\n"
         "CHƯƠNG ĐÃ XÁC NHẬN: " + chapter[:240] + "\n"
-        "TIỂU MỤC ĐƯỢC CHỌN: " + topic[:240] + "\n"
+        "CÁC TIỂU MỤC THEO ĐỀ CƯƠNG (không phải những tiểu mục "
+        "người học đã chọn; tự xác định phần liên quan đến câu hỏi): "
+        + topic[:650] + "\n"
         "HỒ SƠ HỌC TẬP CÁ NHÂN (chỉ điều chỉnh nhịp độ và mức giải thích, "
         "không phải tài liệu để trích dẫn):\n"
         + str(profile or "")[:1700] + "\n"
