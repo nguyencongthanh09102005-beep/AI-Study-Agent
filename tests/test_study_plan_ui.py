@@ -53,14 +53,21 @@ def verify():
     html = res.get_data(as_text=True)
     assert 'id="weekDays"' in html
     assert 'id="plannerViewTabs"' in html
-    # Phase 6.2.1 only reads existing tasks; previous Week/Month/List stays intact.
-    assert 'data-view="timetable"' in html
+    # Phase 6.3 UX: Week is the compact timetable; day details remain accessible.
+    assert 'data-view="timetable"' not in html
     assert 'data-view="week"' in html
+    assert 'data-view="week" role="tab" aria-selected="true">Tuần</button>' in html
+    assert 'id="openQuickTask"' in html
+    assert 'id="backToWeek"' in html
+    assert 'id="weekDays" aria-live="polite" hidden' in html
+    assert 'id="plannerTimetable" hidden' not in html
+    assert "globalSearch" not in html
+    assert "Tìm kiếm môn học, tài liệu, câu hỏi" not in html
     assert 'data-view="month"' in html
     assert 'data-view="list"' in html
     assert 'id="plannerTimetable"' in html
     assert 'id="plannerTimetableGrid"' in html
-    assert "Thời khóa biểu theo buổi" in html
+    assert "Thời khóa biểu tuần" in html
     assert "Sáng · Trưa · Chiều · Tối" in html
     assert "study_timetable_periods.js" in html
     assert 'data-task-title="Ôn chương IaaS"' in html
@@ -70,7 +77,11 @@ def verify():
     assert "study_schedule_conflicts.css" in html
     timetable_js = (Path(__file__).resolve().parents[1] / "static/js/study_plan.js").read_text(encoding="utf-8")
     assert 'function renderTimetable()' in timetable_js
-    assert 'currentView === "timetable"' in timetable_js
+    assert 'currentView === "week"' in timetable_js
+    assert 'currentView = "day"' in timetable_js
+    assert 'backToWeek?.addEventListener' in timetable_js
+    assert 'quickTask?.addEventListener' in timetable_js
+    assert 'renderWeek()' not in timetable_js
     assert 'timetableGrid.replaceChildren()' in timetable_js
     assert 'id="aiPlannerForm"' in html
     assert 'id="toggleEditPlan"' in html

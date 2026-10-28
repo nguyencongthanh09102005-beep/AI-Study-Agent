@@ -6,7 +6,7 @@
 {% block content %}
 <section class="mock-page-head">
   <div><h2>▦ &nbsp; Kế hoạch học tập</h2><p>Lên kế hoạch hôm nay, chạm tới ước mơ ngày mai! ✨</p></div>
-  <div class="head-actions"><button type="button" class="soft-primary" id="openAiPlanner">＋ <span>Tạo kế hoạch mới</span></button></div>
+  <div class="head-actions"><button type="button" class="ghost-action" id="openQuickTask">＋ Thêm buổi học</button><button type="button" class="soft-primary" id="openAiPlanner">＋ <span>Tạo kế hoạch mới</span></button></div>
 </section>
 
 <section class="soft-card week-strip-card">
@@ -22,28 +22,27 @@
     <span></span>
     <div class="segmented-filter" id="plannerViewTabs" role="tablist" aria-label="Kiểu hiển thị kế hoạch">
       <button class="active" type="button" data-view="week" role="tab" aria-selected="true">Tuần</button>
-      <button type="button" data-view="timetable" role="tab" aria-selected="false">Giờ</button>
       <button type="button" data-view="month" role="tab" aria-selected="false">Tháng</button>
       <button type="button" data-view="list" role="tab" aria-selected="false">Danh sách</button>
     </div>
   </div>
-  <div class="week-days" id="weekDays" aria-live="polite">{% for i in range(7) %}<button type="button" class="week-day" data-day-index="{{ i }}"><b>{{ ['T2','T3','T4','T5','T6','T7','CN'][i] }}</b><span class="week-date">--/--</span><small>0 task</small></button>{% endfor %}</div>
+  <div class="week-days" id="weekDays" aria-live="polite" hidden></div>
 </section>
 
-{% if conflict_task_count %}<section class="study-conflict-banner" role="status"><strong>⚠ {{ conflict_task_count }} buổi học đang trùng giờ</strong><p>Các buổi học đang giao nhau về thời gian. Mở chế độ Giờ để xem và chủ động đổi lịch; hệ thống không tự dời buổi học.</p></section>{% endif %}
+{% if conflict_task_count %}<section class="study-conflict-banner" role="status"><strong>⚠ {{ conflict_task_count }} buổi học đang trùng giờ</strong><p>Các buổi học đang giao nhau về thời gian. Mở thời khóa biểu Tuần để xem và chủ động đổi lịch; hệ thống không tự dời buổi học.</p></section>{% endif %}
 
 <section class="planner-layout-new">
-  <section class="soft-card study-hour-timetable" id="plannerTimetable" hidden aria-label="Thời khóa biểu tự học theo giờ">
+  <section class="soft-card study-hour-timetable" id="plannerTimetable" aria-label="Thời khóa biểu tuần theo buổi">
     <header class="study-hour-heading">
-      <div><h3>Thời khóa biểu theo buổi</h3><p>Sáng · Trưa · Chiều · Tối. Giờ học nằm trên từng thẻ; bấm vào thẻ để xem và đổi lịch.</p></div>
+      <div><h3>Thời khóa biểu tuần</h3><p>Sáng · Trưa · Chiều · Tối. Giờ học nằm trên từng thẻ; bấm vào thẻ để xem và đổi lịch.</p></div>
       <span>Lịch tuần gọn</span>
     </header>
     <div class="study-hour-scroll"><div class="study-hour-grid" id="plannerTimetableGrid"></div></div>
     <p class="study-hour-empty" id="plannerTimetableEmpty" hidden>Tuần này chưa có buổi học. Hãy đưa lộ trình vào Kế hoạch học trước.</p>
   </section>
-  <article class="soft-card day-schedule-card">
+  <article class="soft-card day-schedule-card" hidden>
     <div class="card-title-row planner-agenda-header">
-      <div><h3 id="scheduleTitle">◷ &nbsp; Lịch học trong ngày</h3><small class="schedule-view-label" id="scheduleViewLabel">Hôm nay</small></div>
+      <div><button type="button" class="ghost-action planner-back-week" id="backToWeek" hidden>← Trở về thời khóa biểu tuần</button><h3 id="scheduleTitle">◷ &nbsp; Lịch học trong ngày</h3><small class="schedule-view-label" id="scheduleViewLabel">Hôm nay</small></div>
       <div class="planner-agenda-actions">
         <button type="button" class="ghost-action edit-only" id="addTaskButton">＋ Thêm buổi học</button>
         <button type="button" class="ghost-action planner-edit-trigger" id="toggleEditPlan" aria-pressed="false">✎ Chỉnh sửa</button>

@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/mockup.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/readability.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/sidebar_account.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/topbar_cleanup.css') }}">
   {% if page == 'chat' %}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/chat_stage1.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/chat_stage2.css') }}">
@@ -72,11 +73,8 @@
   </aside>
 
   <main class="app-main">
-    <header class="topbar">
-      <label class="global-search">
-        <span>⌕</span>
-        <input id="globalSearch" type="search" placeholder="Tìm kiếm môn học, tài liệu, câu hỏi..." autocomplete="off">
-      </label>
+    <header class="topbar topbar-account-only">
+      {% if page == 'chat' %}<span class="topbar-context-title">Chat AI</span>{% endif %}
       <div class="topbar-actions topbar-mobile-account">
         <span class="topbar-mobile-avatar" title="{{ session.get('user_name','Tài khoản') }}">{{ (session.get('user_name') or 'N')[0]|upper }}</span>
         <a class="topbar-mobile-logout" href="{{ url_for('logout') }}" aria-label="Đăng xuất" title="Đăng xuất">↪</a>

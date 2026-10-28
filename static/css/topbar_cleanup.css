@@ -1,0 +1,13 @@
+/* Remove the inactive global search without hiding per-page search fields.
+   Desktop: reclaim vertical room; mobile: keep account/logout controls.
+   Chat has a dedicated full-height layout, so retain its top bar. */
+body.study-ui:not(.page-chat) .topbar-account-only {display:none !important}
+body.study-ui .topbar-context-title {font-size:14px;font-weight:850;color:#425680}
+@media(max-width:900px) {
+  body.study-ui:not(.page-chat) .topbar-account-only {
+    display:flex !important;
+    height:52px !important;
+    justify-content:flex-end !important;
+    padding:7px 16px !important;
+  }
+}

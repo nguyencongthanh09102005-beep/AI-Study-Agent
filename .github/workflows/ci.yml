@@ -54,6 +54,7 @@ jobs:
           node --check static/js/study_plan.js
           node --check static/js/study_timetable_periods.js
           node tests/test_study_timetable_periods.js
+          node tests/test_weekly_planner_navigation.js
           node --check static/js/chat.js
           node --check static/js/document-summary.js
           node --check static/js/auth-password.js

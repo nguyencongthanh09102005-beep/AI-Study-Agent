@@ -278,3 +278,21 @@
   }
   .page-study_plan .planner-insight { grid-column: auto; }
 }
+
+/* Weekly timetable is the only visible 'Tuần' mode; detail is internal.
+   The month and list views, editing, rescheduling and completion remain intact. */
+.page-study_plan #backToWeek[hidden] {display:none!important}
+.page-study_plan .planner-back-week {
+  display:inline-flex;align-items:center;margin:0 0 12px;
+  padding:8px 12px;border-radius:10px;font-size:12px;
+  font-weight:800;color:#4057b1;background:#eaf0ff;
+  border:1px solid #d7e0fb;cursor:pointer;
+}
+.page-study_plan .planner-back-week:hover {background:#dae5ff}
+.page-study_plan #openQuickTask {
+  font-weight:800;min-height:43px;padding:0 14px;
+  border-radius:12px;white-space:nowrap;
+}
+.page-study_plan .week-strip-card:has(#weekDays[hidden]) {
+  padding-bottom:16px;
+}

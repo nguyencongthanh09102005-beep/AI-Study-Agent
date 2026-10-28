@@ -247,6 +247,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const prevButton = document.getElementById("prevPeriod");
   const nextButton = document.getElementById("nextPeriod");
   const viewTabs = document.getElementById("plannerViewTabs");
+  const backToWeek = document.getElementById("backToWeek");
   const scheduleTitle = document.getElementById("scheduleTitle");
   const scheduleViewLabel = document.getElementById("scheduleViewLabel");
   const emptyState = document.getElementById("scheduleFilterEmpty");
@@ -255,6 +256,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const timetableGrid = document.getElementById("plannerTimetableGrid");
   const timetableEmpty = document.getElementById("plannerTimetableEmpty");
   const agendaCard = document.querySelector(".day-schedule-card");
+  const quickTask = document.getElementById("openQuickTask");
+  quickTask?.addEventListener("click", () => document.getElementById("addTaskButton")?.click());
 
   if (!weekDays || !datePicker) return;
 
@@ -506,16 +509,6 @@ document.addEventListener("DOMContentLoaded", () => {
     return button;
   }
 
-  function renderWeek() {
-    weekDays.hidden = false;
-    weekDays.classList.remove("month-grid");
-    weekDays.innerHTML = "";
-    const start = startOfWeek(selectedDate);
-    for (let i = 0; i < 7; i += 1) {
-      weekDays.appendChild(createDayButton(addDays(start, i)));
-    }
-  }
-
   function renderMonth() {
     weekDays.hidden = false;
     weekDays.classList.add("month-grid");
@@ -547,15 +540,17 @@ document.addEventListener("DOMContentLoaded", () => {
   function renderView({ animate = true } = {}) {
     datePicker.value = toIso(selectedDate);
 
-    if (currentView === "week") renderWeek();
-    if (currentView === "month") renderMonth();
-    if (currentView === "list" || currentView === "timetable") {
+    if (currentView === "month") {
+      renderMonth();
+    } else {
       weekDays.hidden = true;
       weekDays.classList.remove("month-grid");
     }
-    const showTimetable = currentView === "timetable";
+    // 'week' is now the compact weekly timetable; 'day' opens its task details.
+    const showTimetable = currentView === "week";
     if (timetable) timetable.hidden = !showTimetable;
     if (agendaCard) agendaCard.hidden = showTimetable;
+    if (backToWeek) backToWeek.hidden = currentView !== "day";
     if (showTimetable) renderTimetable();
 
     updateHeader();
@@ -578,6 +573,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const button = event.target.closest("[data-date]");
     if (!button) return;
     selectedDate = fromIso(button.dataset.date);
+    currentView = "day";
     renderView();
   });
 
@@ -592,12 +588,18 @@ document.addEventListener("DOMContentLoaded", () => {
     const button = event.target.closest(".study-hour-event[data-date]");
     if (!button) return;
     selectedDate = fromIso(button.dataset.date);
+    currentView = "day";
+    renderView();
+  });
+
+  backToWeek?.addEventListener("click", () => {
     currentView = "week";
     renderView();
   });
 
   todayButton?.addEventListener("click", () => {
     selectedDate = cloneDate(new Date());
+    currentView = "week";
     renderView();
   });
 
@@ -608,8 +610,10 @@ document.addEventListener("DOMContentLoaded", () => {
         selectedDate.getMonth() - 1,
         Math.min(selectedDate.getDate(), 28)
       );
-    } else if (currentView === "week" || currentView === "timetable") {
+    } else if (currentView === "week") {
       selectedDate = addDays(selectedDate, -7);
+    } else if (currentView === "day") {
+      selectedDate = addDays(selectedDate, -1);
     }
     renderView();
   });
@@ -621,15 +625,17 @@ document.addEventListener("DOMContentLoaded", () => {
         selectedDate.getMonth() + 1,
         Math.min(selectedDate.getDate(), 28)
       );
-    } else if (currentView === "week" || currentView === "timetable") {
+    } else if (currentView === "week") {
       selectedDate = addDays(selectedDate, 7);
+    } else if (currentView === "day") {
+      selectedDate = addDays(selectedDate, 1);
     }
     renderView();
   });
 
   datePicker.addEventListener("change", () => {
     selectedDate = fromIso(datePicker.value);
-    if (currentView === "list") currentView = "week";
+    if (currentView === "list" || currentView === "day") currentView = "week";
     renderView();
   });
 
