@@ -5,10 +5,11 @@
 {% block page_styles %}<link rel="stylesheet" href="{{ url_for('static', filename='css/study_session.css') }}">{% endblock %}
 {% block content %}
 <div class="study-room">
+  <div id="studyRoomAiContext" hidden data-task-id="{{ task.id }}" data-subject-id="{{ subject.id }}" data-chapter-number="{{ lesson.unit_id }}" data-lesson-title="{{ lesson.title|e }}" data-chat-enabled="{{ '1' if chat_ready else '0' }}"></div>
   <nav class="study-room-nav" aria-label="Điều hướng buổi học">
     <a href="{{ url_for('study_plan', subject_id=subject.id) }}">← Kế hoạch học</a>
     <a href="{{ url_for('course_path.learning_path', subject_id=subject.id) }}">Xem lộ trình theo chương →</a>
-    <a href="#studyRoomChat">💬 Hỏi AI về buổi này ↓</a>
+    <button type="button" class="study-room-ai-open" data-open-floating-ai>💬 Hỏi AI về buổi này</button>
   </nav>
   <header class="study-room-hero">
     <div>
@@ -53,7 +54,7 @@
         {% if shared_docs %}
           <h4>Học liệu chung · Admin đã duyệt cho chương</h4>
           <div class="study-room-files">{% for doc in shared_docs %}
-            <a href="{{ doc.link }}" target="_blank" rel="noopener noreferrer"><span>📘 {{ doc.name }}</span><small>Mở file ↗</small></a>
+            <a href="{{ doc.link }}" data-ai-approved-source="{{ doc.name|e }}" target="_blank" rel="noopener noreferrer"><span>📘 {{ doc.name }}</span><small>Mở file ↗</small></a>
           {% endfor %}</div>
         {% endif %}
         {% if private_docs %}
@@ -81,44 +82,6 @@
       </section>
     </aside>
   </div>
-  <section class="study-room-card study-room-chat" id="studyRoomChat"
-           data-task-id="{{ task.id }}" data-subject-id="{{ subject.id }}"
-           data-chapter-number="{{ lesson.unit_id }}"
-           data-chat-enabled="{{ '1' if chat_ready else '0' }}"
-           aria-label="Chat AI hỗ trợ buổi học">
-    <div class="study-room-chat-heading">
-      <div>
-        <h3>💬 Chat AI hỗ trợ buổi học</h3>
-        <p class="study-room-chat-subtitle">{{ lesson.title }}</p>
-      </div>
-      <span class="study-room-chat-status" id="studyRoomChatStatus" role="status" aria-live="polite">
-        {{ 'Đang xác thực học liệu...' if chat_ready else 'Chưa có nguồn được duyệt' }}
-      </span>
-    </div>
-    {% if chat_ready %}
-      <p class="study-room-chat-info">AI chỉ dùng tài liệu chung <strong>đã được Admin duyệt</strong> cho Chương {{ lesson.unit_id }}, và tập trung vào các tiểu mục của buổi này. Câu trả lời phải có trích dẫn từ nguồn.</p>
-      <div class="study-room-chat-messages" id="studyRoomChatMessages" role="log" aria-live="polite">
-        <p class="study-room-chat-empty">Đang tải hội thoại của riêng buổi này...</p>
-      </div>
-      <form id="studyRoomChatForm" class="study-room-chat-form">
-        <label for="studyRoomChatQuestion">Câu hỏi về nội dung buổi học</label>
-        <textarea id="studyRoomChatQuestion" rows="3" maxlength="500"
-                  placeholder="Ví dụ: Giải thích tiểu mục đầu tiên trong buổi này..." required disabled></textarea>
-        <div class="study-room-chat-actions">
-          <small>Tối đa 500 ký tự · Có lưu vào lịch sử Chat AI của môn, nhưng tách ngữ cảnh theo buổi.</small>
-          <button type="submit" id="studyRoomChatSend" disabled>Gửi câu hỏi →</button>
-        </div>
-      </form>
-    {% else %}
-      <div class="study-room-chat-unavailable" role="note">
-        Chưa thể bật Chat theo buổi có trích dẫn vì chương này chưa có <strong>tài liệu chung có nội dung đọc được được Admin duyệt</strong>.
-        Tài liệu cá nhân vẫn mở được ở trên nhưng không tự động trở thành nguồn đã duyệt.
-      </div>
-      <a class="study-room-chat-free" href="{{ url_for('chat', subject_id=subject.id) }}">Mở Chat AI thông thường của môn (không xác thực nguồn theo buổi) →</a>
-    {% endif %}
-  </section>
+
 </div>
-{% endblock %}
-{% block scripts %}
-<script src="{{ url_for('static', filename='js/study_session_chat.js') }}"></script>
 {% endblock %}

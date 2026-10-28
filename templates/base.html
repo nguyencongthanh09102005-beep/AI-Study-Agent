@@ -11,6 +11,9 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/readability.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/sidebar_account.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/topbar_cleanup.css') }}">
+  {% if page not in ['chat', 'admin'] %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/ai_bubble.css') }}">
+  {% endif %}
   {% if page == 'chat' %}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/chat_stage1.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/chat_stage2.css') }}">
@@ -104,9 +107,49 @@
   </div>
 </div>
 
+{% if page not in ['chat', 'admin'] %}
+<div id="floatingAiRoot" class="floating-ai-root">
+  <button type="button" id="floatingAiBubble" class="floating-ai-bubble" aria-label="Mở trợ lý AI nổi. Kéo để di chuyển." aria-controls="floatingAiPanel" aria-expanded="false" title="Kéo để di chuyển · Nhấn để mở">
+    <img src="{{ url_for('static', filename='images/ai-robot.svg') }}" alt="" draggable="false">
+    <span class="floating-ai-online" aria-hidden="true"></span>
+  </button>
+  <section id="floatingAiPanel" class="floating-ai-panel" role="dialog" aria-modal="false" aria-label="Trợ lý AI Study Agent" hidden>
+    <header class="floating-ai-header">
+      <img src="{{ url_for('static', filename='images/ai-robot.svg') }}" alt="" draggable="false">
+      <div class="floating-ai-heading">
+        <strong>AI Study Agent</strong>
+        <small id="floatingAiScope">Trợ lý học tập theo môn</small>
+      </div>
+      <button type="button" id="floatingAiClose" class="floating-ai-close" aria-label="Thu nhỏ Chat AI">−</button>
+    </header>
+    <div id="floatingAiMode" class="floating-ai-mode" role="status" aria-live="polite">Đang tải trợ lý...</div>
+    <label id="floatingAiCourseLabel" class="floating-ai-course-label" for="floatingAiCourse">
+      Chọn môn học
+      <select id="floatingAiCourse" aria-label="Chọn môn để hỏi AI"></select>
+    </label>
+    <div id="floatingAiMessages" class="floating-ai-messages" role="log" aria-live="polite" aria-label="Lịch sử Chat AI">
+      <p class="floating-ai-empty">Chọn môn hoặc mở một buổi học để trò chuyện với AI.</p>
+    </div>
+    <form id="floatingAiForm" class="floating-ai-compose">
+      <label class="sr-only" for="floatingAiInput">Nhập câu hỏi cho AI</label>
+      <textarea id="floatingAiInput" rows="2" maxlength="500" placeholder="Hỏi AI về bài đang học..." required disabled></textarea>
+      <div class="floating-ai-compose-footer">
+        <span id="floatingAiStatus" role="status" aria-live="polite">Đang kết nối...</span>
+        <button type="submit" id="floatingAiSend" disabled>Gửi ➤</button>
+      </div>
+    </form>
+    <a id="floatingAiFullChat" class="floating-ai-full-link" href="{{ url_for('chat') }}">Mở Chat AI đầy đủ ↗</a>
+  </section>
+</div>
+{% endif %}
+
 <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 <script src="{{ url_for('static', filename='js/confirm-modal.js') }}"></script>
 <script src="{{ url_for('static', filename='js/mockup.js') }}"></script>
+{% if page not in ['chat', 'admin'] %}
+<script src="{{ url_for('static', filename='js/chat_format.js') }}"></script>
+<script src="{{ url_for('static', filename='js/ai_bubble.js') }}"></script>
+{% endif %}
 {% block scripts %}{% endblock %}
 </body>
 </html>
