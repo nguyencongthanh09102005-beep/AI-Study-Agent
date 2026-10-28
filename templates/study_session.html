@@ -13,7 +13,7 @@
   </nav>
   <header class="study-room-hero">
     <div>
-      <span class="study-room-eyebrow">KHÔNG GIAN HỌC TẬP · ĐỢT 6.3.2</span>
+      <span class="study-room-eyebrow">KHÔNG GIAN HỌC TẬP · ĐỢT 6.4</span>
       <h2>{{ subject.name }}</h2>
       <p>{{ lesson.title }}</p>
       <div class="study-room-meta">
@@ -24,7 +24,30 @@
     </div>
     <span class="study-room-icon" aria-hidden="true">📖</span>
   </header>
-  <p class="study-room-note" role="note">Mở trang này không tự tính là đã học. Chức năng bắt đầu, tạm dừng, tiếp tục và ghi nhận thời gian thực tế sẽ được làm ở Đợt 6.4.</p>
+  <p class="study-room-note" role="note">Mở trang không tự đánh dấu đã học. Chỉ tính thời gian khi bạn bấm Bắt đầu hoặc Tiếp tục và còn hoạt động trên trang học. Nếu tab không hoạt động lâu, phiên sẽ tạm dừng để tránh tính thời gian không thực tế.</p>
+  <section class="study-room-card study-session-timer" id="studySessionTimer"
+           data-task-id="{{ task.id }}" data-csrf="{{ study_csrf }}"
+           data-initial-status="{{ study_state.status }}"
+           data-initial-seconds="{{ study_state.elapsed_seconds }}">
+    <div class="study-session-timer-top">
+      <div>
+        <h3>⏱ Phiên học thực tế</h3>
+        <p class="study-room-muted">Thời lượng dự kiến: {{ task.duration }} phút · Ghi nhận riêng theo buổi</p>
+      </div>
+      <span id="studySessionState" class="study-session-state" role="status" aria-live="polite">Đang tải...</span>
+    </div>
+    <div class="study-session-metrics">
+      <div><small>Thời gian đã học</small><strong id="studySessionElapsed">00:00:00</strong></div>
+      <div><small>Mục tiêu buổi học</small><strong>{{ task.duration }} phút</strong></div>
+    </div>
+    <div class="study-session-actions">
+      <button type="button" id="studySessionStart">▶ Bắt đầu học</button>
+      <button type="button" id="studySessionPause" hidden>⏸ Tạm dừng</button>
+      <button type="button" id="studySessionResume" hidden>▶ Tiếp tục</button>
+      <button type="button" id="studySessionFinish" class="study-session-finish" hidden>✓ Hoàn thành buổi học</button>
+    </div>
+    <p class="study-session-note" id="studySessionNotice" role="status" aria-live="polite">Chưa thực hiện thay đổi nào với lịch học hoặc tiến độ.</p>
+  </section>
   <div class="study-room-columns">
     <main class="study-room-main">
       <section class="study-room-card">
@@ -84,4 +107,7 @@
   </div>
 
 </div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/study_session_timer.js') }}"></script>
 {% endblock %}
