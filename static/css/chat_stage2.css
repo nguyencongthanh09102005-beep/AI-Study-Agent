@@ -291,3 +291,20 @@ body.page-chat .sidebar-course-list .history-text small {
     transform: none !important;
   }
 }
+
+/* A light content entrance after switching subjects; message text does not
+   animate individually, so long conversations remain responsive. */
+body.page-chat .chat-messages.chat-subject-enter {
+  animation: chat-stage2-subject-in 180ms ease-out both;
+}
+
+@keyframes chat-stage2-subject-in {
+  from { opacity: .72; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.page-chat .chat-messages.chat-subject-enter {
+    animation: none !important;
+  }
+}
