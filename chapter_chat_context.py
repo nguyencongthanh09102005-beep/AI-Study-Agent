@@ -1,0 +1,93 @@
+"""Server-side validated context for one existing Chat AI conversation.
+
+Students can launch Chat AI from a chapter; neither URL params nor JSON fields
+are trusted as proof of access. Only confirmed syllabus units and Admin-approved
+shared documents are available in this mode.
+"""
+import json
+
+from chapter_material_routes import (
+    approved_document_rows, chapter_key, ensure_chapter_material_schema,
+    official_syllabus,
+)
+from chapter_tutor import prepared_sources
+from course_path_learning import parse_chapter_details
+from syllabus_learning import syllabus_hash
+from syllabus_routes import _source, ensure_syllabus_schema
+
+
+class LessonContextError(Exception):
+    def __init__(self, message, status=400):
+        self.message = message
+        self.status = status
+        super().__init__(message)
+
+
+def resolve_lesson_context(project, conn, uid, subject_id, chapter_number, topic_index):
+    """Resolve and authorize an exact chapter/topic, with current approved sources."""
+    subject = conn.execute(
+        "SELECT * FROM subjects WHERE id=? AND user_id=?",
+        (subject_id, uid)
+    ).fetchone()
+    if not subject:
+        raise LessonContextError("Môn học không thuộc tài khoản.", 404)
+
+    ensure_syllabus_schema(conn)
+    ensure_chapter_material_schema(conn)
+    kind, text, source_name = _source(project, conn, uid, subject_id)
+    if kind != "shared" or not text:
+        raise LessonContextError(
+            "Chế độ học có dẫn nguồn cần đề cương chung được Admin quản lý.", 409
+        )
+
+    fingerprint = syllabus_hash(text)
+    reviewed = conn.execute("""
+        SELECT status,source_hash,units_json FROM syllabus_reviews
+        WHERE user_id=? AND subject_id=?
+    """, (uid, subject_id)).fetchone()
+    if not reviewed or (reviewed["status"] != "confirmed" or
+                        reviewed["source_hash"] != fingerprint):
+        raise LessonContextError(
+            "Đề cương đã thay đổi hoặc chưa được xác nhận; hãy xác nhận lại.", 409
+        )
+    try:
+        units = json.loads(reviewed["units_json"])
+    except (ValueError, TypeError):
+        raise LessonContextError("Dữ liệu chương đã xác nhận không hợp lệ.", 409)
+    if (isinstance(chapter_number, bool) or
+        not isinstance(chapter_number, int) or
+        chapter_number < 1 or chapter_number > len(units)):
+        raise LessonContextError("Chương không thuộc đề cương đã xác nhận.", 400)
+
+    section = parse_chapter_details(text, units)[chapter_number - 1]
+    topics = section["topics"]
+    if (isinstance(topic_index, bool) or
+        not isinstance(topic_index, int) or
+        topic_index < 0 or topic_index >= max(1, len(topics))):
+        raise LessonContextError("Tiểu mục không thuộc chương đã xác nhận.", 400)
+
+    shared = project.ensure_shared_subject_for_user_subject(conn, uid, subject_id)
+    if not shared or not shared["admin_managed"]:
+        raise LessonContextError("Không có môn học chung do Admin quản lý.", 409)
+    official_text, official_hash, _ = official_syllabus(conn, shared["id"])
+    if not official_text or official_hash != fingerprint:
+        raise LessonContextError("Đề cương chung đã thay đổi; hãy xác nhận lại.", 409)
+
+    key = chapter_key(section["evidence"])
+    rows = approved_document_rows(conn, shared["id"], key, fingerprint)
+    sources = prepared_sources(rows)
+    if not sources:
+        raise LessonContextError(
+            "Chương này chưa có học liệu được Admin duyệt và đọc được nội dung.", 409
+        )
+
+    return {
+        "subject_id": subject_id,
+        "subject_name": subject["name"],
+        "chapter_number": chapter_number,
+        "chapter": section["chapter"],
+        "topic_index": topic_index,
+        "topic": topics[topic_index] if topics else section["chapter"],
+        "source_name": source_name,
+        "sources": sources,
+    }
