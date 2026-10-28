@@ -32,7 +32,7 @@ def prepared_sources(approved_rows):
     return result
 
 
-def make_tutor_prompt(subject, chapter, topic, question, sources, history=""):
+def make_tutor_prompt(subject, chapter, topic, question, sources, history="", profile=""):
     passages = "\n\n".join(
         "NGUỒN " + src["key"] + " (" + src["name"][:150] + "):\n" + src["excerpt"]
         for src in sources
@@ -60,6 +60,9 @@ def make_tutor_prompt(subject, chapter, topic, question, sources, history=""):
         "MÔN HỌC: " + subject[:180] + "\n"
         "CHƯƠNG ĐÃ XÁC NHẬN: " + chapter[:240] + "\n"
         "TIỂU MỤC ĐƯỢC CHỌN: " + topic[:240] + "\n"
+        "HỒ SƠ HỌC TẬP CÁ NHÂN (chỉ điều chỉnh nhịp độ và mức giải thích, "
+        "không phải tài liệu để trích dẫn):\n"
+        + str(profile or "")[:1700] + "\n"
         "ĐỐI THOẠI GẦN ĐÂY (chỉ để hiểu câu hỏi tiếp nối; KHÔNG "
         "là nguồn kiến thức hoặc trích dẫn):\n"
         + str(history or "")[-1800:] + "\n"
