@@ -35,8 +35,16 @@ def ensure_syllabus_schema(conn):
 
 def _source(project, conn, uid, subject_id):
     shared = project.ensure_shared_subject_for_user_subject(conn, uid, subject_id)
-    if shared and (shared["syllabus_text"] or "").strip():
-        return "shared", (shared["syllabus_text"] or "").strip(), "Đề cương chung từ Admin"
+    if shared:
+        official = conn.execute("""
+            SELECT original_name, extracted_text FROM shared_documents
+            WHERE shared_subject_id=? AND is_syllabus=1
+            ORDER BY id DESC LIMIT 1
+        """, (shared["id"],)).fetchone()
+        if official and (official["extracted_text"] or "").strip():
+            return "shared", official["extracted_text"].strip(), official["original_name"]
+        if (shared["syllabus_text"] or "").strip():
+            return "shared", shared["syllabus_text"].strip(), "Đề cương chung từ Admin"
     row = conn.execute("""
         SELECT d.extracted_text, d.original_name FROM documents d
         JOIN subjects s ON s.personal_syllabus_document_id = d.id
