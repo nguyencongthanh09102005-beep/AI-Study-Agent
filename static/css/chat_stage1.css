@@ -1,0 +1,252 @@
+/* ============================================================
+   CHAT AI — UI REFINEMENT, STAGE 1
+   Scoped to page-chat only. Keep sidebar reorganization,
+   chapter-mode picker and animations for subsequent stages.
+
+   Loaded AFTER mockup.css + readability.css deliberately:
+   older rules capped AI messages at 620px / 72% and reduced
+   the chat window height to 440px.
+   ============================================================ */
+
+/* The chat uses the remaining viewport height; avoid page-level
+   scrolling on desktop so the composer remains visible. */
+@media (min-width: 901px) {
+  body.page-chat .page-content {
+    padding: 12px 16px !important;
+    overflow: hidden !important;
+  }
+
+  body.page-chat .chat-shell-new {
+    display: grid !important;
+    grid-template-columns: clamp(210px, 19vw, 255px) minmax(0, 1fr) !important;
+    gap: 14px !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: none !important;
+  }
+
+  body.page-chat .chat-history-panel,
+  body.page-chat .chat-main-panel {
+    min-height: 0 !important;
+    height: 100% !important;
+    max-height: none !important;
+  }
+}
+
+body.page-chat .chat-history-panel {
+  overflow: hidden !important;
+  padding: 14px !important;
+}
+
+body.page-chat .chat-history-list {
+  min-height: 0 !important;
+  overflow-y: auto !important;
+}
+
+body.page-chat .chat-main-panel {
+  display: flex !important;
+  flex-direction: column !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+body.page-chat .chat-header {
+  flex: 0 0 auto !important;
+  min-height: 64px !important;
+  padding: 12px 18px !important;
+}
+
+body.page-chat #lessonModeBanner {
+  flex: 0 0 auto !important;
+  margin: 10px 14px 0 !important;
+  padding: 10px 14px !important;
+  line-height: 1.5;
+}
+
+/* Only message history scrolls; no nested limit at 440px. */
+body.page-chat .chat-main-panel .chat-messages {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  padding: 18px 20px 24px !important;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+/* Widen AI answer area so long explanations and code can be read.
+   Overrides legacy width:fit-content and max-width:620px rules. */
+body.page-chat .chat-messages .ai-message .message-body {
+  flex: 1 1 auto !important;
+  width: auto !important;
+  max-width: min(100%, 1100px) !important;
+  min-width: 0 !important;
+}
+
+body.page-chat .chat-messages .ai-message .message-bubble {
+  display: block !important;
+  width: 100% !important;
+  inline-size: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  height: auto !important;
+  block-size: auto !important;
+  max-height: none !important;
+  padding: 16px 19px !important;
+  box-sizing: border-box !important;
+  white-space: pre-wrap !important;
+  overflow-wrap: anywhere !important;
+  word-break: normal !important;
+  line-height: 1.72 !important;
+  font-size: 14px !important;
+}
+
+/* User text stays shorter than AI explanations. */
+body.page-chat .chat-messages .user-message .message-body {
+  max-width: min(78%, 690px) !important;
+  min-width: 0 !important;
+}
+
+body.page-chat .chat-messages .user-message .message-bubble {
+  max-width: 100% !important;
+  white-space: pre-wrap !important;
+  overflow-wrap: anywhere !important;
+}
+
+body.page-chat .chat-message {
+  margin-bottom: 16px !important;
+}
+
+body.page-chat .chat-suggest-row {
+  flex: 0 0 auto !important;
+  padding: 6px 16px 9px !important;
+  margin: 0 !important;
+}
+
+body.page-chat .chat-composer {
+  flex: 0 0 auto !important;
+  padding: 10px 16px 14px !important;
+  margin: 0 !important;
+}
+
+body.page-chat .composer-inner {
+  width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+}
+
+body.page-chat .composer-inner textarea {
+  min-width: 0 !important;
+  font-size: 14px !important;
+}
+
+/* On narrow screens, do not stack two fixed-height panels and clip the
+   conversation. The course list becomes compact and horizontally scrollable. */
+@media (max-width: 900px) {
+  body.page-chat {
+    height: auto !important;
+    min-height: 100vh !important;
+    overflow-y: auto !important;
+  }
+
+  body.page-chat .page-content {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    padding: 12px 12px 26px !important;
+  }
+
+  body.page-chat .chat-shell-new {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 12px !important;
+    height: auto !important;
+    min-height: 0 !important;
+  }
+
+  body.page-chat .chat-history-panel {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    padding: 12px !important;
+  }
+
+  body.page-chat .chat-side-head {
+    margin-bottom: 7px !important;
+  }
+
+  body.page-chat .chat-history-list {
+    display: flex !important;
+    flex-flow: row nowrap !important;
+    gap: 8px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    padding-bottom: 4px !important;
+  }
+
+  body.page-chat .chat-history-list .subject-chat-item {
+    flex: 0 0 auto !important;
+    width: clamp(160px, 40vw, 230px) !important;
+    min-height: 58px !important;
+  }
+
+  body.page-chat .chat-main-panel {
+    height: min(740px, 76svh) !important;
+    min-height: 480px !important;
+    max-height: none !important;
+  }
+
+  body.page-chat .chat-main-panel .chat-messages {
+    padding: 14px 12px 18px !important;
+  }
+
+  body.page-chat .chat-messages .ai-message .message-body {
+    max-width: calc(100% - 50px) !important;
+  }
+
+  body.page-chat .chat-messages .ai-message .message-bubble {
+    padding: 13px !important;
+  }
+
+  body.page-chat .chat-messages .user-message .message-body {
+    max-width: 83% !important;
+  }
+
+  body.page-chat .chat-suggest-row {
+    gap: 6px !important;
+    padding: 5px 10px 8px !important;
+  }
+
+  body.page-chat .chat-composer {
+    padding: 8px 10px 12px !important;
+  }
+}
+
+@media (max-width: 560px) {
+  body.page-chat .chat-main-panel {
+    height: min(680px, 72svh) !important;
+    min-height: 420px !important;
+  }
+
+  body.page-chat .chat-header {
+    min-height: 55px !important;
+    padding: 10px 12px !important;
+  }
+
+  body.page-chat #lessonModeBanner {
+    margin: 8px 10px 0 !important;
+    padding: 10px !important;
+  }
+
+  body.page-chat .chat-ai-info strong {
+    font-size: 13px !important;
+    overflow-wrap: anywhere;
+  }
+
+  body.page-chat .chat-documents-link {
+    padding: 7px !important;
+  }
+}
