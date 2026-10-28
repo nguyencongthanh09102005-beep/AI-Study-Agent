@@ -114,6 +114,8 @@ def learning_path(subject_id):
                         "course_path.learning_path", subject_id=subject_id,
                         notice=str(exc),
                     ), code=303)
+                if summary["created"]:
+                    project.recalculate_subject_progress(uid, subject_id, conn)
                 conn.commit()
                 message = (
                     f"Đã đưa {summary['created']} buổi mới vào Kế hoạch học; "
