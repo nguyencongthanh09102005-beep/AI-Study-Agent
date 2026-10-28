@@ -330,9 +330,25 @@ Thuật toán độ phức tạp Big O cũng có thể áp dụng cho linked lis
             assert 'sidebarNav?.classList.toggle("is-expanded", expanded)' in js_code
             assert 'navToggle.setAttribute("aria-expanded", String(expanded))' in js_code
             assert 'historyList.classList.add("chat-courses-ready")' in js_code
-            assert '.side-nav:not(.is-expanded) a.chat-nav-secondary' in ui_css
-            assert 'chat-sidebar-shortcuts-collapse' in ui_css
+            # The old flex-basis keyframes caused layout thrashing in the
+            # user's screen recording. FLIP animates only transforms/opacity.
+            assert 'chat-sidebar-shortcuts-collapse' not in ui_css
+            assert 'chat-sidebar-label-collapse' not in ui_css
+            assert 'transition: flex-basis' not in ui_css
+            assert 'transition: max-width' not in ui_css
+            assert 'sidebarAnimations' in js_code
+            assert 'getBoundingClientRect()' in js_code
+            assert 'item.animate([' in js_code
+            assert 'prefers-reduced-motion: reduce' in js_code
             assert 'chat-sidebar-course-reveal' in ui_css
+            navigation_css = (Path(__file__).resolve().parents[1] /
+                              "static/css/readability.css").read_text(encoding="utf-8")
+            assert '@view-transition' in navigation_css
+            assert 'navigation: auto' in navigation_css
+            assert 'navigation: none' in navigation_css
+            assert 'transform:' not in navigation_css[
+                navigation_css.index('::view-transition-old(root)'):]
+
             assert 'body.page-chat .side-nav .chat-nav-toggle { display: none; }' in ui_css
             # Stage 3+: 2 modes and real course/chapter selector, no
             # duplicate chatbot or fake syllabus values in the UI.
