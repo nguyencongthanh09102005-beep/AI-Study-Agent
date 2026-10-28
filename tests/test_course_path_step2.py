@@ -3,10 +3,11 @@ import json
 import sys
 import tempfile
 from pathlib import Path
+from datetime import date
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import app as project
-from course_path_learning import parse_chapter_details, match_course_materials
+from course_path_learning import parse_chapter_details, match_course_materials, build_course_roadmap, PLAN_VERSION
 
 
 def check():
@@ -37,6 +38,76 @@ Chương 6. Thuật toán sắp xếp
 6.2. Sắp xếp trộn
 4. PHƯƠNG PHÁP ĐÁNH GIÁ
 """
+    # Regression: real pypdf extraction has bullet-prefixed numbered subtopics and
+    # standalone section headings; an earlier parser created empty generic chapters.
+    pdf_style = """4. NỘI DUNG CHI TIẾT HỌC PHẦN
+Chương 1. Tổng quan cấu trúc dữ liệu và thuật toán
+Thời lượng: 6 tiết | Phân bổ: Tuần 1-2 | Liên kết chuẩn đầu ra: CLO1, CLO4.
+Mục tiêu sau chương
+Trình bày được cấu trúc dữ liệu, kiểu dữ liệu trừu tượng (ADT).
+Nội dung kiến thức
+• 1.1. Khái niệm cấu trúc dữ liệu, dữ liệu và thuật toán
+• 1.2. Kiểu dữ liệu trừu tượng (ADT) và các phép toán
+• 1.3. Phân biệt độ phức tạp thời gian và không gian
+• 1.4. Ký hiệu O lớn (Big O)
+• 1.5. Đọc mã giả và phân tích vòng lặp
+Học liệu tham chiếu
+SL01 – Slide Tổng quan (tài liệu giả định).
+Hoạt động học tập đề xuất
+Đọc SL01 và phân tích 3 đoạn mã có vòng lặp.
+Bài tập
+BT01: Viết giải thích Big O cho 5 đoạn mã.
+Tự kiểm tra theo chương
+Quiz Chương 1: 8 câu; chủ đề ADT, Big O.
+Tiêu chí gợi ý để chuyển tiếp
+Gợi ý kiểm tra đạt 70% và giải thích được bài phân tích.
+Chương 2. Mảng và danh sách liên kết
+Thời lượng: 9 tiết | Phân bổ: Tuần 3-5 | Liên kết chuẩn đầu ra: CLO2, CLO4.
+Mục tiêu sau chương
+Phân biệt mảng và danh sách liên kết.
+Nội dung kiến thức
+• 2.1. Mảng một chiều
+• 2.2. Danh sách liên kết đơn
+Bài tập
+BT02: Cài đặt danh sách liên kết đơn.
+Tự kiểm tra theo chương
+Quiz Chương 2: 10 câu lý thuyết.
+5. KẾ HOẠCH GIẢNG DẠY 15 TUẦN
+• 2.3. Đây không phải tiểu mục của chương 2
+"""
+    pdf_units = [
+        {"title": "Chương 1. Tổng quan cấu trúc dữ liệu và thuật toán",
+         "evidence": "Chương 1. Tổng quan cấu trúc dữ liệu và thuật toán"},
+        {"title": "Chương 2. Mảng và danh sách liên kết",
+         "evidence": "Chương 2. Mảng và danh sách liên kết"},
+    ]
+    detailed = parse_chapter_details(pdf_style, pdf_units)
+    assert len(detailed) == 2
+    assert len(detailed[0]["topics"]) == 5, detailed[0]["topics"]
+    assert detailed[0]["topics"][0].startswith("1.1.")
+    assert "kiểu dữ liệu trừu tượng" in detailed[0]["objectives"][0]
+    assert detailed[0]["exercises"] == ["BT01: Viết giải thích Big O cho 5 đoạn mã."]
+    assert detailed[0]["resource_hints"][0].startswith("SL01")
+    assert detailed[0]["clo_refs"] == ["CLO1", "CLO4"]
+    assert detailed[0]["quiz_count_from_syllabus"] == 8
+    assert detailed[0]["passing_percent_from_syllabus"] == 70
+    assert detailed[0]["teaching_periods"] == 6
+    assert detailed[1]["topics"] == ["2.1. Mảng một chiều", "2.2. Danh sách liên kết đơn"]
+    plan45 = build_course_roadmap(detailed, [], {
+        "goal": "Đạt 8 điểm", "daily_minutes": 45, "preferred_time": "19:00"
+    }, start_date=date(2026, 10, 28))
+    plan90 = build_course_roadmap(detailed, [], {
+        "goal": "Đạt 8 điểm", "daily_minutes": 90, "preferred_time": "19:00"
+    }, start_date=date(2026, 10, 28))
+    assert len(plan45) == 4, len(plan45)  # 3 for chapter 1, 1 for chapter 2.
+    assert len(plan90) == 3, len(plan90)  # Larger learning sessions cover 3 items each.
+    assert plan45[0]["planner_version"] == PLAN_VERSION
+    assert plan45[2]["quiz"]["recommended_questions"] == 8
+    assert plan45[2]["quiz"]["question_count_from_syllabus"] is True
+    assert any("BT01" in a for a in plan45[2]["activities"])
+    assert plan45[2]["materials"] == []  # No uploaded slide: do not invent one.
+    assert plan45[0]["topics"][0].startswith("1.1.")
+
     units = [
         {"title": line, "evidence": line}
         for line in example.splitlines() if line.startswith("Chương ")
