@@ -10,6 +10,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Animate only transforms/opacity (FLIP). Animating flex-basis or max-width
   // would repeatedly reflow every course card and visibly stutter.
   let sidebarAnimations = [];
+  let hasRevealedInitialCourses = false;
   navToggle?.addEventListener("click", () => {
     sidebarAnimations.forEach(animation => animation.cancel());
     sidebarAnimations = [];
@@ -518,8 +519,13 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    chats.forEach(chat => {
+    const firstCourseReveal = !hasRevealedInitialCourses;
+    chats.forEach((chat, index) => {
       const item = document.createElement("button");
+      if (firstCourseReveal) {
+        item.classList.add("chat-course-enter");
+        item.style.setProperty("--course-enter-index", String(Math.min(index, 7)));
+      }
       item.type = "button";
       item.className =
         "chat-history-item subject-chat-item" +
@@ -546,6 +552,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       historyList.appendChild(item);
     });
+    if (chats.length) hasRevealedInitialCourses = true;
     renderMobileSubjectPicker();
     renderModeCourses();
   }
