@@ -43,6 +43,8 @@ from chapter_material_routes import chapter_material_bp
 app.register_blueprint(chapter_material_bp)
 from study_session_routes import study_session_bp
 app.register_blueprint(study_session_bp)
+from study_session_quiz_routes import session_quiz_bp
+app.register_blueprint(session_quiz_bp)
 # Khi thiếu SECRET_KEY, dùng khóa ngẫu nhiên chỉ cho phiên chạy hiện tại.
 # Khi triển khai cần đặt SECRET_KEY bí mật, ổn định trong biến môi trường.
 app.secret_key = os.getenv("SECRET_KEY") or secrets.token_hex(32)
@@ -5821,10 +5823,16 @@ def quiz():
     # =====================================================
     # DỮ LIỆU TRANG QUIZ
     # =====================================================
-    from study_session_quiz import ensure_session_quiz_schema, get_session_quiz_context, public_session_quiz_context
+    from study_session_quiz import get_session_quiz_context, public_session_quiz_context
+    from study_session_quiz_runtime import (
+        ensure_quiz_runtime_schema, context_for_task, saved_quiz, quiz_access,
+    )
     from chapter_chat_context import LessonContextError
-    ensure_session_quiz_schema(conn)
+    ensure_quiz_runtime_schema(conn)
     session_quiz_context = None
+    session_quiz_status = None
+    if not session.get("session_quiz_csrf"):
+        session["session_quiz_csrf"] = secrets.token_hex(24)
     requested_task = request.args.get('task_id')
     if requested_task is not None:
         try:
@@ -5837,6 +5845,33 @@ def quiz():
         try:
             verified = get_session_quiz_context(sys.modules[__name__], conn, uid, task_number)
             session_quiz_context = public_session_quiz_context(verified)
+            # Final examination can use approved earlier sessions even if
+            # the final review slot has no standalone approved document.
+            try:
+                scoped, previous, total = context_for_task(
+                    sys.modules[__name__], conn, uid, task_number
+                )
+                existing = saved_quiz(conn, uid, task_number,
+                                      scoped["source_signature"])
+                session_quiz_context["ready"] = bool(scoped["ready"])
+                if previous:
+                    session_quiz_context["source_names"] = scoped["source_names"]
+                if existing:
+                    access = quiz_access(conn, sys.modules[__name__], uid,
+                                         existing["id"])
+                    session_quiz_status = {
+                        "quiz_id": existing["id"], "count": total,
+                        "allowed": access["allowed"],
+                        "can_start": access.get("can_start", False),
+                        "study_at": access.get("study_at", ""),
+                        "ends_at": access.get("ends_at", ""),
+                        "reason": access.get("reason", ""),
+                    }
+                else:
+                    session_quiz_status = {"quiz_id": None, "count": total}
+            except LessonContextError as error:
+                session_quiz_context["ready"] = False
+                session_quiz_context["reason"] = error.message
         except LessonContextError as error:
             conn.close()
             return error.message, error.status
@@ -5875,6 +5910,7 @@ def quiz():
             q.*,
             qsl.session_title AS linked_session_title,
             qsl.chapter_number AS linked_chapter_number,
+            qsl.quiz_id AS linked_quiz_id,
             COUNT(qa.id) AS attempt_count,
             MAX(qa.created_at) AS last_attempt_at,
             MAX(qa.score) AS best_score
@@ -5891,10 +5927,13 @@ def quiz():
         (uid,)
     ).fetchall()
 
-    conn.close()
-
     parsed = []
     for q in quizzes:
+        # Never send questions for a locked session Quiz to Jinja/HTML.
+        if q["linked_quiz_id"]:
+            access = quiz_access(conn, sys.modules[__name__], uid, q["id"])
+            if not access["allowed"]:
+                continue
         item = dict(q)
         try:
             item["questions"] = json.loads(q["payload"])
@@ -5902,6 +5941,7 @@ def quiz():
             item["questions"] = []
         item["attempted"] = int(q["attempt_count"] or 0) > 0
         parsed.append(item)
+    conn.close()
 
     selected_document_id = request.args.get("document_id", type=int)
     selected_subject_id = request.args.get("subject_id", type=int)
@@ -5930,6 +5970,8 @@ def quiz():
         selected_subject_id=selected_subject_id,
         selected_quiz_mode=selected_quiz_mode,
         session_quiz_context=session_quiz_context,
+        session_quiz_status=session_quiz_status,
+        session_quiz_csrf=session.get('session_quiz_csrf', ''),
         generation_error=request.args.get("generation_error", "").strip()[:240]
     )
 
@@ -6026,6 +6068,12 @@ def submit_quiz():
         return jsonify({
             "error": "Không tìm thấy quiz."
         }), 404
+
+    from study_session_quiz_runtime import quiz_access
+    gate = quiz_access(conn, sys.modules[__name__], uid, quiz_id)
+    if gate["linked"] and not gate["allowed"]:
+        conn.close()
+        return jsonify({"error": gate.get("reason", "Quiz đang khóa.")}), 409
 
     try:
         questions = json.loads(quiz_row["payload"])
@@ -8274,6 +8322,12 @@ def api_mobile_quiz_detail(quiz_id):
     if not quiz:
         conn.close()
         return jsonify({"error": "Không tìm thấy Quiz."}), 404
+    from study_session_quiz_runtime import quiz_access
+    gate = quiz_access(conn, sys.modules[__name__], uid, quiz_id)
+    if gate["linked"] and not gate["allowed"]:
+        conn.close()
+        return jsonify({"error": gate.get("reason", "Quiz đang khóa."),
+                        "locked": True}), 409
     attempts = conn.execute(
         """SELECT id,score,correct_count,total_questions,answers_json,created_at
            FROM quiz_attempts WHERE quiz_id=? AND user_id=?
