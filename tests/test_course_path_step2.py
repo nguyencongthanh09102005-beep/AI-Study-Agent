@@ -48,11 +48,13 @@ Trình bày được cấu trúc dữ liệu, kiểu dữ liệu trừu tượng
 Nội dung kiến thức
 • 1.1. Khái niệm cấu trúc dữ liệu, dữ liệu và thuật toán
 • 1.2. Kiểu dữ liệu trừu tượng (ADT) và các phép toán
+AI STUDY AGENT / ĐỀ CƯƠNG CHI TIẾT GIẢ LẬP
 • 1.3. Phân biệt độ phức tạp thời gian và không gian
 • 1.4. Ký hiệu O lớn (Big O)
 • 1.5. Đọc mã giả và phân tích vòng lặp
 Học liệu tham chiếu
 SL01 – Slide Tổng quan (tài liệu giả định).
+AI STUDY AGENT / ĐỀ CƯƠNG CHI TIẾT GIẢ LẬP
 Hoạt động học tập đề xuất
 Đọc SL01 và phân tích 3 đoạn mã có vòng lặp.
 Bài tập
@@ -61,6 +63,7 @@ Tự kiểm tra theo chương
 Quiz Chương 1: 8 câu; chủ đề ADT, Big O.
 Tiêu chí gợi ý để chuyển tiếp
 Gợi ý kiểm tra đạt 70% và giải thích được bài phân tích.
+AI STUDY AGENT / ĐỀ CƯƠNG CHI TIẾT GIẢ LẬP
 Chương 2. Mảng và danh sách liên kết
 Thời lượng: 9 tiết | Phân bổ: Tuần 3-5 | Liên kết chuẩn đầu ra: CLO2, CLO4.
 Mục tiêu sau chương
@@ -92,6 +95,10 @@ Quiz Chương 2: 10 câu lý thuyết.
     assert detailed[0]["quiz_count_from_syllabus"] == 8
     assert detailed[0]["passing_percent_from_syllabus"] == 70
     assert detailed[0]["teaching_periods"] == 6
+    for chapter in detailed:
+        for field in ("topics", "objectives", "exercises", "resource_hints", "quiz", "criteria", "activities"):
+            assert not any("AI STUDY AGENT /" in item for item in (chapter["quiz_description"] if field == "quiz" else chapter["passing_criteria"] if field == "criteria" else chapter["class_activities"] if field == "activities" else chapter[field])), (field, chapter)
+
     assert detailed[1]["topics"] == ["2.1. Mảng một chiều", "2.2. Danh sách liên kết đơn"]
     plan45 = build_course_roadmap(detailed, [], {
         "goal": "Đạt 8 điểm", "daily_minutes": 45, "preferred_time": "19:00"
