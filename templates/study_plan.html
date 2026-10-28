@@ -35,8 +35,8 @@
 <section class="planner-layout-new">
   <section class="soft-card study-hour-timetable" id="plannerTimetable" hidden aria-label="Thời khóa biểu tự học theo giờ">
     <header class="study-hour-heading">
-      <div><h3>Thời khóa biểu tự học</h3><p>Xem giờ, môn và nội dung từng buổi trong tuần. Chọn buổi để mở lịch ngày tương ứng.</p></div>
-      <span>Đợt 6.2.2 · Cảnh báo trùng giờ</span>
+      <div><h3>Thời khóa biểu theo buổi</h3><p>Sáng · Trưa · Chiều · Tối. Giờ học nằm trên từng thẻ; bấm vào thẻ để xem và đổi lịch.</p></div>
+      <span>Lịch tuần gọn</span>
     </header>
     <div class="study-hour-scroll"><div class="study-hour-grid" id="plannerTimetableGrid"></div></div>
     <p class="study-hour-empty" id="plannerTimetableEmpty" hidden>Tuần này chưa có buổi học. Hãy đưa lộ trình vào Kế hoạch học trước.</p>
@@ -134,5 +134,6 @@
 
 <div class="planner-modal" id="reminderModal" aria-hidden="true"><div class="planner-modal-backdrop" data-close-reminder-modal></div><div class="planner-modal-panel small"><div class="modal-head"><h3>Chỉnh sửa deadline</h3><button type="button" class="modal-close" data-close-reminder-modal aria-label="Đóng chỉnh sửa deadline">×</button></div><form method="post" id="reminderForm" class="planner-form"><label class="full-field"><span>Tên nhắc việc</span><input type="text" name="title" id="reminderTitle" required></label><label class="full-field"><span>Deadline</span><input type="datetime-local" name="due_at" id="reminderDueAt" required></label><div class="modal-actions full-field"><button type="button" class="planner-btn secondary" data-close-reminder-modal>Hủy</button><button type="submit" class="planner-btn primary">Lưu deadline</button></div></form><form method="post" id="deleteReminderForm" class="delete-reminder-form" data-confirm-title="Xóa nhắc việc?" data-confirm-message="Nhắc việc này sẽ bị xóa khỏi kế hoạch học." data-confirm-label="Xóa nhắc việc"><button type="submit">🗑 Xóa nhắc việc</button></form></div></div>
 <div class="deadline-toast" id="deadlineToast" hidden><div class="toast-icon">🔔</div><div><strong>Sắp đến deadline</strong><p id="deadlineToastText"></p></div><button type="button" id="closeDeadlineToast" aria-label="Đóng thông báo deadline">×</button></div>
+<script src="{{ url_for('static', filename='js/study_timetable_periods.js') }}"></script>
 <script src="{{ url_for('static', filename='js/study_plan.js') }}"></script>
 {% endblock %}

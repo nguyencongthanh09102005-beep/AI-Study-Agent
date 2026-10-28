@@ -60,6 +60,9 @@ def verify():
     assert 'data-view="list"' in html
     assert 'id="plannerTimetable"' in html
     assert 'id="plannerTimetableGrid"' in html
+    assert "Thời khóa biểu theo buổi" in html
+    assert "Sáng · Trưa · Chiều · Tối" in html
+    assert "study_timetable_periods.js" in html
     assert 'data-task-title="Ôn chương IaaS"' in html
     assert 'data-subject-name="Điện toán đám mây"' in html
     assert 'data-task-done="1"' in html

@@ -52,6 +52,8 @@ jobs:
           node --check static/js/quiz.js
           node --check static/js/mockup.js
           node --check static/js/study_plan.js
+          node --check static/js/study_timetable_periods.js
+          node tests/test_study_timetable_periods.js
           node --check static/js/chat.js
           node --check static/js/document-summary.js
           node --check static/js/auth-password.js

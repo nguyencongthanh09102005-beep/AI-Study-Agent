@@ -306,34 +306,34 @@ document.addEventListener("DOMContentLoaded", () => {
   let selectedDate = fromIso(datePicker.value);
   let currentView = "week";
 
-  // Phase 6.2.1: read-only weekly hour timetable from the existing study_tasks DOM.
-  // No database writes and no second copy of the learning sessions.
+  // Compact timetable: 4 fixed day parts (plus Khuya only when scheduled).
+  // Events still come from the existing study_tasks, with no duplicated records.
   function renderTimetable() {
     if (!timetableGrid) return;
+    const calendar = window.StudyTimetablePeriods;
+    if (!calendar) return;
     const start = startOfWeek(selectedDate);
     const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
     const keys = days.map(toIso);
     const events = new Map();
-    let firstHour = 7;
-    let lastHour = 22;
     let total = 0;
 
     scheduleItems.forEach((item) => {
       const dayIndex = keys.indexOf(item.dataset.taskDate);
       if (dayIndex === -1) return;
-      const match = /T(\d{2}):(\d{2})/.exec(item.dataset.taskDatetime || "");
-      if (!match) return;
-      const hour = Number(match[1]);
-      const minute = Number(match[2]);
-      if (hour > 23 || minute > 59) return;
-      firstHour = Math.min(firstHour, hour);
-      lastHour = Math.max(lastHour, hour);
-      const key = dayIndex + ":" + hour;
+      const parsed = calendar.parseStudyTime(item.dataset.taskDatetime);
+      if (!parsed) return;
+      const period = calendar.periodForHour(parsed.hour);
+      if (!period) return;
+      const key = dayIndex + ":" + period.id;
       if (!events.has(key)) events.set(key, []);
-      events.get(key).push({ item, hour, minute });
+      events.get(key).push({ item, timeOfDay: parsed.timeOfDay });
       total += 1;
     });
-    events.forEach((entries) => entries.sort((a, b) => a.minute - b.minute));
+    events.forEach(list => list.sort((a, b) =>
+      a.timeOfDay - b.timeOfDay ||
+      Number(a.item.dataset.taskId) - Number(b.item.dataset.taskId)
+    ));
     timetableGrid.replaceChildren();
 
     const makeDiv = (cls, value) => {
@@ -342,7 +342,8 @@ document.addEventListener("DOMContentLoaded", () => {
       if (value !== undefined) el.textContent = value;
       return el;
     };
-    timetableGrid.appendChild(makeDiv("study-hour-corner", "Giờ"));
+
+    timetableGrid.appendChild(makeDiv("study-hour-corner", "Buổi"));
     days.forEach((day) => {
       const header = makeDiv("study-hour-day");
       header.appendChild(makeDiv("study-hour-dayname", ["CN", "T2", "T3", "T4", "T5", "T6", "T7"][day.getDay()]));
@@ -351,39 +352,55 @@ document.addEventListener("DOMContentLoaded", () => {
       timetableGrid.appendChild(header);
     });
 
-    for (let hour = firstHour; hour <= lastHour; hour += 1) {
-      timetableGrid.appendChild(makeDiv("study-hour-label", pad(hour) + ":00"));
+    const periods = calendar.PERIODS.filter(period =>
+      !period.optional || days.some((_, dayIndex) => events.has(dayIndex + ":" + period.id))
+    );
+    periods.forEach((period) => {
+      const label = makeDiv("study-hour-label");
+      label.appendChild(makeDiv("study-hour-period-name", period.title));
+      label.appendChild(makeDiv("study-hour-period-range", period.time));
+      timetableGrid.appendChild(label);
+
       for (let dayIndex = 0; dayIndex < 7; dayIndex += 1) {
         const cell = makeDiv("study-hour-cell");
-        const inCell = events.get(dayIndex + ":" + hour) || [];
-        inCell.forEach(({ item, minute }) => {
+        const inCell = events.get(dayIndex + ":" + period.id) || [];
+        if (!inCell.length) cell.classList.add("study-hour-cell-empty");
+        inCell.forEach(({ item }) => {
           const button = document.createElement("button");
           button.type = "button";
           button.className = "study-hour-event";
-          if (item.dataset.taskDone === "1") button.classList.add("done");
           button.dataset.date = item.dataset.taskDate;
-          const timeText = pad(hour) + ":" + pad(minute);
+          if (item.dataset.taskDone === "1") button.classList.add("done");
+
           const subject = item.dataset.subjectName || "Học tập";
           const title = item.dataset.taskTitle || "Buổi học";
-          const duration = item.dataset.taskDuration || "45";
-          button.appendChild(makeDiv("study-hour-event-time", timeText + " · " + duration + " phút"));
+          const timeText = calendar.formatStudyTimeRange(
+            item.dataset.taskDatetime, item.dataset.taskDuration
+          );
+          button.appendChild(makeDiv("study-hour-event-time", timeText));
           button.appendChild(makeDiv("study-hour-event-subject", subject));
-          button.appendChild(makeDiv("study-hour-event-title", title));
-          if (item.dataset.taskSource === "roadmap") button.appendChild(makeDiv("study-hour-event-tag", "Từ lộ trình"));
+          const titleEl = makeDiv("study-hour-event-title", title);
+          titleEl.title = title;
+          button.appendChild(titleEl);
+          if (item.dataset.taskSource === "roadmap") {
+            button.appendChild(makeDiv("study-hour-event-tag", "Từ lộ trình"));
+          }
           if (item.dataset.taskConflict === "1") {
             button.classList.add("conflict");
-            button.appendChild(makeDiv("study-hour-event-conflict", "⚠ Trùng giờ · chọn để đổi lịch"));
+            button.appendChild(makeDiv("study-hour-event-conflict", "⚠ Trùng giờ"));
           }
-          if (item.dataset.taskDone === "1") button.appendChild(makeDiv("study-hour-event-tag", "Đã hoàn thành"));
-          button.setAttribute("aria-label", timeText + ", " + subject + ", " + title + ". Mở lịch ngày.");
+          if (item.dataset.taskDone === "1") {
+            button.appendChild(makeDiv("study-hour-event-tag", "Đã hoàn thành"));
+          }
+          button.setAttribute("aria-label",
+            timeText + ", " + subject + ", " + title + ". Mở lịch ngày.");
           cell.appendChild(button);
         });
         timetableGrid.appendChild(cell);
       }
-    }
+    });
     if (timetableEmpty) timetableEmpty.hidden = total !== 0;
   }
-
 
   function animateSurface() {
     const surfaces = [
