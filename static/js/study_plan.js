@@ -254,7 +254,7 @@ document.addEventListener("DOMContentLoaded", () => {
     scheduleItems.forEach((item) => {
       const dayIndex = keys.indexOf(item.dataset.taskDate);
       if (dayIndex === -1) return;
-      const match = /T(\\d{2}):(\\d{2})/.exec(item.dataset.taskDatetime || "");
+      const match = /T(\d{2}):(\d{2})/.exec(item.dataset.taskDatetime || "");
       if (!match) return;
       const hour = Number(match[1]);
       const minute = Number(match[2]);
