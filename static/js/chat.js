@@ -151,6 +151,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const seq = ++modeSeq;
     lessonMode = null;
     modeError = "";
+    updateChatHeader(); // Disable sending until the newly selected chapter is verified.
     const current = getCurrentChat();
     const chapterNumber = Number(chapterSelector?.value);
     const topicIndex = Number(topicSelector?.value);
@@ -592,7 +593,8 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function sendMessage() {
-    if (!input || sending || !currentChatId) return;
+    if (!input || sending || !currentChatId ||
+        (chatMode === "chapter" && !lessonMode)) return;
 
     const text = input.value.trim();
     if (!text) return;
