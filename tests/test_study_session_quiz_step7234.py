@@ -167,14 +167,26 @@ def run():
             project.build_quiz = mock_build
             client = project.app.test_client()
             endpoint = f"/api/subjects/{subject}/quiz-preparation"
+            first_status = f"/api/study-plan/tasks/{task_rows[0]['id']}/quiz-status"
+            final_status = f"/api/study-plan/tasks/{task_rows[-1]['id']}/quiz-status"
             assert client.get(endpoint).status_code == 401
+            assert client.get(first_status).status_code == 401
             login(client, other)
             assert client.get(endpoint).status_code == 404
+            assert client.get(first_status).status_code == 404
             login(client, admin)
             assert client.get(endpoint).status_code == 403
+            assert client.get(first_status).status_code == 403
             login(client, student)
             route = f"/subjects/{subject}/learning-path"
             assert client.get(route).status_code == 200
+            unprepared = client.get(first_status)
+            assert unprepared.status_code == 200, unprepared.get_data(as_text=True)
+            assert unprepared.get_json()["state"] == "unprepared"
+            room = client.get(f"/study-plan/tasks/{task_rows[0]['id']}/learn")
+            assert room.status_code == 200
+            assert "Quiz của buổi học này" in room.get_data(as_text=True)
+            assert "Chưa chuẩn bị xong" in room.get_data(as_text=True)
             with client.session_transaction() as sess:
                 csrf = sess["session_quiz_csrf"]
             assert client.post(endpoint + "/next", json={}).status_code == 403
@@ -192,6 +204,18 @@ def run():
             status = client.get(endpoint).get_json()
             assert status["done"] is True
             assert status["ready"] == len(task_rows)
+            ready_first = client.get(first_status)
+            assert ready_first.status_code == 200
+            assert ready_first.get_json()["count"] == 15
+            assert ready_first.get_json()["state"] == "locked"
+            assert "questions" not in ready_first.get_json()
+            assert "payload" not in ready_first.get_json()
+            ready_final = client.get(final_status)
+            assert ready_final.status_code == 200
+            assert ready_final.get_json()["count"] == 60
+            assert ready_final.get_json()["is_final"] is True
+            room_ready = client.get(f"/study-plan/tasks/{task_rows[0]['id']}/learn")
+            assert "Quiz đã tạo sẵn" in room_ready.get_data(as_text=True)
             conn = project.db()
             for i, task in enumerate(task_rows):
                 context, prior, count = context_for_task(project, conn, student, task["id"])
@@ -268,6 +292,9 @@ def run():
             conn.commit()
             conn.close()
             assert client.get(f"/api/mobile/quizzes/{first_quiz}").status_code == 409
+            revoked_status = client.get(first_status)
+            assert revoked_status.status_code == 200
+            assert revoked_status.get_json()["state"] == "blocked"
             assert client.post("/api/quiz/submit", json={
                 "quiz_id": first_quiz, "answers": [0]*15
             }).status_code == 409
