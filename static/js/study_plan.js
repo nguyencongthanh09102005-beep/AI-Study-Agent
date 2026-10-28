@@ -394,7 +394,20 @@ document.addEventListener("DOMContentLoaded", () => {
           }
           button.setAttribute("aria-label",
             timeText + ", " + subject + ", " + title + ". Mở lịch ngày.");
-          cell.appendChild(button);
+          // Independent link: the lesson button still opens the selected day.
+          // Only scheduled roadmap sessions have a Study Session (6.3.1).
+          const card = makeDiv("study-hour-event-shell");
+          card.appendChild(button);
+          if (item.dataset.taskSource === "roadmap" &&
+              /^\d+$/.test(item.dataset.taskId || "")) {
+            const launch = document.createElement("a");
+            launch.className = "study-hour-launch";
+            launch.href = "/study-plan/tasks/" + item.dataset.taskId + "/learn";
+            launch.textContent = item.dataset.taskDone === "1"
+              ? "Xem lại buổi học →" : "▶ Bắt đầu học";
+            card.appendChild(launch);
+          }
+          cell.appendChild(card);
         });
         timetableGrid.appendChild(cell);
       }

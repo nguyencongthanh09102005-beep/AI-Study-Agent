@@ -93,6 +93,7 @@ jobs:
         run: |
           python tests/test_study_plan_ui.py
           python tests/test_schedule_conflicts.py
+          python tests/test_study_session_step631.py
 
       - name: Final roles and manual deadline data-integrity audit
         run: python tests/test_final_integrity_audit.py

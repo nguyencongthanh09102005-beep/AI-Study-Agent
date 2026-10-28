@@ -41,6 +41,8 @@ from course_path_routes import course_path_bp
 app.register_blueprint(course_path_bp)
 from chapter_material_routes import chapter_material_bp
 app.register_blueprint(chapter_material_bp)
+from study_session_routes import study_session_bp
+app.register_blueprint(study_session_bp)
 # Khi thiếu SECRET_KEY, dùng khóa ngẫu nhiên chỉ cho phiên chạy hiện tại.
 # Khi triển khai cần đặt SECRET_KEY bí mật, ổn định trong biến môi trường.
 app.secret_key = os.getenv("SECRET_KEY") or secrets.token_hex(32)
