@@ -300,3 +300,27 @@ def study_session_quiz_context(task_id):
         return jsonify(public_session_quiz_context(context))
     finally:
         conn.close()
+
+
+@study_session_bp.route("/api/study-plan/tasks/<int:task_id>/quiz-status",
+                        methods=["GET"])
+def learning_session_quiz_status(task_id):
+    """Live Quiz readiness for one student-owned session; never return answers."""
+    project = sys.modules[current_app.import_name]
+    uid = session.get("user_id")
+    if not uid:
+        return jsonify({"error": "Hãy đăng nhập để xem Quiz theo buổi."}), 401
+    conn = project.db()
+    try:
+        user = conn.execute("SELECT role FROM users WHERE id=?", (uid,)).fetchone()
+        if not user or user["role"] != "student":
+            return jsonify({"error": "Chỉ sinh viên được xem Quiz theo buổi."}), 403
+        from study_session_chat_context import verified_study_session
+        try:
+            verified_study_session(project, conn, uid, task_id)
+        except LessonContextError as err:
+            return jsonify({"error": err.message}), err.status
+        from study_session_quiz_runtime import per_lesson_quiz_status
+        return jsonify(per_lesson_quiz_status(conn, project, uid, task_id))
+    finally:
+        conn.close()
