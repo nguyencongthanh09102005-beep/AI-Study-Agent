@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+{% block title %}Học Chương {{ chapter.unit_id }} · {{ subject.name }}{% endblock %}
+{% block page_title %}Không gian học theo chương{% endblock %}
+{% block page_desc %}Đề cương xác định nội dung; tài liệu Admin đã duyệt cung cấp học liệu{% endblock %}
+{% block content %}
+<section class="soft-card" style="max-width:1050px;margin:0 auto;padding:26px">
+  <a class="back-link" href="{{ url_for('course_path.learning_path', subject_id=subject.id) }}">← Lộ trình theo chương</a>
+  <p style="color:#657a9e;font-size:13px;margin:18px 0 6px">{{ subject.code }} · Chương {{ chapter.unit_id }}/{{ total_chapters }}</p>
+  <h2 style="color:#263d79;line-height:1.35">{{ chapter.chapter }}</h2>
+  <div style="background:#f0f4fd;border-radius:12px;padding:14px;margin:14px 0;font-size:13px;color:#526991">
+    Căn cứ đề cương: <strong>{{ source_name }}</strong>. Nội dung dưới đây chỉ gồm những gì có trong đề cương hoặc tài liệu thực sự của môn.
+  </div>
+  <h3 style="color:#293f75">Mục tiêu của chương</h3>
+  {% if chapter.objectives %}
+    <ul style="line-height:1.8">{% for item in chapter.objectives %}<li>{{ item }}</li>{% endfor %}</ul>
+  {% else %}<p style="color:#7585a0">Đề cương không có mục tiêu chi tiết được nhận diện cho chương này.</p>{% endif %}
+  <h3 style="color:#293f75">Các tiểu mục cần học</h3>
+  {% if chapter.topics %}
+    <ol style="line-height:2;list-style:none;padding-left:0">{% for item in chapter.topics %}
+    <li style="border-bottom:1px solid #e3e9f2;padding:9px 0">📖 {{ item }}</li>
+    {% endfor %}</ol>
+  {% else %}<p>Chưa trích xuất được tiểu mục. Mở đề cương gốc để kiểm tra.</p>{% endif %}
+  <h3 style="color:#293f75">Học liệu chung đã được Admin xác nhận</h3>
+  {% if materials %}
+    {% for item in materials %}
+    <article style="border:1px solid #dce6f5;border-radius:12px;padding:17px;margin:11px 0">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <div><strong>📄 {{ item.name }}</strong><div style="font-size:12px;color:#56765b;margin-top:5px">✓ Đã gắn với chương này bởi Admin</div></div>
+        <a class="soft-primary" href="{{ url_for('shared_document_file', doc_id=item.id) }}" target="_blank" rel="noopener">Đọc tài liệu gốc</a>
+      </div>
+      {% if item.excerpts %}
+      <p style="font-size:13px;color:#637894;margin:14px 0 6px">Một số dòng trích từ tài liệu có liên quan đến chương (nguyên văn, không phải tóm tắt AI):</p>
+      <ul style="line-height:1.75">{% for line in item.excerpts %}<li>{{ line }}</li>{% endfor %}</ul>
+      {% else %}
+      <p style="color:#7b819c;font-size:13px">Tài liệu đã được Admin liên kết, nhưng hệ thống chưa tìm được đoạn trích đủ tin cậy. Hãy mở file gốc để đọc.</p>
+      {% endif %}
+    </article>
+    {% endfor %}
+  {% else %}
+    <div style="background:#fff8eb;border-radius:11px;padding:16px;color:#865c2b">
+      {% if not mapping_allowed and source_kind != 'shared' %}
+        Bạn đang sử dụng đề cương cá nhân. Học liệu chung được liên kết theo đề cương chuẩn của Admin; nếu môn chưa có bản chung, hãy sử dụng tài liệu cá nhân hoặc nhờ Admin bổ sung đề cương.
+      {% else %}
+        Chưa có học liệu chung được Admin xác nhận cho chương này. Admin có thể tải slide, giáo trình hoặc bài thực hành lên và duyệt liên kết.
+      {% endif %}
+    </div>
+  {% endif %}
+  {% if personal_materials %}
+    <h3 style="color:#293f75">Gợi ý tài liệu cá nhân (chỉ mình bạn thấy)</h3>
+    {% for item in personal_materials %}
+      <div style="border:1px solid #e6eaf2;border-radius:12px;padding:15px;margin:10px 0">
+        <strong>📒 {{ item.name }}</strong>
+        <p style="font-size:12px;color:#667b99">Được gợi ý dựa trên nội dung trùng khớp; không chia sẻ cho người khác.</p>
+        {% for line in item.excerpts %}<p style="font-size:13px">“{{ line }}”</p>{% endfor %}
+      </div>
+    {% endfor %}
+  {% endif %}
+  <h3 style="color:#293f75">Bài tập và đánh giá theo đề cương</h3>
+  {% if chapter.exercises %}
+  <ul style="line-height:1.85">{% for item in chapter.exercises %}<li>{{ item }}</li>{% endfor %}</ul>
+  {% else %}<p style="color:#7585a0">Chưa nhận diện được bài tập cụ thể.</p>{% endif %}
+  {% if chapter.quiz_description %}
+    <p><strong>Đề xuất kiểm tra:</strong> {{ chapter.quiz_description|join('; ') }}</p>
+  {% endif %}
+  {% if chapter.passing_criteria %}
+    <p><strong>Tiêu chí từ đề cương:</strong> {{ chapter.passing_criteria|join('; ') }}</p>
+  {% endif %}
+  <p style="color:#647896;font-size:13px">Quiz thực hành theo chương và cơ chế điều chỉnh tiến độ là bước tiếp theo, chưa kích hoạt ở màn hình này.</p>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:24px">
+    <a class="soft-primary" href="{{ url_for('course_path.learning_path', subject_id=subject.id) }}">← Về lộ trình</a>
+    {% if chapter_number < total_chapters %}<a class="soft-primary" href="{{ url_for('chapter_material.student_chapter', subject_id=subject.id, chapter_number=chapter_number+1) }}">Chương tiếp theo →</a>{% endif %}
+  </div>
+</section>
+{% endblock %}
