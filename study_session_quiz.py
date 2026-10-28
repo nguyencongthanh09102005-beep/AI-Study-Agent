@@ -24,7 +24,7 @@ def ensure_session_quiz_schema(conn):
             quiz_id INTEGER PRIMARY KEY,
             task_id INTEGER,
             user_id INTEGER NOT NULL,
-            subject_id INTEGER NOT NULL,
+            subject_id INTEGER,
             chapter_number INTEGER NOT NULL CHECK(chapter_number >= 1),
             session_title TEXT NOT NULL,
             session_signature TEXT NOT NULL,
@@ -34,7 +34,7 @@ def ensure_session_quiz_schema(conn):
             FOREIGN KEY(quiz_id) REFERENCES quizzes(id) ON DELETE CASCADE,
             FOREIGN KEY(task_id) REFERENCES study_tasks(id) ON DELETE SET NULL,
             FOREIGN KEY(user_id) REFERENCES users(id),
-            FOREIGN KEY(subject_id) REFERENCES subjects(id)
+            FOREIGN KEY(subject_id) REFERENCES subjects(id) ON DELETE SET NULL
         )
     """)
     conn.execute("""
