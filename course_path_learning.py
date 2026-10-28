@@ -178,6 +178,38 @@ def _terms(value):
     }
 
 
+def personal_course_documents(conn, user_id, subject_id, exclude_document_id,
+                              active_syllabus_text, limit=50):
+    """Select private learning files, excluding exact copies of the active syllabus.
+
+    Re-uploaded identical files are shown once. All original files remain stored.
+    """
+    rows = conn.execute("""
+        SELECT id,original_name,extracted_text FROM documents
+        WHERE user_id=? AND subject_id=? AND id!=COALESCE(?, -1)
+        ORDER BY id DESC LIMIT ?
+    """, (user_id, subject_id, exclude_document_id, limit)).fetchall()
+    normalized_source = " ".join((active_syllabus_text or "").split()).casefold()
+    seen, results = set(), []
+    for row in rows:
+        body = row["extracted_text"] or ""
+        normalized_body = " ".join(body.split()).casefold()
+        if not normalized_body or (normalized_source and
+                                   normalized_body == normalized_source):
+            continue
+        dedup_key = (row["original_name"].strip().casefold(), normalized_body)
+        if dedup_key in seen:
+            continue
+        seen.add(dedup_key)
+        results.append({
+            "id": row["id"],
+            "name": row["original_name"],
+            "text": body,
+            "kind": "personal",
+        })
+    return results
+
+
 def match_course_materials(section, documents):
     """Only return genuinely subject-scoped files with topical text evidence."""
     search_terms = _terms(section["chapter"] + " " + " ".join(section["topics"][:8]))
