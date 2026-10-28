@@ -5359,7 +5359,9 @@ def api_chat_lesson_context():
         "topic_index": context["topic_index"],
         "topic": context["topic"],
         "topics": context["topics"],
-        "source_names": [src["name"] for src in context["sources"]]
+        "source_names": list(dict.fromkeys(
+            src["name"] for src in context["sources"]
+        ))
     })
 
 
