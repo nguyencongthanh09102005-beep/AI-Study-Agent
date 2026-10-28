@@ -63,3 +63,19 @@ body.page-chat .chat-markdown .chat-code-copy button {
   body.page-chat .chat-markdown .chat-data-table td,
   body.page-chat .chat-markdown .chat-data-table th { padding: 8px 9px; }
 }
+
+body.page-chat .chat-markdown .chat-math-fraction {
+  display: inline-flex; vertical-align: middle; flex-direction: column;
+  text-align: center; line-height: 1.1; margin: 0 .12em;
+}
+body.page-chat .chat-markdown .chat-math-fraction > span:first-child {
+  padding: 0 .18em .12em; border-bottom: 1px solid currentColor;
+}
+body.page-chat .chat-markdown .chat-math-fraction > span:last-child {
+  padding: .12em .18em 0;
+}
+body.page-chat .chat-markdown .chat-math-root {
+  display: inline-block; border-top: 1px solid currentColor; padding: .05em .14em 0;
+}
+body.page-chat .chat-markdown .chat-formula-fallback sup,
+body.page-chat .chat-markdown .chat-formula-fallback sub { font-size: .7em; }
