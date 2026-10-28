@@ -5441,10 +5441,28 @@ def api_chat():
             return jsonify({"error": "Chương hoặc tiểu mục không hợp lệ."}), 400
         from chapter_chat_context import LessonContextError, resolve_lesson_context
         try:
-            lesson_context = resolve_lesson_context(
-                sys.modules[__name__], conn, uid, subject_id,
-                chapter_number, topic_index, question=question
-            )
+            if "task_id" in requested_lesson:
+                # An in-room request must be validated against the *saved* task,
+                # course ownership and current roadmap signature on each send.
+                if topic_index is not None:
+                    raise LessonContextError(
+                        "Chat theo buổi tự dùng các tiểu mục của chính buổi học.", 400
+                    )
+                raw_task_id = requested_lesson["task_id"]
+                if isinstance(raw_task_id, bool) or not str(raw_task_id).isdigit():
+                    raise LessonContextError("Mã buổi học không hợp lệ.", 400)
+                from study_session_chat_context import validated_session_chat
+                lesson_context = validated_session_chat(
+                    sys.modules[__name__], conn, uid, int(raw_task_id), question=question
+                )
+                if (lesson_context["subject_id"] != subject_id or
+                        lesson_context["chapter_number"] != chapter_number):
+                    raise LessonContextError("Buổi học không thuộc môn/chương đã chọn.", 404)
+            else:
+                lesson_context = resolve_lesson_context(
+                    sys.modules[__name__], conn, uid, subject_id,
+                    chapter_number, topic_index, question=question
+                )
         except LessonContextError as exc:
             conn.close()
             return jsonify({"error": exc.message}), exc.status
@@ -5465,12 +5483,28 @@ def api_chat():
     if lesson_context:
         from chapter_tutor import make_tutor_prompt, parse_tutor_answer
         personal_context = get_personal_learning_context(uid, subject_id)
+        session_scope = ""
+        if lesson_context.get("session_task_id"):
+            session_scope = (
+                "BUỔI ĐANG HỌC: " + lesson_context["session_title"] + "\n"
+                "CHỈ GIẢNG CÁC TIỂU MỤC CỦA BUỔI: " +
+                "; ".join(lesson_context["session_topics"])[:800] + "\n"
+                "MỤC TIÊU CỦA BUỔI: " +
+                "; ".join(lesson_context["session_objectives"])[:500] + "\n"
+                "HOẠT ĐỘNG DỰ KIẾN: " +
+                "; ".join(lesson_context["session_activities"])[:500] + "\n"
+                "Nếu câu hỏi nằm ngoài phạm vi buổi này, hãy nêu rõ và gợi ý "
+                "quay về nội dung đang học. Không lấy nội dung của các buổi "
+                "khác làm nội dung được giao trong buổi này."
+            )
         prompt = make_tutor_prompt(
             subject_name, lesson_context["chapter"],
-            "; ".join(lesson_context["topics"]) if lesson_context["topic_index"] is None
-            else lesson_context["topic"],
+            ("; ".join(lesson_context["session_topics"])
+             if lesson_context.get("session_task_id") else
+             ("; ".join(lesson_context["topics"])
+              if lesson_context["topic_index"] is None else lesson_context["topic"])),
             question, lesson_context["sources"], conversation_history,
-            profile=personal_context
+            profile=personal_context, session_scope=session_scope
         )
         raw, ai_error = gemini_generate(prompt)
         tutored = parse_tutor_answer(raw, lesson_context["sources"]) if raw else None
@@ -5512,11 +5546,18 @@ def api_chat():
         # Never persist or return a chapter answer for an outdated approval.
         from chapter_chat_context import LessonContextError, resolve_lesson_context
         try:
-            live = resolve_lesson_context(
-                sys.modules[__name__], conn, uid, subject_id,
-                lesson_context["chapter_number"], lesson_context["topic_index"],
-                question=question
-            )
+            if lesson_context.get("session_task_id"):
+                from study_session_chat_context import validated_session_chat
+                live = validated_session_chat(
+                    sys.modules[__name__], conn, uid,
+                    lesson_context["session_task_id"], question=question
+                )
+            else:
+                live = resolve_lesson_context(
+                    sys.modules[__name__], conn, uid, subject_id,
+                    lesson_context["chapter_number"], lesson_context["topic_index"],
+                    question=question
+                )
         except LessonContextError:
             conn.close()
             return jsonify({
@@ -5582,6 +5623,7 @@ def api_chat():
         "lesson": ({
             "chapter_number": lesson_context["chapter_number"],
             "topic_index": lesson_context["topic_index"],
+            "session_task_id": lesson_context.get("session_task_id"),
             "chapter": lesson_context["chapter"],
             "topic": lesson_context["topic"],
             "topics": lesson_context["topics"],

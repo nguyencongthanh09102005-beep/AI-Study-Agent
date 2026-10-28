@@ -100,7 +100,7 @@ def prepared_sources(approved_rows, question=""):
         })
     return result
 
-def make_tutor_prompt(subject, chapter, topic, question, sources, history="", profile=""):
+def make_tutor_prompt(subject, chapter, topic, question, sources, history="", profile="", session_scope=""):
     passages = "\n\n".join(
         "NGUỒN " + src["key"] + " (" + src["name"][:150] + "):\n" + src["excerpt"]
         for src in sources
@@ -130,7 +130,10 @@ def make_tutor_prompt(subject, chapter, topic, question, sources, history="", pr
         '"citations":[{"source_key":"T1","quote":"trích nguyên văn từ T1"}],'
         '"practice":"một câu hỏi hoặc bài tập tự luyện dựa trên nguồn"}.\n\n'
         + FORMAT_POLICY + "\n\n" +
-        "MÔN HỌC: " + subject[:180] + "\n"
+        ("NGỮ CẢNH BUỔI HỌC ĐÃ XÁC THỰC (chỉ hướng dẫn phạm vi, "
+         "không thay thế nguồn được phê duyệt):\n"
+         + session_scope[:1900] + "\n" if session_scope else "")
+        + "MÔN HỌC: " + subject[:180] + "\n"
         "CHƯƠNG ĐÃ XÁC NHẬN: " + chapter[:240] + "\n"
         "CÁC TIỂU MỤC THEO ĐỀ CƯƠNG (không phải những tiểu mục "
         "người học đã chọn; tự xác định phần liên quan đến câu hỏi): "

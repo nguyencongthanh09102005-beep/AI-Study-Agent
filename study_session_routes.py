@@ -6,7 +6,7 @@ alter progress, call an LLM, or generate a quiz.
 import json
 import sys
 from datetime import datetime, timedelta
-from flask import Blueprint, current_app, render_template, session, redirect, url_for
+from flask import Blueprint, current_app, render_template, session, redirect, url_for, jsonify
 
 from course_path_learning import PLAN_VERSION, unit_fingerprint
 from course_path_routes import ensure_roadmap_schema
@@ -17,6 +17,7 @@ from chapter_material_routes import (
     approved_document_rows, chapter_key, ensure_chapter_material_schema,
     official_syllabus,
 )
+from chapter_tutor import prepared_sources
 
 study_session_bp = Blueprint("study_session", __name__)
 
@@ -145,12 +146,68 @@ def learning_session(task_id):
                             "link": url_for("shared_document_file", doc_id=row["id"]),
                         })
 
+        # The chapter tutor requires non-empty, readable, currently approved
+        # shared files. Personal documents stay available in the room but
+        # are not silently reclassified as Admin-approved source material.
+        chat_ready = bool(
+            kind == "shared" and shared_docs and
+            prepared_sources(approved_document_rows(
+                conn, shared["id"],
+                chapter_key(units[chapter_index - 1].get("evidence", "")),
+                fingerprint
+            ))
+        ) if kind == "shared" and shared_docs else False
+
         start_text, end_text = _schedule_display(task["study_at"], task["duration"])
         return render_template(
             "study_session.html", page="study_plan",
             subject=subject, task=task, lesson=lesson,
             syllabus_name=syllabus_name, private_docs=private_docs,
             shared_docs=shared_docs, start_text=start_text, end_text=end_text,
+            chat_ready=chat_ready,
         )
+    finally:
+        conn.close()
+
+
+@study_session_bp.route("/api/study-plan/tasks/<int:task_id>/chat-history")
+def learning_session_chat_history(task_id):
+    """Only turns tagged with this verified session + current sources."""
+    project = sys.modules[current_app.import_name]
+    uid = session.get("user_id")
+    if not uid:
+        return jsonify({"error": "Hãy đăng nhập để sử dụng Chat AI."}), 401
+    conn = project.db()
+    try:
+        user = conn.execute("SELECT role FROM users WHERE id=?", (uid,)).fetchone()
+        if not user or user["role"] != "student":
+            return jsonify({"error": "Chỉ sinh viên được sử dụng Chat theo buổi."}), 403
+        from chapter_chat_context import LessonContextError
+        from study_session_chat_context import validated_session_chat
+        from chat_lesson_memory import history_for_mode
+        try:
+            context = validated_session_chat(project, conn, uid, task_id)
+        except LessonContextError as error:
+            return jsonify({"error": error.message}), error.status
+        project.ensure_subject_chats(uid, conn)
+        conversation = conn.execute("""
+            SELECT id FROM chat_conversations
+            WHERE user_id=? AND subject_id=? ORDER BY id LIMIT 1
+        """, (uid, context["subject_id"])).fetchone()
+        if not conversation:
+            return jsonify({"error": "Không tìm thấy Chat theo môn học."}), 404
+        messages = history_for_mode(
+            conn, uid, conversation["id"], context, limit=40
+        )
+        return jsonify({
+            "conversation_id": conversation["id"],
+            "subject_id": context["subject_id"],
+            "chapter_number": context["chapter_number"],
+            "session_task_id": context["session_task_id"],
+            "messages": [dict(item) for item in messages],
+            "source_names": list(dict.fromkeys(
+                item["name"] for item in context["sources"]
+            )),
+        })
     finally:
         conn.close()
