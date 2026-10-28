@@ -26,6 +26,11 @@
     // Lightweight local fallback: support common math even without KaTeX.
     // Everything is escaped before adding our own fixed safe markup.
     let content = escapeHtml(tex);
+    // Common LaTeX text nodes (e.g. \\text{head}) must render as readable
+    // labels, not as literal command strings. Text is escaped first.
+    content = content.replace(/\\(?:text|mathrm|operatorname)\{([^{}]{0,150})\}/g,
+      (_m, label) => '<span class="chat-math-text">' + label + '</span>');
+    content = content.replace(/\\(?:left|right)(?=[\\[({})]|\s|$)/g, "");
     content = content.replace(/\\frac\{([^{}]+)\}\{([^{}]+)\}/g,
       (_m, top, bottom) => '<span class="chat-math-fraction"><span>' +
         top + '</span><span>' + bottom + '</span></span>');
@@ -50,6 +55,10 @@
     const tokens = [];
     let raw = String(value == null ? "" : value)
       .replace(/[\uE000\uE001]/g, "");
+    // Some model outputs escape Markdown stars before serialization.
+    // Unescape only paired bold delimiters, not code spans.
+    raw = raw.replace(/\\\*\\\*([^\n]*?)\\\*\\\*/g,
+      (_match, label) => "**" + label + "**");
     const reserve = html => "\uE000" + (tokens.push(html) - 1) + "\uE001";
     raw = raw.replace(/`([^`\n]+)`/g,
       (_m, code) => reserve("<code>" + escapeHtml(code) + "</code>"));
@@ -120,9 +129,9 @@
     for (let index = 0; index < lines.length; index += 1) {
       const row = lines[index];
       const trimmed = row.trim();
-      if (trimmed === "$" || trimmed === "\\[") {
+      if (trimmed === "$" || trimmed === "$" || trimmed === "\\[") {
         flush(); closeList();
-        const close = trimmed === "$" ? "$" : "\\]";
+        const close = trimmed === "\\[" ? "\\]" : trimmed;
         const mathLines = [];
         index += 1;
         while (index < lines.length && lines[index].trim() !== close) {
