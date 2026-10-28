@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+{% block title %}Lộ trình theo chương · {{ subject.name }}{% endblock %}
+{% block page_title %}Lộ trình học theo đề cương{% endblock %}
+{% block page_desc %}Học theo từng chương, tiểu mục và nguồn tài liệu của đúng môn học{% endblock %}
+{% block content %}
+<section class="soft-card" style="max-width:1050px;margin:0 auto;padding:26px">
+  <a class="back-link" href="{{ url_for('subject_detail', subject_id=subject.id) }}">← Quay lại môn học</a>
+  <h2 style="color:#263d79;margin:12px 0">{{ subject.name }}</h2>
+  <p style="color:#67799e;line-height:1.7">Bước 2: Đề cương đã xác nhận → tiểu mục từng chương → hoạt động học → gợi ý tài liệu đúng môn → điểm kiểm tra chương.</p>
+  {% if notice %}<p role="status" style="background:#e9f8ee;color:#176945;border-radius:10px;padding:12px">{{ notice }}</p>{% endif %}
+  {% if stale %}<p role="alert" style="background:#fff2e4;color:#8d4b1b;border-radius:10px;padding:12px">Đề cương hoặc danh sách chương đã thay đổi. Lộ trình cũ không còn hợp lệ, hãy tạo lại.</p>{% endif %}
+  <div style="padding:16px;background:#f1f4fd;border-radius:12px;margin:15px 0">
+    <strong>Nguồn đề cương:</strong> {{ syllabus_name }}
+    <p style="color:#607294;margin:6px 0 0">{{ units|length }} chương đã xác nhận. Kế hoạch riêng cho sinh viên này; không trộn môn hay tài liệu của sinh viên khác.</p>
+  </div>
+  {% if not units %}
+    <p>Chưa có chương học được xác nhận. Hãy phân tích đề cương trước.</p>
+    <a class="soft-primary" href="{{ url_for('syllabus.review', subject_id=subject.id) }}">Đi tới phân tích đề cương</a>
+  {% else %}
+    <form method="post" style="margin:18px 0">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="action" value="generate">
+      <button type="submit" class="soft-primary">📚 {{ 'Tạo lại lộ trình theo đề cương' if sessions else 'Xây dựng lộ trình từng chương' }}</button>
+    </form>
+    {% if sessions %}
+      <p style="color:#62779d"><strong>{{ sessions|length }} buổi học</strong> · xếp theo thứ tự đề cương · ngày học dự kiến từ thời điểm tạo. Đây là lộ trình riêng trong môn, chưa tự động thêm vào Kế hoạch học toàn cục.</p>
+      {% for lesson in sessions %}
+      <article style="background:#f6f8fe;border:1px solid #e1e8f4;border-radius:14px;padding:20px;margin:15px 0">
+        <div style="display:flex;gap:12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap">
+          <div>
+            <span style="color:#526be5;font-weight:700;font-size:13px">Buổi {{ lesson.session_id }} · Chương {{ lesson.unit_id }}</span>
+            <h3 style="color:#253c75;margin:8px 0">{{ lesson.title }}</h3>
+          </div>
+          <span style="background:#e6edff;padding:8px 12px;border-radius:10px;color:#314781;font-size:13px">{{ lesson.date }} · {{ lesson.time }} · {{ lesson.duration }} phút</span>
+        </div>
+        <div style="color:#647897;font-size:13px;margin-bottom:12px">Dẫn chứng đề cương: {{ lesson.source_evidence }}</div>
+        <h4 style="color:#324a80;margin:12px 0 6px">Nội dung cần học</h4>
+        {% if lesson.topics %}
+          <ul style="line-height:1.85">{% for topic in lesson.topics %}<li>{{ topic }}</li>{% endfor %}</ul>
+        {% else %}<p style="color:#7383a2">Đề cương không tách rõ tiểu mục; cần xem toàn bộ chương trong PDF.</p>{% endif %}
+        <h4 style="color:#324a80;margin:12px 0 6px">Mục tiêu và hoạt động</h4>
+        <ul style="line-height:1.85">{% for objective in lesson.objectives %}<li>{{ objective }}</li>{% endfor %}{% for action in lesson.activities %}<li>{{ action }}</li>{% endfor %}</ul>
+        <h4 style="color:#324a80;margin:12px 0 6px">Tài liệu tham chiếu</h4>
+        {% if lesson.materials %}
+          <ul style="line-height:1.85">
+          {% for doc in lesson.materials %}<li>
+            {{ 'Tài liệu chung' if doc.kind == 'shared' else 'Tài liệu cá nhân' }}:
+            <strong>{{ doc.name }}</strong> <span style="color:#7383a2;font-size:12px">(gợi ý khớp nội dung, cần kiểm tra lại)</span>
+          </li>{% endfor %}</ul>
+        {% else %}<p style="color:#8a6170">Chưa tìm được tài liệu của đúng môn có nội dung khớp chương này. Có thể bổ sung slide/giáo trình sau.</p>{% endif %}
+        {% if lesson.source_material_hints %}
+          <p style="color:#607294;font-size:13px">Đề cương gợi ý: {{ lesson.source_material_hints|join('; ') }}</p>
+        {% endif %}
+        {% if lesson.clo_refs %}<p style="font-size:13px;color:#5c6f90">CLO được nhắc trong chương: {{ lesson.clo_refs|join(', ') }}</p>{% else %}<p style="font-size:12px;color:#8490a8">Chưa xác định ánh xạ CLO trực tiếp cho buổi này.</p>{% endif %}
+        {% if lesson.quiz %}
+          <div style="margin-top:14px;border-top:1px solid #e2e7f1;padding-top:12px">
+            <strong style="color:#314a81">📝 Điểm kiểm tra cuối chương: {{ lesson.quiz.recommended_questions }} câu</strong>
+            <p style="margin:6px 0;color:#647897;font-size:13px">Đề xuất phạm vi: {{ lesson.quiz.scope }}. Chức năng tạo Quiz theo mã chương và đánh giá năng lực sẽ được nối ở bước kế tiếp; hiện tại chưa có nút Quiz theo chương để tránh kiểm tra sai phạm vi.</p>
+          </div>
+        {% endif %}
+      </article>
+      {% endfor %}
+    {% else %}
+      <p style="color:#697b9e">Chưa có lộ trình. Bấm nút trên để tạo lộ trình từ {{ units|length }} chương đã xác nhận.</p>
+    {% endif %}
+  {% endif %}
+</section>
+{% endblock %}
