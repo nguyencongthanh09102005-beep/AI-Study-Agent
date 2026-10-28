@@ -233,9 +233,13 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     currentChatId = chat.id;
     rememberSelectedSubject(chat.subject_id);
+    messagesBox?.classList.remove("chat-subject-enter");
     renderSubjectChats();
     updateChatHeader();
     await loadMessages(chat.id);
+    if (getCurrentChat()?.id === chat.id) {
+      messagesBox?.classList.add("chat-subject-enter");
+    }
     focusInputWithoutScroll();
   }
 
