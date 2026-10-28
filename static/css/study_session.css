@@ -67,3 +67,26 @@
 .page-study_plan .study-room-chat-free{display:inline-block;color:#445dc9;font-size:12px;font-weight:800;text-decoration:none;margin-top:15px}
 .page-study_plan .study-room-chat-free:hover{text-decoration:underline}
 @media(max-width:680px){.page-study_plan .study-room-chat-bubble{max-width:100%}.page-study_plan .study-room-chat-actions button{width:100%}}
+
+
+/* Phase 6.4: per-session study time; chat remains a separate bubble. */
+.page-study_plan .study-session-timer{margin:0 0 17px;padding:19px 23px}
+.study-session-timer [hidden]{display:none!important}
+.study-session-timer-top{display:flex;align-items:start;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.study-session-timer-top h3{margin:0 0 3px;font-size:16px}
+.study-session-timer-top .study-room-muted{margin:0}
+.study-session-state{display:inline-flex;padding:7px 12px;background:#eff3fe;border:1px solid #d8e2fa;border-radius:100px;color:#495fb5;font-size:12px;font-weight:800}
+.study-session-state[data-state="running"]{background:#e6f8ed;border-color:#bcebd1;color:#226d46}
+.study-session-state[data-state="completed"]{background:#e8f8f0;border-color:#bdebd3;color:#236f52}
+.study-session-metrics{display:flex;align-items:center;flex-wrap:wrap;gap:16px;margin:14px 0}
+.study-session-metrics>div{display:grid;gap:5px;min-width:170px;background:#f5f7ff;border:1px solid #e1e9fa;border-radius:12px;padding:13px 16px}
+.study-session-metrics small{font-size:11px;color:#7083a8;font-weight:750}
+.study-session-metrics strong{font-size:21px;letter-spacing:.035em;color:#294179;font-variant-numeric:tabular-nums}
+.study-session-actions{display:flex;gap:10px;flex-wrap:wrap}
+.study-session-actions button{border:none;border-radius:10px;padding:11px 15px;background:#546ddb;color:#fff;font-family:inherit;font-size:12px;font-weight:800;cursor:pointer}
+.study-session-actions button:hover{filter:brightness(.96)}
+.study-session-actions button:focus-visible{outline:3px solid #899bff;outline-offset:2px}
+.study-session-actions button:disabled{opacity:.52;cursor:wait}
+.study-session-actions .study-session-finish{background:#147a5d}
+.study-session-note{margin:10px 0 0!important;font-size:11px!important;color:#60739d!important;line-height:1.6}
+@media(max-width:680px){.study-session-metrics>div{flex:1;min-width:125px}.study-session-timer .study-session-actions button{flex:1}}
