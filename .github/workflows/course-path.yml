@@ -21,7 +21,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
       - name: Validate Chat AI frontend syntax
-        run: node --check static/js/chat.js
+        run: |
+          node --check static/js/chat.js
+          node --check static/js/chat_format.js
+          node tests/test_chat_markdown.js
       - name: Validate parser, routes and schemas
         run: |
           python -m py_compile app.py syllabus_learning.py syllabus_routes.py course_path_learning.py course_path_routes.py chapter_material_routes.py ai_chapter_suggestions.py chapter_tutor.py chapter_chat_context.py
