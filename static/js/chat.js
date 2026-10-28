@@ -8,7 +8,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const lessonBanner = document.getElementById("lessonModeBanner");
   const lessonTitle = document.getElementById("lessonModeTitle");
   const lessonSources = document.getElementById("lessonModeSources");
-  const exitLessonButton = document.getElementById("exitLessonMode");
 
   let chats = [];
   let currentChatId = null;
@@ -75,8 +74,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  exitLessonButton?.addEventListener("click", clearLessonMode);
-
 
   async function api(url, options = {}) {
     const response = await fetch(url, options);
@@ -135,7 +132,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       if (input) {
         input.disabled = false;
-        input.placeholder = "Hỏi tiếp về " + lessonMode.topic + "...";
+        input.placeholder = "Nhập tin nhắn...";
       }
       if (sendBtn) sendBtn.disabled = false;
       updateLessonUI();
@@ -154,7 +151,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (input) {
       input.disabled = false;
-      input.placeholder = `Hỏi AI về ${chat.title}...`;
+      input.placeholder = "Nhập tin nhắn...";
     }
 
     if (sendBtn) sendBtn.disabled = false;
