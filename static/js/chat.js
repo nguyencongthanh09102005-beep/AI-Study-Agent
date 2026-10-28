@@ -3,6 +3,19 @@ document.addEventListener("DOMContentLoaded", () => {
   const input = document.getElementById("chatInput");
   const sendBtn = document.getElementById("chatSendButton");
   const historyList = document.querySelector(".sidebar-course-list .chat-history-list");
+  const sidebarNav = document.getElementById("chatSidebarNav");
+  const navToggle = document.getElementById("chatNavToggle");
+  const navToggleLabel = navToggle?.querySelector(".chat-nav-toggle-label");
+
+  // The sidebar stays fully navigable: on Chat AI the other pages start
+  // as compact icon shortcuts, and users may expand them at any time.
+  navToggle?.addEventListener("click", () => {
+    const expanded = !sidebarNav?.classList.contains("is-expanded");
+    sidebarNav?.classList.toggle("is-expanded", expanded);
+    navToggle.setAttribute("aria-expanded", String(expanded));
+    if (navToggleLabel) navToggleLabel.textContent =
+      expanded ? "Thu gọn chức năng" : "Hiện đầy đủ chức năng";
+  });
   const mobileSubjectPicker = document.getElementById("chatMobileSubject");
   const subjectNameEl = document.getElementById("chatSubjectName");
   const contextStatusEl = document.getElementById("chatContextStatus");
@@ -459,6 +472,8 @@ document.addEventListener("DOMContentLoaded", () => {
   function renderSubjectChats() {
     if (!historyList) return;
     historyList.innerHTML = "";
+    historyList.setAttribute("aria-busy", "false");
+    historyList.classList.add("chat-courses-ready");
 
     if (!chats.length) {
       renderMobileSubjectPicker();
@@ -688,8 +703,9 @@ document.addEventListener("DOMContentLoaded", () => {
       console.error("Không tải được Chat theo môn:", error);
 
       if (historyList) {
+        historyList.setAttribute("aria-busy", "false");
         historyList.innerHTML =
-          '<p class="muted">Không tải được danh sách môn học.</p>';
+          '<p class="muted">Không tải được danh sách môn học. Hãy tải lại trang để thử lại.</p>';
       }
 
       currentMessages = [];
