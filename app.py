@@ -5401,23 +5401,6 @@ def api_chat():
         conn.close()
         return jsonify({"error": "Không tìm thấy Chat của môn học."}), 404
 
-    history_rows = conn.execute(
-        """
-        SELECT role, content
-        FROM chat_messages
-        WHERE user_id=? AND conversation_id=?
-        ORDER BY id DESC
-        LIMIT 10
-        """,
-        (uid, conversation_id)
-    ).fetchall()
-
-    history_rows = list(reversed(history_rows))
-    conversation_history = "\n".join(
-        f"{'Bạn' if row['role']=='user' else 'AI'}: {row['content']}"
-        for row in history_rows
-    )
-
     subject_id = conversation["subject_id"]
     subject_name = conversation["subject_name"]
     lesson_context = None
@@ -5446,6 +5429,18 @@ def api_chat():
         except LessonContextError as exc:
             conn.close()
             return jsonify({"error": exc.message}), exc.status
+
+    # Keep one visible Chat AI history per subject, but only pass back recent
+    # turns from the SAME mode, chapter, topic, and approved source version.
+    # Previous free-chat and other chapter content must not become evidence.
+    from chat_lesson_memory import history_for_mode, save_message_context
+    history_rows = history_for_mode(
+        conn, uid, conversation_id, lesson_context
+    )
+    conversation_history = "\n".join(
+        f"{'Bạn' if row['role']=='user' else 'AI'}: {row['content']}"
+        for row in history_rows
+    )
     conn.close()
 
     if lesson_context:
@@ -5493,7 +5488,7 @@ def api_chat():
     conn = db()
     created_at = now()
 
-    conn.execute(
+    user_message = conn.execute(
         """
         INSERT INTO chat_messages(
             user_id,conversation_id,role,content,created_at
@@ -5501,13 +5496,19 @@ def api_chat():
         """,
         (uid, conversation_id, "user", question, created_at)
     )
-    conn.execute(
+    save_message_context(
+        conn, user_message.lastrowid, uid, conversation_id, lesson_context
+    )
+    assistant_message = conn.execute(
         """
         INSERT INTO chat_messages(
             user_id,conversation_id,role,content,created_at
         ) VALUES(?,?,?,?,?)
         """,
         (uid, conversation_id, "assistant", answer, now())
+    )
+    save_message_context(
+        conn, assistant_message.lastrowid, uid, conversation_id, lesson_context
     )
 
     updated_at = now()
