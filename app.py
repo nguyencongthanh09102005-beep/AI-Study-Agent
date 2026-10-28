@@ -5308,6 +5308,27 @@ def api_chat_messages(conversation_id):
     ])
 
 
+@app.route("/api/chat/course-outline", methods=["GET"])
+@login_required
+def api_chat_course_outline():
+    """Read-only chapter choices for the current student's course."""
+    from chapter_chat_context import LessonContextError, list_chapter_options
+    try:
+        subject_id = int(request.args.get("subject_id"))
+    except (ValueError, TypeError):
+        return jsonify({"error": "Hãy chọn một môn học hợp lệ."}), 400
+    conn = db()
+    try:
+        result = list_chapter_options(
+            sys.modules[__name__], conn, session["user_id"], subject_id
+        )
+    except LessonContextError as exc:
+        return jsonify({"error": exc.message}), exc.status
+    finally:
+        conn.close()
+    return jsonify(result)
+
+
 @app.route("/api/chat/lesson-context", methods=["GET"])
 @login_required
 def api_chat_lesson_context():
