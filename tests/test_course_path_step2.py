@@ -7,7 +7,7 @@ from datetime import date
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import app as project
-from course_path_learning import parse_chapter_details, match_course_materials, build_course_roadmap, PLAN_VERSION
+from course_path_learning import parse_chapter_details, match_course_materials, build_course_roadmap, PLAN_VERSION, normalized_lines
 
 
 def check():
@@ -86,6 +86,14 @@ Quiz Chương 2: 10 câu lý thuyết.
     ]
     detailed = parse_chapter_details(pdf_style, pdf_units)
     assert len(detailed) == 2
+    # pypdf can append repeated page header to a meaningful content line.
+    inline_pdf = ("2.5. So sánh mảng và linked list; "
+                  "AI STUDY AGENT / ĐỀ CƯƠNG CHI TIẾT GIẢ LẬP\n"
+                  "Đạt 70%; AI STUDY AGENT / ĐỀ CƯƠNG CHI TIẾT GIẢ LẬP\n"
+                  "AI STUDY AGENT / ĐỀ CƯƠNG CHI TIẾT GIẢ LẬP\n")
+    assert normalized_lines(inline_pdf) == [
+        "2.5. So sánh mảng và linked list", "Đạt 70%"
+    ]
     assert len(detailed[0]["topics"]) == 5, detailed[0]["topics"]
     assert detailed[0]["topics"][0].startswith("1.1.")
     assert "kiểu dữ liệu trừu tượng" in detailed[0]["objectives"][0]
@@ -243,6 +251,23 @@ Quiz Chương 2: 10 câu lý thuyết.
             conn.close()
             loaded = client.get(f"/subjects/{course}/learning-path")
             assert loaded.status_code == 200 and "7 buổi học" in loaded.get_data(as_text=True)
+            # Regression: parser updates must invalidate previously saved roadmaps
+            # even when the source syllabus and approved chapters are identical.
+            conn = project.db()
+            obsolete = json.loads(plan["sessions_json"])
+            obsolete[0]["planner_version"] = PLAN_VERSION - 1
+            conn.execute("UPDATE course_roadmaps SET sessions_json=? WHERE user_id=? AND subject_id=?",
+                         (json.dumps(obsolete, ensure_ascii=False), student, course))
+            conn.commit()
+            conn.close()
+            outdated = client.get(f"/subjects/{course}/learning-path").get_data(as_text=True)
+            assert "không còn hợp lệ" in outdated
+            assert "7 buổi học" not in outdated
+            updated = client.post(f"/subjects/{course}/learning-path",
+                                  data={"csrf_token": csrf, "action": "generate"})
+            assert updated.status_code == 303
+            assert "7 buổi học" in client.get(
+                f"/subjects/{course}/learning-path").get_data(as_text=True)
 
             outsider = project.app.test_client()
             with outsider.session_transaction() as sess:
