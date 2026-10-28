@@ -21,6 +21,8 @@ from chapter_material_routes import (
 from chapter_tutor import prepared_sources
 from study_session_tracking import (ensure_tracking_schema, verified_roadmap_task,
                                     read_state, apply_action, StudyTrackingError)
+from study_session_quiz import get_session_quiz_context, public_session_quiz_context
+from chapter_chat_context import LessonContextError
 
 study_session_bp = Blueprint("study_session", __name__)
 
@@ -269,5 +271,27 @@ def learning_session_tracking(task_id):
     except StudyTrackingError as error:
         conn.rollback()
         return jsonify({"error": error.message}), error.status
+    finally:
+        conn.close()
+
+
+@study_session_bp.route("/api/study-plan/tasks/<int:task_id>/quiz-context",
+                        methods=["GET"])
+def study_session_quiz_context(task_id):
+    """7.1: read-only, per-user chapter+session+approved-source preview.
+
+    No question generation, Quiz writes, answer keys or file texts.
+    """
+    project = sys.modules[current_app.import_name]
+    uid = session.get("user_id")
+    if not uid:
+        return jsonify({"error": "Hãy đăng nhập để xem Quiz theo buổi."}), 401
+    conn = project.db()
+    try:
+        try:
+            context = get_session_quiz_context(project, conn, uid, task_id)
+        except LessonContextError as error:
+            return jsonify({"error": error.message}), error.status
+        return jsonify(public_session_quiz_context(context))
     finally:
         conn.close()
