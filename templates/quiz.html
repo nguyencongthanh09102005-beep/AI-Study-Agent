@@ -157,7 +157,7 @@
     <div class="quiz-mini-tabs"><button class="active" type="button" data-quiz-filter="all">Tất cả</button><button type="button" data-quiz-filter="recent">Gần đây</button><button type="button" data-quiz-filter="done">Đã làm</button></div>
     <div class="quiz-picker-list">
       {% for quiz in quizzes %}
-      <button type="button" class="quiz-picker {% if loop.first %}active{% endif %}" data-quiz-target="quiz-work-{{ quiz.id }}" data-attempted="{{ 'true' if quiz.attempted else 'false' }}" data-recent-rank="{{ loop.index }}">
+      <button type="button" class="quiz-picker {% if quiz.id == active_quiz_id %}active{% endif %}" data-quiz-target="quiz-work-{{ quiz.id }}" data-attempted="{{ 'true' if quiz.attempted else 'false' }}" data-recent-rank="{{ loop.index }}">
         <span class="mini-activity {{ ['blue','purple','green','orange'][loop.index0 % 4] }}">?</span>
         <span><b>{{ quiz.title }}</b><small>{% if quiz.linked_session_title %}Theo buổi · {{ quiz.linked_session_title }} · {% endif %}{{ quiz.questions|length }} câu hỏi{% if quiz.attempted %} · Đã làm{% if quiz.best_score is not none %} · Cao nhất {{ quiz.best_score|round(0)|int }}%{% endif %}{% else %} · Chưa làm{% endif %}</small></span><em>›</em>
       </button>
@@ -169,7 +169,7 @@
 
   <section class="quiz-workspaces">
     {% for quiz in quizzes %}
-    <article class="soft-card quiz-card {% if loop.first %}active-workspace{% endif %}" id="quiz-work-{{ quiz.id }}" data-quiz-id="{{ quiz.id }}">
+    <article class="soft-card quiz-card {% if quiz.id == active_quiz_id %}active-workspace{% endif %}" id="quiz-work-{{ quiz.id }}" data-quiz-id="{{ quiz.id }}">
       <div class="quiz-work-head">
         <div><span class="mini-activity blue">?</span><span><h3>{{ quiz.title }}</h3><small>Câu hỏi luyện tập bằng AI</small></span></div>
         <button type="button" class="quiz-delete-btn" data-delete-url="{{ url_for('delete_quiz', quiz_id=quiz.id) }}" data-quiz-title="{{ quiz.title }}" title="Xóa quiz">×</button>

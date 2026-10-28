@@ -5942,6 +5942,12 @@ def quiz():
         item["attempted"] = int(q["attempt_count"] or 0) > 0
         parsed.append(item)
     conn.close()
+    active_session_quiz_id = (
+        session_quiz_status["quiz_id"] if session_quiz_status
+        and session_quiz_status.get("allowed") else None
+    )
+    active_quiz_id = (active_session_quiz_id or
+                      (parsed[0]["id"] if parsed else None))
 
     selected_document_id = request.args.get("document_id", type=int)
     selected_subject_id = request.args.get("subject_id", type=int)
@@ -5972,6 +5978,7 @@ def quiz():
         session_quiz_context=session_quiz_context,
         session_quiz_status=session_quiz_status,
         session_quiz_csrf=session.get('session_quiz_csrf', ''),
+        active_quiz_id=active_quiz_id,
         generation_error=request.args.get("generation_error", "").strip()[:240]
     )
 
