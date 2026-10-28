@@ -5337,9 +5337,10 @@ def api_chat_lesson_context():
     try:
         subject_id = int(request.args.get("subject_id"))
         chapter_number = int(request.args.get("chapter_number"))
-        topic_index = int(request.args.get("topic_index"))
+        topic_value = request.args.get("topic_index")
+        topic_index = int(topic_value) if topic_value not in (None, "") else None
     except (ValueError, TypeError):
-        return jsonify({"error": "Thiếu mã môn, chương hoặc tiểu mục."}), 400
+        return jsonify({"error": "Thiếu mã môn hoặc chương hợp lệ."}), 400
     conn = db()
     try:
         context = resolve_lesson_context(
@@ -5357,6 +5358,7 @@ def api_chat_lesson_context():
         "chapter": context["chapter"],
         "topic_index": context["topic_index"],
         "topic": context["topic"],
+        "topics": context["topics"],
         "source_names": [src["name"] for src in context["sources"]]
     })
 
@@ -5422,7 +5424,8 @@ def api_chat():
             }), 400
         try:
             chapter_number = int(requested_lesson.get("chapter_number"))
-            topic_index = int(requested_lesson.get("topic_index"))
+            topic_value = requested_lesson.get("topic_index")
+            topic_index = int(topic_value) if topic_value not in (None, "") else None
         except (TypeError, ValueError):
             conn.close()
             return jsonify({"error": "Chương hoặc tiểu mục không hợp lệ."}), 400
@@ -5430,7 +5433,7 @@ def api_chat():
         try:
             lesson_context = resolve_lesson_context(
                 sys.modules[__name__], conn, uid, subject_id,
-                chapter_number, topic_index
+                chapter_number, topic_index, question=question
             )
         except LessonContextError as exc:
             conn.close()
@@ -5453,7 +5456,9 @@ def api_chat():
         from chapter_tutor import make_tutor_prompt, parse_tutor_answer
         personal_context = get_personal_learning_context(uid, subject_id)
         prompt = make_tutor_prompt(
-            subject_name, lesson_context["chapter"], lesson_context["topic"],
+            subject_name, lesson_context["chapter"],
+            "; ".join(lesson_context["topics"]) if lesson_context["topic_index"] is None
+            else lesson_context["topic"],
             question, lesson_context["sources"], conversation_history,
             profile=personal_context
         )
@@ -5499,7 +5504,8 @@ def api_chat():
         try:
             live = resolve_lesson_context(
                 sys.modules[__name__], conn, uid, subject_id,
-                lesson_context["chapter_number"], lesson_context["topic_index"]
+                lesson_context["chapter_number"], lesson_context["topic_index"],
+                question=question
             )
         except LessonContextError:
             conn.close()
@@ -5568,6 +5574,7 @@ def api_chat():
             "topic_index": lesson_context["topic_index"],
             "chapter": lesson_context["chapter"],
             "topic": lesson_context["topic"],
+            "topics": lesson_context["topics"],
         } if lesson_context else None),
         "updated_at": updated_at
     })
