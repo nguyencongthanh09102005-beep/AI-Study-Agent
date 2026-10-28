@@ -60,6 +60,8 @@ jobs:
           node --check static/js/ai_bubble.js
           node tests/test_study_session_chat.js
           node tests/test_ai_bubble.js
+          node --check static/js/study_session_timer.js
+          node tests/test_study_session_timer.js
           node tests/test_chat_markdown.js
           node --check static/js/document-summary.js
           node --check static/js/auth-password.js
@@ -100,7 +102,8 @@ jobs:
           python tests/test_study_plan_ui.py
           python tests/test_schedule_conflicts.py
           python tests/test_study_session_step631.py
-          python -m py_compile study_session_chat_context.py
+          python tests/test_study_session_tracking.py
+          python -m py_compile study_session_tracking.py study_session_routes.py study_session_chat_context.py
 
       - name: Final roles and manual deadline data-integrity audit
         run: python tests/test_final_integrity_audit.py
