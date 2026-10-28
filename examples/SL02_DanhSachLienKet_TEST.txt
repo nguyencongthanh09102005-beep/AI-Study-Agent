@@ -1,0 +1,52 @@
+TÀI LIỆU THỬ NGHIỆM – CHƯƠNG 2: MẢNG VÀ DANH SÁCH LIÊN KẾT
+Học phần: Cấu trúc dữ liệu và thuật toán (CTDL_TEST)
+Loại: học liệu minh họa phục vụ kiểm thử, KHÔNG phải tài liệu chính thức của trường.
+Người sử dụng: Admin tải lên như học liệu chung (KHÔNG đánh dấu "Đề cương chuẩn").
+
+2.1. MẢNG MỘT CHIỀU
+Mảng (array) là cấu trúc lưu các phần tử cùng kiểu dữ liệu tại các vị trí liên tiếp.
+Truy cập phần tử theo chỉ số thường có chi phí O(1).
+Chèn/xóa tại vị trí giữa mảng tĩnh có thể cần dời các phần tử, chi phí O(n).
+Ví dụ: a = [4, 8, 12, 16]. Muốn chèn 10 trước 12 cần dời 12 và 16.
+Bài luyện tập: mô phỏng chèn 7 vào vị trí thứ 2 của mảng [2, 4, 6, 8].
+
+2.2. DANH SÁCH LIÊN KẾT ĐƠN
+Danh sách liên kết đơn (singly linked list) gồm các node liên kết theo con trỏ next.
+Mỗi node gồm dữ liệu và tham chiếu đến node kế tiếp. Head là con trỏ đầu danh sách.
+Ví dụ: head -> [5|next] -> [11|next] -> [18|null].
+Danh sách liên kết không yêu cầu các node nằm liên tiếp trong bộ nhớ.
+Truy cập node thứ k thường phải duyệt từ head, có chi phí O(k).
+
+2.3. THAO TÁC DUYỆT, THÊM, XÓA VÀ TÌM KIẾM
+Thêm node vào đầu danh sách: đặt new.next = head rồi cập nhật head = new.
+Xóa node đầu: cập nhật head = head.next sau khi xử lý trường hợp danh sách rỗng.
+Tìm kiếm một giá trị: bắt đầu từ head, so sánh lần lượt từng node đến khi tìm thấy.
+Nếu đã có con trỏ node đứng trước, chèn sau node đó có thể thực hiện trong O(1).
+Bài tập BT03: cài đặt cấu trúc Node, insert_head, delete_head và find.
+Kiểm tra: thử danh sách rỗng, danh sách một node và trường hợp không tìm thấy.
+
+2.4. DANH SÁCH LIÊN KẾT ĐÔI VÀ DANH SÁCH VÒNG
+Danh sách liên kết đôi (doubly linked list) có hai liên kết prev và next.
+Nhờ prev có thể di chuyển ngược nhưng cần thêm bộ nhớ cho con trỏ.
+Danh sách vòng (circular linked list) có node cuối trỏ về node đầu.
+Cần tránh vòng lặp vô hạn khi duyệt danh sách vòng.
+Bài luyện tập: trình bày sự khác nhau giữa singly, doubly và circular linked list.
+
+2.5. SO SÁNH CHI PHÍ THAO TÁC GIỮA MẢNG VÀ LINKED LIST
+Mảng: truy cập theo chỉ số O(1); tìm kiếm tuần tự O(n); chèn/xóa giữa O(n).
+Danh sách liên kết: truy cập vị trí O(n); tìm kiếm O(n); chèn sau node đã biết O(1).
+Chi phí thực tế còn tùy vào bộ nhớ đệm, cấp phát và cách cài đặt.
+Bài tập BT04: phân tích khi nào chọn mảng, khi nào chọn danh sách liên kết cho:
+(a) truy xuất ngẫu nhiên nhiều lần; (b) thường xuyên chèn ở đầu.
+
+CÂU HỎI TỰ ÔN (KHÔNG PHẢI QUIZ ĐÃ CHẤM)
+1. Vai trò của head và next là gì?
+2. Vì sao linked list không truy cập trực tiếp phần tử thứ k trong O(1)?
+3. Độ phức tạp khi thêm node vào đầu danh sách liên kết đơn là bao nhiêu?
+4. Trường hợp nào danh sách liên kết đôi có lợi hơn danh sách liên kết đơn?
+5. Giải thích sự khác biệt giữa chi phí chèn và truy cập của mảng và linked list.
+
+GHI CHÚ KIỂM THỬ
+Sau khi Admin tải file này, mở "Gắn chương" và xác nhận "Chương 2. Mảng và danh sách liên kết".
+Sinh viên mở CTDL_TEST -> Lộ trình theo chương -> Mở bài học Chương 2 để xem học liệu đã duyệt.
+File là nội dung mẫu do hệ thống tạo cho kiểm thử, không phải SL02 chính thức.
