@@ -46,6 +46,7 @@ jobs:
           python tests/test_study_session_quiz_step71.py
           python tests/test_study_session_quiz_step7234.py
           python tests/test_quiz_learning_analysis_step751_752.py
+          python tests/test_final_qa.py
           python tests/test_delete_subject_session_quiz.py
           python tests/test_schedule_conflicts.py
           python tests/test_chapter_materials_step3.py
