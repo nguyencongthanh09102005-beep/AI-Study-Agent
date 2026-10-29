@@ -98,6 +98,11 @@ def run():
             assert "Một tài liệu tốt hôm nay" not in html
             assert "nền tảng cho thành công ngày mai" not in html
             assert 'class="quote-card' not in html
+            assert 'id="documentDropzone"' in html
+            assert 'class="dropzone-inner library-dropzone"' in html
+            assert "Kéo thả tài liệu vào đây" in html
+            assert "document_dropzone.js" in html
+            assert 'class="library-upload-file"' not in html
             assert 'id="documentFileInput"' in html
             assert "Tóm tắt AI" in html and "Tạo Quiz" in html
             assert "Xóa tài liệu" in html and "Chuyển sang môn" in html
