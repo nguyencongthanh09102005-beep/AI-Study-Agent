@@ -86,13 +86,21 @@ def next_review_slot(conn, user_id, duration, preferred_time,
         first = datetime.combine(day, datetime.min.time()).replace(
             hour=hh, minute=mm)
         last = datetime.combine(day, datetime.min.time()).replace(hour=22)
-        # Respect preferred time first. If it conflicts, move 15m at a time.
-        options = [first]
+        # Check the nearest available 15-minute slots to the preferred
+        # time (19:45 before 08:00 when the 19:00-19:45 lesson is occupied).
+        # When equally close, prefer after the requested time.
+        options = []
         scan = datetime.combine(day, datetime.min.time()).replace(hour=8)
         while scan + timedelta(minutes=duration) <= last:
-            if scan != first:
-                options.append(scan)
+            options.append(scan)
             scan += timedelta(minutes=15)
+        if first not in options:
+            options.append(first)
+        options.sort(key=lambda candidate: (
+            abs((candidate-first).total_seconds()),
+            candidate < first,
+            candidate
+        ))
         for candidate in options:
             finish = candidate + timedelta(minutes=duration)
             if candidate.hour < 8 or finish > last:
