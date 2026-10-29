@@ -5792,7 +5792,7 @@ def quiz():
                         title = f"Quiz môn {subject['name']}"
 
         if questions:
-            conn.execute(
+            cursor = conn.execute(
                 """
                 INSERT INTO quizzes(
                     user_id,subject_id,document_id,title,payload,created_at
@@ -5808,6 +5808,9 @@ def quiz():
                     now()
                 )
             )
+            if mode == "weakness" and subject_id:
+                from quiz_review_progress import save_review_baseline
+                save_review_baseline(conn, uid, subject_id, cursor.lastrowid, now())
             conn.commit()
 
         conn.close()
@@ -6324,7 +6327,10 @@ def submit_quiz():
     ).fetchone()
 
     from quiz_learning_analysis import summarize_quiz_attempt
+    from quiz_review_progress import compare_review_attempt
     analysis = summarize_quiz_attempt(questions, normalized_answers)
+    review_comparison = compare_review_attempt(
+        conn, uid, quiz_id, questions, normalized_answers)
     response_data = {
         "success": True,
         "attempt_id": attempt_id,
@@ -6349,6 +6355,7 @@ def submit_quiz():
         "learning_updated": bool(subject_id),
         "adaptive_learning": bool(subject_id),
         "analysis": analysis,
+        "review_comparison": review_comparison,
     }
     if submission_key:
         conn.execute("""
@@ -7965,6 +7972,9 @@ def api_mobile_quiz_generate():
         )
     )
     quiz_id = cursor.lastrowid
+    if mode == "weakness" and subject_id:
+        from quiz_review_progress import save_review_baseline
+        save_review_baseline(conn, uid, subject_id, quiz_id, now())
     conn.commit()
     conn.close()
 
