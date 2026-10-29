@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Bài tập Chương {{ chapter_number }} · {{ subject.name }}{% endblock %}
+{% block page_title %}Bài tập theo chương{% endblock %}
+{% block page_desc %}Nộp lời giải · Nhận xét có nguồn · Lưu tiến bộ riêng{% endblock %}
+{% block content %}
+<section class="soft-card" style="max-width:1080px;margin:0 auto;padding:24px">
+  <a class="back-link" href="{{ url_for('chapter_material.student_chapter', subject_id=subject.id, chapter_number=chapter_number) }}">← Học chương {{ chapter_number }}</a>
+  <div style="margin:18px 0 22px">
+    <p style="font-size:12px;color:#65799a">{{ subject.name }} · Chương {{ chapter_number }}</p>
+    <h2 style="color:#253c79">{{ chapter.chapter }}</h2>
+    <p style="color:#667b98;font-size:13px;line-height:1.7">Bài tập chỉ lấy từ đề cương đã xác nhận: <strong>{{ source_name }}</strong>. Nhận xét AI (nếu có) chỉ sử dụng học liệu chung đã được Admin duyệt đúng chương; không phải điểm chính thức hoặc xác nhận đạt CLO.</p>
+  </div>
+  {% if notice %}<p role="status" style="border-radius:10px;padding:12px;background:#eaf5ef;color:#24604a">{{ notice }}</p>{% endif %}
+  {% if chapter.exercises %}
+    {% for exercise in chapter.exercises %}
+    <article style="border:1px solid #dae3f5;border-radius:15px;padding:20px;margin:16px 0;background:#fbfcff">
+      <h3 style="font-size:16px;color:#283f79">Bài tập {{ loop.index }}</h3>
+      <p style="line-height:1.8;color:#425478;white-space:pre-wrap">{{ exercise }}</p>
+      <form method="post" action="{{ url_for('chapter_exercise.exercises',subject_id=subject.id,chapter_number=chapter_number) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="exercise_index" value="{{ loop.index0 }}">
+        <label style="display:block;font-weight:750;color:#3d5183;margin:10px 0 8px" for="chapterAnswer{{ loop.index }}">Bài làm của bạn</label>
+        <textarea id="chapterAnswer{{ loop.index }}" name="answer" minlength="12" maxlength="5000" rows="6" required placeholder="Nhập cách giải, giải thích hoặc mã nguồn của bạn..." style="width:100%;min-height:150px;resize:vertical;border:1px solid #cfdcf1;border-radius:11px;padding:12px;font:inherit;color:#304576;background:#fff"></textarea>
+        <div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:12px">
+          <button class="ghost-action" type="submit" name="action" value="save">💾 Lưu bài làm</button>
+          <button class="soft-primary" type="submit" name="action" value="evaluate" {% if not evidence_ready %}disabled title="Cần học liệu chung được Admin duyệt để nhận xét có căn cứ"{% endif %}>✦ Nộp và nhờ AI nhận xét</button>
+        </div>
+        {% if evidence_ready %}
+        <p style="font-size:12px;color:#697e9e;line-height:1.6;margin-top:8px">Khi yêu cầu nhận xét, bài làm và các đoạn học liệu đã duyệt sẽ được gửi tới Gemini. AI chỉ gợi ý để bạn tự sửa, không chấm điểm chính thức.</p>
+        {% else %}
+        <p style="font-size:12px;color:#9a6326;margin-top:8px">Chưa có học liệu chung được duyệt đúng chương. Bạn vẫn lưu bài làm được; nút AI sẽ khả dụng khi Admin bổ sung học liệu.</p>
+        {% endif %}
+      </form>
+    </article>
+    {% endfor %}
+  {% else %}
+    <p style="background:#fff5e9;border:1px solid #f4dfc6;padding:15px;border-radius:12px;color:#805d34">Đề cương đã xác nhận chưa có bài tập cụ thể cho chương này. Hệ thống không tự tạo đề bài giả. Hãy bổ sung đề cương có bài tập hoặc trao đổi với giảng viên.</p>
+  {% endif %}
+  <section id="attempts" style="margin-top:24px">
+    <h3 style="color:#293f75">Lịch sử bài làm của bạn</h3>
+    {% if not history %}<p style="font-size:13px;color:#7082a2">Chưa có bài làm. Mỗi lần nộp sẽ được lưu riêng để bạn đối chiếu các lần sửa.</p>{% endif %}
+    {% for item in history %}
+    <article style="background:#f4f7ff;border:1px solid #dce5f4;border-radius:13px;padding:17px;margin:12px 0">
+      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <strong style="color:#31477d">Lần nộp #{{ item.id }} · Bài tập {{ item.exercise_index + 1 }}</strong>
+        <small style="color:#7184a5">{{ item.created_at[:16]|replace('T',' ') }}</small>
+      </div>
+      {% if item.stale %}<p style="color:#97591f;font-size:12px">Đề cương đã đổi; đây là bài làm từ phiên bản cũ, không nhận xét lại theo nguồn mới.</p>{% endif %}
+      <details style="margin-top:9px">
+        <summary style="cursor:pointer;font-weight:700;color:#4d61bb">Xem bài làm đã nộp</summary>
+        <p style="white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;line-height:1.8">{{ item.answer_text }}</p>
+      </details>
+      {% if item.feedback %}
+        <div style="background:white;border-radius:10px;padding:13px;margin-top:12px">
+          <strong style="color:#3557ae">💬 Gợi ý AI (không phải điểm chính thức)</strong>
+          <p style="font-size:13px;line-height:1.75;white-space:pre-wrap">{{ item.feedback.explanation }}</p>
+          {% if item.feedback.practice %}<p style="font-size:13px"><strong>Gợi ý sửa bài:</strong> {{ item.feedback.practice }}</p>{% endif %}
+          {% for cite in item.feedback.citations %}
+          <blockquote style="font-size:12px;color:#596b90;border-left:3px solid #879be7;padding-left:11px;margin:9px 0">
+            {{ cite.source_name }}: “{{ cite.quote }}”
+          </blockquote>
+          {% endfor %}
+        </div>
+      {% elif not item.stale and item.feedback_status != 'reviewed' %}
+        <p style="font-size:12px;color:#617492">
+          {% if item.feedback_status == 'missing_sources' %}Chưa có nguồn duyệt hợp lệ để AI nhận xét.{% elif item.feedback_status == 'unavailable' %}Gemini chưa trả nhận xét đủ dẫn chứng; bài làm vẫn đã lưu.{% else %}Bài làm đã lưu, chưa yêu cầu AI nhận xét.{% endif %}
+        </p>
+        {% if evidence_ready %}
+        <form method="post" action="{{ url_for('chapter_exercise.exercises',subject_id=subject.id,chapter_number=chapter_number) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="attempt_id" value="{{ item.id }}">
+          <button class="ghost-action" name="action" value="retry" type="submit">✦ Nhận xét bài làm này</button>
+        </form>
+        {% endif %}
+      {% endif %}
+    </article>
+    {% endfor %}
+  </section>
+  <div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:24px">
+    <a class="soft-primary" href="{{ url_for('quiz',mode='subject',subject_id=subject.id) }}">📝 Quiz kiểm tra kiến thức →</a>
+    <a class="ghost-action" href="{{ url_for('course_path.learning_path',subject_id=subject.id) }}">Xem lộ trình môn học</a>
+  </div>
+</section>
+{% endblock %}
