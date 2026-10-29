@@ -113,6 +113,8 @@ def run():
             assert outsider.get(file_path+"?download=1").status_code==403
 
             from chapter_material_routes import chapter_key
+            from syllabus_routes import ensure_syllabus_schema
+            ensure_syllabus_schema(conn)
             ensure_chapter_material_schema(conn)
             units=[
                 {"title":"Chương 1. Sự ra đời của Đảng",
