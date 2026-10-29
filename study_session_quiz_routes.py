@@ -45,9 +45,11 @@ def status(subject_id):
         _auth(project, conn, uid, subject_id)
         ensure_quiz_runtime_schema(conn)
         items = preparation_status(conn, project, uid, subject_id)
+        from quiz_preparation_jobs import status as job_status
         ready = sum(1 for item in items if item["status"] == "ready")
         return jsonify({"total": len(items), "ready": ready, "items": items,
-                        "done": bool(items) and ready == len(items)})
+                        "done": bool(items) and ready == len(items),
+                        "job": job_status(conn,uid,subject_id)})
     except LessonContextError as err:
         return jsonify({"error": err.message}), err.status
     finally:
@@ -72,6 +74,55 @@ def next_step(subject_id):
     except LessonContextError as err:
         conn.rollback()
         return jsonify({"error": err.message}), err.status
+    finally:
+        conn.close()
+
+
+@session_quiz_bp.route(
+    "/api/subjects/<int:subject_id>/quiz-preparation/background",
+    methods=["POST"])
+def start_background(subject_id):
+    """Queue a durable job; never call Gemini inside this HTTP request."""
+    project = sys.modules[current_app.import_name]
+    uid = session.get("user_id")
+    if not uid:
+        return jsonify({"error": "Hãy đăng nhập."}), 401
+    if not _csrf():
+        return jsonify({"error": "Phiên xác nhận không hợp lệ."}), 403
+    conn = project.db()
+    try:
+        _auth(project, conn, uid, subject_id)
+        from quiz_preparation_jobs import enqueue, start_local_worker
+        state = enqueue(conn, project, uid, subject_id)
+        # Supported for persistent Flask processes (local python app.py).
+        # Production/serverless requires a dedicated persistent worker.
+        start_local_worker(project)
+        return jsonify({"state":state,"accepted":True})
+    except LessonContextError as err:
+        conn.rollback()
+        return jsonify({"error": err.message}), err.status
+    finally:
+        conn.close()
+
+
+@session_quiz_bp.route(
+    "/api/subjects/<int:subject_id>/quiz-preparation/background/pause",
+    methods=["POST"])
+def pause_background(subject_id):
+    project = sys.modules[current_app.import_name]
+    uid = session.get("user_id")
+    if not uid:
+        return jsonify({"error": "Hãy đăng nhập."}), 401
+    if not _csrf():
+        return jsonify({"error": "Phiên xác nhận không hợp lệ."}), 403
+    conn = project.db()
+    try:
+        _auth(project, conn, uid, subject_id)
+        from quiz_preparation_jobs import pause
+        state=pause(conn,uid,subject_id)
+        return jsonify({"state":state})
+    except LessonContextError as err:
+        return jsonify({"error":err.message}),err.status
     finally:
         conn.close()
 
