@@ -376,6 +376,15 @@ def run():
                 (first_quiz, student)
             ).fetchone()[0] == 2
             conn.close()
+            # Finishing a Quiz unlocks it only for that owner, never for
+            # another student even when their route knows the Quiz id.
+            login(client, other)
+            assert f'data-quiz-id="{first_quiz}"' not in client.get("/quiz").get_data(as_text=True)
+            assert client.get(f"/api/mobile/quizzes/{first_quiz}").status_code == 404
+            assert client.post("/api/quiz/submit", json={
+                "quiz_id": first_quiz, "answers": [0] * 15
+            }).status_code == 404
+            login(client, student)
 
             # Approval revoked => neither quiz nor answer keys leak, even with
             # the previous grant; historical quiz and answers are preserved.
