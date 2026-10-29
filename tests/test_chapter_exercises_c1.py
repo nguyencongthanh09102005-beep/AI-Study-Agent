@@ -78,7 +78,7 @@ BT02: Nêu cách thêm một node.
                   is_syllabus,created_by_user_id,created_at)
                 VALUES(?,?,?,?,0,?,?)
             """,(sid,"slide-chuong-1.txt","slide-c1.txt",source,admin,now)).lastrowid
-            hash_=syllabus_hash(syllabus)
+            hash_=syllabus_hash(syllabus.strip())
             conn.execute("""
                 INSERT INTO shared_document_chapters(
                   document_id,shared_subject_id,chapter_key,syllabus_hash,
