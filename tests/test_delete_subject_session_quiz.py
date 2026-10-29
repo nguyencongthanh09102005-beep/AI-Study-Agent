@@ -191,6 +191,15 @@ def verify():
             conn.close()
             assert str(first["quiz"]) not in client.get("/quiz").get_data(as_text=True).split('data-quiz-id="')
             assert client.get(f"/api/mobile/quizzes/{first['quiz']}").status_code == 409
+            # The private archived record remains in SQLite, but the
+            # deleted course's session Quiz must leave the selectable lists
+            # on both Web and Mobile.
+            mobile_archive = client.get("/api/mobile/quizzes")
+            assert mobile_archive.status_code == 200
+            assert all(q["id"] != first["quiz"]
+                       for q in mobile_archive.get_json()["quizzes"])
+            assert any(q["id"] == second["quiz"]
+                       for q in mobile_archive.get_json()["quizzes"])
             assert client.post("/api/quiz/submit", json={
                 "quiz_id": first["quiz"], "answers": [0]
             }).status_code == 409
