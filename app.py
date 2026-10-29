@@ -4924,10 +4924,12 @@ def documents():
     # Resolve current code -> shared subject linkage for older student accounts too.
     # This makes an admin upload visible on the very next student page request.
     shared_subject_names = {}
+    shared_subject_codes = {}
     for student_subject in subs:
         common = ensure_shared_subject_for_user_subject(conn, uid, student_subject["id"])
         if common:
             shared_subject_names[common["id"]] = student_subject["name"]
+            shared_subject_codes[common["id"]] = student_subject["code"] or ""
 
     shared_docs = []
     if shared_subject_names:
@@ -4978,13 +4980,9 @@ def documents():
         shared_buckets[row["shared_subject_id"]].append(row)
     shared_groups = []
     for shared_id, display_name in shared_subject_names.items():
-        linked_subject = next(
-            (row for row in subs if row["name"] == display_name
-             and row["shared_subject_id"] == shared_id), None
-        )
         shared_groups.append({
             "key": f"shared-{shared_id}", "name": display_name,
-            "code": linked_subject["code"] if linked_subject else "",
+            "code": shared_subject_codes.get(shared_id, ""),
             "files": sorted(shared_buckets[shared_id],
                             key=lambda row: (not bool(row["is_syllabus"]), -row["id"]))
         })
