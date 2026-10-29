@@ -6311,7 +6311,12 @@ def submit_quiz():
             limit=8
         )
         weaknesses = [dict(row) for row in weakness_rows]
-        weakness_count = len(weaknesses)
+        # The UI shows only eight examples, but the total MUST count all
+        # currently active weak topics (not just the preview rows).
+        weakness_count = conn.execute("""
+            SELECT COUNT(*) FROM learning_weaknesses
+            WHERE user_id=? AND subject_id=? AND miss_count>correct_count
+        """, (uid, subject_id)).fetchone()[0]
 
     attempt_stats = conn.execute(
         """
