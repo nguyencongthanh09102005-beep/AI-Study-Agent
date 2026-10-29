@@ -184,6 +184,8 @@ def room(task_id):
     if not info:
         abort(404)
     answer = session.pop("manual_lesson_answer", None)
+    if answer and answer.get("task_id") != task_id:
+        answer = None
     return render_template(
         "manual_study_room.html", page="study_plan",
         info=info, csrf_token=_csrf(), answer=answer,
@@ -201,7 +203,7 @@ def prepare_quiz(task_id):
     # The generation helper rechecks source ownership before/after Gemini.
     success, message = generate_for_lesson(project, uid, task_id)
     if not success:
-        session["manual_lesson_answer"] = {"error": message}
+        session["manual_lesson_answer"] = {"task_id": task_id, "error": message}
     return redirect(url_for("manual_lesson.room",task_id=task_id),code=303)
 
 
@@ -225,7 +227,7 @@ def ask(task_id):
     text = (info["extracted_text"] or "").strip()
     if len(text) < 80:
         session["manual_lesson_answer"] = {
-            "question": question,
+            "task_id": task_id, "question": question,
             "error": "Tài liệu chưa trích xuất đủ nội dung để AI giải thích.",
         }
         return redirect(url_for("manual_lesson.room",task_id=task_id),code=303)
@@ -244,9 +246,9 @@ def ask(task_id):
         reply, error = project.gemini_generate(prompt)
     except Exception:
         reply, error = None, "Gemini tạm thời không phản hồi."
-    result = {"question": question}
+    result = {"task_id": task_id, "question": question}
     if reply:
-        result["response"] = str(reply)[:8500]
+        result["response"] = str(reply)[:1800]  # Cookie session has a ~4 KB limit.
         result["source"] = info["original_name"]
     else:
         result["error"] = error or "AI chưa thể trả lời, vui lòng thử lại."
