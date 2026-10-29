@@ -120,7 +120,11 @@
         <strong>AI Study Agent</strong>
         <small id="floatingAiScope">Trợ lý học tập theo môn</small>
       </div>
-      <button type="button" id="floatingAiClose" class="floating-ai-close" aria-label="Thu nhỏ Chat AI">−</button>
+      <div class="floating-ai-window-actions">
+        <button type="button" id="floatingAiExpand" class="floating-ai-window-button" aria-label="Mở rộng cửa sổ Chat AI" aria-pressed="false" title="Mở rộng / Thu gọn kích thước">⛶</button>
+        <button type="button" id="floatingAiResetSize" class="floating-ai-window-button" aria-label="Đặt lại kích thước Chat AI" title="Kích thước mặc định">↺</button>
+        <button type="button" id="floatingAiClose" class="floating-ai-close" aria-label="Thu nhỏ Chat AI">−</button>
+      </div>
     </header>
     <div id="floatingAiMode" class="floating-ai-mode" role="status" aria-live="polite">Đang tải trợ lý...</div>
     <label id="floatingAiCourseLabel" class="floating-ai-course-label" for="floatingAiCourse">
@@ -139,6 +143,9 @@
       </div>
     </form>
     <a id="floatingAiFullChat" class="floating-ai-full-link" href="{{ url_for('chat') }}">Mở Chat AI đầy đủ ↗</a>
+    <div id="floatingAiResize" class="floating-ai-resize-handle" role="separator" tabindex="0"
+         aria-orientation="vertical" aria-label="Đổi kích thước Chat AI. Kéo góc này, hoặc dùng phím mũi tên để chỉnh."
+         title="Kéo để chỉnh chiều rộng và chiều cao · Phím mũi tên để chỉnh"></div>
   </section>
 </div>
 {% endif %}
