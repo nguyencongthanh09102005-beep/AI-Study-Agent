@@ -126,6 +126,7 @@
         {% if lesson.activities %}
           <ul>{% for activity in lesson.activities %}<li>{{ activity }}</li>{% endfor %}</ul>
         {% else %}<p>Chưa có hoạt động học được lập cho buổi này.</p>{% endif %}
+        <p style="margin-top:13px"><a class="study-room-link" href="{{ url_for('chapter_exercise.exercises', subject_id=subject.id, chapter_number=lesson.unit_id) }}">✍️ Làm bài tập theo chương · Nộp lời giải & nhận góp ý AI →</a></p>
       </section>
     </main>
     <aside class="study-room-aside">
