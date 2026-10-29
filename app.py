@@ -8482,8 +8482,14 @@ def uploaded_file(filename):
 
 if __name__ == "__main__":
     init_db()
+    # Local persistent Flask server: resume queued AI Quiz preparation even
+    # after navigating away, tab close, or application restart. Disable the
+    # development reloader to prevent duplicate concurrent worker threads.
+    from quiz_preparation_jobs import start_local_worker
+    start_local_worker(sys.modules[__name__])
     app.run(
         debug=os.getenv("FLASK_DEBUG", "0") == "1",
+        use_reloader=False,
         host=os.getenv("FLASK_HOST", "0.0.0.0"),
         port=int(os.getenv("FLASK_PORT", "5000"))
     )
