@@ -4268,6 +4268,9 @@ def subject_detail(subject_id):
         uid,
         subject_id=subject_id
     )
+    # Phase 8.1/8.2: evidence-backed and read-only; no Gemini on page load.
+    from adaptive_decision_phase8 import decide_next_learning_step
+    adaptive_decision = decide_next_learning_step(conn, uid, subject_id)
 
     conn.close()
 
@@ -4284,7 +4287,8 @@ def subject_detail(subject_id):
         syllabus_documents=syllabus_documents,
         quiz_stats=quiz_stats,
         upcoming_tasks=upcoming_tasks,
-        next_best_action=next_best_action
+        next_best_action=next_best_action,
+        adaptive_decision=adaptive_decision
     )
 
 
