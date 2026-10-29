@@ -65,6 +65,37 @@ def run():
             # For the remaining F2 tests, remove only the test fixture lock.
             conn.execute("DELETE FROM roadmap_manual_time_locks WHERE task_id=?", (road,))
             conn.execute("UPDATE study_tasks SET study_at=? WHERE id=?", (iso(road_at),road))
+            # Backwards compatibility: recognize an edited time from a saved
+            # verified roadmap even when the lock table was absent historically.
+            import json
+            from course_path_routes import ensure_roadmap_schema
+            from course_schedule_sync import session_signature
+            ensure_roadmap_schema(conn)
+            original_lesson = {
+                "session_id":1, "unit_id":1, "title":"Buoi 1",
+                "date":road_at.date().isoformat(),
+                "time":road_at.strftime("%H:%M"),
+                "source_evidence":"original", "topics":["Cương lĩnh"],
+                "objectives":[], "activities":[],
+            }
+            signature=session_signature(original_lesson)
+            conn.execute("""
+                INSERT INTO course_roadmaps(user_id,subject_id,source_hash,units_hash,sessions_json,updated_at)
+                VALUES(?,?,?,?,?,?)
+            """, (uid,sid,"original","unit",
+                  json.dumps([original_lesson]),stamp))
+            conn.execute("""
+                UPDATE study_tasks SET roadmap_session_signature=?
+                WHERE id=?
+            """, (signature,road))
+            conn.commit()
+            assert not is_manual_roadmap_time(conn,uid,road)
+            conn.execute("UPDATE study_tasks SET study_at=? WHERE id=?",
+                         (iso(road_at+timedelta(minutes=10)),road))
+            conn.commit()
+            assert is_manual_roadmap_time(conn,uid,road)
+            assert proposal_for_subject(conn,uid,sid) is None
+            conn.execute("UPDATE study_tasks SET study_at=? WHERE id=?", (iso(road_at),road))
             conn.commit()
             valid=proposal_for_subject(conn,uid,sid)
             assert valid
