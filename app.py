@@ -45,6 +45,8 @@ from chapter_exercise_routes import chapter_exercise_bp
 app.register_blueprint(chapter_exercise_bp)
 from clo_review_routes import clo_review_bp
 app.register_blueprint(clo_review_bp)
+from shared_analysis_cache import shared_analysis_bp
+app.register_blueprint(shared_analysis_bp)
 from study_session_routes import study_session_bp
 app.register_blueprint(study_session_bp)
 from study_session_quiz_routes import session_quiz_bp
