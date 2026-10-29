@@ -86,3 +86,35 @@ body.study-ui .floating-ai-message {
     overflow-x: auto;
   }
 }
+
+/* Login/signup/admin-login are standalone pages and use the same small
+   improvements without modifying their existing two-column presentation. */
+body.mock-auth-page .auth-form-card,
+body.mock-auth-page .auth-visual,
+body.mock-auth-page .auth-pane {
+  min-width: 0;
+}
+body.mock-auth-page .auth-form-new input {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+body.mock-auth-page .auth-form-new label > span,
+body.mock-auth-page .auth-password-group > label,
+body.mock-auth-page .auth-pane > p,
+body.mock-auth-page .auth-options,
+body.mock-auth-page .auth-top-switch,
+body.mock-auth-page .auth-bottom-switch {
+  font-size: max(13px, 0.8125rem);
+  line-height: 1.55;
+}
+body.mock-auth-page :is(a, button, input):focus-visible {
+  outline: 2px solid #4e62ef;
+  outline-offset: 2px;
+}
+@media (max-width: 600px) {
+  body.mock-auth-page .auth-shell-new,
+  body.mock-auth-page .auth-form-card {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+}
