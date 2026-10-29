@@ -95,6 +95,8 @@ jobs:
           python -m py_compile clo_review_routes.py
           python tests/test_clo_evidence_c2.py
           python tests/test_agent_personalization_c3.py
+          python -m py_compile shared_analysis_cache.py
+          python tests/test_shared_cache_c4.py
           python tests/test_credits_roadmap.py
           python tests/test_course_schedule_sync.py
 
