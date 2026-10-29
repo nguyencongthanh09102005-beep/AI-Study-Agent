@@ -63,6 +63,8 @@ def is_manual_roadmap_time(conn, user_id, task_id):
     A different timestamp for that *same* source is evidence of an earlier
     manual adjustment; preserving it is safer than moving it silently.
     """
+    from course_schedule_sync import ensure_session_schedule_schema
+    ensure_session_schedule_schema(conn)
     ensure_adaptive_plan_schema(conn)
     if conn.execute("""
         SELECT 1 FROM roadmap_manual_time_locks
