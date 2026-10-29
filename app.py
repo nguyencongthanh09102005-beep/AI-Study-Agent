@@ -6085,6 +6085,29 @@ def submit_quiz():
         conn.close()
         return jsonify({"error": gate.get("reason", "Quiz đang khóa.")}), 409
 
+    # Optional request id is generated per submit click by the Web client.
+    # Retries of the same POST must NOT add another attempt/weakness signal.
+    submission_key = payload.get("request_id")
+    if submission_key is not None and (
+        not isinstance(submission_key, str) or
+        not re.fullmatch(r"[A-Za-z0-9_-]{8,100}", submission_key)
+    ):
+        conn.close()
+        return jsonify({"error": "Mã lần nộp không hợp lệ."}), 400
+    if submission_key:
+        from quiz_learning_analysis import ensure_quiz_submission_receipts
+        ensure_quiz_submission_receipts(conn)
+        conn.execute("BEGIN IMMEDIATE")
+        submitted_before = conn.execute("""
+            SELECT response_json FROM quiz_submission_receipts
+            WHERE user_id=? AND quiz_id=? AND request_id=?
+        """, (uid, quiz_id, submission_key)).fetchone()
+        if submitted_before:
+            response_copy = json.loads(submitted_before["response_json"])
+            conn.rollback()
+            conn.close()
+            return jsonify(response_copy)
+
     try:
         questions = json.loads(quiz_row["payload"])
     except (json.JSONDecodeError, TypeError):
@@ -6295,10 +6318,9 @@ def submit_quiz():
         (uid, quiz_id)
     ).fetchone()
 
-    conn.commit()
-    conn.close()
-
-    return jsonify({
+    from quiz_learning_analysis import summarize_quiz_attempt
+    analysis = summarize_quiz_attempt(questions, normalized_answers)
+    response_data = {
         "success": True,
         "attempt_id": attempt_id,
         "score": score,
@@ -6320,8 +6342,40 @@ def submit_quiz():
         "resolved_topics": resolved_topics,
         "adaptive_task": adaptive_task,
         "learning_updated": bool(subject_id),
-        "adaptive_learning": bool(subject_id)
-    })
+        "adaptive_learning": bool(subject_id),
+        "analysis": analysis,
+    }
+    if submission_key:
+        conn.execute("""
+            INSERT INTO quiz_submission_receipts(
+                user_id,quiz_id,request_id,attempt_id,response_json,created_at)
+            VALUES(?,?,?,?,?,?)
+        """, (uid, quiz_id, submission_key, attempt_id,
+              json.dumps(response_data, ensure_ascii=False), now()))
+    conn.commit()
+    conn.close()
+    return jsonify(response_data)
+
+
+@app.route("/api/quiz/<int:quiz_id>/analysis", methods=["GET"])
+@login_required
+def quiz_attempt_analysis(quiz_id):
+    """Read only the logged-in student's aggregated scored results.
+
+    The JSON never contains the original question, options, submitted answer
+    or answer key. Archived/locked Quiz payload is not disclosed.
+    """
+    uid = session["user_id"]
+    from quiz_learning_analysis import analysis_for_saved_attempt
+    conn = db()
+    try:
+        attempt_id = request.args.get("attempt_id", type=int)
+        result = analysis_for_saved_attempt(conn, uid, quiz_id, attempt_id)
+        if not result:
+            return jsonify({"error": "Không có kết quả Quiz của bạn."}), 404
+        return jsonify(result)
+    finally:
+        conn.close()
 
 
 @app.route("/reminders", methods=["GET", "POST"])
