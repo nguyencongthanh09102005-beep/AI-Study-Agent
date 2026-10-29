@@ -4271,6 +4271,10 @@ def subject_detail(subject_id):
     # Phase 8.1/8.2: evidence-backed and read-only; no Gemini on page load.
     from adaptive_decision_phase8 import decide_next_learning_step
     adaptive_decision = decide_next_learning_step(conn, uid, subject_id)
+    from adaptive_plan_phase8 import proposal_for_subject
+    adaptive_plan_proposal = proposal_for_subject(conn, uid, subject_id)
+    if "adaptive_plan_csrf" not in session:
+        session["adaptive_plan_csrf"] = secrets.token_urlsafe(32)
 
     conn.close()
 
@@ -4288,8 +4292,36 @@ def subject_detail(subject_id):
         quiz_stats=quiz_stats,
         upcoming_tasks=upcoming_tasks,
         next_best_action=next_best_action,
-        adaptive_decision=adaptive_decision
+        adaptive_decision=adaptive_decision,
+        adaptive_plan_proposal=adaptive_plan_proposal,
+        adaptive_plan_csrf=session["adaptive_plan_csrf"]
     )
+
+
+@app.route("/subjects/<int:subject_id>/adaptive-plan", methods=["POST"])
+@login_required
+def choose_adaptive_plan(subject_id):
+    """Phase 8.3: explicit, CSRF-protected consent; owner-scoped and atomic."""
+    from adaptive_plan_phase8 import apply_student_choice
+    submitted_csrf = request.form.get("csrf_token", "")
+    expected_csrf = session.get("adaptive_plan_csrf", "")
+    if not expected_csrf or not secrets.compare_digest(submitted_csrf, expected_csrf):
+        return "Phiên xác nhận không hợp lệ. Tải lại trang và thử lại.", 403
+    uid = session["user_id"]
+    conn = db()
+    try:
+        proposal = apply_student_choice(
+            conn, uid, subject_id, request.form.get("proposal_key"),
+            request.form.get("choice")
+        )
+    except (ValueError, sqlite3.IntegrityError):
+        conn.close()
+        return redirect(url_for("subject_detail", subject_id=subject_id,
+                                adaptive_notice="stale"), code=303)
+    conn.close()
+    notice = "accepted" if request.form.get("choice") == "accept" else "dismissed"
+    return redirect(url_for("subject_detail", subject_id=subject_id,
+                            adaptive_notice=notice), code=303)
 
 
 @app.route("/subjects/<int:subject_id>/delete", methods=["POST"])
