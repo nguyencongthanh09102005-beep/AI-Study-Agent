@@ -77,3 +77,68 @@ body.study-ui .library-shell{padding:20px 22px 24px;min-width:0}
  #documentLibrary .library-file-actions{padding-left:0}
  #documentLibrary .library-file-more-body{right:auto;left:0}
 }
+
+
+/* Personal upload: restore the original, prominent dashed drag-and-drop area.
+   Everything else (library tabs, search, folders and file actions) stays as-is. */
+#documentLibrary .library-dropzone {
+  min-height: 180px;
+  padding: 24px;
+  border: 2px dashed #94aaff;
+  border-radius: 16px;
+  background: rgba(255,255,255,.60);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  cursor: pointer;
+  transition: border-color .18s, background-color .18s, box-shadow .18s;
+}
+#documentLibrary .library-dropzone:hover,
+#documentLibrary .library-dropzone:focus-visible,
+#documentLibrary .library-dropzone.is-drag-over {
+  border-color: #5666f1;
+  background: #edf3ff;
+  box-shadow: inset 0 0 0 2px rgba(98,113,242,.10);
+}
+#documentLibrary .library-dropzone input[type="file"] {
+  display: none;
+}
+#documentLibrary .library-dropzone .upload-cloud {
+  flex: 0 0 58px;
+}
+#documentLibrary .library-dropzone-copy {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  max-width: 450px;
+}
+#documentLibrary .library-dropzone-copy strong {
+  color: #405de5;
+  font-size: 16px;
+  font-weight: 800;
+}
+#documentLibrary .library-dropzone-copy small {
+  color: #5e7398;
+  font-size: 13px;
+}
+#documentLibrary .library-dropzone-copy em {
+  color: #7385a8;
+  font-style: normal;
+  font-size: 12px;
+  line-height: 1.6;
+}
+@media (max-width: 520px) {
+  #documentLibrary .library-dropzone {
+    flex-direction: column;
+    text-align: center;
+    min-height: 170px;
+    gap: 10px;
+    padding: 19px 12px;
+  }
+  #documentLibrary .library-dropzone .upload-cloud {
+    flex: 0 0 52px;
+    width: 52px;
+    height: 52px;
+  }
+}
