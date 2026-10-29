@@ -58,6 +58,47 @@ def decide_next_learning_step(conn, user_id, subject_id, current=None):
             break
 
     evidence = [f"Tiến độ môn hiện tại: {int(subject['progress'] or 0)}%"]
+    # C3: include private practice activity and learning preferences without
+    # assuming AI-written exercise comments are official assessment scores.
+    from chapter_exercise_routes import ensure_exercise_schema
+    ensure_exercise_schema(conn)
+    practice = conn.execute("""
+        SELECT COUNT(*) AS submissions,
+               SUM(CASE WHEN feedback_status='reviewed' THEN 1 ELSE 0 END) AS reviewed
+        FROM chapter_exercise_attempts WHERE user_id=? AND subject_id=?
+    """, (user_id,subject_id)).fetchone()
+    latest_practice = conn.execute("""
+        SELECT chapter_number,created_at FROM chapter_exercise_attempts
+        WHERE user_id=? AND subject_id=?
+        ORDER BY id DESC LIMIT 1
+    """, (user_id,subject_id)).fetchone()
+    practice_count = int(practice["submissions"] or 0)
+    reviewed_count = int(practice["reviewed"] or 0)
+    practice_chapter = int(latest_practice["chapter_number"]) if latest_practice else None
+    if practice_chapter and not 1 <= practice_chapter <= 80:
+        practice_chapter = None
+    if practice_count:
+        evidence.append(
+            f"Bài tập tự luận riêng: {practice_count} lần nộp, "
+            f"{reviewed_count} lượt có nhận xét AI dựa trên nguồn "
+            "(không phải điểm chính thức)"
+        )
+    else:
+        evidence.append("Chưa có bài tập tự luận đã nộp trong môn này")
+    profile = conn.execute("""
+        SELECT learning_style,preferred_study_time,daily_minutes,goals
+        FROM learning_profiles WHERE user_id=?
+    """, (user_id,)).fetchone()
+    if profile:
+        preference = (profile["learning_style"] or "balanced").strip()[:32]
+        preferred_at = (profile["preferred_study_time"] or "19:00").strip()[:5]
+        duration = max(15,min(180,int(profile["daily_minutes"] or 45)))
+        evidence.append(
+            f"Sở thích học cá nhân: {preference}, khoảng {duration} phút/buổi, "
+            f"ưu tiên {preferred_at}"
+        )
+        if (profile["goals"] or "").strip():
+            evidence.append("Mục tiêu đã lưu: " + profile["goals"].strip()[:130])
     material_chapter = None
     if latest and int(latest["total_questions"] or 0) > 0:
         count = int(latest["total_questions"])
@@ -120,4 +161,7 @@ def decide_next_learning_step(conn, user_id, subject_id, current=None):
         "review_task": dict(review_task) if review_task else None,
         "deadline_urgent": bool(deadline),
         "material_chapter": material_chapter,
+        "practice_count": practice_count,
+        "practice_reviewed": reviewed_count,
+        "practice_chapter": practice_chapter,
     }
