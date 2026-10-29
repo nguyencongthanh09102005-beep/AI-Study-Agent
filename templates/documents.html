@@ -1,106 +1,166 @@
 {% extends "base.html" %}
 {% block page_title %}Tài liệu{% endblock %}
-{% block page_desc %}Lưu trữ, quản lý và khai thác tài liệu với sức mạnh AI{% endblock %}
-{% block page_styles %}<link rel="stylesheet" href="{{ url_for('static', filename='css/documents.css') }}">{% endblock %}
+{% block page_desc %}Thư viện tài liệu cá nhân và tài liệu dùng chung theo từng môn học{% endblock %}
+{% block page_styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/documents.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/document_library.css') }}">
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/document_library.js') }}"></script>{% endblock %}
 
 {% block content %}
-<section class="mock-page-head">
-  <div><h2><span class="title-folder">▰</span> Tài liệu học tập</h2><p>Lưu trữ, quản lý và khai thác tài liệu với sức mạnh AI</p></div>
-  <div class="quote-card compact">❝ <span>"Một tài liệu tốt hôm nay<br>là nền tảng cho thành công ngày mai."</span></div>
-</section>
-
-<div class="personal-document-notice">
-  <span class="personal-document-lock">🔒</span>
+<section class="mock-page-head library-page-head">
   <div>
-    <strong>Tài liệu cá nhân</strong>
-    <p>Mọi file bạn tải lên chỉ thuộc tài khoản của bạn. Study Agent có thể sử dụng để học, tóm tắt và tạo quiz nhưng không tự động chia sẻ cho sinh viên khác.</p>
+    <h2><span class="title-folder">▰</span> Tài liệu học tập</h2>
+    <p>Chọn loại tài liệu, sau đó mở môn học để xem file.</p>
   </div>
-  <span class="personal-document-badge">Private</span>
-</div>
+</section>
 
-<section class="document-top-grid">
-  <form method="post" enctype="multipart/form-data" class="soft-card upload-dropzone" id="uploadForm" data-upload-max-mb="{{ upload_max_mb }}">
-    {% if upload_error %}
-    <div role="alert" class="upload-limit-alert" style="padding:10px 12px;border-radius:10px;background:#fff1ec;color:#a43b25;border:1px solid #f5b9a9">
-      Tệp vừa chọn vượt giới hạn {{ upload_max_mb }} MB. Hãy nén hoặc chia nhỏ tệp rồi thử lại.
+<section class="soft-card library-shell" id="documentLibrary" aria-label="Thư viện tài liệu">
+  <div class="library-header">
+    <div class="library-tabs" role="tablist" aria-label="Chọn loại tài liệu">
+      <button type="button" role="tab" id="tabPersonalLibrary" data-library-tab="personal"
+              aria-controls="personalLibraryPanel" aria-selected="true">🔒 Tài liệu cá nhân <span>{{ documents|length }}</span></button>
+      <button type="button" role="tab" id="tabSharedLibrary" data-library-tab="shared"
+              aria-controls="sharedLibraryPanel" aria-selected="false" tabindex="-1">📚 Tài liệu dùng chung <span>{{ shared_documents|length }}</span></button>
     </div>
-    {% endif %}
-    <label class="dropzone-inner">
-      <input id="documentFileInput" type="file" name="file" accept=".pdf,.docx,.txt,.md" required>
-      <span class="upload-cloud">↑</span>
-      <span><strong>Tải tài liệu cá nhân</strong><small>Kéo thả file vào đây hoặc nhấn để chọn file</small><em>Chỉ bạn và Personal Agent của bạn sử dụng · PDF, Word DOCX, TXT, Markdown · Tối đa {{ upload_max_mb }} MB/tệp</em></span>
+    <label class="library-search">
+      <span aria-hidden="true">⌕</span>
+      <input type="search" id="documentLibrarySearch" placeholder="Tìm môn hoặc tên file..." autocomplete="off" aria-label="Tìm môn học hoặc tài liệu">
     </label>
-    <div class="upload-inline-controls">
-      <select name="subject_id"><option value="">Tất cả môn học</option>{% for s in subjects %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}</select>
-      <span id="selectedFileName">Chưa chọn file</span>
-      <button class="soft-primary" type="submit">↑ Tải lên</button>
-    </div>
-    <div id="uploadSizeError" role="alert" hidden style="padding:8px 12px;color:#a43b25;font-size:13px"></div>
-  </form>
-
-  <article class="soft-card storage-card">
-    <div class="storage-head"><h3>◉ &nbsp; Trạng thái tài liệu</h3></div>
-    <div class="storage-number"><strong>{{ documents|length }}</strong><span> tài liệu đã lưu</span><em>{{ storage_mb }} MB</em></div>
-    <div class="progress-track storage"><i style="width: {{ extraction_percent }}%"></i></div>
-    <div class="storage-legend"><span><i class="legend-dot blue"></i>{{ extracted_count }}/{{ documents|length }} đã trích xuất nội dung</span><span><i class="legend-dot gray"></i>{{ extraction_percent }}% sẵn sàng cho AI</span></div>
-  </article>
-</section>
-
-<section class="toolbar-row document-toolbar">
-  <label class="page-search"><span>⌕</span><input id="documentSearch" type="search" placeholder="Tìm kiếm tài liệu..."></label>
-  <div class="segmented-filter" id="documentTypeFilters">
-    <button class="active" type="button" data-doc-filter="all">Tất cả</button>
-    <button type="button" data-doc-filter="pdf">▣ PDF</button>
-    <button type="button" data-doc-filter="txt">▤ TXT</button>
-    <button type="button" data-doc-filter="md">▧ MD</button>
   </div>
-  <span class="toolbar-spacer"></span>
-  <span class="select-look">Sắp xếp: mới nhất</span>
-</section>
+  <p class="library-search-status" id="librarySearchStatus" role="status" aria-live="polite" hidden></p>
 
-<div class="document-section-head"><h3>▤ &nbsp; Tài liệu của tôi ({{ documents|length }})</h3><span class="private-list-label">🔒 Chỉ tài khoản này</span></div>
-
-<section class="document-card-grid" id="documentCardGrid">
-  {% for d in documents %}
-  {% set ext = d.original_name.rsplit('.', 1)[-1]|lower if '.' in d.original_name else 'txt' %}
-  <article class="soft-card document-card-new" data-document-card data-type="{{ ext }}" data-searchable="{{ d.original_name|e }} {{ d.subject_name or '' }}">
-    <div class="doc-card-top">
-      <span class="file-icon {{ ext }}">{{ ext|upper }}</span>
-      <div class="doc-title"><h3>{{ d.original_name }}</h3><span class="subject-tag">{{ d.subject_name or 'Tổng hợp' }}</span></div>
-      <button class="doc-more" type="button">⋮</button>
+  <section role="tabpanel" id="personalLibraryPanel" data-library-panel="personal" aria-labelledby="tabPersonalLibrary">
+    <div class="library-panel-description">
+      <span>🔒 Chỉ bạn và Personal Agent của bạn được sử dụng tài liệu này.</span>
+      <small>{{ extracted_count }}/{{ documents|length }} file đã trích xuất · {{ storage_mb }} MB đã lưu</small>
     </div>
-    <div class="doc-meta"><span>▦ {{ d.created_at }}</span><span>▤ {{ 'Đã đọc' if d.extracted_text else 'Chưa trích xuất' }}</span></div>
-    <form method="post" action="{{ url_for('update_document_subject', doc_id=d.id) }}" class="document-subject-form compact-form">
-      <select name="subject_id" aria-label="Môn học của tài liệu"><option value="">Chưa phân loại</option>{% for s in subjects %}<option value="{{ s.id }}" {% if d.subject_id == s.id %}selected{% endif %}>{{ s.name }}</option>{% endfor %}</select>
-      <button type="submit" title="Lưu môn">✓</button>
+    <form method="post" enctype="multipart/form-data" class="library-upload" id="uploadForm"
+          data-upload-max-mb="{{ upload_max_mb }}">
+      {% if upload_error %}
+      <p class="library-upload-error" role="alert">Tệp vượt giới hạn {{ upload_max_mb }} MB. Hãy nén hoặc chia nhỏ tệp và thử lại.</p>
+      {% endif %}
+      <label class="library-upload-file">
+        <span aria-hidden="true">☁</span>
+        <span><strong>Tải tài liệu cá nhân</strong><small>PDF, Word DOCX, TXT hoặc MD · Tối đa {{ upload_max_mb }} MB</small></span>
+        <input id="documentFileInput" type="file" name="file" accept=".pdf,.docx,.txt,.md" required>
+      </label>
+      <div class="library-upload-controls">
+        <select name="subject_id" aria-label="Chọn môn cho tài liệu">
+          <option value="">Chưa phân loại</option>
+          {% for s in subjects %}
+          <option value="{{ s.id }}">{{ s.name }}</option>
+          {% endfor %}
+        </select>
+        <span id="selectedFileName" class="library-upload-name">Chưa chọn file</span>
+        <button type="submit" class="soft-primary">↑ Tải lên</button>
+      </div>
+      <p id="uploadSizeError" class="library-upload-error" role="alert" hidden></p>
     </form>
-    <div class="doc-actions">
-      <a href="{{ url_for('uploaded_file', filename=d.stored_name) }}" target="_blank" rel="noopener">◉ Xem file</a>
-      <a href="{{ url_for('document_summary', doc_id=d.id) }}">✦ Tóm tắt AI</a>
-      <a href="{{ url_for('quiz', document_id=d.id) }}">? Tạo quiz</a>
-      <form method="post" action="{{ url_for('delete_document', doc_id=d.id) }}" data-confirm-title="Xóa tài liệu?" data-confirm-message="Tài liệu “{{ d.original_name }}” và các quiz được tạo từ tài liệu này sẽ bị xóa." data-confirm-label="Xóa tài liệu"><button type="submit" title="Xóa">×</button></form>
-    </div>
-  </article>
-  {% else %}
-  <div class="soft-card empty-soft">Chưa có tài liệu. Hãy tải file đầu tiên.</div>
-  {% endfor %}
-</section>
 
-<section class="document-section-head" style="margin-top:30px"><h3>▤ &nbsp; Tài liệu dùng chung ({{ shared_documents|length }})</h3><span class="private-list-label" style="background:#e1e7ff;color:#5065d8">♜ Quản trị viên cung cấp</span></section>
-<p style="font-size:12px;color:#7484a8;margin:3px 0 15px">Tự động liên kết theo mã môn học của bạn. Study Agent sử dụng nội dung đã được xử lý.</p>
-<section class="document-card-grid" id="sharedDocumentGrid">
-  {% for d in shared_documents %}
-  {% set ext = d.original_name.rsplit('.', 1)[-1]|lower if '.' in d.original_name else 'txt' %}
-  <article class="soft-card document-card-new" data-document-card data-type="{{ ext }}" data-searchable="{{ d.original_name|e }} {{ d.shared_subject_name|e }}">
-    <div class="doc-card-top">
-      <span class="file-icon {{ ext }}">{{ ext|upper }}</span>
-      <div class="doc-title"><h3>{{ d.original_name }}</h3><span class="subject-tag">{{ d.shared_subject_name }} · {{ d.code }}</span></div>
+    <div class="library-folder-list" data-library-folder-list>
+      {% for folder in personal_groups %}
+      <details class="library-folder" data-library-folder data-folder-name="{{ folder.name|e }} {{ folder.code|e }}">
+        <summary class="library-folder-heading">
+          <span class="library-folder-icon" aria-hidden="true">▰</span>
+          <span class="library-folder-title"><strong>{{ folder.name }}</strong>
+            <small>{% if folder.code %}{{ folder.code }} · {% endif %}{{ folder.files|length }} tài liệu cá nhân</small>
+          </span>
+          <span class="library-folder-chevron" aria-hidden="true">⌄</span>
+        </summary>
+        <div class="library-folder-files">
+          {% for d in folder.files %}
+          {% set ext = d.original_name.rsplit('.', 1)[-1]|lower if '.' in d.original_name else 'txt' %}
+          <article class="library-file-row" data-library-file data-searchable="{{ d.original_name|e }}">
+            <span class="library-file-icon" aria-hidden="true">{{ ext|upper }}</span>
+            <div class="library-file-body">
+              <strong title="{{ d.original_name }}">{{ d.original_name }}</strong>
+              <small>{{ ext|upper }} · {{ d.created_at[:16]|replace('T',' ') }} · {{ 'Đã xử lý' if d.extracted_text else 'Chưa trích xuất' }}</small>
+            </div>
+            <div class="library-file-actions">
+              <a href="{{ url_for('personal_document_file', doc_id=d.id) }}?preview=1"
+                 target="_blank" rel="noopener noreferrer" aria-label="Xem file {{ d.original_name }}">↗ Xem file</a>
+              <details class="library-file-more">
+                <summary aria-label="Thêm thao tác với {{ d.original_name }}">Tùy chọn <span aria-hidden="true">⌄</span></summary>
+                <div class="library-file-more-body">
+                  <a href="{{ url_for('document_summary', doc_id=d.id) }}">✦ Tóm tắt AI</a>
+                  <a href="{{ url_for('quiz', document_id=d.id) }}">? Tạo Quiz</a>
+                  <a href="{{ url_for('personal_document_file', doc_id=d.id) }}?download=1">↓ Tải file gốc</a>
+                  <form method="post" action="{{ url_for('update_document_subject', doc_id=d.id) }}" class="library-change-subject">
+                    <label>Chuyển sang môn
+                      <select name="subject_id" aria-label="Chuyển môn của {{ d.original_name }}">
+                        <option value="">Chưa phân loại</option>
+                        {% for s in subjects %}
+                        <option value="{{ s.id }}" {% if d.subject_id == s.id %}selected{% endif %}>{{ s.name }}</option>
+                        {% endfor %}
+                      </select>
+                    </label>
+                    <button type="submit">Lưu môn</button>
+                  </form>
+                  <form method="post" action="{{ url_for('delete_document', doc_id=d.id) }}"
+                        data-confirm-title="Xóa tài liệu?"
+                        data-confirm-message="Tài liệu “{{ d.original_name }}” và các quiz được tạo từ tài liệu này sẽ bị xóa."
+                        data-confirm-label="Xóa tài liệu">
+                    <button type="submit" class="library-delete">Xóa tài liệu</button>
+                  </form>
+                </div>
+              </details>
+            </div>
+          </article>
+          {% else %}
+          <p class="library-folder-empty">Chưa có tài liệu cá nhân cho môn này.</p>
+          {% endfor %}
+        </div>
+      </details>
+      {% else %}
+      <p class="library-empty">Chưa có môn học. Hãy tạo môn trước để quản lý tài liệu theo môn.</p>
+      {% endfor %}
     </div>
-    <div class="doc-meta"><span>▦ {{ d.created_at }}</span><span>✓ Đã xử lý</span>{% if d.is_syllabus %}<span>📑 Đề cương chuẩn</span>{% endif %}</div>
-    <div class="doc-actions" style="display:flex;gap:9px"><a style="padding:0 16px" href="{{ url_for('shared_document_file', doc_id=d.id) }}" target="_blank" rel="noopener">◉ Xem file chung</a></div>
-  </article>
-  {% else %}
-  <div class="soft-card empty-soft">Chưa có tài liệu chung cho các môn của bạn. Khi Admin tải lên theo mã môn, file sẽ tự xuất hiện tại đây.</div>
-  {% endfor %}
+  </section>
+
+  <section role="tabpanel" id="sharedLibraryPanel" data-library-panel="shared"
+           aria-labelledby="tabSharedLibrary" hidden>
+    <div class="library-panel-description">
+      <span>📚 Tài liệu được Admin cung cấp theo mã môn. Sinh viên chỉ có quyền xem.</span>
+      <small>{{ shared_documents|length }} tài liệu dùng chung</small>
+    </div>
+    <div class="library-folder-list" data-library-folder-list>
+      {% for folder in shared_groups %}
+      <details class="library-folder" data-library-folder data-folder-name="{{ folder.name|e }} {{ folder.code|e }}">
+        <summary class="library-folder-heading">
+          <span class="library-folder-icon" aria-hidden="true">▰</span>
+          <span class="library-folder-title"><strong>{{ folder.name }}</strong>
+            <small>{% if folder.code %}{{ folder.code }} · {% endif %}{{ folder.files|length }} tài liệu dùng chung</small>
+          </span>
+          <span class="library-folder-chevron" aria-hidden="true">⌄</span>
+        </summary>
+        <div class="library-folder-files">
+          {% for d in folder.files %}
+          {% set ext = d.original_name.rsplit('.', 1)[-1]|lower if '.' in d.original_name else 'txt' %}
+          <article class="library-file-row" data-library-file data-searchable="{{ d.original_name|e }}">
+            <span class="library-file-icon" aria-hidden="true">{{ ext|upper }}</span>
+            <div class="library-file-body">
+              <strong title="{{ d.original_name }}">{{ d.original_name }}</strong>
+              <small>{{ ext|upper }} · {{ d.created_at[:16]|replace('T',' ') }}
+                {% if d.is_syllabus %}<span class="library-syllabus-badge">Đề cương chuẩn</span>{% else %}· Học liệu chung{% endif %}
+              </small>
+            </div>
+            <div class="library-file-actions">
+              <a href="{{ url_for('shared_document_file', doc_id=d.id) }}?preview=1"
+                 target="_blank" rel="noopener noreferrer" aria-label="Xem file dùng chung {{ d.original_name }}">↗ Xem file</a>
+              <a class="library-download" href="{{ url_for('shared_document_file', doc_id=d.id) }}?download=1"
+                 aria-label="Tải {{ d.original_name }}">↓ Tải</a>
+            </div>
+          </article>
+          {% else %}
+          <p class="library-folder-empty">Chưa có tài liệu chung của môn này. Admin có thể bổ sung sau.</p>
+          {% endfor %}
+        </div>
+      </details>
+      {% else %}
+      <p class="library-empty">Chưa có môn học nào liên kết với kho kiến thức chung.</p>
+      {% endfor %}
+    </div>
+  </section>
 </section>
 {% endblock %}
