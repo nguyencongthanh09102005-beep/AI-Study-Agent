@@ -29,6 +29,38 @@ def ensure_adaptive_plan_schema(conn):
           FOREIGN KEY(subject_id) REFERENCES subjects(id) ON DELETE CASCADE
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS roadmap_manual_time_locks (
+          task_id INTEGER PRIMARY KEY,
+          user_id INTEGER NOT NULL,
+          locked_at TEXT NOT NULL,
+          FOREIGN KEY(task_id) REFERENCES study_tasks(id) ON DELETE CASCADE,
+          FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    """)
+
+
+def lock_manual_roadmap_time(conn, user_id, task_id):
+    """A student-set roadmap time must never be silently moved by the Agent."""
+    ensure_adaptive_plan_schema(conn)
+    owned = conn.execute("""
+        SELECT id FROM study_tasks
+        WHERE id=? AND user_id=? AND source='roadmap'
+    """, (task_id, user_id)).fetchone()
+    if owned:
+        conn.execute("""
+            INSERT INTO roadmap_manual_time_locks(task_id,user_id,locked_at)
+            VALUES(?,?,?)
+            ON CONFLICT(task_id) DO UPDATE SET locked_at=excluded.locked_at
+        """, (task_id, user_id, local_now().isoformat(timespec="seconds")))
+
+
+def is_manual_roadmap_time(conn, user_id, task_id):
+    ensure_adaptive_plan_schema(conn)
+    return bool(conn.execute("""
+        SELECT 1 FROM roadmap_manual_time_locks
+        WHERE task_id=? AND user_id=?
+    """, (task_id, user_id)).fetchone())
 
 
 def _parse_time(value):
@@ -68,6 +100,8 @@ def proposal_for_subject(conn, user_id, subject_id, current=None):
     """, (user_id, subject_id, current.isoformat(timespec="minutes"))).fetchone()
     if not row:
         return None
+    if is_manual_roadmap_time(conn, user_id, row["id"]):
+        return None  # Respect any student's previous manual rescheduling.
     old_at = _parse_time(row["study_at"])
     if not old_at or old_at >= review_end:
         return None
