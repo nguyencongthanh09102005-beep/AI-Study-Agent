@@ -81,6 +81,30 @@ window.QuizLearningAnalytics = Object.freeze({
       planLink.href = "/study-plan?subject_id=" +
         encodeURIComponent(String(payload.subject_id));
     }
+    const comparison = payload.review_comparison;
+    if (comparison && typeof comparison === "object") {
+      const section = node(panel, "section", "", "quiz-analysis-section");
+      node(section, "h5", "↗ Kết quả kiểm tra lại sau ôn điểm yếu");
+      if (Number(comparison.comparable_topics) > 0) {
+        for (const item of comparison.topics || []) {
+          const row = node(section, "div", "", "quiz-analysis-review");
+          node(row, "strong", (item.chapter ? item.chapter + " · " : "") +
+            item.topic);
+          node(row, "p",
+            "Đúng trước ôn: " + item.before_percent + "% (" +
+            item.before_questions + " lượt câu hỏi) · Kiểm tra lại: " +
+            item.after_percent + "% (" + item.review_questions +
+            " câu) · Chênh lệch: " +
+            (item.delta_percent > 0 ? "+" : "") + item.delta_percent +
+            " điểm phần trăm", "quiz-analysis-note");
+        }
+      } else {
+        node(section, "p",
+          "Quiz ôn tập chưa có câu hỏi trùng chủ đề điểm yếu ban đầu. " +
+          "Không đủ căn cứ để so sánh trước và sau.", "quiz-analysis-note");
+      }
+      node(section, "p", comparison.note || "", "quiz-analysis-note");
+    }
     node(panel, "p",
       "Thống kê theo lần làm Quiz này, không cộng dồn nhiều lượt. " +
       "Một chủ đề chỉ có 1 câu là dấu hiệu cần xem lại, chưa đủ kết luận năng lực. " +
