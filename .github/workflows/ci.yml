@@ -97,6 +97,8 @@ jobs:
           python tests/test_agent_personalization_c3.py
           python -m py_compile shared_analysis_cache.py
           python tests/test_shared_cache_c4.py
+          python -m py_compile evaluation/benchmark_agent_vs_gemini.py
+          python tests/test_evaluation_harness_c5.py
           python tests/test_credits_roadmap.py
           python tests/test_course_schedule_sync.py
 
