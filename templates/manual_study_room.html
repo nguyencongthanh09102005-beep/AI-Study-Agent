@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block page_title %}Buổi học cá nhân · {{ info.subject_name }}{% endblock %}
+{% block page_desc %}Học từ tài liệu riêng của bạn · {{ info.original_name }}{% endblock %}
+{% block page_styles %}
+<link rel="stylesheet" href="{{ url_for('static',filename='css/study_session.css') }}">
+<link rel="stylesheet" href="{{ url_for('static',filename='css/manual_study_room.css') }}">
+{% endblock %}
+{% block content %}
+<div class="manual-room">
+  <nav class="manual-room-nav">
+    <a href="{{ url_for('study_plan') }}">← Kế hoạch học</a>
+    <a href="{{ url_for('documents') }}?tab=personal">📁 Tài liệu cá nhân</a>
+  </nav>
+  <header class="soft-card manual-room-hero">
+    <span class="manual-room-eyebrow">KHÔNG GIAN HỌC CÁ NHÂN · RIÊNG TƯ</span>
+    <h2>{{ info.title }}</h2>
+    <p>{{ info.subject_name }} · {{ info.study_at[:16]|replace('T',' ') }} · {{ info.duration }} phút</p>
+    <p class="manual-room-subtitle">AI chỉ sử dụng nội dung trích xuất từ tài liệu cá nhân đã chọn trong phần trợ giúp tại đây. Không dùng chung với sinh viên khác.</p>
+    <form method="post" action="{{ url_for('toggle_study_task',task_id=info.id) }}">
+      <button class="ghost-action" type="submit">{{ '↺ Đánh dấu chưa hoàn thành' if info.done else '✓ Đánh dấu hoàn thành buổi học' }}</button>
+    </form>
+  </header>
+  {% if answer and answer.error %}
+  <div class="manual-room-notice" role="alert">{{ answer.error }}</div>
+  {% endif %}
+  <div class="manual-room-grid">
+    <section class="soft-card manual-room-file">
+      <div class="manual-room-panel-head">
+        <h3>📄 Tài liệu cho buổi học</h3>
+        <span class="manual-room-private">Riêng tư</span>
+      </div>
+      <p class="manual-room-file-name">{{ info.original_name }}</p>
+      {% set ext = info.original_name.rsplit('.',1)[-1]|lower if '.' in info.original_name else '' %}
+      {% if ext in ('pdf','docx') %}
+      <iframe src="{{ document_preview }}?preview=1" title="Xem tài liệu {{ info.original_name }}"
+              loading="lazy" class="manual-room-preview"
+              {% if ext=='docx' %}sandbox=""{% endif %}></iframe>
+      {% else %}
+      <div class="manual-room-extract"><pre>{{ (info.extracted_text or '')[:9000] or 'Tài liệu chưa trích xuất được nội dung.' }}</pre></div>
+      {% endif %}
+      <div class="manual-room-file-actions">
+        <a class="soft-primary" href="{{ document_preview }}?preview=1" target="_blank" rel="noopener noreferrer">↗ Xem file chi tiết</a>
+        <a class="ghost-action" href="{{ document_preview }}?download=1">↓ Tải file</a>
+      </div>
+      {% if ext=='docx' %}
+      <p class="manual-room-small">Word được xem dưới dạng văn bản, bảng và hình thông dụng; định dạng phức tạp có thể khác bản gốc.</p>
+      {% endif %}
+    </section>
+    <div class="manual-room-side">
+      <section class="soft-card manual-room-panel">
+        <h3>💬 Hỏi AI về tài liệu này</h3>
+        <p>AI dựa trên đúng file cá nhân đã chọn. Nếu tài liệu không đủ thông tin, AI phải nói rõ.</p>
+        <form method="post" action="{{ url_for('manual_lesson.ask',task_id=info.id) }}" class="manual-room-ask">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <label for="manualStudyQuestion">Bạn muốn giải thích phần nào?</label>
+          <textarea id="manualStudyQuestion" name="question" maxlength="700" rows="3"
+                    placeholder="Ví dụ: Tóm tắt phần 1.1 trong tài liệu này..." required>{{ answer.question if answer and answer.question else '' }}</textarea>
+          <button class="soft-primary" type="submit">✦ Hỏi Study Agent</button>
+        </form>
+        {% if answer and answer.response %}
+        <div class="manual-room-answer" role="status">
+          <strong>Trả lời từ tài liệu: {{ answer.source }}</strong>
+          <p>{{ answer.response }}</p>
+        </div>
+        {% endif %}
+      </section>
+      <section class="soft-card manual-room-panel">
+        <h3>📝 Quiz theo tài liệu cá nhân</h3>
+        {% if info.quiz_id %}
+        <p>✓ Đã chuẩn bị 10 câu từ tài liệu này. Quiz được lưu trong danh sách Quiz của bạn.</p>
+        <a class="soft-primary manual-room-quiz-link"
+           href="{{ url_for('quiz',quiz_id=info.quiz_id) }}">▶ Mở Quiz đã chuẩn bị</a>
+        {% else %}
+        <p>{% if info.quiz_requested %}Bạn đã yêu cầu Quiz cho buổi này, nhưng chưa có bài hợp lệ. Có thể thử lại.{% else %}Chỉ tạo khi bạn bấm chuẩn bị để tiết kiệm quota Gemini.{% endif %}</p>
+        <form method="post" action="{{ url_for('manual_lesson.prepare_quiz',task_id=info.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="soft-primary manual-room-prepare">✦ Chuẩn bị Quiz 10 câu</button>
+        </form>
+        <p class="manual-room-small">Việc chuẩn bị có thể cần thời gian để Gemini tạo và kiểm tra câu hỏi. Không tự tạo lại khi tải trang.</p>
+        {% endif %}
+      </section>
+      {% if info.note %}
+      <section class="soft-card manual-room-panel">
+        <h3>🎯 Ghi chú buổi học</h3>
+        <p>{{ info.note }}</p>
+      </section>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
