@@ -8379,7 +8379,10 @@ def api_mobile_quizzes():
            FROM quizzes q
            LEFT JOIN quiz_attempts qa ON qa.quiz_id=q.id AND qa.user_id=q.user_id
            LEFT JOIN subjects s ON s.id=q.subject_id AND s.user_id=q.user_id
+           LEFT JOIN quiz_session_links qsl
+             ON qsl.quiz_id=q.id AND qsl.user_id=q.user_id
            WHERE q.user_id=? AND (? IS NULL OR q.subject_id=?)
+             AND (qsl.quiz_id IS NULL OR qsl.subject_id IS NOT NULL)
            GROUP BY q.id ORDER BY q.id DESC LIMIT 100""",
         (uid, subject_id, subject_id)
     ).fetchall()
