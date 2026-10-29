@@ -176,6 +176,10 @@
       </div>
       <div class="quiz-progress-area"><div class="quiz-progress-info"><span>Tiến độ làm bài</span><strong class="quiz-progress-text">0 / {{ quiz.questions|length }} câu</strong></div><div class="quiz-progress-bar"><span style="width:0%"></span></div></div>
       <div class="quiz-result"><div class="quiz-result-icon">🎯</div><div><strong class="quiz-result-title">Kết quả</strong><p class="quiz-result-text">Bạn chưa nộp bài.</p></div></div>
+      <div class="quiz-learning-analysis" aria-label="Phân tích kiến thức sau Quiz" hidden></div>
+      {% if quiz.attempted %}
+      <button type="button" class="quiz-analysis-history" data-analysis-url="{{ url_for('quiz_attempt_analysis', quiz_id=quiz.id) }}">📊 Xem phân tích lần làm gần nhất</button>
+      {% endif %}
       <div class="quiz-question-list">
         {% for q in quiz.questions %}
         {% set question_index = loop.index %}
@@ -198,5 +202,6 @@
 </section>
 
 <div class="quiz-modal-overlay" id="deleteQuizModal"><div class="quiz-modal" role="dialog" aria-modal="true" aria-labelledby="deleteQuizTitle"><div class="quiz-modal-icon">🗑️</div><h3 id="deleteQuizTitle">Xóa quiz?</h3><p id="deleteQuizText">Bạn có chắc muốn xóa quiz này không?</p><div class="quiz-modal-actions"><button type="button" class="quiz-modal-cancel" id="cancelDeleteQuiz">Hủy</button><form method="post" id="deleteQuizForm"><button type="submit" class="quiz-modal-delete">Xóa quiz</button></form></div></div></div>
+<script src="{{ url_for('static', filename='js/quiz_learning_analytics.js') }}"></script>
 <script src="{{ url_for('static', filename='js/quiz.js') }}"></script>
 {% endblock %}
