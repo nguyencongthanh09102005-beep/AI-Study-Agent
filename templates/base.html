@@ -44,9 +44,9 @@
       {% else %}
       <a class="{{ 'active' if page=='dashboard' else '' }}{{ ' chat-nav-secondary' if page == 'chat' else '' }}" href="{{ url_for('dashboard') }}" title="Tổng quan"><span>⌂</span><b>Tổng quan</b></a>
       <a class="{{ 'active' if page=='subjects' else '' }}{{ ' chat-nav-secondary' if page == 'chat' else '' }}" href="{{ url_for('subjects') }}" title="Môn học"><span>▱</span><b>Môn học</b></a>
-      <a class="{{ 'active' if page=='documents' else '' }}{{ ' chat-nav-secondary' if page == 'chat' else '' }}" href="{{ url_for('documents') }}" title="Tài liệu"><span>▤</span><b>Tài liệu</b></a>
-      <a class="{{ 'active' if page=='quiz' else '' }}{{ ' chat-nav-secondary' if page == 'chat' else '' }}" href="{{ url_for('quiz') }}" title="Quiz"><span>?</span><b>Quiz</b></a>
       <a class="{{ 'active' if page=='study_plan' else '' }}{{ ' chat-nav-secondary' if page == 'chat' else '' }}" href="{{ url_for('study_plan') }}" title="Kế hoạch học"><span>▦</span><b>Kế hoạch học</b></a>
+      <a class="{{ 'active' if page=='quiz' else '' }}{{ ' chat-nav-secondary' if page == 'chat' else '' }}" href="{{ url_for('quiz') }}" title="Quiz"><span>?</span><b>Quiz</b></a>
+      <a class="{{ 'active' if page=='documents' else '' }}{{ ' chat-nav-secondary' if page == 'chat' else '' }}" href="{{ url_for('documents') }}" title="Tài liệu"><span>▤</span><b>Tài liệu</b></a>
       <a class="{{ 'active' if page=='chat' else '' }}{{ ' chat-nav-primary' if page == 'chat' else '' }}" href="{{ url_for('chat') }}"><span>◯</span><b>Chat AI</b></a>
       {% if page == 'chat' %}
       <button type="button" id="chatNavToggle" class="chat-nav-toggle" aria-controls="chatSidebarNav" aria-expanded="false">
