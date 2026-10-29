@@ -121,3 +121,22 @@ def analysis_for_saved_attempt(conn, uid, quiz_id, attempt_id=None):
         "created_at": attempt["created_at"],
         "analysis": details,
     }
+
+
+
+def ensure_quiz_submission_receipts(conn):
+    """Additive idempotency ledger: one request key cannot count weaknesses twice."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS quiz_submission_receipts(
+            user_id INTEGER NOT NULL,
+            quiz_id INTEGER NOT NULL,
+            request_id TEXT NOT NULL,
+            attempt_id INTEGER NOT NULL,
+            response_json TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            PRIMARY KEY(user_id,quiz_id,request_id),
+            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY(quiz_id) REFERENCES quizzes(id) ON DELETE CASCADE,
+            FOREIGN KEY(attempt_id) REFERENCES quiz_attempts(id) ON DELETE CASCADE
+        )
+    """)
