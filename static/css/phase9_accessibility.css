@@ -1,0 +1,88 @@
+/* F6: Web readability + responsive hardening.
+   Keep existing brand colors, page layout and desktop grid structure.
+   Loaded last as a focused enhancement; does not replace legacy CSS.
+*/
+body.study-ui .page-content,
+body.study-ui .app-main,
+body.study-ui .soft-card,
+body.study-ui .proactive-agent-copy,
+body.study-ui .agent-panel {
+  min-width: 0;
+}
+body.study-ui .page-content :is(p, li, small, td, th, label) {
+  overflow-wrap: anywhere;
+}
+body.study-ui .page-content :is(input, select, textarea) {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+/* Previously 10–11px labels were hard to read, especially in planning. */
+body.study-ui .course-meta small,
+body.study-ui .metric-copy em,
+body.study-ui .doc-meta,
+body.study-ui .quiz-create-tip,
+body.study-ui .quiz-mode-note,
+body.study-ui .chat-note,
+body.study-ui .chat-history-panel .history-text small,
+body.study-ui .page-content .proactive-agent-kicker,
+body.study-ui .page-content .proactive-agent-meta,
+body.study-ui .page-content .study-room-chat-status,
+body.study-ui .page-content .study-room-chat-info,
+body.study-ui .page-content .study-room-quiz-hint {
+  font-size: max(12px, 0.75rem);
+  line-height: 1.55;
+}
+body.study-ui .page-content :is(button, input, select, textarea) {
+  font-family: inherit;
+}
+body.study-ui .page-content :is(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid #4e62ef;
+  outline-offset: 2px;
+}
+body.study-ui .chat-markdown .chat-table-scroll,
+body.study-ui .floating-ai-message-body .chat-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+body.study-ui .floating-ai-message {
+  font-size: 13.5px;
+  line-height: 1.65;
+}
+@media (max-width: 840px) {
+  body.study-ui .agent-summary-grid,
+  body.study-ui .agent-two-column,
+  body.study-ui .agent-bottom-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  body.study-ui .page-content .proactive-agent-main,
+  body.study-ui .page-content .proactive-agent-actions {
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+  body.study-ui .page-content .proactive-agent-actions a {
+    white-space: normal;
+    text-align: center;
+  }
+  body.study-ui .page-content .admin-table-wrap,
+  body.study-ui .page-content .admin-table-wrapper,
+  body.study-ui .page-content .study-hour-scroll {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+}
+@media (max-width: 600px) {
+  body.study-ui .page-content .proactive-agent-card,
+  body.study-ui .page-content .agent-panel,
+  body.study-ui .page-content .soft-card {
+    max-width: 100%;
+  }
+  body.study-ui .page-content .proactive-agent-actions a {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+  body.study-ui .page-content .chat-markdown pre,
+  body.study-ui .page-content .chat-markdown .chat-table-scroll {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+}
