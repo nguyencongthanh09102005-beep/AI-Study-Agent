@@ -5,6 +5,7 @@ lesson can be moved, and only after the owning student explicitly confirms a
 fresh, checked proposal. Manual tasks, deadlines and completed lessons stay put.
 """
 import hashlib
+import json
 import secrets
 from datetime import datetime, timedelta
 
@@ -56,11 +57,53 @@ def lock_manual_roadmap_time(conn, user_id, task_id):
 
 
 def is_manual_roadmap_time(conn, user_id, task_id):
+    """Also recognize edits made before the F1 lock-table migration.
+
+    Legacy imports retain the original roadmap session and its signature.
+    A different timestamp for that *same* source is evidence of an earlier
+    manual adjustment; preserving it is safer than moving it silently.
+    """
     ensure_adaptive_plan_schema(conn)
-    return bool(conn.execute("""
+    if conn.execute("""
         SELECT 1 FROM roadmap_manual_time_locks
         WHERE task_id=? AND user_id=?
-    """, (task_id, user_id)).fetchone())
+    """, (task_id, user_id)).fetchone():
+        return True
+    row = conn.execute("""
+        SELECT subject_id,roadmap_session_id,roadmap_session_signature,study_at
+        FROM study_tasks
+        WHERE id=? AND user_id=? AND source='roadmap'
+    """, (task_id, user_id)).fetchone()
+    if not row or row["roadmap_session_id"] is None or not row["roadmap_session_signature"]:
+        return False
+    exists = conn.execute("""
+        SELECT 1 FROM sqlite_master
+        WHERE type='table' AND name='course_roadmaps'
+    """).fetchone()
+    if not exists:
+        return False
+    saved = conn.execute("""
+        SELECT sessions_json FROM course_roadmaps
+        WHERE user_id=? AND subject_id=?
+    """, (user_id, row["subject_id"])).fetchone()
+    if not saved:
+        return True  # Original schedule cannot be verified: do not overwrite.
+    try:
+        from course_schedule_sync import session_signature
+        lessons = json.loads(saved["sessions_json"])
+        lesson = next(item for item in lessons
+                      if isinstance(item, dict) and
+                      item.get("session_id") == row["roadmap_session_id"])
+        if session_signature(lesson) != row["roadmap_session_signature"]:
+            return True  # Source changed; preserve an existing timetable.
+        original = datetime.fromisoformat(
+            str(lesson["date"]) + "T" + str(lesson["time"])
+        ).isoformat(timespec="minutes")
+        actual = _parse_time(row["study_at"])
+        return actual is None or actual.isoformat(timespec="minutes") != original
+    except (ValueError, TypeError, KeyError, StopIteration):
+        return True
+
 
 
 def _parse_time(value):
