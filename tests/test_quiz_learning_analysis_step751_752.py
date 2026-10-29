@@ -186,7 +186,28 @@ def check():
                 SELECT COUNT(*) FROM study_tasks
                 WHERE user_id=? AND subject_id=? AND source='adaptive' AND done=0
             """, (student, course)).fetchone()[0] == 0
+            # Nine distinct weak topics: the preview lists at most eight,
+            # while the TOTAL weakness count must still be nine.
+            nine = [
+                {"question": f"Giải thuật ví dụ {i}?", "chapter": "Chương 3",
+                 "topic": f"Chủ đề kiểm thử {i}", "answer": 0,
+                 "options": ["Đúng", "Sai 1", "Sai 2", "Sai 3"]}
+                for i in range(9)
+            ]
+            quiz_nine = conn.execute("""
+                INSERT INTO quizzes(user_id,subject_id,document_id,title,payload,created_at)
+                VALUES(?,?,NULL,?,?,?)
+            """, (student, course, "Kiểm thử 9 điểm yếu",
+                  json.dumps(nine, ensure_ascii=False), project.now())).lastrowid
+            conn.commit()
             conn.close()
+            many = client.post("/api/quiz/submit", json={
+                "quiz_id": quiz_nine, "answers": [1] * 9,
+                "request_id": "request75nine"
+            })
+            assert many.status_code == 200, many.get_data(as_text=True)[:800]
+            assert many.get_json()["weakness_count"] == 9
+            assert len(many.get_json()["weaknesses"]) == 8
             login(client, other)
             assert client.get(
                 f"/api/quiz/{quiz}/analysis?attempt_id={data['attempt_id']}"
