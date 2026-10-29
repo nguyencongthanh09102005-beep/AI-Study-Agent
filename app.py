@@ -7047,7 +7047,7 @@ def create_study_task():
         from manual_lesson_routes import generate_for_lesson
         done, message = generate_for_lesson(sys.modules[__name__], uid, task_id)
         if not done:
-            session["manual_lesson_answer"] = {"error": message}
+            session["manual_lesson_answer"] = {"task_id": task_id, "error": message}
     if document_id:
         return redirect(url_for("manual_lesson.room", task_id=task_id),code=303)
     return redirect(url_for("study_plan"))
