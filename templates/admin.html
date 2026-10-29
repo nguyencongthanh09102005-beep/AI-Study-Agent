@@ -88,8 +88,8 @@
         {% for item in subjects %}<option value="{{ item.id }}">{{ item.code }} · {{ item.name }}</option>{% endfor %}
       </select>
       <label for="adminUploadFile">Tài liệu học tập <span>*</span></label>
-      <input id="adminUploadFile" type="file" name="file" accept=".pdf,.txt,.md" required>
-      <span class="admin-form-hint">PDF / TXT / MD · Tối đa {{ upload_max_mb }} MB · PDF scan ảnh chưa hỗ trợ OCR</span>
+      <input id="adminUploadFile" type="file" name="file" accept=".pdf,.docx,.txt,.md" required>
+      <span class="admin-form-hint">PDF / DOCX / TXT / MD · Tối đa {{ upload_max_mb }} MB · PDF scan ảnh chưa hỗ trợ OCR</span>
       <label class="admin-checkbox"><input type="checkbox" name="is_syllabus" value="1"> Đặt làm đề cương chuẩn của môn</label>
       <p id="adminFileError" class="admin-file-error" role="alert" hidden></p>
       <button class="admin-primary" type="submit">↑ Tải lên & xử lý tài liệu</button>
