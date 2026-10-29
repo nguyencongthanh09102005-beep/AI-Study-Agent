@@ -2,7 +2,7 @@
 {% block title %}{{ subject.name }} · AI Study Agent{% endblock %}
 {% block page_title %}{{ subject.name }}{% endblock %}
 {% block page_desc %}Kiến thức chuẩn dùng chung và Personal Agent riêng cho từng sinh viên{% endblock %}
-{% block page_styles %}<link rel="stylesheet" href="{{ url_for('static', filename='css/subject_detail.css') }}">{% endblock %}
+{% block page_styles %}<link rel="stylesheet" href="{{ url_for('static', filename='css/subject_detail.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='css/course_overview_refresh.css') }}">{% endblock %}
 
 {% block content %}
 <section class="agent-subject-head soft-card">
@@ -10,20 +10,19 @@
     <a class="back-link" href="{{ url_for('subjects') }}">← Môn học</a>
     <div class="subject-kicker">{{ subject.code or 'MÔN HỌC' }} · {{ subject.credits or 0 }} tín chỉ</div>
     <h2>{{ subject.name }}</h2>
-    <p>{{ subject.description or 'Chưa có mô tả cho môn học này.' }}</p>
-    <div class="subject-progress-row">
-      <span>Tiến độ học tập</span>
-      <strong>{{ subject.progress or 0 }}%</strong>
-    </div>
+    {% if subject.description %}<p>{{ subject.description }}</p>{% endif %}
+    <div class="subject-progress-row"><span>Tiến độ học tập</span><strong>{{ subject.progress or 0 }}%</strong></div>
     <div class="progress-track"><i style="width: {{ subject.progress or 0 }}%"></i></div>
   </div>
-
-  <div class="agent-subject-actions">
-    <a class="soft-primary" href="{{ url_for('syllabus.review', subject_id=subject.id) }}">📑 Đề cương → Phân tích chương</a>
-    <a class="soft-primary" href="{{ url_for('course_path.learning_path', subject_id=subject.id) }}">📚 Lộ trình theo chương</a>
-    <a class="soft-primary" href="{{ url_for('chat') }}?subject_id={{ subject.id }}">🤖 Hỏi Study Agent</a>
-    <a class="ghost-action" href="{{ url_for('documents') }}">▤ Tài liệu</a>
-    <a class="ghost-action" href="{{ url_for('study_plan', subject_id=subject.id) }}">▦ Kế hoạch học theo đề cương</a>
+  <div class="agent-subject-actions course-head-actions">
+    {% if adaptive_decision and adaptive_decision.kind in ('review','verify') %}
+    <a class="soft-primary" href="{{ url_for('quiz', mode='weakness', subject_id=subject.id) }}">▶ Học / Ôn ngay</a>
+    {% elif next_study_task %}
+    <a class="soft-primary" href="{{ url_for('study_session.learning_session', task_id=next_study_task.id) }}">▶ Tiếp tục học</a>
+    {% else %}
+    <a class="soft-primary" href="{{ url_for('syllabus.review', subject_id=subject.id) if not syllabus_confirmed else url_for('course_path.learning_path', subject_id=subject.id) }}">▶ Bắt đầu học</a>
+    {% endif %}
+    <a class="ghost-action" href="{{ url_for('syllabus.review', subject_id=subject.id) }}">📖 Đề cương & lộ trình</a>
   </div>
 </section>
 
@@ -109,177 +108,128 @@
 </section>
 {% endif %}
 
-<section class="agent-summary-grid">
-  <article class="soft-card agent-summary-card">
-    <span class="summary-icon blue">▤</span>
-    <div>
-      <small>Kiến thức chung</small>
-      <strong>{{ shared_items|length }} mục</strong>
-      <p>Đề cương và kiến thức có thể dùng lại cho sinh viên cùng môn.</p>
+<section class="course-overview-stats" aria-label="Thống kê môn học">
+  <span>📚 Kiến thức chung <strong>{{ shared_items|length }} mục</strong></span>
+  <span>🎯 Mục tiêu <strong>{{ '%.1f'|format(subject.target_score) if subject.target_score else 'Chưa đặt' }}</strong></span>
+  <span>📝 Quiz <strong>{{ quiz_stats.attempts or 0 }} lượt</strong></span>
+  <span>⚑ Cần ôn <strong>{{ weaknesses|length }} mục</strong></span>
+</section>
+
+<section class="course-material-split" aria-label="Đề cương và tài liệu theo chương">
+  <article class="soft-card agent-panel course-syllabus-panel">
+    <div class="panel-head">
+      <div><span class="panel-kicker">KIẾN THỨC DÙNG CHUNG</span><h3>📑 Đề cương chuẩn</h3></div>
+      <span class="shared-badge">{{ 'Shared · Chỉ xem' if shared_subject.syllabus_text else 'Dự phòng' }}</span>
     </div>
+    {% if syllabus_file %}
+      {% set source_file_url = url_for('shared_document_file', doc_id=syllabus_file.id) if syllabus_file.scope == 'shared' else url_for('personal_document_file', doc_id=syllabus_file.id) %}
+      <div class="course-file-heading">
+        <span class="course-file-name" title="{{ syllabus_file.name }}">📄 {{ syllabus_file.name }}</span>
+        <small>{{ 'PDF' if syllabus_file.type == '.pdf' else 'Word' if syllabus_file.type == '.docx' else 'Tài liệu' }}</small>
+      </div>
+      {% if syllabus_file.type in ('.pdf', '.docx') %}
+      <iframe class="course-syllabus-preview"
+              title="Xem trước đề cương {{ syllabus_file.name }}"
+              src="{{ source_file_url }}?preview=1"
+              loading="lazy" referrerpolicy="same-origin"
+              {% if syllabus_file.type == '.docx' %}sandbox=""{% endif %}></iframe>
+      {% else %}
+      <div class="course-syllabus-unavailable">
+        File này không có trình xem trước định dạng trang; bạn vẫn có thể mở file gốc.
+      </div>
+      {% endif %}
+      <div class="course-file-actions">
+        <a class="soft-primary" href="{{ source_file_url }}?preview=1" target="_blank" rel="noopener noreferrer">↗ Xem file chi tiết</a>
+        <a class="ghost-action" href="{{ source_file_url }}?download=1">↓ Tải file gốc</a>
+      </div>
+      <p class="course-file-caption">✓ Đã trích xuất nội dung để Study Agent phân tích đề cương và xây dựng lộ trình. Văn bản AI đọc được giữ trong hệ thống, không hiển thị tại đây.</p>
+      {% if syllabus_file.type == '.docx' %}
+      <p class="course-file-hint">Bản xem Word giữ chữ và bảng cơ bản; font, hình ảnh và ngắt trang phức tạp có thể khác file gốc.</p>
+      {% endif %}
+    {% elif shared_subject.syllabus_text %}
+      <div class="empty-agent">Đề cương chuẩn đã được hệ thống lưu dưới dạng văn bản, nhưng chưa tìm thấy file gốc để xem trực tiếp. Nhờ Admin tải lại đề cương PDF/DOCX nếu cần xem bản gốc.</div>
+    {% else %}
+      <div class="empty-agent">Chưa có đề cương chuẩn hoặc đề cương dự phòng. Bạn có thể chọn đề cương cá nhân trong Cài đặt học tập, hoặc đợi Admin bổ sung tài liệu chung.</div>
+    {% endif %}
   </article>
 
-  <article class="soft-card agent-summary-card">
-    <span class="summary-icon green">◎</span>
-    <div>
-      <small>Mục tiêu của bạn</small>
-      <strong>{% if subject.target_score %}{{ '%.1f'|format(subject.target_score) }} điểm{% else %}Chưa đặt{% endif %}</strong>
-      <p>Study Agent dùng mục tiêu này để điều chỉnh gợi ý học tập.</p>
+  <article class="soft-card agent-panel course-chapter-panel">
+    <div class="panel-head">
+      <div><span class="panel-kicker">HỌC LIỆU THEO ĐỀ CƯƠNG</span><h3>📚 Tài liệu theo chương</h3></div>
+      <span class="shared-badge">{{ chapter_items|length }} chương</span>
     </div>
-  </article>
-
-  <article class="soft-card agent-summary-card">
-    <span class="summary-icon purple">?</span>
-    <div>
-      <small>Quiz cá nhân</small>
-      <strong>{{ quiz_stats.attempts or 0 }} lượt</strong>
-      <p>Điểm TB {{ quiz_stats.avg_score or 0 }}% · cao nhất {{ quiz_stats.best_score or 0 }}%.</p>
+    <p class="course-chapter-intro">Chỉ hiển thị chương đã xác nhận và tài liệu chung đã được Admin gắn đúng chương. Không tự tạo file hoặc chương mới.</p>
+    {% if chapter_items %}
+    <div class="course-chapter-list">
+      {% for chapter in chapter_items[:4] %}
+      <a class="course-chapter-item" href="{{ url_for('chapter_material.student_chapter', subject_id=subject.id, chapter_number=chapter.number) }}">
+        <span class="course-chapter-index">{{ chapter.number }}</span>
+        <span class="course-chapter-text">
+          <strong>{{ chapter.title }}</strong>
+          {% if chapter.material_count %}
+          <small>✓ {{ chapter.material_count }} tài liệu được duyệt{% if chapter.preview_files %} · {{ chapter.preview_files[0] }}{% endif %}</small>
+          {% else %}
+          <small>Chưa có tài liệu chung được duyệt cho chương này</small>
+          {% endif %}
+        </span>
+        <span aria-hidden="true">›</span>
+      </a>
+      {% endfor %}
     </div>
-  </article>
-
-  <article class="soft-card agent-summary-card">
-    <span class="summary-icon orange">⚑</span>
-    <div>
-      <small>Phần cần ôn thêm</small>
-      <strong>{{ weaknesses|length }} mục</strong>
-      <p>Tự cập nhật từ những câu bạn làm sai trong quiz.</p>
-    </div>
+    <a class="ghost-action course-all-chapters" href="{{ url_for('course_path.learning_path', subject_id=subject.id) }}">Xem tất cả chương và lộ trình →</a>
+    {% else %}
+    <div class="empty-agent">Chưa có danh sách chương đã xác nhận cho phiên bản đề cương này. Hãy phân tích và xác nhận đề cương trước khi xem tài liệu theo chương.</div>
+    <a class="ghost-action course-all-chapters" href="{{ url_for('syllabus.review', subject_id=subject.id) }}">Phân tích và xác nhận đề cương →</a>
+    {% endif %}
+    {% if shared_items %}
+    <details class="course-more-materials">
+      <summary>Tài liệu và kiến thức chung khác ({{ shared_items|length }} mục)</summary>
+      <div class="course-more-materials-list">
+        {% for item in shared_items %}
+          {% if shared_file_ids.get(item.id) %}
+            <a href="{{ url_for('shared_document_file', doc_id=shared_file_ids[item.id]) }}" target="_blank" rel="noopener noreferrer">{{ item.title }}</a>
+          {% else %}
+            <span>{{ item.title }} · Ghi chú dùng chung</span>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </details>
+    {% endif %}
   </article>
 </section>
 
-<section class="agent-two-column">
-  <article class="soft-card agent-panel shared-readonly-panel">
-    <div class="panel-head">
-      <div>
-        <span class="panel-kicker">SHARED KNOWLEDGE · DÙNG CHUNG THEO MÔN</span>
-        <h3>📚 Kiến thức chuẩn của môn</h3>
-      </div>
-      <span class="shared-badge">Shared · Read only</span>
-    </div>
-
-    <p class="panel-desc">
-      Study Agent dùng phần này làm nền kiến thức chung cho các sinh viên học cùng môn.
-      Ở giao diện sinh viên, nội dung này chỉ được sử dụng để học và không thể chỉnh sửa.
-    </p>
-
-    <div class="shared-scope-note">
-      <span>◉</span>
-      <div>
-        <strong>{{ shared_subject.code or subject.code or subject.name }}</strong>
-        <small>
-          {% if shared_subject.code or subject.code %}
-          Các sinh viên có cùng mã môn dùng chung kho kiến thức này.
-          {% else %}
-          Môn chưa có mã; hệ thống đang ghép kho chung theo tên môn.
-          {% endif %}
-        </small>
-      </div>
-    </div>
-
-    <div class="shared-readonly-section">
-      <div class="mini-section-head">
-        <h4>📑 Đề cương chuẩn</h4>
-        <span>Không thuộc dữ liệu cá nhân</span>
-      </div>
-      {% if shared_subject.syllabus_text %}
-      <div class="shared-syllabus-readonly">{{ shared_subject.syllabus_text }}</div>
-      {% else %}
-      <div class="empty-agent">
-        Chưa có đề cương chuẩn trong kho dùng chung. Khi Admin tải lên, hệ thống sẽ tự liên kết theo mã môn; trong thời gian này Study Agent có thể dùng đề cương cá nhân của bạn.
-      </div>
-      {% endif %}
-    </div>
-
-    <div class="shared-readonly-section">
-      <div class="mini-section-head">
-        <h4>▤ Tài liệu & kiến thức chung đã xử lý</h4>
-        <span>{{ shared_items|length }} mục</span>
-      </div>
-      <div class="shared-list">
-        {% for item in shared_items %}
-        <div class="shared-item">
-          <span class="shared-item-icon">▤</span>
-          <div>
-            <strong>{{ item.title }}</strong>
-            <small>{{ 'Tài liệu chuẩn đã xử lý' if item.source_type == 'shared_document' else item.source_type }} · {{ item.created_at[:10] }}</small>
-            <p>{{ item.content[:180] }}{% if item.content|length > 180 %}…{% endif %}</p>
-            {% if shared_file_ids.get(item.id) %}<a href="{{ url_for('shared_document_file', doc_id=shared_file_ids[item.id]) }}" target="_blank" rel="noopener" style="color:#5265ff;font-size:11px;font-weight:800;">◉ Xem tài liệu chung</a>{% endif %}
-          </div>
-        </div>
-        {% else %}
-        <div class="empty-agent">Chưa có tài liệu chuẩn dùng chung cho môn này.</div>
-        {% endfor %}
-      </div>
-    </div>
-
-    <div class="future-role-note">
-      <span>🔒</span>
-      <p><strong>Tài liệu dùng chung:</strong> được quản trị viên cung cấp và xử lý trước. Sinh viên chỉ xem và sử dụng trong Chat AI, Quiz, kế hoạch học; không thể thay đổi kho chung.</p>
-    </div>
-  </article>
-
-  <article class="soft-card agent-panel personal-panel">
-    <div class="panel-head">
-      <div>
-        <span class="panel-kicker">RIÊNG CỦA BẠN</span>
-        <h3>✨ Hồ sơ học tập cá nhân</h3>
-      </div>
-      <span class="personal-badge">Private</span>
-    </div>
-
-    <p class="panel-desc">Toàn bộ dữ liệu trong phần này chỉ thuộc tài khoản của bạn và được dùng để cá nhân hóa Study Agent.</p>
-
-    <div class="personal-syllabus-box">
-      <div class="mini-section-head">
-        <h4>📑 Đề cương cá nhân dự phòng</h4>
-        {% if shared_subject.syllabus_text %}
-        <span>Shared syllabus đang được ưu tiên</span>
-        {% elif subject.personal_syllabus_document_id %}
-        <span>Đang dùng khi tạo roadmap</span>
-        {% else %}
-        <span>Chưa chọn</span>
-        {% endif %}
-      </div>
-
-      {% if shared_subject.syllabus_text %}
-      <p>
-        Môn này đã có đề cương chuẩn trong Shared Knowledge. Bạn vẫn có thể chọn một file cá nhân
-        làm bản dự phòng; Study Agent luôn ưu tiên đề cương chuẩn khi bản chuẩn tồn tại.
-      </p>
-      {% else %}
-      <p>
-        Shared Knowledge chưa có đề cương chuẩn. Chọn một tài liệu cá nhân của môn làm đề cương
-        để Study Agent vẫn tạo roadmap theo đúng phạm vi môn học.
-      </p>
-      {% endif %}
-
+<details class="soft-card course-settings-card" id="courseSettings">
+  <summary class="course-settings-summary">
+    <span><strong>⚙ Cài đặt học tập</strong>
+      <small>{{ profile.preferred_study_time or '19:00' }} · {{ profile.daily_minutes or 45 }} phút/buổi · Mục tiêu {{ '%.1f'|format(subject.target_score) if subject.target_score else 'chưa đặt' }}</small>
+    </span>
+    <span class="course-settings-chevron">⌄</span>
+  </summary>
+  <div class="course-settings-body">
+    {% if not shared_subject.syllabus_text %}
+    <section class="personal-syllabus-box">
+      <h4>📑 Đề cương cá nhân dự phòng</h4>
+      <p>Chỉ sử dụng khi chưa có đề cương chuẩn trong kho chung. Tài liệu vẫn thuộc riêng tài khoản của bạn.</p>
       {% if syllabus_documents %}
       <form method="post" class="personal-syllabus-form">
         <input type="hidden" name="action_type" value="personal_syllabus">
-        <select name="personal_syllabus_document_id" aria-label="Chọn tài liệu làm đề cương cá nhân">
-          <option value="">Không dùng đề cương cá nhân</option>
+        <select name="personal_syllabus_document_id" aria-label="Chọn đề cương cá nhân">
+          <option value="">Không sử dụng đề cương cá nhân</option>
           {% for doc in syllabus_documents %}
-          <option value="{{ doc.id }}" {% if subject.personal_syllabus_document_id == doc.id %}selected{% endif %}>
-            {{ doc.original_name }}
-          </option>
+          <option value="{{ doc.id }}" {% if subject.personal_syllabus_document_id == doc.id %}selected{% endif %}>{{ doc.original_name }}</option>
           {% endfor %}
         </select>
         <button class="ghost-action" type="submit">Lưu đề cương</button>
       </form>
-      <small class="personal-syllabus-hint">File này vẫn là tài liệu riêng của bạn, không được đưa vào Shared Knowledge.</small>
       {% else %}
-      <div class="empty-agent">
-        Chưa có tài liệu cá nhân để chọn làm đề cương.
-        <a href="{{ url_for('documents') }}">Tải tài liệu lên →</a>
-      </div>
+      <a href="{{ url_for('documents') }}">Tải đề cương cá nhân →</a>
       {% endif %}
-    </div>
-
+    </section>
+    {% endif %}
     <form method="post" class="agent-form personal-form">
       <input type="hidden" name="action_type" value="profile">
       <div class="form-grid-2">
-        <label>
-          <span>Phong cách học</span>
+        <label><span>Phong cách học</span>
           <select name="learning_style">
             <option value="balanced" {% if profile.learning_style == 'balanced' %}selected{% endif %}>Cân bằng</option>
             <option value="visual" {% if profile.learning_style == 'visual' %}selected{% endif %}>Ưu tiên ví dụ / trực quan</option>
@@ -287,71 +237,34 @@
             <option value="deep" {% if profile.learning_style == 'deep' %}selected{% endif %}>Giải thích sâu</option>
           </select>
         </label>
-        <label>
-          <span>Giờ học ưu tiên</span>
+        <label><span>Giờ học ưu tiên</span>
           <input type="time" name="preferred_study_time" value="{{ profile.preferred_study_time or '19:00' }}">
         </label>
-        <label>
-          <span>Thời lượng mỗi buổi</span>
+        <label><span>Thời lượng mỗi buổi (phút)</span>
           <input type="number" name="daily_minutes" min="15" max="240" value="{{ profile.daily_minutes or 45 }}">
         </label>
-        <label>
-          <span>Mục tiêu điểm môn</span>
-          <input type="text" value="{% if subject.target_score %}{{ '%.1f'|format(subject.target_score) }}{% else %}Chưa đặt{% endif %}" disabled>
+        <label><span>Mục tiêu điểm môn (đã đặt khi tạo môn)</span>
+          <input type="text" value="{{ '%.1f'|format(subject.target_score) if subject.target_score else 'Chưa đặt' }}" disabled>
         </label>
       </div>
-      <label>
-        <span>Mục tiêu học tập cá nhân</span>
-        <textarea name="goals" rows="4" placeholder="Ví dụ: Nắm chắc chương 1–5 trước cuối tháng...">{{ profile.goals or '' }}</textarea>
+      <label><span>Mục tiêu học tập cá nhân</span>
+        <textarea name="goals" rows="3">{{ profile.goals or '' }}</textarea>
       </label>
-      <label>
-        <span>Ghi chú để Study Agent hiểu bạn hơn</span>
-        <textarea name="notes" rows="4" placeholder="Ví dụ: Mình dễ nhớ qua ví dụ thực tế, hay quên công thức...">{{ profile.notes or '' }}</textarea>
+      <label><span>Ghi chú cá nhân (giữ lại dữ liệu đã nhập)</span>
+        <textarea name="notes" rows="2">{{ profile.notes or '' }}</textarea>
       </label>
-      <button class="soft-primary compact-primary" type="submit">Lưu hồ sơ cá nhân</button>
+      <button class="soft-primary compact-primary" type="submit">Lưu cài đặt học tập</button>
     </form>
+    <p class="course-settings-footnote">Tài liệu riêng của môn: {{ documents|length }} file đang hiển thị · <a href="{{ url_for('documents') }}">Quản lý tài liệu →</a></p>
+  </div>
+</details>
 
-    <div class="weakness-section">
-      <div class="mini-section-head">
-        <h4>🎯 Phần cần ôn thêm</h4>
-        {% if weaknesses %}
-        <a href="{{ url_for('quiz', mode='weakness', subject_id=subject.id) }}">Ôn điểm yếu →</a>
-        {% else %}
-        <span>Tự học từ quiz</span>
-        {% endif %}
-      </div>
-      {% for w in weaknesses %}
-      <div class="weakness-item">
-        <span class="weak-dot"></span>
-        <div>
-          <strong>{{ w.topic }}</strong>
-          <small>{% if w.chapter %}{{ w.chapter }} · {% endif %}Sai {{ w.miss_count }} lần · Đúng {{ w.correct_count }} lần</small>
-        </div>
-      </div>
-      {% else %}
-      <div class="empty-agent">Chưa có dữ liệu điểm yếu. Làm quiz để Study Agent bắt đầu học từ kết quả của bạn.</div>
-      {% endfor %}
-    </div>
-  </article>
-</section>
-
-<section class="agent-bottom-grid">
-  <article class="soft-card agent-panel compact-panel">
-    <div class="mini-section-head"><h4>📄 Tài liệu cá nhân của môn</h4><a href="{{ url_for('documents') }}">Quản lý →</a></div>
-    {% for doc in documents %}
-    <div class="simple-row"><span>▤</span><b>{{ doc.original_name }}</b><small>{{ doc.created_at[:10] }}</small></div>
-    {% else %}
-    <div class="empty-agent">Chưa có tài liệu cá nhân cho môn này.</div>
-    {% endfor %}
-  </article>
-
-  <article class="soft-card agent-panel compact-panel">
-    <div class="mini-section-head"><h4>🗓 Nhiệm vụ sắp tới</h4><a href="{{ url_for('study_plan') }}">Xem kế hoạch →</a></div>
-    {% for task in upcoming_tasks %}
-    <div class="simple-row"><span>◷</span><b>{{ task.title }}</b><small>{{ task.study_at[:16]|replace('T',' ') }} · {{ task.duration }} phút</small></div>
-    {% else %}
-    <div class="empty-agent">Chưa có nhiệm vụ sắp tới.</div>
-    {% endfor %}
-  </article>
+<section class="soft-card course-upcoming-panel">
+  <div class="mini-section-head"><h3>🗓 Buổi học sắp tới</h3><a href="{{ url_for('study_plan', subject_id=subject.id) }}">Xem thời khóa biểu →</a></div>
+  {% for task in upcoming_tasks[:2] %}
+  <div class="simple-row"><span>◷</span><b>{{ task.title }}</b><small>{{ task.study_at[:16]|replace('T',' ') }}</small></div>
+  {% else %}
+  <p class="course-empty-short">Chưa có lịch học của môn này. Bạn có thể tạo lịch từ lộ trình.</p>
+  {% endfor %}
 </section>
 {% endblock %}
