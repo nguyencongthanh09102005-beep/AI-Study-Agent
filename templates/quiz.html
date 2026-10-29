@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block page_title %}Quiz{% endblock %}
 {% block page_desc %}Luyện tập hiệu quả với quiz được cá nhân hóa bởi AI{% endblock %}
-{% block page_styles %}<link rel="stylesheet" href="{{ url_for('static', filename='css/quiz.css') }}">{% endblock %}
+{% block page_styles %}<link rel="stylesheet" href="{{ url_for('static', filename='css/quiz.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='css/quiz_layout_refresh.css') }}">{% endblock %}
 
 {% block content %}
 {% if generation_error %}
@@ -65,18 +65,26 @@
 </section>
 {% endif %}
 
-<section class="soft-card quiz-create-hub" id="quizCreateModes" data-initial-mode="{{ selected_quiz_mode or ('document' if selected_document_id else 'subject') }}">
+{% set quiz_create_open = generation_error or selected_document_id or (selected_quiz_mode and selected_quiz_mode != 'subject') or not quizzes %}
+<section class="soft-card quiz-create-hub quiz-create-collapsible" id="quizCreateModes"
+         data-initial-mode="{{ selected_quiz_mode or ('document' if selected_document_id else 'subject') }}">
   <div class="quiz-create-hub-head">
     <div class="quiz-create-title">
       <span class="quiz-create-main-icon">▤</span>
       <div>
-        <h2>Tạo Quiz</h2>
-        <p>Luyện tập theo môn, tài liệu hoặc ôn lại những phần Study Agent ghi nhận bạn còn yếu.</p>
+        <h2>Tạo Quiz mới</h2>
+        <p>Theo môn học · Từ tài liệu · Ôn điểm yếu</p>
       </div>
     </div>
-    <div class="quiz-create-tip">✦ <span>Quiz được tạo theo đúng ngữ cảnh học tập hiện tại của bạn.</span></div>
+    <button class="quiz-create-collapse-toggle" id="quizCreateToggle" type="button"
+            aria-expanded="{{ 'true' if quiz_create_open else 'false' }}"
+            aria-controls="quizCreateBody" title="Mở hoặc thu gọn phần tạo Quiz">
+      <span class="quiz-create-toggle-label">{{ 'Thu gọn' if quiz_create_open else 'Mở' }}</span>
+      <span aria-hidden="true" class="quiz-create-toggle-chevron">⌄</span>
+    </button>
   </div>
 
+  <div id="quizCreateBody" class="quiz-create-collapsible-body" {% if not quiz_create_open %}hidden{% endif %}>
   <div class="quiz-mode-tabs" role="tablist" aria-label="Chế độ tạo quiz">
     <button type="button" class="quiz-mode-tab active" data-create-mode="subject" role="tab" aria-selected="true">
       <span>▱</span> Theo môn học
@@ -153,9 +161,25 @@
       <p class="quiz-mode-note">ⓘ Quiz ưu tiên các chủ đề bạn thường làm sai dựa trên lịch sử làm bài trước đó.</p>
     </form>
   </div>
+  </div>
 </section>
 
-<section class="quiz-work-layout">
+{% set quiz_summary = namespace(best=none, weaknesses=0) %}
+{% for quiz in quizzes %}
+  {% if quiz.best_score is not none and (quiz_summary.best is none or quiz.best_score > quiz_summary.best) %}
+    {% set quiz_summary.best = quiz.best_score %}
+  {% endif %}
+{% endfor %}
+{% for subject in subjects %}
+  {% set quiz_summary.weaknesses = quiz_summary.weaknesses + (subject.weakness_count or 0) %}
+{% endfor %}
+<section class="quiz-compact-stats" aria-label="Tổng quan Quiz">
+  <div class="quiz-compact-stat"><span class="quiz-stat-icon" aria-hidden="true">📝</span><span><small>Bài Quiz</small><strong>{{ quizzes|length }}</strong></span></div>
+  <div class="quiz-compact-stat"><span class="quiz-stat-icon" aria-hidden="true">⭐</span><span><small>Điểm cao nhất</small><strong>{{ quiz_summary.best|round(0)|int if quiz_summary.best is not none else '—' }}{% if quiz_summary.best is not none %}%{% endif %}</strong></span></div>
+  <div class="quiz-compact-stat"><span class="quiz-stat-icon" aria-hidden="true">🎯</span><span><small>Chủ đề cần ôn</small><strong>{{ quiz_summary.weaknesses }}</strong></span></div>
+</section>
+
+<section class="quiz-work-layout quiz-new-layout">
   <aside class="soft-card quiz-library">
     <div class="card-title-row"><h3>▣ &nbsp; Danh sách quiz của bạn</h3><span>{{ quizzes|length }} bài</span></div>
     <div class="quiz-mini-tabs"><button class="active" type="button" data-quiz-filter="all">Tất cả</button><button type="button" data-quiz-filter="recent">Gần đây</button><button type="button" data-quiz-filter="done">Đã làm</button></div>
@@ -166,7 +190,7 @@
         <span><b>{{ quiz.title }}</b><small>{% if quiz.linked_session_title %}Theo buổi · {{ quiz.linked_session_title }} · {% endif %}{{ quiz.questions|length }} câu hỏi{% if quiz.attempted %} · Đã làm{% if quiz.best_score is not none %} · Cao nhất {{ quiz.best_score|round(0)|int }}%{% endif %}{% else %} · Chưa làm{% endif %}</small></span><em>›</em>
       </button>
       {% else %}
-      <div class="empty-soft">Chưa có quiz. Chọn tài liệu phía trên để tạo bài đầu tiên.</div>
+      <div class="empty-soft">Chưa có Quiz. Mở “Tạo Quiz mới” ở phía trên để bắt đầu.</div>
       {% endfor %}
     </div>
   </aside>
@@ -178,12 +202,12 @@
         <div><span class="mini-activity blue">?</span><span><h3>{{ quiz.title }}</h3><small>Câu hỏi luyện tập bằng AI</small></span></div>
         <button type="button" class="quiz-delete-btn" data-delete-url="{{ url_for('delete_quiz', quiz_id=quiz.id) }}" data-quiz-title="{{ quiz.title }}" title="Xóa quiz">×</button>
       </div>
-      <div class="quiz-progress-area"><div class="quiz-progress-info"><span>Tiến độ làm bài</span><strong class="quiz-progress-text">0 / {{ quiz.questions|length }} câu</strong></div><div class="quiz-progress-bar"><span style="width:0%"></span></div></div>
-      <div class="quiz-result"><div class="quiz-result-icon">🎯</div><div><strong class="quiz-result-title">Kết quả</strong><p class="quiz-result-text">Bạn chưa nộp bài.</p></div></div>
-      <div class="quiz-learning-analysis" aria-label="Phân tích kiến thức sau Quiz" hidden></div>
-      {% if quiz.attempted %}
-      <button type="button" class="quiz-analysis-history" data-analysis-url="{{ url_for('quiz_attempt_analysis', quiz_id=quiz.id) }}">📊 Xem phân tích lần làm gần nhất</button>
-      {% endif %}
+      <div class="quiz-progress-area">
+        <div class="quiz-progress-info"><span class="quiz-current-question">Câu 1/{{ quiz.questions|length }}</span>
+          <strong class="quiz-progress-text">Đã trả lời 0/{{ quiz.questions|length }}</strong>
+        </div>
+        <div class="quiz-progress-bar"><span style="width:0%"></span></div>
+      </div>
       <div class="quiz-question-list">
         {% for q in quiz.questions %}
         {% set question_index = loop.index %}
@@ -200,6 +224,21 @@
         {% endfor %}
       </div>
       <div class="quiz-actions"><button type="button" class="quiz-prev-btn">← Câu trước</button><div class="quiz-step-actions"><button type="button" class="quiz-reset-btn">↻ Làm lại</button><button type="button" class="quiz-next-btn">Câu tiếp theo →</button><button type="button" class="quiz-submit-btn">✓ Nộp bài</button></div></div>
+      <div class="quiz-result" role="status" aria-live="polite">
+        <div class="quiz-result-icon">🎯</div>
+        <div><strong class="quiz-result-title">Kết quả</strong><p class="quiz-result-text">Bạn chưa nộp bài.</p></div>
+      </div>
+      <details class="quiz-history-details">
+        <summary>◷ Lịch sử & phân tích bài làm <span aria-hidden="true">⌄</span></summary>
+        <div class="quiz-history-content">
+          {% if quiz.attempted %}
+          <button type="button" class="quiz-analysis-history" data-analysis-url="{{ url_for('quiz_attempt_analysis', quiz_id=quiz.id) }}">📊 Xem phân tích lần làm gần nhất</button>
+          {% else %}
+          <p class="quiz-history-helper">Sau khi nộp Quiz, kết quả và phân tích điểm yếu sẽ xuất hiện tại đây.</p>
+          {% endif %}
+          <div class="quiz-learning-analysis" aria-label="Phân tích kiến thức sau Quiz" hidden></div>
+        </div>
+      </details>
     </article>
     {% endfor %}
   </section>
