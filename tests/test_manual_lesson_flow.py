@@ -102,7 +102,7 @@ def run():
             assert "Hỏi AI về tài liệu này" in room_html
             assert "Chuẩn bị Quiz 10 câu" in room_html
             assert f"/documents/{doc}/file?preview=1" in room_html
-            assert "Không gian học cá nhân" in room_html
+            assert "KHÔNG GIAN HỌC CÁ NHÂN" in room_html
             assert outsider.get(f"/manual-study/{manual_id}").status_code==404
             assert outsider.post(f"/manual-study/{manual_id}/prepare-quiz",
                                 data={}).status_code==403
