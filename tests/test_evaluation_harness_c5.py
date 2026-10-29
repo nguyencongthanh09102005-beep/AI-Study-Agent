@@ -46,11 +46,15 @@ def check():
     args=[sys.executable,"evaluation/benchmark_agent_vs_gemini.py",
           "--cases",str(DEFAULT_CASES),"--max-cases","2"]
     env=os.environ.copy()
-    env.pop("GEMINI_API_KEY",None)
-    out=subprocess.run(args,capture_output=True,text=True,check=True,env=env)
+    # An empty explicit value prevents app.load_dotenv() from restoring a real
+    # API key in the child process on developer machines.
+    env["GEMINI_API_KEY"]=""
+    print("C5: checking offline dry run...",flush=True)
+    out=subprocess.run(args,capture_output=True,text=True,check=True,env=env,timeout=30)
     assert "DRY RUN: no API calls" in out.stdout
     assert "no benchmark result invented" in out.stdout
-    no_key=subprocess.run(args+["--live"],capture_output=True,text=True,env=env)
+    print("C5: verifying --live refuses missing API key...",flush=True)
+    no_key=subprocess.run(args+["--live"],capture_output=True,text=True,env=env,timeout=30)
     assert no_key.returncode!=0
     assert "GEMINI_API_KEY missing" in no_key.stderr or "GEMINI_API_KEY missing" in no_key.stdout
     print("C5 evaluation harness PASS: paired prompts, verified quotes, explicit live opt-in, no invented scores")
