@@ -4,6 +4,7 @@ Read-only. A Quiz score is not a diagnosis of mastery; persistent weaknesses
 take priority, and no improvement is claimed without comparable review data.
 No Gemini calls or schedule mutations happen here.
 """
+import re
 from datetime import datetime, timedelta
 
 from adaptive_review_schedule import local_now
@@ -56,7 +57,8 @@ def decide_next_learning_step(conn, user_id, subject_id, current=None):
             deadline = due
             break
 
-    evidence = []
+    evidence = [f"Tiến độ môn hiện tại: {int(subject['progress'] or 0)}%"]
+    material_chapter = None
     if latest and int(latest["total_questions"] or 0) > 0:
         count = int(latest["total_questions"])
         right = max(0, min(count, int(latest["correct_count"] or 0)))
@@ -70,6 +72,11 @@ def decide_next_learning_step(conn, user_id, subject_id, current=None):
         top = weaknesses[0]
         miss, correct = int(top["miss_count"]), int(top["correct_count"])
         label = f"{top['chapter']} · {top['topic']}" if top["chapter"] else top["topic"]
+        chapter_match = re.match(r"^\s*chương\s*0*(\d+)", str(top["chapter"] or ""), re.I)
+        if chapter_match:
+            chapter_number = int(chapter_match.group(1))
+            if 1 <= chapter_number <= 80:
+                material_chapter = chapter_number
         evidence.append(f"Chủ đề cần theo dõi: {label} · sai {miss}, đúng {correct}")
         evidence.append(f"Còn {len(weaknesses)} chủ đề ưu tiên trong mẫu 8 chủ đề")
         if miss >= 2:
@@ -112,4 +119,5 @@ def decide_next_learning_step(conn, user_id, subject_id, current=None):
         "latest_score": score, "next_task": dict(next_task) if next_task else None,
         "review_task": dict(review_task) if review_task else None,
         "deadline_urgent": bool(deadline),
+        "material_chapter": material_chapter,
     }
