@@ -54,6 +54,11 @@
     {% if adaptive_decision.kind in ('review', 'verify') %}
       <a class="proactive-primary" href="{{ url_for('quiz', mode='weakness', subject_id=subject.id) }}">Ôn điểm yếu →</a>
       <a class="proactive-secondary" href="{{ url_for('study_plan', subject_id=subject.id) }}">Xem lịch ôn</a>
+      {% if adaptive_decision.material_chapter %}
+        <a class="proactive-secondary" href="{{ url_for('chapter_material.student_chapter', subject_id=subject.id, chapter_number=adaptive_decision.material_chapter) }}">Đọc học liệu Chương {{ adaptive_decision.material_chapter }}</a>
+      {% else %}
+        <a class="proactive-secondary" href="{{ url_for('course_path.learning_path', subject_id=subject.id) }}">Học liệu theo lộ trình</a>
+      {% endif %}
     {% elif adaptive_decision.kind == 'continue' and adaptive_decision.next_task %}
       <a class="proactive-primary" href="{{ url_for('study_plan', subject_id=subject.id) }}">Xem buổi tiếp theo →</a>
       <a class="proactive-secondary" href="{{ url_for('course_path.learning_path', subject_id=subject.id) }}">Lộ trình theo chương</a>
