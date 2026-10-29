@@ -4254,6 +4254,77 @@ def subject_detail(subject_id):
         (uid, subject_id)
     ).fetchall()
 
+    # Course overview: use the approved syllabus and real admin chapter links.
+    # Never generate chapter titles or material counts from unapproved AI output.
+    shared_syllabus_doc = conn.execute("""
+        SELECT id,original_name,stored_name FROM shared_documents
+        WHERE shared_subject_id=? AND is_syllabus=1
+        ORDER BY id DESC LIMIT 1
+    """, (shared["id"],)).fetchone()
+    syllabus_file = None
+    if shared_syllabus_doc:
+        syllabus_file = {
+            "id": shared_syllabus_doc["id"],
+            "name": shared_syllabus_doc["original_name"],
+            "type": Path(shared_syllabus_doc["stored_name"]).suffix.lower(),
+            "scope": "shared",
+        }
+    elif not (shared["syllabus_text"] or "").strip() and subject["personal_syllabus_document_id"]:
+        selected = conn.execute("""
+            SELECT id,original_name,stored_name FROM documents
+            WHERE id=? AND user_id=? AND subject_id=?
+        """, (subject["personal_syllabus_document_id"], uid, subject_id)).fetchone()
+        if selected:
+            syllabus_file = {
+                "id": selected["id"], "name": selected["original_name"],
+                "type": Path(selected["stored_name"]).suffix.lower(),
+                "scope": "personal",
+            }
+    from syllabus_routes import _source, ensure_syllabus_schema
+    from syllabus_learning import syllabus_hash
+    from chapter_material_routes import (
+        approved_document_rows, chapter_key, official_syllabus,
+    )
+    ensure_syllabus_schema(conn)
+    source_kind, source_text, _ = _source(sys.modules[__name__], conn, uid, subject_id)
+    source_signature = syllabus_hash(source_text) if source_text else ""
+    confirmed = conn.execute("""
+        SELECT units_json FROM syllabus_reviews
+        WHERE user_id=? AND subject_id=? AND status='confirmed' AND source_hash=?
+    """, (uid, subject_id, source_signature)).fetchone()
+    chapter_items = []
+    if confirmed:
+        try:
+            units = json.loads(confirmed["units_json"])
+            if not isinstance(units, list):
+                units = []
+        except (TypeError, ValueError):
+            units = []
+        mapping_ok = False
+        if source_kind == "shared" and source_text:
+            official_text, official_hash, _ = official_syllabus(conn, shared["id"])
+            mapping_ok = bool(official_text and official_hash == source_signature)
+        for index, unit in enumerate(units[:40], 1):
+            if not isinstance(unit, dict):
+                continue
+            key = chapter_key(unit.get("evidence", ""))
+            approved = approved_document_rows(
+                conn, shared["id"], key, source_signature
+            ) if mapping_ok and key else []
+            chapter_items.append({
+                "number": index, "title": str(unit.get("title") or
+                                              unit.get("evidence") or
+                                              f"Chương {index}")[:200],
+                "material_count": len(approved),
+                "preview_files": [row["original_name"] for row in approved[:2]],
+            })
+    next_study_task = conn.execute("""
+        SELECT id,title FROM study_tasks
+        WHERE user_id=? AND subject_id=? AND source='roadmap'
+          AND done=0 AND roadmap_session_id IS NOT NULL
+        ORDER BY study_at,id LIMIT 1
+    """, (uid, subject_id)).fetchone()
+
     next_best_action = get_next_best_action(
         conn,
         uid,
@@ -4285,7 +4356,11 @@ def subject_detail(subject_id):
         next_best_action=next_best_action,
         adaptive_decision=adaptive_decision,
         adaptive_plan_proposal=adaptive_plan_proposal,
-        adaptive_plan_csrf=session["adaptive_plan_csrf"]
+        adaptive_plan_csrf=session["adaptive_plan_csrf"],
+        syllabus_file=syllabus_file,
+        chapter_items=chapter_items,
+        next_study_task=next_study_task,
+        syllabus_confirmed=bool(confirmed)
     )
 
 
