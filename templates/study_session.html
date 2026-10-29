@@ -76,6 +76,8 @@
             ⚠ Chưa đủ điều kiện chuẩn bị Quiz.
           {% elif quiz_status.state == 'unprepared' %}
             ◷ Chưa chuẩn bị xong Quiz.
+          {% elif quiz_status.state == 'review' %}
+            ✓ Quiz đã làm · Có thể ôn lại bất cứ lúc nào.
           {% elif quiz_status.state == 'active' %}
             ✓ Quiz đã mở và có thể làm bài.
           {% elif quiz_status.state == 'available' %}
@@ -93,6 +95,8 @@
             {% else %}
               Hãy mở Lộ trình theo chương và chọn Chuẩn bị / Tiếp tục tạo Quiz. Cần học liệu chung được Admin duyệt.
             {% endif %}
+          {% elif quiz_status.state == 'review' %}
+            Kết quả đã lưu vào mục Quiz. Bạn có thể làm lại để ôn kiến thức cũ, không phụ thuộc giờ học.
           {% elif quiz_status.state == 'active' or quiz_status.state == 'available' %}
             Bài kiểm tra được mở theo giờ học hiện tại; chọn vào Quiz để bắt đầu hoặc tiếp tục làm.
           {% else %}
@@ -108,7 +112,8 @@
         {% endif %}
         <div class="study-room-quiz-actions">
           <a class="study-room-quiz-primary" href="{{ url_for('quiz', task_id=task.id) }}" id="studyRoomQuizGo">
-            {% if quiz_status.state in ('active', 'available') %}▶ Làm Quiz theo buổi
+            {% if quiz_status.state == 'review' %}↻ Ôn lại Quiz đã làm
+            {% elif quiz_status.state in ('active', 'available') %}▶ Làm Quiz theo buổi
             {% elif quiz_status.state == 'locked' %}🔒 Xem lịch mở Quiz
             {% else %}Xem ngữ cảnh Quiz{% endif %}
           </a>
