@@ -117,14 +117,13 @@ def run():
             assert result.status_code in (302,303)
             doc_after=alice.get("/documents").get_data(as_text=True)
             assert "ai_practice.txt" in doc_after
-            from bs4 import BeautifulSoup
-            soup=BeautifulSoup(doc_after,"html.parser")
-            folders=soup.select("details[data-library-folder]")
-            ai_folder=[x for x in folders if x.get("data-folder-name","").startswith("Trí tuệ nhân tạo")]
-            assert len(ai_folder)==2, len(ai_folder)  # personal and common
-            assert ai_folder[0].select_one("[data-library-file]") is not None
-            assert "ai_practice.txt" in ai_folder[0].get_text()
-            assert "ai_practice.txt" not in ai_folder[1].get_text()
+            folders=doc_after.split('<details class="library-folder" ')[1:]
+            ai_folder=[x for x in folders if
+                       x.startswith('data-library-folder data-folder-name="Trí tuệ nhân tạo')]
+            assert len(ai_folder)==2, len(ai_folder)  # private and shared course views
+            assert 'data-library-file' in ai_folder[0]
+            assert "ai_practice.txt" in ai_folder[0]
+            assert "ai_practice.txt" not in ai_folder[1]
             conn=project.db()
             assert conn.execute("SELECT count(*) FROM documents WHERE user_id=?",
                                 (users["alice"],)).fetchone()[0]==3
