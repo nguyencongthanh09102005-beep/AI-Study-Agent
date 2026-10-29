@@ -96,6 +96,25 @@ def run():
                 conn.close()
                 assert tick(project) is False
             assert calls==[(uid,sid),(uid,sid)]
+
+            # A network/SDK exception must become a recoverable error, not
+            # a silent 'running' loop that spends Gemini quota repeatedly.
+            with patch("quiz_preparation_jobs.preparation_status",
+                       return_value=[{"status":"pending"}]):
+                conn=project.db()
+                assert enqueue(conn,project,uid,sid)=="queued"
+                conn.close()
+            with patch("quiz_preparation_jobs.prepare_step",
+                       side_effect=OSError("Simulated Gemini network reset")), \
+                 patch("quiz_preparation_jobs.logging.exception") as logged:
+                assert tick(project) is True
+                logged.assert_called_once()
+                assert tick(project) is False
+            conn=project.db()
+            job=status(conn,uid,sid)
+            assert job["state"]=="error",job
+            assert "Tiếp tục" in job["message"],job
+            conn.close()
         finally:
             project.DB_PATH,project.UPLOAD_DIR=old_db,old_up
     print("7.6 server queue/auth/CSRF/pause/resume/worker steps PASS")
