@@ -2463,62 +2463,24 @@ nhưng phải nằm bên trong chuỗi JSON escape đúng quy tắc. Cấu trúc
     raw, error = gemini_generate(prompt)
 
     if raw:
+        from chat_response_validation import parse_free_chat_response
         try:
-            match = re.search(r"\{[\s\S]*\}", raw)
-            if not match:
-                raise ValueError("Không tìm thấy JSON object")
-
-            data = json.loads(match.group(0))
-            answer = str(data.get("answer") or "").strip()
-            mode = str(data.get("mode") or "general").strip().lower()
-            requested_sources = data.get("sources") or []
-
-            personal_allowed = {name: name for name in source_names}
-            shared_allowed = {name: name for name in shared_source_names}
-            used_sources = []
-
-            if isinstance(requested_sources, list):
-                allowed = (
-                    personal_allowed
-                    if mode == "document"
-                    else shared_allowed
-                    if mode == "shared"
-                    else {}
-                )
-                for item in requested_sources:
-                    name = str(item or "").strip()
-                    if name in allowed and name not in used_sources:
-                        used_sources.append(name)
-
-            if not answer:
-                raise ValueError("Gemini trả về answer rỗng")
-
-            if mode == "document" and used_sources:
-                if len(used_sources) == 1:
-                    source_line = f'Dựa trên tài liệu "{used_sources[0]}":'
-                else:
-                    joined = ", ".join(f'"{name}"' for name in used_sources)
-                    source_line = f"Dựa trên các tài liệu {joined}:"
-
-                return source_line + "\n\n" + answer, used_sources, "document"
-
-            if mode == "shared" and used_sources:
-                if len(used_sources) == 1:
-                    source_line = f'Dựa trên kiến thức chung "{used_sources[0]}":'
-                else:
-                    joined = ", ".join(f'"{name}"' for name in used_sources)
-                    source_line = f"Dựa trên các nguồn kiến thức chung {joined}:"
-
-                return source_line + "\n\n" + answer, used_sources, "shared"
-
-            # Không có nguồn hợp lệ -> coi là kiến thức chung để tránh gắn nguồn sai.
+            answer, used_sources, mode = parse_free_chat_response(
+                raw, source_names, shared_source_names
+            )
+            if mode == "document":
+                joined = ", ".join(f'"{name}"' for name in used_sources)
+                return f"Dựa trên tài liệu cá nhân {joined}:\\n\\n".replace(
+                    "\\n", "\n") + answer, used_sources, "document"
+            if mode == "shared":
+                joined = ", ".join(f'"{name}"' for name in used_sources)
+                return f"Dựa trên kiến thức chung {joined}:\\n\\n".replace(
+                    "\\n", "\n") + answer, used_sources, "shared"
             return answer, [], "general"
-
-        except (ValueError, TypeError, json.JSONDecodeError) as exc:
-            print("Không đọc được JSON Chat từ Gemini:", exc)
-            # Không gắn tên file khi không xác định chắc chắn mode nguồn.
-            cleaned = raw.strip()
-            return cleaned, [], "general"
+        except ValueError as exc:
+            # Never expose malformed JSON or invented source names to students.
+            print("Gemini Chat JSON/provenance validation failed:", exc)
+            error = "Câu trả lời AI không hợp lệ hoặc nguồn không kiểm chứng được."
 
     # Nếu Gemini/model dự phòng đều lỗi, vẫn cố gắng trả lời từ
     # tài liệu cá nhân hoặc kiến thức chung đã có trong hệ thống.
@@ -2549,6 +2511,14 @@ nhưng phải nằm bên trong chuỗi JSON escape đúng quy tắc. Cấu trúc
     if error:
         print("Gemini Chat fallback:", error)
 
+    # F4: make provenance and limitations obvious when using a local excerpt.
+    if fallback_context:
+        fallback = (
+            "⚠ Trích đoạn tham khảo tự động từ học liệu đã lưu; "
+            "chưa phải câu trả lời AI được kiểm chứng. "
+            "Hãy đối chiếu tài liệu gốc.\\n\\n".replace("\\n", "\n")
+            + fallback
+        )
     return (
         fallback,
         fallback_sources if fallback_context else [],
