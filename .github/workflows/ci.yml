@@ -116,6 +116,8 @@ jobs:
           python tests/test_quiz_background_jobs_step76.py
           python tests/test_adaptive_phase8.py
           python tests/test_phase9_schedule_safety.py
+          python tests/test_phase9_chat_safety.py
+          python -m py_compile chat_response_validation.py
           python -m py_compile adaptive_decision_phase8.py adaptive_plan_phase8.py
           python tests/test_delete_subject_session_quiz.py
           python -m py_compile study_session_quiz.py study_session_quiz_runtime.py study_session_quiz_routes.py subject_course_cleanup.py
