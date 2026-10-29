@@ -5,6 +5,8 @@ No external AI API or network-based document conversion is used.
 """
 import io
 import sys
+import struct
+import zlib
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -28,6 +30,15 @@ def _sample_word():
     t.cell(0, 1).text = "Nội dung"
     t.cell(1, 0).text = "1"
     t.cell(1, 1).text = "<script>alert('bad')</script>"
+    # Real inline PNG image: preview must not silently drop common diagrams.
+    def png_chunk(kind, data):
+        blob = kind + data
+        return struct.pack("!I", len(data)) + blob + struct.pack("!I", zlib.crc32(blob))
+    ihdr = struct.pack("!2I5B", 1, 1, 8, 2, 0, 0, 0)
+    picture = (b"\x89PNG\r\n\x1a\n" + png_chunk(b"IHDR", ihdr)
+               + png_chunk(b"IDAT", zlib.compress(b"\x00\xff\x00\x00"))
+               + png_chunk(b"IEND", b""))
+    sample.add_picture(io.BytesIO(picture))
     buffer = io.BytesIO()
     sample.save(buffer)
     return buffer.getvalue()
@@ -48,6 +59,7 @@ def run():
             assert "Nội dung" in text and "<script>" in text
             rendered = render_docx_preview(src, "de_cuong.docx")
             assert "<table>" in rendered and "<td>" in rendered
+    assert "data:image/png;base64," in rendered, "Word inline image was not preserved"
             assert "&lt;script&gt;" in rendered
             assert "<script>" not in rendered
 
