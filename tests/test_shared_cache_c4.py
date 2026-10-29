@@ -84,7 +84,8 @@ Chương 2. Danh sách liên kết và con trỏ
             assert stats["first_analysis_gemini_call_count"]==1
             assert stats["total_entries"]==1
             assert stats["entries"][0]["shared_subject_id"]==shared
-            assert "personal" not in json.dumps(stats).lower()
+            assert all("user_id" not in entry and "document_text" not in entry
+                       for entry in stats["entries"])
             # Source edit invalidates the cache: no reuse of an old syllabus.
             revised=syllabus.replace("Chương 2. Danh sách liên kết và con trỏ",
                                      "Chương 2. Mảng và bộ nhớ")
