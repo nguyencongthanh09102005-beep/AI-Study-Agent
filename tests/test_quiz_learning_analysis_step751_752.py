@@ -48,6 +48,43 @@ def check():
     assert "correct_answers" not in analysis
     assert "Câu đầu tiên" not in json.dumps(analysis, ensure_ascii=False)
 
+    # Real-life screenshot regression: one physical chapter is spelled two
+    # ways in 15 AI questions. It must produce one chapter bar of 3/15=20%.
+    verbose = "CHƯƠNG 1: SỰ RA ĐỜI CỦA ĐẢNG & PHONG TRÀO ĐẤU TRANH GIÀNH CHÍNH QUYỀN (1858 - 1945)"
+    screenshot_questions = [
+        {
+            "question": f"Câu lịch sử thứ {index}?",
+            "chapter": verbose if index < 10 else "CHƯƠNG 1",
+            "topic": (verbose + " · Chuyển biến xã hội Việt Nam"
+                      if index < 6 else
+                      "CHƯƠNG 1 · Lực lượng cách mạng"
+                      if index < 10 else
+                      "Nguyên nhân thất bại phong trào"),
+            "answer": 0,
+        }
+        for index in range(15)
+    ]
+    screenshot_answers = [0] * 3 + [1] * 12
+    screenshot = summarize_quiz_attempt(screenshot_questions,
+                                        screenshot_answers)
+    assert (screenshot["correct"], screenshot["incorrect"]) == (3, 12)
+    assert len(screenshot["chapters"]) == 1, screenshot["chapters"]
+    assert screenshot["chapters"][0] == {
+        "name": "Chương 1", "correct": 3, "incorrect": 12,
+        "total": 15, "percent": 20.0
+    }
+    assert {x["name"] for x in screenshot["topics"]} == {
+        "Chuyển biến xã hội Việt Nam", "Lực lượng cách mạng",
+        "Nguyên nhân thất bại phong trào",
+    }
+    assert all(x["chapter"] == "Chương 1" for x in screenshot["topics"])
+    # Distinct numbered chapters are never folded together (1 != 10).
+    different = summarize_quiz_attempt(
+        [{"chapter": "Chương 1", "topic": "A", "answer": 0},
+         {"chapter": "Chương 10", "topic": "B", "answer": 0}],
+        [0, 0])
+    assert len(different["chapters"]) == 2
+
     # A broken old answer key is unknown, not a diagnosed incorrect answer.
     legacy = summarize_quiz_attempt(
         [{"question": "?"}, {"chapter": "Chương 1", "topic": "T", "answer": "1"}],
