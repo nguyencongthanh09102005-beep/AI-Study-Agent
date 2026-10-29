@@ -122,6 +122,58 @@ def proposal_for_subject(conn, user_id, subject_id, current=None):
     proposed_at = _parse_time(proposed)
     if not proposed_at or proposed_at <= old_at or proposed_at < review_end:
         return None
+    # F2: never put a study lesson after its subject's next deadline or
+    # overtake the following roadmap lesson (including an edited next lesson).
+    proposed_end = proposed_at + timedelta(minutes=duration)
+    from course_schedule_sync import ensure_session_schedule_schema
+    ensure_session_schedule_schema(conn)
+    selected = conn.execute("""
+        SELECT roadmap_session_id FROM study_tasks
+        WHERE id=? AND user_id=? AND subject_id=?
+    """, (row["id"], user_id, subject_id)).fetchone()
+    number = selected["roadmap_session_id"] if selected else None
+    if number is not None:
+        # A previous session in roadmap order cannot be scheduled after us.
+        previous_rows = conn.execute("""
+            SELECT study_at,duration FROM study_tasks
+            WHERE user_id=? AND subject_id=? AND source='roadmap'
+              AND done=0 AND roadmap_session_id<? AND id<>?
+        """, (user_id, subject_id, number, row["id"])).fetchall()
+        next_rows = conn.execute("""
+            SELECT study_at FROM study_tasks
+            WHERE user_id=? AND subject_id=? AND source='roadmap'
+              AND done=0 AND roadmap_session_id>? AND id<>?
+        """, (user_id, subject_id, number, row["id"])).fetchall()
+    else:
+        # Legacy lesson without a session index: preserve the existing
+        # chronological order of other unfinished roadmap lessons.
+        previous_rows = []
+        next_rows = conn.execute("""
+            SELECT study_at FROM study_tasks
+            WHERE user_id=? AND subject_id=? AND source='roadmap'
+              AND done=0 AND study_at>? AND id<>?
+        """, (row["study_at"], user_id, subject_id, row["id"])).fetchall()
+    for item in previous_rows:
+        previous_at = _parse_time(item["study_at"])
+        try:
+            previous_length = int(item["duration"])
+        except (ValueError, TypeError):
+            return None
+        if not previous_at or previous_length <= 0:
+            return None
+        if proposed_at < previous_at + timedelta(minutes=previous_length):
+            return None
+    for item in next_rows:
+        next_at = _parse_time(item["study_at"])
+        if not next_at or proposed_end > next_at:
+            return None
+    for reminder in conn.execute("""
+        SELECT due_at FROM reminders
+        WHERE user_id=? AND subject_id=? AND done=0 AND due_at!=''
+    """, (user_id, subject_id)):
+        due = _parse_time(reminder["due_at"])
+        if due and proposed_end > due:
+            return None
     identity = (
         f"phase8|{user_id}|{subject_id}|{row['id']}|{row['study_at']}|"
         f"{proposed}|{review['id']}|{review['study_at']}|{review_duration}"
