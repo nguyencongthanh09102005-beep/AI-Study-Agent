@@ -4318,6 +4318,8 @@ def subject_detail(subject_id):
                 "material_count": len(approved),
                 "preview_files": [row["original_name"] for row in approved[:2]],
             })
+    from course_schedule_sync import ensure_session_schedule_schema
+    ensure_session_schedule_schema(conn)
     next_study_task = conn.execute("""
         SELECT id,title FROM study_tasks
         WHERE user_id=? AND subject_id=? AND source='roadmap'
