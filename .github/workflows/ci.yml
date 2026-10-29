@@ -122,6 +122,8 @@ jobs:
           python tests/test_document_library_folders.py
           node --check static/js/document_library.js
           node tests/test_document_library_ui.js
+          node --check static/js/document_dropzone.js
+          node tests/test_document_dropzone_ui.js
           python -m py_compile syllabus_file_preview.py
           python -m py_compile chat_response_validation.py
           python -m py_compile adaptive_decision_phase8.py adaptive_plan_phase8.py
