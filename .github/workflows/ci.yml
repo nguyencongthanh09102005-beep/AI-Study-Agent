@@ -106,6 +106,7 @@ jobs:
         run: |
           python tests/test_study_plan_ui.py
           python tests/test_study_plan_roadmap_first.py
+          python tests/test_manual_lesson_flow.py
           python tests/test_schedule_conflicts.py
           python tests/test_study_session_step631.py
           python tests/test_study_session_tracking.py
