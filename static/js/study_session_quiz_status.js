@@ -27,6 +27,10 @@ document.addEventListener("DOMContentLoaded", () => {
           data.total_parts + " phần. Vào Lộ trình theo chương để tiếp tục."
         : "Vào Lộ trình theo chương → Chuẩn bị / Tiếp tục tạo Quiz.";
       go.textContent = "Xem ngữ cảnh Quiz";
+    } else if (state === "review") {
+      status.textContent = "✓ Quiz " + label + "đã làm · Có thể ôn lại bất cứ lúc nào";
+      detail.textContent = "Kết quả đã lưu trong mục Quiz. Bạn có thể làm lại để củng cố kiến thức, không phụ thuộc giờ học.";
+      go.textContent = "↻ Ôn lại Quiz đã làm";
     } else if (state === "active") {
       status.textContent = "✓ Quiz " + label + "đang được mở";
       detail.textContent = "Có thể vào bài kiểm tra và nộp kết quả.";
