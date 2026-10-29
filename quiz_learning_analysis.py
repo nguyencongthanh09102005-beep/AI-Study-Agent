@@ -14,6 +14,41 @@ def _label(value, fallback, limit=120):
     return clean[:limit] if clean else fallback
 
 
+def _chapter_identity(raw):
+    """Unify 'CHƯƠNG 1', 'Chương 1: title', and 'Chương 01 · title'.
+
+    This is ONLY a display/aggregation key, never a rewrite of stored Quiz
+    questions or the long-term adaptive learning signals.
+    """
+    original = _label(raw, "Chưa xác định chương", 240)
+    match = re.match(r"^chương\s*0*(\d+)(?!\d)", original, re.IGNORECASE)
+    if match:
+        number = int(match.group(1))
+        return f"chapter:{number}", f"Chương {number}", number
+    return original.casefold(), original, None
+
+
+def _topic_identity(raw, full_chapter, chapter_number):
+    """Remove redundant chapter headings, preserving the actual topic name."""
+    topic = _label(raw, "Chưa xác định chủ đề", 300)
+    chapter = _label(full_chapter, "", 240)
+    if chapter and topic.casefold().startswith(chapter.casefold()):
+        suffix = topic[len(chapter):].strip(" :;·—–-|.")
+        if suffix:
+            topic = suffix
+    elif chapter_number is not None:
+        # 'CHƯƠNG 1 · Thắng lợi ...' => 'Thắng lợi ...'
+        prefix = re.match(
+            rf"^chương\s*0*{chapter_number}(?!\d)\s*[:;·—–|.\-]+\s*",
+            topic, re.IGNORECASE
+        )
+        if prefix:
+            remainder = topic[prefix.end():].strip()
+            if remainder:
+                topic = remainder
+    return topic[:180]
+
+
 def _valid_key(question):
     if not isinstance(question, dict):
         return None
@@ -46,11 +81,13 @@ def summarize_quiz_attempt(questions, answers, max_topics=12):
         is_correct = selected == expected
         correct += int(is_correct)
         incorrect += int(not is_correct)
-        chapter = _label(question.get("chapter"), "Chưa xác định chương")
-        topic = _label(question.get("topic"), "Chưa xác định chủ đề", 180)
+        chapter_key, chapter, chapter_number = _chapter_identity(
+            question.get("chapter"))
+        topic = _topic_identity(question.get("topic"),
+                                question.get("chapter"), chapter_number)
         for bucket, key, label in (
-            (chapters, chapter.casefold(), chapter),
-            (topics, (chapter.casefold(), topic.casefold()), topic),
+            (chapters, chapter_key, chapter),
+            (topics, (chapter_key, topic.casefold()), topic),
         ):
             if key not in bucket:
                 bucket[key] = {"name": label, "correct": 0, "incorrect": 0}
