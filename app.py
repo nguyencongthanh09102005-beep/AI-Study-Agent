@@ -6870,7 +6870,7 @@ def update_study_task(task_id):
     if study_at:
         conn = db()
         old_task = conn.execute(
-            "SELECT subject_id,source FROM study_tasks WHERE id=? AND user_id=?",
+            "SELECT subject_id,source,study_at FROM study_tasks WHERE id=? AND user_id=?",
             (task_id, uid)
         ).fetchone()
         subject_id = owned_subject_id(
@@ -6889,6 +6889,10 @@ def update_study_task(task_id):
         if old_task and old_task["source"] == "adaptive":
             from adaptive_review_schedule import lock_adaptive_time
             lock_adaptive_time(conn, task_id, uid)
+        if (old_task and old_task["source"] == "roadmap"
+                and old_task["study_at"] != study_at):
+            from adaptive_plan_phase8 import lock_manual_roadmap_time
+            lock_manual_roadmap_time(conn, uid, task_id)
         if old_task and old_task["subject_id"]:
             recalculate_subject_progress(uid, old_task["subject_id"], conn)
         if subject_id:
