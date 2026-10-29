@@ -63,6 +63,10 @@ def run():
             assert "PRIVATE_USER2_DO_NOT_LEAK" in foreign
             assert "chuong2.txt" not in foreign_sources
 
+            anonymous=project.app.test_client()
+            auth=anonymous.get("/login")
+            assert auth.status_code==200
+            assert "phase9_accessibility.css" in auth.get_data(as_text=True)
             client=project.app.test_client()
             with client.session_transaction() as sess:
                 sess["user_id"]=first[0]
