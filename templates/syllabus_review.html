@@ -21,11 +21,11 @@
       {% endif %}
     </div>
   </div>
-  <h3 style="color:#304777">Tải đề cương cá nhân (PDF/TXT/MD)</h3>
+  <h3 style="color:#304777">Tải đề cương cá nhân (PDF/DOCX/TXT/MD)</h3>
   <form method="post" enctype="multipart/form-data" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <input type="hidden" name="action" value="upload">
-    <input type="file" name="file" accept=".pdf,.txt,.md" required style="max-width:360px">
+    <input type="file" name="file" accept=".pdf,.docx,.txt,.md" required style="max-width:360px">
     <button type="submit" class="soft-primary">Tải lên đúng môn</button>
   </form>
   <p style="color:#7a87a3;font-size:12px">Tối đa {{ upload_max_mb }} MB. PDF dạng ảnh chưa hỗ trợ OCR. Nếu có đề cương chung, bản chung được ưu tiên.</p>
