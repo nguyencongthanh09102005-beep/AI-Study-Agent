@@ -1883,13 +1883,10 @@ def sync_adaptive_review_task(conn, user_id, subject_id):
         120
     )
 
-    now_dt = datetime.now()
-    review_dt = datetime.fromisoformat(
-        f"{now_dt.date().isoformat()}T{preferred_time}"
+    from adaptive_review_schedule import (
+        ensure_review_schedule_schema, has_manual_time, next_review_slot
     )
-    # Nếu giờ học hôm nay đã qua/gần sát, xếp sang ngày mai.
-    if review_dt <= now_dt + timedelta(minutes=20):
-        review_dt = review_dt + timedelta(days=1)
+    ensure_review_schedule_schema(conn)
 
     top = weaknesses[0]
     top_label = (
@@ -1916,8 +1913,7 @@ def sync_adaptive_review_task(conn, user_id, subject_id):
 
     existing_rows = conn.execute(
         """
-        SELECT id
-        FROM study_tasks
+        SELECT id,study_at,duration FROM study_tasks
         WHERE user_id=? AND subject_id=?
           AND source='adaptive' AND done=0
         ORDER BY id DESC
@@ -1925,24 +1921,22 @@ def sync_adaptive_review_task(conn, user_id, subject_id):
         (user_id, subject_id)
     ).fetchall()
 
-    study_at = review_dt.isoformat(timespec="minutes")
-
     if existing_rows:
         keep_id = existing_rows[0]["id"]
+        if has_manual_time(conn, keep_id, user_id):
+            # Preserve user-chosen time/duration on every later Quiz.
+            study_at = existing_rows[0]["study_at"]
+            duration = existing_rows[0]["duration"]
+        else:
+            study_at = next_review_slot(
+                conn, user_id, duration, preferred_time, keep_id)
         conn.execute(
             """
             UPDATE study_tasks
             SET title=?, study_at=?, duration=?, note=?
             WHERE id=? AND user_id=?
             """,
-            (
-                title,
-                study_at,
-                duration,
-                note,
-                keep_id,
-                user_id
-            )
+            (title, study_at, duration, note, keep_id, user_id)
         )
 
         extra_ids = [row["id"] for row in existing_rows[1:]]
@@ -1953,6 +1947,7 @@ def sync_adaptive_review_task(conn, user_id, subject_id):
             )
         task_id = keep_id
     else:
+        study_at = next_review_slot(conn, user_id, duration, preferred_time)
         cursor = conn.execute(
             """
             INSERT INTO study_tasks(
@@ -6832,7 +6827,7 @@ def update_study_task(task_id):
     if study_at:
         conn = db()
         old_task = conn.execute(
-            "SELECT subject_id FROM study_tasks WHERE id=? AND user_id=?",
+            "SELECT subject_id,source FROM study_tasks WHERE id=? AND user_id=?",
             (task_id, uid)
         ).fetchone()
         subject_id = owned_subject_id(
@@ -6848,6 +6843,9 @@ def update_study_task(task_id):
             """,
             (subject_id, title, study_at, duration, note, task_id, uid)
         )
+        if old_task and old_task["source"] == "adaptive":
+            from adaptive_review_schedule import lock_adaptive_time
+            lock_adaptive_time(conn, task_id, uid)
         if old_task and old_task["subject_id"]:
             recalculate_subject_progress(uid, old_task["subject_id"], conn)
         if subject_id:
