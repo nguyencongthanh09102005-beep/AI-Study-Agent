@@ -2242,6 +2242,14 @@ def gemini_generate(prompt):
     except ValueError:
         request_timeout = 25
     request_timeout = max(10, min(request_timeout, 60))
+    # F3: cap the total latency across primary retries, backups and backoff.
+    # This is especially important for synchronous Chat and live demonstrations.
+    try:
+        total_budget = int(os.getenv("GEMINI_TOTAL_TIMEOUT", "35"))
+    except ValueError:
+        total_budget = 35
+    total_budget = max(15, min(total_budget, 90))
+    deadline = time.monotonic() + total_budget
 
     last_error = ""
 
@@ -2250,6 +2258,9 @@ def gemini_generate(prompt):
         max_attempts = 1 + primary_retries if model_index == 0 else 1
 
         for attempt in range(max_attempts):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0.5:
+                return None, "Gemini phản hồi quá thời gian chờ tổng. Hãy thử lại."
             url = (
                 "https://generativelanguage.googleapis.com/v1beta/"
                 f"models/{model}:generateContent"
@@ -2270,7 +2281,7 @@ def gemini_generate(prompt):
                             }
                         ]
                     },
-                    timeout=request_timeout,
+                    timeout=min(float(request_timeout), max(1.0, remaining)),
                 )
 
                 if res.ok:
@@ -2330,6 +2341,8 @@ def gemini_generate(prompt):
                         f"Gemini {model} tạm lỗi HTTP {status}; "
                         f"retry sau {delay:.1f}s"
                     )
+                    if delay >= deadline - time.monotonic():
+                        break
                     time.sleep(delay)
                     continue
 
@@ -2347,6 +2360,8 @@ def gemini_generate(prompt):
 
                 if model_index == 0 and attempt < max_attempts - 1:
                     delay = min(4.0, (2 ** attempt)) + random.uniform(0.1, 0.5)
+                    if delay >= deadline - time.monotonic():
+                        break
                     time.sleep(delay)
                     continue
 
