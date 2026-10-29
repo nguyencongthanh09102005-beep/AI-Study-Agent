@@ -15,7 +15,7 @@
     <span class="manual-room-eyebrow">KHÔNG GIAN HỌC CÁ NHÂN · RIÊNG TƯ</span>
     <h2>{{ info.title }}</h2>
     <p>{{ info.subject_name }} · {{ info.study_at[:16]|replace('T',' ') }} · {{ info.duration }} phút</p>
-    <p class="manual-room-subtitle">AI chỉ sử dụng nội dung trích xuất từ tài liệu cá nhân đã chọn trong phần trợ giúp tại đây. Không dùng chung với sinh viên khác.</p>
+    <p class="manual-room-subtitle">Các câu hỏi AI chỉ lấy ngữ cảnh từ file cá nhân bạn chọn, không dùng chung với sinh viên khác. Khi bạn bấm Hỏi AI hoặc Chuẩn bị Quiz, nội dung trích xuất của file sẽ được gửi tới Gemini để xử lý.</p>
     <form method="post" action="{{ url_for('toggle_study_task',task_id=info.id) }}">
       <button class="ghost-action" type="submit">{{ '↺ Đánh dấu chưa hoàn thành' if info.done else '✓ Đánh dấu hoàn thành buổi học' }}</button>
     </form>
