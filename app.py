@@ -4955,6 +4955,40 @@ def documents():
         except OSError:
             pass
 
+    # Folder view is purely presentational: preserve the original per-user
+    # and per-shared-course permission filters in the SQL queries above.
+    personal_buckets = {row["id"]: [] for row in subs}
+    personal_buckets[None] = []
+    for row in docs:
+        key = row["subject_id"] if row["subject_id"] in personal_buckets else None
+        personal_buckets[key].append(row)
+    personal_groups = [
+        {"key": f"personal-{row['id']}", "name": row["name"],
+         "code": row["code"] or "", "files": personal_buckets[row["id"]]}
+        for row in subs
+    ]
+    if personal_buckets[None]:
+        personal_groups.append({
+            "key": "personal-unassigned", "name": "Chưa phân loại",
+            "code": "", "files": personal_buckets[None]
+        })
+
+    shared_buckets = {subject_id: [] for subject_id in shared_subject_names}
+    for row in shared_docs:
+        shared_buckets[row["shared_subject_id"]].append(row)
+    shared_groups = []
+    for shared_id, display_name in shared_subject_names.items():
+        linked_subject = next(
+            (row for row in subs if row["name"] == display_name
+             and row["shared_subject_id"] == shared_id), None
+        )
+        shared_groups.append({
+            "key": f"shared-{shared_id}", "name": display_name,
+            "code": linked_subject["code"] if linked_subject else "",
+            "files": sorted(shared_buckets[shared_id],
+                            key=lambda row: (not bool(row["is_syllabus"]), -row["id"]))
+        })
+
     extraction_percent = (
         round((extracted_count / len(docs)) * 100)
         if docs else 0
@@ -4971,6 +5005,8 @@ def documents():
         extraction_percent=extraction_percent,
         storage_mb=storage_mb,
         shared_documents=shared_docs,
+        personal_groups=personal_groups,
+        shared_groups=shared_groups,
         upload_max_mb=MAX_UPLOAD_MB,
         upload_error=request.args.get("upload_error") == "too_large"
     )
