@@ -45,7 +45,8 @@ window.QuizLearningAnalytics = Object.freeze({
           ? item.chapter + " · " + item.name : item.name;
         node(info, "span", name || "Chưa phân loại");
         node(info, "strong", String(item.correct || 0) + "/" + String(item.total || 0) +
-          " · " + String(item.percent ?? 0) + "%");
+          " · " + String(item.percent ?? 0) + "%" +
+          (kind === "topic" && Number(item.total) === 1 ? " · 1 câu" : ""));
         const track = node(row, "div", "", "quiz-analysis-track");
         const fill = node(track, "div", "", "quiz-analysis-fill");
         const percent = Math.max(0, Math.min(100, Number(item.percent) || 0));
@@ -82,6 +83,7 @@ window.QuizLearningAnalytics = Object.freeze({
     }
     node(panel, "p",
       "Thống kê theo lần làm Quiz này, không cộng dồn nhiều lượt. " +
+      "Một chủ đề chỉ có 1 câu là dấu hiệu cần xem lại, chưa đủ kết luận năng lực. " +
       "Điểm yếu dài hạn và lịch ôn được hệ thống cập nhật riêng.",
       "quiz-analysis-note");
   }
