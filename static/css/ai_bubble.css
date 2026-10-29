@@ -79,3 +79,61 @@
  .floating-ai-root[data-side="left"] .floating-ai-panel{left:0}
 }
 @media(prefers-reduced-motion:reduce){.floating-ai-bubble{transition:none}}
+
+
+/* User-adjustable floating assistant. Desktop size stays viewport-bounded. */
+.floating-ai-panel{
+ box-sizing:border-box;min-width:min(340px,calc(100vw - 32px));
+ max-width:calc(100vw - 32px);max-height:calc(100dvh - 32px);
+}
+.floating-ai-window-actions{display:flex;align-items:center;gap:5px;flex:none}
+.floating-ai-window-button{
+ width:32px;height:32px;display:grid;place-items:center;flex:none;
+ border:0;border-radius:9px;background:#e9eefe;color:#435a91;
+ font-size:19px;font-weight:700;cursor:pointer;
+}
+.floating-ai-window-button:hover,.floating-ai-close:hover{background:#dce5ff}
+.floating-ai-window-button:focus-visible,.floating-ai-resize-handle:focus-visible{
+ outline:3px solid #6b80fd;outline-offset:2px;
+}
+.floating-ai-resize-handle{
+ position:absolute;bottom:3px;left:3px;z-index:4;width:22px;height:22px;
+ cursor:nesw-resize;touch-action:none;user-select:none;
+ border-radius:0 0 0 16px;background:transparent;
+}
+.floating-ai-resize-handle::after{
+ content:"";position:absolute;bottom:5px;left:5px;width:12px;height:12px;
+ background:repeating-linear-gradient(135deg,transparent 0 3px,#8195c7 3px 5px,transparent 5px 7px);
+ clip-path:polygon(0 100%,0 15%,85% 100%);
+ opacity:.9;transform:scaleX(-1);
+}
+.floating-ai-root[data-side="left"] .floating-ai-resize-handle{
+ left:auto;right:3px;cursor:nwse-resize;border-radius:0 0 16px 0;
+}
+.floating-ai-root[data-side="left"] .floating-ai-resize-handle::after{
+ left:auto;right:5px;transform:none;
+}
+/* Tables get enough room to remain readable; scroll sideways within the
+   response instead of squeezing every word into a 50px-wide column. */
+.floating-ai-message.assistant{box-sizing:border-box;width:100%;max-width:100%;min-width:0}
+.floating-ai-message.user{max-width:85%}
+.floating-ai-message-body.chat-markdown{min-width:0;max-width:100%}
+.floating-ai-message-body .chat-table-scroll{
+ display:block;width:100%;max-width:100%;overflow-x:auto;overscroll-behavior-x:contain;
+ -webkit-overflow-scrolling:touch;
+}
+.floating-ai-message-body .chat-data-table{
+ table-layout:fixed;width:max(100%,640px);min-width:640px;
+}
+.floating-ai-message-body .chat-data-table th,
+.floating-ai-message-body .chat-data-table td{
+ white-space:normal;word-break:normal;overflow-wrap:break-word;hyphens:auto;
+}
+@media(max-width:600px){
+ .floating-ai-panel{
+  width:100vw!important;height:100dvh!important;max-width:none!important;
+  max-height:100dvh!important;min-width:0!important;
+ }
+ .floating-ai-window-button,.floating-ai-resize-handle{display:none!important}
+ .floating-ai-message-body .chat-data-table{width:max(100%,560px);min-width:560px}
+}
