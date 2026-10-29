@@ -149,6 +149,9 @@ def analysis_for_saved_attempt(conn, uid, quiz_id, attempt_id=None):
     except (ValueError, TypeError):
         questions, answers = [], []
     details = summarize_quiz_attempt(questions, answers)
+    from quiz_review_progress import compare_review_attempt
+    review_comparison = compare_review_attempt(
+        conn, uid, quiz_id, questions, answers)
     return {
         "quiz_id": quiz_id, "attempt_id": attempt["id"],
         "quiz_title": quiz["title"], "subject_id": quiz["subject_id"],
@@ -156,7 +159,7 @@ def analysis_for_saved_attempt(conn, uid, quiz_id, attempt_id=None):
         "correct_count": attempt["correct_count"],
         "total_questions": attempt["total_questions"],
         "created_at": attempt["created_at"],
-        "analysis": details,
+        "analysis": details, "review_comparison": review_comparison,
     }
 
 
