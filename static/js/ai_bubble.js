@@ -7,6 +7,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const bubble = document.getElementById("floatingAiBubble");
   const panel = document.getElementById("floatingAiPanel");
   const close = document.getElementById("floatingAiClose");
+  const expandButton = document.getElementById("floatingAiExpand");
+  const resetSizeButton = document.getElementById("floatingAiResetSize");
+  const resizeHandle = document.getElementById("floatingAiResize");
   const scope = document.getElementById("floatingAiScope");
   const mode = document.getElementById("floatingAiMode");
   const courseLabel = document.getElementById("floatingAiCourseLabel");
@@ -28,7 +31,9 @@ document.addEventListener("DOMContentLoaded", () => {
   } : null;
 
   const STORAGE_KEY = "ai-study-floating-position-v1";
+  const SIZE_KEY = "ai-study-floating-size-v1";
   let position = null, pointer = null, ignoreClick = false;
+  let panelSize = {width: 420, height: 640}, expanded = false, resizePointer = null;
   let loaded = false, busy = false, disabled = true, requestToken = 0;
   let conversationId = null, subjectId = null;
   let courses = [], approvedSourceNames = [];
@@ -235,6 +240,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function openPanel() {
+    applyPanelSize();
     bubble.hidden = true;
     panel.hidden = false;
     bubble.setAttribute("aria-expanded", "true");
@@ -260,6 +266,132 @@ document.addEventListener("DOMContentLoaded", () => {
   );
 
   function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
+
+  // The popup is always viewport-bounded. On small screens it is fullscreen,
+  // and we keep the custom desktop dimensions for when the screen grows again.
+  function mobilePanel() { return window.innerWidth <= 600; }
+  function boundedPanelSize(size) {
+    const maxWidth = Math.max(1, window.innerWidth - 32);
+    const maxHeight = Math.max(1, window.innerHeight - 32);
+    return {
+      width: Math.round(clamp(size.width, Math.min(340, maxWidth), maxWidth)),
+      height: Math.round(clamp(size.height, Math.min(310, maxHeight), maxHeight))
+    };
+  }
+  function savePanelSize() {
+    try {
+      localStorage.setItem(SIZE_KEY, JSON.stringify({
+        width: panelSize.width, height: panelSize.height, expanded
+      }));
+    } catch (_error) { /* Privacy mode: resize still works for this page. */ }
+  }
+  function applyPanelSize() {
+    if (mobilePanel()) {
+      panel.style.removeProperty("width");
+      panel.style.removeProperty("height");
+    } else {
+      const chosen = expanded
+        ? {width: Math.min(1100, window.innerWidth - 32),
+           height: window.innerHeight - 32}
+        : panelSize;
+      const size = boundedPanelSize(chosen);
+      panel.style.width = size.width + "px";
+      panel.style.height = size.height + "px";
+    }
+    expandButton?.setAttribute("aria-pressed", String(expanded));
+    if (expandButton) {
+      expandButton.textContent = expanded ? "▢" : "⛶";
+      expandButton.setAttribute("aria-label", expanded
+        ? "Trở về kích thước Chat AI tùy chỉnh" : "Mở rộng cửa sổ Chat AI");
+      expandButton.title = expanded ? "Trở về kích thước trước" : "Mở rộng để đọc bảng";
+    }
+  }
+  function usePanelSize(width, height) {
+    expanded = false;
+    const size = boundedPanelSize({width, height});
+    panelSize = size;
+    applyPanelSize();
+  }
+  try {
+    const saved = JSON.parse(localStorage.getItem(SIZE_KEY));
+    if (Number.isFinite(saved?.width) && Number.isFinite(saved?.height) &&
+        saved.width >= 300 && saved.height >= 280 &&
+        saved.width <= 10000 && saved.height <= 10000) {
+      panelSize = {width: saved.width, height: saved.height};
+      expanded = saved.expanded === true;
+    }
+  } catch (_error) { /* Stored dimensions may be unavailable or malformed. */ }
+  applyPanelSize();
+
+  expandButton?.addEventListener("click", () => {
+    if (mobilePanel()) return;
+    expanded = !expanded;
+    applyPanelSize();
+    savePanelSize();
+  });
+  resetSizeButton?.addEventListener("click", () => {
+    if (mobilePanel()) return;
+    panelSize = {width: 420, height: 640};
+    expanded = false;
+    applyPanelSize();
+    savePanelSize();
+  });
+  resizeHandle?.addEventListener("pointerdown", event => {
+    if (event.button !== 0 || mobilePanel()) return;
+    const bounds = panel.getBoundingClientRect();
+    resizePointer = {
+      id: event.pointerId, x: event.clientX, y: event.clientY,
+      width: bounds.width, height: bounds.height,
+      leftSide: root.dataset.side === "left", moved: false
+    };
+    resizeHandle.setPointerCapture?.(event.pointerId);
+    event.preventDefault();
+  });
+  resizeHandle?.addEventListener("pointermove", event => {
+    if (!resizePointer || resizePointer.id !== event.pointerId) return;
+    const dx = event.clientX - resizePointer.x;
+    const dy = event.clientY - resizePointer.y;
+    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) resizePointer.moved = true;
+    if (!resizePointer.moved) return;
+    event.preventDefault();
+    usePanelSize(
+      resizePointer.width + (resizePointer.leftSide ? dx : -dx),
+      resizePointer.height - dy
+    );
+  });
+  function finishResize(event) {
+    if (!resizePointer || resizePointer.id !== event.pointerId) return;
+    if (resizePointer.moved) savePanelSize();
+    if (resizeHandle?.hasPointerCapture?.(event.pointerId)) {
+      resizeHandle.releasePointerCapture(event.pointerId);
+    }
+    resizePointer = null;
+  }
+  resizeHandle?.addEventListener("pointerup", finishResize);
+  resizeHandle?.addEventListener("pointercancel", finishResize);
+  resizeHandle?.addEventListener("keydown", event => {
+    if (mobilePanel()) return;
+    const step = event.shiftKey ? 64 : 24;
+    const keys = {
+      ArrowRight: [step, 0], ArrowLeft: [-step, 0],
+      ArrowUp: [0, step], ArrowDown: [0, -step]
+    };
+    if (event.key === "Home") {
+      event.preventDefault();
+      panelSize = {width: 420, height: 640};
+      expanded = false;
+      applyPanelSize();
+      savePanelSize();
+      return;
+    }
+    if (!keys[event.key]) return;
+    event.preventDefault();
+    const current = panel.getBoundingClientRect();
+    usePanelSize(current.width + keys[event.key][0],
+                 current.height + keys[event.key][1]);
+    savePanelSize();
+  });
+
   function place(x, y) {
     const edge = 10;
     const size = bubble.offsetWidth || 62;
@@ -319,6 +451,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   window.addEventListener("resize", () => {
     if (position) place(position.x,position.y);
+    applyPanelSize();
   });
   courseSelect.addEventListener("change", () => {
     if (!busy && !isLesson) selectCourse(Number(courseSelect.value));
