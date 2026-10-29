@@ -27,27 +27,42 @@
   </div>
 </section>
 
-{% if next_best_action %}
-<section class="soft-card proactive-agent-card proactive-{{ next_best_action.kind }}">
+{% if adaptive_decision %}
+<section class="soft-card proactive-agent-card" id="adaptiveDecision" data-decision="{{ adaptive_decision.kind }}" style="margin-bottom:20px">
   <div class="proactive-agent-main">
     <span class="proactive-agent-avatar">🤖</span>
     <div class="proactive-agent-copy">
-      <div class="proactive-agent-kicker">
-        <span>STUDY AGENT</span>
-        <b>{{ next_best_action.eyebrow }}</b>
-      </div>
-      <h3>{{ next_best_action.title }}</h3>
-      <p>{{ next_best_action.reason }}</p>
+      <div class="proactive-agent-kicker"><span>PERSONAL STUDY AGENT · ĐỢT 8</span><b>Đánh giá từ dữ liệu học thật</b></div>
+      <h3>{{ adaptive_decision.title }}</h3>
+      <p>{{ adaptive_decision.reason }}</p>
       <div class="proactive-agent-meta">
-        {% for item in next_best_action.meta %}
-        <span>{{ item }}</span>
-        {% endfor %}
+        <span>{{ 'Có deadline gần' if adaptive_decision.deadline_urgent else 'Theo tiến độ hiện tại' }}</span>
+        <span>{{ 'Chưa đủ dữ liệu để kết luận' if adaptive_decision.kind == 'collect' else 'Đề xuất, không tự đổi lịch' }}</span>
       </div>
+      <details style="margin-top:12px">
+        <summary style="cursor:pointer;font-weight:750;color:#385291">Vì sao Study Agent đề xuất bước này?</summary>
+        <ul style="padding-left:20px;margin:8px 0;color:#465875;line-height:1.7">
+          {% for evidence in adaptive_decision.evidence %}
+          <li>{{ evidence }}</li>
+          {% endfor %}
+        </ul>
+        <small style="color:#697a93">Kết luận được tính từ Quiz, điểm yếu và kế hoạch riêng của tài khoản này; không suy đoán bằng AI sinh văn bản.</small>
+      </details>
     </div>
   </div>
   <div class="proactive-agent-actions">
-    <a class="proactive-primary" href="{{ next_best_action.primary_url }}">{{ next_best_action.primary_label }} →</a>
-    <a class="proactive-secondary" href="{{ next_best_action.secondary_url }}">{{ next_best_action.secondary_label }}</a>
+    {% if adaptive_decision.kind in ('review', 'verify') %}
+      <a class="proactive-primary" href="{{ url_for('quiz', mode='weakness', subject_id=subject.id) }}">Ôn điểm yếu →</a>
+      <a class="proactive-secondary" href="{{ url_for('study_plan', subject_id=subject.id) }}">Xem lịch ôn</a>
+    {% elif adaptive_decision.kind == 'continue' and adaptive_decision.next_task %}
+      <a class="proactive-primary" href="{{ url_for('study_plan', subject_id=subject.id) }}">Xem buổi tiếp theo →</a>
+      <a class="proactive-secondary" href="{{ url_for('course_path.learning_path', subject_id=subject.id) }}">Lộ trình theo chương</a>
+    {% elif adaptive_decision.kind == 'continue' %}
+      <a class="proactive-primary" href="{{ url_for('course_path.learning_path', subject_id=subject.id) }}">Xem lộ trình theo chương →</a>
+    {% else %}
+      <a class="proactive-primary" href="{{ url_for('quiz', mode='subject', subject_id=subject.id) }}">Tạo Quiz môn học →</a>
+      <a class="proactive-secondary" href="{{ url_for('course_path.learning_path', subject_id=subject.id) }}">Xem lộ trình</a>
+    {% endif %}
   </div>
 </section>
 {% endif %}
