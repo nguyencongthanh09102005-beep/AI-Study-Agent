@@ -4743,9 +4743,53 @@ def shared_document_file(doc_id):
     conn.close()
     if not authorized:
         return "Không có quyền xem tài liệu của môn học này.", 403
+    stored_path = UPLOAD_DIR / document["stored_name"]
+    if request.args.get("preview") == "1" and stored_path.suffix.lower() == ".docx":
+        return _render_word_preview(stored_path, document["original_name"])
     return send_from_directory(
         UPLOAD_DIR, document["stored_name"],
-        as_attachment=False, download_name=document["original_name"]
+        as_attachment=request.args.get("download") == "1",
+        download_name=document["original_name"]
+    )
+
+
+def _render_word_preview(path, name):
+    """Authenticated-only HTML preview with restrictive content security policy."""
+    from flask import Response
+    from syllabus_file_preview import render_docx_preview
+    try:
+        page = render_docx_preview(path, name)
+    except Exception:
+        return "Không đọc được bản xem trước Word. Hãy tải file gốc để xem.", 422
+    response = Response(page, mimetype="text/html; charset=utf-8")
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'none'; style-src 'unsafe-inline'; "
+        "img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'self'"
+    )
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Cache-Control"] = "private, no-store"
+    return response
+
+
+@app.route("/documents/<int:doc_id>/file")
+@login_required
+def personal_document_file(doc_id):
+    """Source file/preview is accessible only to the owner of that document."""
+    conn = db()
+    row = conn.execute("""
+        SELECT original_name,stored_name FROM documents
+        WHERE id=? AND user_id=?
+    """, (doc_id, session["user_id"])).fetchone()
+    conn.close()
+    if not row:
+        return "Không tìm thấy tài liệu cá nhân.", 404
+    path = UPLOAD_DIR / row["stored_name"]
+    if request.args.get("preview") == "1" and path.suffix.lower() == ".docx":
+        return _render_word_preview(path, row["original_name"])
+    return send_from_directory(
+        UPLOAD_DIR, row["stored_name"],
+        as_attachment=request.args.get("download") == "1",
+        download_name=row["original_name"]
     )
 
 
