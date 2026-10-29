@@ -59,7 +59,7 @@ def run():
             assert "Nội dung" in text and "<script>" in text
             rendered = render_docx_preview(src, "de_cuong.docx")
             assert "<table>" in rendered and "<td>" in rendered
-    assert "data:image/png;base64," in rendered, "Word inline image was not preserved"
+            assert "data:image/png;base64," in rendered, "Word inline image was not preserved"
             assert "&lt;script&gt;" in rendered
             assert "<script>" not in rendered
 
