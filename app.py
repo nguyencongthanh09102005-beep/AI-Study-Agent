@@ -45,6 +45,8 @@ from study_session_routes import study_session_bp
 app.register_blueprint(study_session_bp)
 from study_session_quiz_routes import session_quiz_bp
 app.register_blueprint(session_quiz_bp)
+from manual_lesson_routes import manual_lesson_bp
+app.register_blueprint(manual_lesson_bp)
 # Khi thiếu SECRET_KEY, dùng khóa ngẫu nhiên chỉ cho phiên chạy hiện tại.
 # Khi triển khai cần đặt SECRET_KEY bí mật, ổn định trong biến môi trường.
 app.secret_key = os.getenv("SECRET_KEY") or secrets.token_hex(32)
@@ -6613,6 +6615,23 @@ def study_plan():
 
     profile = ensure_learning_profile(conn, uid)
 
+    from manual_lesson_routes import ensure_schema as ensure_manual_lesson_schema
+    ensure_manual_lesson_schema(conn)
+    personal_study_documents = conn.execute("""
+        SELECT d.id,d.subject_id,d.original_name
+        FROM documents d JOIN subjects s
+          ON s.id=d.subject_id AND s.user_id=d.user_id
+        WHERE d.user_id=? AND length(trim(COALESCE(d.extracted_text,''))) >= 80
+        ORDER BY s.name,d.original_name,d.id
+    """, (uid,)).fetchall()
+    manual_lesson_docs = {
+        row["task_id"]: row["document_id"] for row in conn.execute("""
+            SELECT m.task_id,m.document_id
+            FROM manual_lesson_documents m JOIN study_tasks t ON t.id=m.task_id
+            WHERE m.user_id=? AND t.user_id=? AND t.source='manual'
+        """, (uid,uid)).fetchall()
+    }
+
     task_rows = conn.execute(
         """
         SELECT t.*, s.name AS subject_name
@@ -6840,6 +6859,8 @@ def study_plan():
         urgent_count=urgent_count,
         today_input=today.isoformat(),
         profile=profile,
+        personal_study_documents=personal_study_documents,
+        manual_lesson_docs=manual_lesson_docs,
     )
 
 
@@ -6978,30 +6999,51 @@ def generate_study_plan_route():
 @login_required
 def create_study_task():
     uid = session["user_id"]
-    title = request.form.get("title", "").strip() or "Buổi học"
+    title = request.form.get("title", "").strip()[:160] or "Buổi học"
     study_at = request.form.get("study_at", "").strip()
     duration = _safe_int(request.form.get("duration"), 45, 15, 240)
-    note = request.form.get("note", "").strip()
+    note = request.form.get("note", "").strip()[:1000]
+    document_id = request.form.get("document_id", type=int)
+    prepare_quiz = request.form.get("prepare_quiz") == "1"
 
     if not study_at:
         return redirect(url_for("study_plan"))
+    try:
+        datetime.fromisoformat(study_at)
+    except (TypeError, ValueError):
+        return "Ngày giờ học không hợp lệ.", 400
 
     conn = db()
-    subject_id = owned_subject_id(
-        conn,
-        uid,
-        request.form.get("subject_id")
-    )
-    conn.execute(
-        """
-        INSERT INTO study_tasks(
-            user_id,subject_id,title,study_at,duration,note,done,source,created_at
-        ) VALUES(?,?,?,?,?,?,?,?,?)
-        """,
-        (uid, subject_id, title, study_at, duration, note, 0, "manual", now())
-    )
-    conn.commit()
-    conn.close()
+    try:
+        subject_id = owned_subject_id(conn, uid, request.form.get("subject_id"))
+        from manual_lesson_routes import owned_document, attach_document
+        if document_id and not owned_document(conn, uid, subject_id, document_id):
+            return "Tài liệu cá nhân không thuộc môn đã chọn.", 400
+        if prepare_quiz and not document_id:
+            return "Hãy chọn tài liệu cá nhân trước khi yêu cầu chuẩn bị Quiz.", 400
+
+        cursor = conn.execute("""
+            INSERT INTO study_tasks(
+                user_id,subject_id,title,study_at,duration,note,done,source,created_at
+            ) VALUES(?,?,?,?,?,?,?,?,?)
+        """, (uid, subject_id, title, study_at, duration, note, 0, "manual", now()))
+        if document_id:
+            attach_document(conn, uid, cursor.lastrowid, subject_id,
+                            document_id, now(), quiz_requested=prepare_quiz)
+        task_id = cursor.lastrowid
+        conn.commit()
+    finally:
+        conn.close()
+
+    if document_id and prepare_quiz:
+        # AI cost only after explicit opt-in. Failure leaves the calendar
+        # session intact and lets the student retry in the private study room.
+        from manual_lesson_routes import generate_for_lesson
+        done, message = generate_for_lesson(sys.modules[__name__], uid, task_id)
+        if not done:
+            session["manual_lesson_answer"] = {"error": message}
+    if document_id:
+        return redirect(url_for("manual_lesson.room", task_id=task_id),code=303)
     return redirect(url_for("study_plan"))
 
 
@@ -7025,6 +7067,19 @@ def update_study_task(task_id):
             uid,
             request.form.get("subject_id")
         )
+        from manual_lesson_routes import (ensure_schema as ensure_manual_schema,
+                                          owned_document)
+        ensure_manual_schema(conn)
+        binding = conn.execute("""
+            SELECT document_id FROM manual_lesson_documents
+            WHERE task_id=? AND user_id=?
+        """, (task_id, uid)).fetchone()
+        # Editing an existing manual lesson cannot silently attach an unrelated
+        # course document or leave a private document bound to the wrong course.
+        if binding and not owned_document(conn, uid, subject_id,
+                                          binding["document_id"]):
+            conn.close()
+            return "Không thể chuyển buổi học sang môn khác khi vẫn gắn tài liệu cũ.", 400
         conn.execute(
             """
             UPDATE study_tasks
