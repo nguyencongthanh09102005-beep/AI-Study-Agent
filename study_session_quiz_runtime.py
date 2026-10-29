@@ -455,6 +455,17 @@ def quiz_access(conn, project, uid, quiz_id, at=None):
             ctx["task_signature"] != link["session_signature"]):
         return {"linked": True, "allowed": False,
                 "reason": "Nguồn hoặc nội dung lộ trình đã thay đổi."}
+    # A submitted Quiz remains open for later revision. The persistent
+    # attempt row is the durable unlock; it cannot be forged from the client.
+    # Verify current course, roadmap and approved sources ABOVE this check.
+    # Revoked sources and deleted subjects stay blocked.
+    submitted = conn.execute("""
+        SELECT 1 FROM quiz_attempts
+        WHERE quiz_id=? AND user_id=? LIMIT 1
+    """, (quiz_id, uid)).fetchone()
+    if submitted:
+        return {"linked": True, "allowed": True, "count": count,
+                "review_unlocked": True}
     at = at or study_now()
     grant = conn.execute("""
         SELECT started_at,valid_until FROM quiz_session_grants
