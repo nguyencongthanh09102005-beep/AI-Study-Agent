@@ -6807,7 +6807,8 @@ def study_plan():
         )
     else:
         agent_tip = (
-            "Chưa có lịch học. Hãy chọn môn, mục tiêu và deadline để AI tạo kế hoạch đầu tiên."
+            "Chưa có lịch học. Mở Môn học → Đề cương & lộ trình để xếp các buổi "
+            "theo chương vào thời khóa biểu, hoặc thêm buổi thủ công nếu cần."
         )
 
     # Keep pending deadlines immediately visible. Completed deadlines are
