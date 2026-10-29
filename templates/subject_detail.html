@@ -23,6 +23,7 @@
     <a class="soft-primary" href="{{ url_for('syllabus.review', subject_id=subject.id) if not syllabus_confirmed else url_for('course_path.learning_path', subject_id=subject.id) }}">▶ Bắt đầu học</a>
     {% endif %}
     <a class="ghost-action" href="{{ url_for('syllabus.review', subject_id=subject.id) }}">📖 Đề cương & lộ trình</a>
+    <a class="ghost-action" href="{{ url_for('clo_review.overview',subject_id=subject.id) }}">🎯 CLO & minh chứng</a>
   </div>
 </section>
 
