@@ -83,7 +83,13 @@ def verify():
     assert 'quickTask?.addEventListener' in timetable_js
     assert 'renderWeek()' not in timetable_js
     assert 'timetableGrid.replaceChildren()' in timetable_js
-    assert 'id="aiPlannerForm"' in html
+    # The verified course roadmap owns the creation of lesson sequences.
+    # Study Plan remains the calendar; the duplicate AI Planner is removed.
+    assert 'id="aiPlannerForm"' not in html
+    assert 'id="aiPlannerModal"' not in html
+    assert 'id="openAiPlanner"' not in html
+    assert "Tạo kế hoạch mới" not in html
+    assert "Đề cương & lộ trình" in html or "Thời khóa biểu" in html
     assert 'id="toggleEditPlan"' in html
     assert 'id="addTaskButton"' in html
     assert 'id="taskForm"' in html
