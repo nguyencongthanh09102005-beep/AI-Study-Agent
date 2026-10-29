@@ -36,6 +36,7 @@ def run():
                 VALUES(?,'Lịch sử','HIST754',3,?)
             """,(uid,project.now())).lastrowid
             source=[question("Lịch sử A","Cương lĩnh"),question("Lịch sử B","Phong trào")]
+            source[0]["chapter"]="CHƯƠNG 01: TỔNG QUAN LỊCH SỬ ĐẢNG"
             prior=conn.execute("""
                 INSERT INTO quizzes(user_id,subject_id,document_id,title,payload,created_at)
                 VALUES(?,?,NULL,'Quiz buổi 1',?,?)
