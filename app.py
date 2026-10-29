@@ -61,7 +61,7 @@ app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 # Bật chỉ khi chạy HTTPS thật; khi demo LAN HTTP giữ =0.
 app.config["SESSION_COOKIE_SECURE"] = os.getenv("SESSION_COOKIE_SECURE", "0") == "1"
 
-ALLOWED_EXTENSIONS = {"pdf", "txt", "md"}
+ALLOWED_EXTENSIONS = {"pdf", "txt", "md", "docx"}
 
 
 @app.errorhandler(RequestEntityTooLarge)
@@ -2039,6 +2039,12 @@ def extract_text(path: Path):
     ext = path.suffix.lower()
     if ext in {".txt", ".md"}:
         return path.read_text(encoding="utf-8", errors="ignore")[:100000]
+    if ext == ".docx":
+        try:
+            from syllabus_file_preview import extract_docx_text
+            return extract_docx_text(path)
+        except Exception:
+            return ""
     if ext == ".pdf" and PdfReader:
         try:
             reader = PdfReader(str(path))
@@ -4572,7 +4578,7 @@ def admin_add_document():
     upload = request.files.get("file")
     if not subject_id or not upload or not upload.filename or not allowed_file(upload.filename):
         return redirect(url_for(
-            "admin_shared_documents", error="Chọn môn và tệp PDF, TXT hoặc MD hợp lệ."
+            "admin_shared_documents", error="Chọn môn và tệp PDF, DOCX, TXT hoặc MD hợp lệ."
         ))
     original = os.path.basename(upload.filename.replace("\\", "/")).strip()[:180]
     safe = secure_filename(original)
