@@ -27,6 +27,7 @@ jobs:
           node --check static/js/ai_bubble.js
           node tests/test_study_session_chat.js
           node tests/test_ai_bubble.js
+          node tests/test_ai_bubble_resize.js
           node --check static/js/study_session_timer.js
           node tests/test_study_session_timer.js
           node --check static/js/chat_format.js
