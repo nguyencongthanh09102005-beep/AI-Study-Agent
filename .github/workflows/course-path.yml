@@ -32,6 +32,7 @@ jobs:
           node --check static/js/chat_format.js
           node tests/test_chat_markdown.js
           node --check static/js/quiz_preparation.js
+          node --check static/js/quiz_learning_analytics.js
           node --check static/js/study_session_quiz_status.js
       - name: Validate parser, routes and schemas
         run: |
@@ -44,6 +45,7 @@ jobs:
           python tests/test_study_session_tracking.py
           python tests/test_study_session_quiz_step71.py
           python tests/test_study_session_quiz_step7234.py
+          python tests/test_quiz_learning_analysis_step751_752.py
           python tests/test_delete_subject_session_quiz.py
           python tests/test_schedule_conflicts.py
           python tests/test_chapter_materials_step3.py
