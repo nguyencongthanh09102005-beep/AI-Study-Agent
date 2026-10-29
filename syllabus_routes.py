@@ -100,7 +100,7 @@ def review(subject_id):
             if action == "upload":
                 uploaded = request.files.get("file")
                 if not uploaded or not uploaded.filename or not project.allowed_file(uploaded.filename):
-                    return _back(subject_id, error="Chọn file PDF, TXT hoặc MD hợp lệ.")
+                    return _back(subject_id, error="Chọn file PDF, DOCX, TXT hoặc MD hợp lệ.")
                 original = os.path.basename(uploaded.filename.replace("\\", "/"))[:180]
                 safe = secure_filename(original)
                 if not safe:
@@ -112,7 +112,7 @@ def review(subject_id):
                     extracted = project.extract_text(path)
                     if not extracted.strip():
                         path.unlink(missing_ok=True)
-                        return _back(subject_id, error="Không trích xuất được chữ từ PDF. PDF scan cần OCR.")
+                        return _back(subject_id, error="Không trích xuất được nội dung từ file. PDF scan cần OCR; Word phải là DOCX hợp lệ.")
                     cursor = conn.execute("""
                         INSERT INTO documents(user_id,subject_id,original_name,stored_name,
                                               extracted_text,created_at)
