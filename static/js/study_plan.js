@@ -387,11 +387,16 @@ document.addEventListener("DOMContentLoaded", () => {
           // Only scheduled roadmap sessions have a Study Session (6.3.1).
           const card = makeDiv("study-hour-event-shell");
           card.appendChild(button);
-          if (item.dataset.taskSource === "roadmap" &&
-              /^\d+$/.test(item.dataset.taskId || "")) {
+          const validTaskId = /^\d+$/.test(item.dataset.taskId || "");
+          const official = item.dataset.taskSource === "roadmap";
+          const personal = item.dataset.taskSource === "manual" &&
+                           item.dataset.manualDoc === "1";
+          if (validTaskId && (official || personal)) {
             const launch = document.createElement("a");
             launch.className = "study-hour-launch";
-            launch.href = "/study-plan/tasks/" + item.dataset.taskId + "/learn";
+            launch.href = official
+              ? "/study-plan/tasks/" + item.dataset.taskId + "/learn"
+              : "/manual-study/" + item.dataset.taskId;
             launch.textContent = item.dataset.taskDone === "1"
               ? "Xem lại buổi học →" : "▶ Bắt đầu học";
             card.appendChild(launch);
