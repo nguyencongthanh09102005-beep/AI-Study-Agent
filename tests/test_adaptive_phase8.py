@@ -59,6 +59,8 @@ def run():
             project.record_quiz_learning_signal(conn,uid,sid,"Cương lĩnh","Chương 1",False)
             d2=decide_next_learning_step(conn,uid,sid)
             assert d2["kind"]=="review" and d2["weakness_count"]==1
+            assert d2["material_chapter"]==1
+            assert any("Tiến độ môn" in x for x in d2["evidence"])
 
             future=(local_now()+timedelta(days=2)).date()
             review_at=datetime.combine(future,datetime.min.time()).replace(hour=19)
