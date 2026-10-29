@@ -6,6 +6,7 @@ to another page or closing a tab never cancels work. In serverless/ephemeral
 deployments run a separate persistent worker instead; request-lifetime
 threads are NOT guaranteed to survive there.
 """
+import logging
 import threading
 import time
 from datetime import datetime
@@ -120,6 +121,13 @@ def tick(project):
             conn.rollback()
             new_state="error"
             message=str(getattr(error,"message",error))[:280]
+        except Exception:
+            # Unexpected network/SDK errors must not leave a job 'running'
+            # forever and trigger repeated Gemini calls on the next tick.
+            conn.rollback()
+            logging.exception("Unexpected Quiz preparation error for subject %s", sid)
+            new_state="error"
+            message="Quá trình tạo Quiz bị gián đoạn. Hãy thử Tiếp tục tạo Quiz."
         # Keep a pause request made during Gemini; never unpause implicitly.
         conn.execute("""
             UPDATE quiz_preparation_jobs SET state=?,message=?,updated_at=?
@@ -136,7 +144,8 @@ def _serve(project):
         try:
             worked=tick(project)
         except Exception:
-            # An unexpected error must not terminate the worker forever.
+            # A broken DB/worker error should be visible in server logs.
+            logging.exception("Quiz preparation worker tick failed")
             worked=False
         time.sleep(0.25 if worked else 1.0)
 
