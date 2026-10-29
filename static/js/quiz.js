@@ -139,11 +139,45 @@ document.addEventListener("DOMContentLoaded", () => {
     const resultBox = quizCard.querySelector(".quiz-result");
     const resultTitle = quizCard.querySelector(".quiz-result-title");
     const resultText = quizCard.querySelector(".quiz-result-text");
+    const analysisPanel = quizCard.querySelector(".quiz-learning-analysis");
+    const analysisHistory = quizCard.querySelector(".quiz-analysis-history");
     const submitBtn = quizCard.querySelector(".quiz-submit-btn");
     const resetBtn = quizCard.querySelector(".quiz-reset-btn");
     const toggleBtn = quizCard.querySelector(".quiz-toggle");
 
     let submitted = false;
+    // Keep this key on retries; a new attempt gets a fresh key only on Reset.
+    function newSubmissionKey() {
+      if (window.crypto && typeof window.crypto.randomUUID === "function") {
+        return window.crypto.randomUUID();
+      }
+      return Date.now().toString(36) + "_" + Math.random().toString(36).slice(2);
+    }
+    let submissionKey = newSubmissionKey();
+
+    analysisHistory?.addEventListener("click", async () => {
+      const endpoint = analysisHistory.dataset.analysisUrl;
+      if (!endpoint) return;
+      analysisHistory.disabled = true;
+      const previousLabel = analysisHistory.textContent;
+      analysisHistory.textContent = "Đang xem kết quả...";
+      try {
+        const response = await fetch(endpoint, {
+          method: "GET", credentials: "same-origin",
+          headers: {"Accept": "application/json"}
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Không đọc được kết quả.");
+        window.QuizLearningAnalytics?.render(analysisPanel, data);
+      } catch (error) {
+        if (resultText) resultText.textContent =
+          error.message || "Không thể tải phân tích Quiz.";
+        resultBox?.classList.add("show");
+      } finally {
+        analysisHistory.disabled = false;
+        analysisHistory.textContent = previousLabel;
+      }
+    });
 
     // -----------------------------------------------------
     // THU GỌN / MỞ QUIZ
@@ -261,7 +295,8 @@ document.addEventListener("DOMContentLoaded", () => {
           },
           body: JSON.stringify({
             quiz_id: quizId,
-            answers: answers
+            answers: answers,
+            request_id: submissionKey
           })
         });
 
@@ -389,6 +424,8 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         }
 
+        window.QuizLearningAnalytics?.render(analysisPanel, data);
+
         if (progressText) progressText.textContent = "Đã hoàn thành";
         if (progressBar) progressBar.style.width = "100%";
 
@@ -417,6 +454,11 @@ document.addEventListener("DOMContentLoaded", () => {
     // -----------------------------------------------------
     resetBtn?.addEventListener("click", () => {
       submitted = false;
+      submissionKey = newSubmissionKey();
+      if (analysisPanel) {
+        analysisPanel.hidden = true;
+        analysisPanel.replaceChildren();
+      }
 
       questions.forEach(question => {
         question.classList.remove("unanswered");
