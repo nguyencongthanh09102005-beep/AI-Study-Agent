@@ -1,0 +1,8 @@
+#taskModal .manual-task-doc-section{display:grid;gap:10px;border-top:1px solid #e1e9f7;padding-top:15px;margin-top:5px}
+#taskModal .manual-task-doc-section[hidden]{display:none!important}
+#taskModal .manual-task-doc-section>label{font-size:12px;font-weight:800;color:#455a8a}
+#taskModal .manual-task-doc-section>select{width:100%;max-width:100%;min-height:42px;border:1px solid #d5e0f3;border-radius:10px;background:#fff;color:#344976;padding:10px 12px;font:inherit;font-size:13px}
+#taskModal .manual-doc-hint{font-size:12px;line-height:1.6;color:#6d7d9b;margin:0}
+#taskModal .manual-quiz-choice{display:flex;align-items:flex-start;gap:10px;line-height:1.55;font-size:12px;cursor:pointer}
+#taskModal .manual-quiz-choice input{margin-top:3px;accent-color:#5c5bf0;width:17px;height:17px;flex:none}
+#taskModal .manual-quiz-choice input:disabled+span{opacity:.55}
