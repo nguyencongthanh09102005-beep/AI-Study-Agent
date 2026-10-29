@@ -100,9 +100,11 @@ def main():
         print(f"Validated {len(cases)} evaluation cases. "
               "Use --live only with a configured GEMINI_API_KEY and explicit consent.")
         return
-    from app import gemini_generate
+    # Check before importing app: app.load_dotenv() must not restore a removed
+    # key during an offline test. An explicit --live remains necessary.
     if not os.getenv("GEMINI_API_KEY","").strip():
         raise SystemExit("GEMINI_API_KEY missing: refusing to simulate real results.")
+    from app import gemini_generate
     rows=run_cases(cases,gemini_generate)
     result={
         "timestamp_utc":datetime.now(timezone.utc).isoformat(),
