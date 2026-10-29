@@ -249,7 +249,9 @@ def per_lesson_quiz_status(conn, project, uid, task_id):
         study_at=access.get("study_at", ""),
         ends_at=access.get("ends_at", ""),
         reason=access.get("reason", ""),
-        state=("active" if access.get("allowed") else
+        review_unlocked=bool(access.get("review_unlocked")),
+        state=("review" if access.get("review_unlocked") else
+               "active" if access.get("allowed") else
                "available" if access.get("can_start") else "locked"),
     )
     row = conn.execute("""
