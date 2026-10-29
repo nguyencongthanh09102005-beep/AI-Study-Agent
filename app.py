@@ -6096,6 +6096,10 @@ def submit_quiz():
         return jsonify({"error": "Mã lần nộp không hợp lệ."}), 400
     if submission_key:
         from quiz_learning_analysis import ensure_quiz_submission_receipts
+        # The profile creator commits on first use. Run it BEFORE locking
+        # the graded attempt to keep Quiz/weakness/receipt atomic.
+        if quiz_row["subject_id"]:
+            ensure_learning_profile(conn, uid)
         ensure_quiz_submission_receipts(conn)
         conn.execute("BEGIN IMMEDIATE")
         submitted_before = conn.execute("""
