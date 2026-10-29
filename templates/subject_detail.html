@@ -23,7 +23,6 @@
     <a class="soft-primary" href="{{ url_for('syllabus.review', subject_id=subject.id) if not syllabus_confirmed else url_for('course_path.learning_path', subject_id=subject.id) }}">▶ Bắt đầu học</a>
     {% endif %}
     <a class="ghost-action" href="{{ url_for('syllabus.review', subject_id=subject.id) }}">📖 Đề cương & lộ trình</a>
-    <a class="ghost-action" href="{{ url_for('clo_review.overview',subject_id=subject.id) }}">🎯 CLO & minh chứng</a>
   </div>
 </section>
 
@@ -56,6 +55,7 @@
       <a class="proactive-secondary" href="{{ url_for('study_plan', subject_id=subject.id) }}">Xem lịch ôn</a>
       {% if adaptive_decision.material_chapter %}
         <a class="proactive-secondary" href="{{ url_for('chapter_material.student_chapter', subject_id=subject.id, chapter_number=adaptive_decision.material_chapter) }}">Đọc học liệu Chương {{ adaptive_decision.material_chapter }}</a>
+        <a class="proactive-secondary" href="{{ url_for('chapter_exercise.exercises', subject_id=subject.id, chapter_number=adaptive_decision.material_chapter) }}">Luyện bài tập Chương {{ adaptive_decision.material_chapter }} →</a>
       {% else %}
         <a class="proactive-secondary" href="{{ url_for('course_path.learning_path', subject_id=subject.id) }}">Học liệu theo lộ trình</a>
       {% endif %}
@@ -66,6 +66,9 @@
       <a class="proactive-primary" href="{{ url_for('course_path.learning_path', subject_id=subject.id) }}">Xem lộ trình theo chương →</a>
     {% else %}
       <a class="proactive-primary" href="{{ url_for('quiz', mode='subject', subject_id=subject.id) }}">Tạo Quiz môn học →</a>
+      {% if adaptive_decision.practice_chapter %}
+      <a class="proactive-secondary" href="{{ url_for('chapter_exercise.exercises',subject_id=subject.id,chapter_number=adaptive_decision.practice_chapter) }}">Xem bài tập đã nộp Chương {{ adaptive_decision.practice_chapter }} →</a>
+      {% endif %}
       <a class="proactive-secondary" href="{{ url_for('course_path.learning_path', subject_id=subject.id) }}">Xem lộ trình</a>
     {% endif %}
   </div>
@@ -160,6 +163,7 @@
       <span class="shared-badge">{{ chapter_items|length }} chương</span>
     </div>
     <p class="course-chapter-intro">Chỉ hiển thị chương đã xác nhận và tài liệu chung đã được Admin gắn đúng chương. Không tự tạo file hoặc chương mới.</p>
+    <p style="margin:8px 0 15px"><a href="{{ url_for('clo_review.overview',subject_id=subject.id) }}" style="font-size:13px;color:#465bb8;font-weight:800">🎯 Xem chuẩn đầu ra CLO và minh chứng tiến bộ →</a></p>
     {% if chapter_items %}
     <div class="course-chapter-list">
       {% for chapter in chapter_items[:4] %}
