@@ -142,9 +142,10 @@ BT02: Nêu cách thêm một node.
                 data={"csrf_token":other_token,"action":"retry",
                       "attempt_id":str(first_id)}
             ).status_code == 404
-            assert str(first_id) not in peer.get(
+            peer_history = peer.get(
                 f"/subjects/{other_subject}/chapters/1/exercises"
-            ).get_data(as_text=True).split('id="attempts"')[-1]
+            ).get_data(as_text=True)
+            assert "Vòng lặp chạy từ 0 đến n-1" not in peer_history
 
             calls=[]
             def mocked_gemini(prompt):
