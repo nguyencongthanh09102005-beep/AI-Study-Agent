@@ -19,6 +19,8 @@ def run():
             project.UPLOAD_DIR.mkdir()
             project.init_db()
             conn = project.db()
+            from course_schedule_sync import ensure_session_schedule_schema
+            ensure_session_schedule_schema(conn)
             stamp = project.now()
             uid = conn.execute("""
                 INSERT INTO users(name,email,password_hash,role,created_at)
