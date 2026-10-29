@@ -5865,6 +5865,7 @@ def quiz():
                     session_quiz_status = {
                         "quiz_id": existing["id"], "count": total,
                         "allowed": access["allowed"],
+                        "review_unlocked": access.get("review_unlocked", False),
                         "can_start": access.get("can_start", False),
                         "study_at": access.get("study_at", ""),
                         "ends_at": access.get("ends_at", ""),
