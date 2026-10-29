@@ -26,9 +26,9 @@
     </div>
     {% endif %}
     <label class="dropzone-inner">
-      <input id="documentFileInput" type="file" name="file" accept=".pdf,.txt,.md" required>
+      <input id="documentFileInput" type="file" name="file" accept=".pdf,.docx,.txt,.md" required>
       <span class="upload-cloud">↑</span>
-      <span><strong>Tải tài liệu cá nhân</strong><small>Kéo thả file vào đây hoặc nhấn để chọn file</small><em>Chỉ bạn và Personal Agent của bạn sử dụng · PDF, TXT, Markdown · Tối đa {{ upload_max_mb }} MB/tệp</em></span>
+      <span><strong>Tải tài liệu cá nhân</strong><small>Kéo thả file vào đây hoặc nhấn để chọn file</small><em>Chỉ bạn và Personal Agent của bạn sử dụng · PDF, Word DOCX, TXT, Markdown · Tối đa {{ upload_max_mb }} MB/tệp</em></span>
     </label>
     <div class="upload-inline-controls">
       <select name="subject_id"><option value="">Tất cả môn học</option>{% for s in subjects %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}</select>
