@@ -8257,6 +8257,9 @@ def api_mobile_tasks(task_id=None):
                WHERE id=? AND user_id=?""",
             (title, subject_id, study_at, duration, note, task_id, uid)
         )
+        if old["source"] == "adaptive":
+            from adaptive_review_schedule import lock_adaptive_time
+            lock_adaptive_time(conn, task_id, uid)
         if old["subject_id"]:
             recalculate_subject_progress(uid, old["subject_id"], conn)
     else:
