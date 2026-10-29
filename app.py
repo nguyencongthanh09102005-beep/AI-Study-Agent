@@ -6132,7 +6132,13 @@ def quiz():
         session_quiz_status["quiz_id"] if session_quiz_status
         and session_quiz_status.get("allowed") else None
     )
-    active_quiz_id = (active_session_quiz_id or
+    selected_quiz_id = request.args.get("quiz_id", type=int)
+    # A deep link may select only a Quiz that passed owner and access filters.
+    linked_quiz_id = next(
+        (item["id"] for item in parsed if item["id"] == selected_quiz_id),
+        None
+    )
+    active_quiz_id = (active_session_quiz_id or linked_quiz_id or
                       (parsed[0]["id"] if parsed else None))
 
     selected_document_id = request.args.get("document_id", type=int)
