@@ -9,8 +9,16 @@ import re
 
 
 def topic_key(chapter, topic):
-    value = str(chapter or "").strip() + " " + str(topic or "").strip()
-    return re.sub(r"\s+", " ", re.sub(r"[^\wÀ-ỹ]+", " ", value.lower())).strip()[:180]
+    # Match the same chapter identity used by 7.5.2 report. E.g.
+    # "CHƯƠNG 01: full title" and "Chương 1" are the same chapter.
+    # Do not collapse similarly named topics from different chapters.
+    from quiz_learning_analysis import _chapter_identity, _topic_identity
+    key, _title, number = _chapter_identity(chapter)
+    short_topic = _topic_identity(topic, chapter, number)
+    normalized = re.sub(
+        r"\s+", " ", re.sub(r"[^\wÀ-ỹ]+", " ", short_topic.lower())
+    ).strip()
+    return (key + "|" + normalized)[:320]
 
 
 def ensure_review_baseline_schema(conn):
@@ -47,7 +55,7 @@ def save_review_baseline(conn, uid, subject_id, quiz_id, created_at):
     if not rows:
         return
     baseline = [
-        {"key": row["topic_key"], "topic": row["topic"],
+        {"key": topic_key(row["chapter"], row["topic"]), "topic": row["topic"],
          "chapter": row["chapter"], "wrong": row["miss_count"],
          "correct": row["correct_count"]}
         for row in rows
