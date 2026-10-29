@@ -352,6 +352,14 @@ def prepare_step(project, conn, uid, subject_id):
                 raise LessonContextError(
                     "Câu hỏi bị trùng với buổi trước trong đề tổng hợp; "
                     "hãy thử tạo lại phần này.", 409)
+            # The approved chapter for the verified lesson takes precedence
+            # over a model's free-form chapter label. This matters especially
+            # for the 60-question final exam spanning many prior lessons.
+            verified_chapter = str(source_ctx.get("chapter") or "").strip()
+            if verified_chapter:
+                for question in questions:
+                    if isinstance(question, dict):
+                        question["chapter"] = verified_chapter[:120]
             if not _question_count_valid(questions, count):
                 raise LessonContextError(
                     "Gemini chưa tạo đủ câu hỏi kiến thức hợp lệ. "
