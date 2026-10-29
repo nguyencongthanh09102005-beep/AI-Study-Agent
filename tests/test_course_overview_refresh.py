@@ -138,9 +138,9 @@ def run():
                 writer.write(fh)
             conn.execute("""
                 INSERT INTO shared_document_chapters(document_id,shared_subject_id,
-                    chapter_key,syllabus_hash,updated_at)
-                VALUES(?,?,?,?,?)
-            """,(slide,shared_id,"1",fingerprint,stamp))
+                    chapter_key,syllabus_hash,confirmed_by,confirmed_at)
+                VALUES(?,?,?,?,?,?)
+            """,(slide,shared_id,"1",fingerprint,admin_id,stamp))
             conn.commit()
 
             page=student.get(f"/subjects/{sid}")
