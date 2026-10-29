@@ -114,6 +114,8 @@ jobs:
           python tests/test_adaptive_review_step753.py
           python tests/test_quiz_review_progress_step754.py
           python tests/test_quiz_background_jobs_step76.py
+          python tests/test_adaptive_phase8.py
+          python -m py_compile adaptive_decision_phase8.py adaptive_plan_phase8.py
           python tests/test_delete_subject_session_quiz.py
           python -m py_compile study_session_quiz.py study_session_quiz_runtime.py study_session_quiz_routes.py subject_course_cleanup.py
           python -m py_compile study_session_tracking.py study_session_routes.py study_session_chat_context.py
