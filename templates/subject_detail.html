@@ -67,6 +67,43 @@
 </section>
 {% endif %}
 
+{% if request.args.get('adaptive_notice') in ('accepted', 'dismissed', 'stale') %}
+<section class="soft-card" role="status" style="margin:0 0 16px;padding:14px 18px">
+  {% if request.args.get('adaptive_notice') == 'accepted' %}
+    ✅ Đã áp dụng giờ học mới. Bạn có thể kiểm tra trong Kế hoạch học.
+  {% elif request.args.get('adaptive_notice') == 'dismissed' %}
+    Đã giữ nguyên lịch học. Agent sẽ không tự áp dụng thay đổi này.
+  {% else %}
+    Đề xuất hoặc lịch học vừa thay đổi. Không ghi đè dữ liệu; hãy kiểm tra lại giờ mới.
+  {% endif %}
+</section>
+{% endif %}
+{% if adaptive_plan_proposal %}
+<section class="soft-card" id="adaptivePlanProposal" style="margin:0 0 20px;padding:20px">
+  <div class="mini-section-head"><h3>🗓 Đề xuất điều chỉnh kế hoạch · Đợt 8.3</h3><span>Chờ sinh viên quyết định</span></div>
+  <p style="line-height:1.65;color:#475a7b;margin:10px 0">
+    Buổi theo lộ trình <strong>{{ adaptive_plan_proposal.title }}</strong> đang được xếp trước khi bạn kịp ôn điểm yếu.
+    Agent đề xuất dời buổi này sang khung giờ trống <strong>sau buổi ôn</strong>.
+    Chỉ buổi này được thay đổi nếu bạn đồng ý; lịch ôn, buổi thủ công và deadline vẫn giữ nguyên.
+  </p>
+  <div style="display:flex;flex-wrap:wrap;gap:12px;margin:14px 0">
+    <div style="background:#f1f4fa;padding:12px;border-radius:10px"><small>Giờ hiện tại</small><br><strong>{{ adaptive_plan_proposal.old_text }}</strong></div>
+    <div style="background:#e9f5ef;padding:12px;border-radius:10px"><small>Giờ đề xuất</small><br><strong>{{ adaptive_plan_proposal.new_text }}</strong></div>
+    <div style="background:#f1f4fa;padding:12px;border-radius:10px"><small>Buổi ôn Adaptive</small><br><strong>{{ adaptive_plan_proposal.review_text }}</strong></div>
+  </div>
+  {% if adaptive_plan_proposal.dismissed %}
+    <p style="color:#63738b">Bạn đã chọn giữ lịch cũ cho đề xuất này. Nếu dữ liệu Quiz hoặc lịch thay đổi, Agent sẽ đánh giá lại.</p>
+  {% else %}
+    <form method="post" action="{{ url_for('choose_adaptive_plan', subject_id=subject.id) }}" style="display:flex;flex-wrap:wrap;gap:10px">
+      <input type="hidden" name="csrf_token" value="{{ adaptive_plan_csrf }}">
+      <input type="hidden" name="proposal_key" value="{{ adaptive_plan_proposal.proposal_key }}">
+      <button class="soft-primary" type="submit" name="choice" value="accept">✓ Đồng ý đổi giờ buổi này</button>
+      <button class="ghost-action" type="submit" name="choice" value="dismiss">Giữ lịch hiện tại</button>
+    </form>
+  {% endif %}
+</section>
+{% endif %}
+
 <section class="agent-summary-grid">
   <article class="soft-card agent-summary-card">
     <span class="summary-icon blue">▤</span>
