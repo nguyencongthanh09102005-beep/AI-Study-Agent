@@ -1,0 +1,46 @@
+[
+  {
+    "id": "BIG-O-01",
+    "subject": "Cấu trúc dữ liệu và giải thuật",
+    "chapter": "Chương 1. Thuật toán và độ phức tạp",
+    "topic": "1.2. Ký hiệu O lớn",
+    "source_name": "Nguồn thử nghiệm Big O (dữ liệu mô phỏng)",
+    "source_excerpt": "Vòng lặp duyệt tuần tự n phần tử thực hiện tối đa n lần thao tác với thời gian O(n). Vòng lặp hai tầng độc lập với n lần lặp mỗi tầng có thể có thời gian O(n²).",
+    "question": "Vì sao vòng lặp một tầng có độ phức tạp O(n)?",
+    "goal": "Đạt 8 điểm",
+    "weak_topic": "Phân tích độ phức tạp vòng lặp"
+  },
+  {
+    "id": "STACK-02",
+    "subject": "Cấu trúc dữ liệu và giải thuật",
+    "chapter": "Chương 2. Ngăn xếp và hàng đợi",
+    "topic": "Stack LIFO",
+    "source_name": "Nguồn thử nghiệm cấu trúc dữ liệu (mô phỏng)",
+    "source_excerpt": "Ngăn xếp (stack) sử dụng nguyên tắc LIFO: phần tử được thêm sau cùng sẽ được lấy ra trước tiên. Các thao tác thông dụng là push để thêm và pop để lấy phần tử ở đỉnh.",
+    "question": "Giải thích khác nhau giữa push và pop trong stack.",
+    "goal": "Hiểu cấu trúc dữ liệu",
+    "weak_topic": "Phân biệt push và pop"
+  },
+  {
+    "id": "LINKED-03",
+    "subject": "Cấu trúc dữ liệu và giải thuật",
+    "chapter": "Chương 3. Danh sách liên kết",
+    "topic": "Node và con trỏ next",
+    "source_name": "Nguồn thử nghiệm linked list (mô phỏng)",
+    "source_excerpt": "Trong danh sách liên kết đơn, mỗi node gồm dữ liệu và tham chiếu next trỏ đến node kế tiếp. Node cuối thường có next bằng null. Để duyệt danh sách, lần lượt đi qua các tham chiếu next cho đến khi gặp null.",
+    "question": "Một node của danh sách liên kết đơn chứa những thành phần nào?",
+    "goal": "Thực hiện bài tập cài đặt node",
+    "weak_topic": "Con trỏ next và node cuối"
+  },
+  {
+    "id": "SOURCE-LIMIT-04",
+    "subject": "Cấu trúc dữ liệu và giải thuật",
+    "chapter": "Chương 1. Thuật toán và độ phức tạp",
+    "topic": "Độ phức tạp",
+    "source_name": "Nguồn thử nghiệm Big O (dữ liệu mô phỏng)",
+    "source_excerpt": "Vòng lặp duyệt tuần tự n phần tử thực hiện tối đa n lần thao tác với thời gian O(n). Nguồn này không đề cập đến kỹ thuật mã hóa AES hay tính an toàn của thuật toán mật mã.",
+    "question": "Hãy chứng minh độ an toàn của thuật toán AES-256 dựa trên tài liệu này.",
+    "goal": "Hỏi lại khái niệm bị nhầm",
+    "weak_topic": "Phân biệt thuật toán và mã hóa"
+  }
+]
