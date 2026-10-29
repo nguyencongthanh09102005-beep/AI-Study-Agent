@@ -41,7 +41,11 @@
     <div class="session-quiz-launch">
       <strong>{{ session_quiz_status.count }} câu đã chuẩn bị sẵn</strong>
       {% if session_quiz_status.allowed %}
-        <p>Quiz đang được mở. Chọn bài trong danh sách bên dưới để làm và nộp kết quả.</p>
+        {% if session_quiz_status.review_unlocked %}
+          <p>✓ Bạn đã làm Quiz này. Bài đã lưu trong mục Quiz và luôn mở để ôn lại kiến thức cũ khi môn học vẫn còn hợp lệ.</p>
+        {% else %}
+          <p>Quiz đang được mở theo giờ học. Chọn bài bên dưới để làm và nộp kết quả.</p>
+        {% endif %}
         <a href="#quiz-work-{{ session_quiz_status.quiz_id }}" class="session-quiz-back">↓ Đến bài kiểm tra</a>
       {% elif session_quiz_status.can_start %}
         <p>Đã đến khung giờ kiểm tra. Hãy bắt đầu để mở câu hỏi.</p>
