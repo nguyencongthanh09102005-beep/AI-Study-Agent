@@ -5,7 +5,7 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/documents.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/document_library.css') }}">
 {% endblock %}
-{% block scripts %}<script src="{{ url_for('static', filename='js/document_library.js') }}"></script>{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/document_library.js') }}"></script><script src="{{ url_for('static', filename='js/document_dropzone.js') }}"></script>{% endblock %}
 
 {% block content %}
 <section class="mock-page-head library-page-head">
@@ -40,10 +40,17 @@
       {% if upload_error %}
       <p class="library-upload-error" role="alert">Tệp vừa chọn vượt giới hạn {{ upload_max_mb }} MB. Hãy nén hoặc chia nhỏ tệp và thử lại.</p>
       {% endif %}
-      <label class="library-upload-file">
-        <span aria-hidden="true">☁</span>
-        <span><strong>Tải tài liệu cá nhân</strong><small>PDF, Word DOCX, TXT hoặc MD · Tối đa {{ upload_max_mb }} MB</small></span>
-        <input id="documentFileInput" type="file" name="file" accept=".pdf,.docx,.txt,.md" required>
+      <label class="dropzone-inner library-dropzone" id="documentDropzone"
+             for="documentFileInput" role="button" tabindex="0"
+             aria-label="Kéo thả tài liệu hoặc nhấn để chọn file">
+        <input id="documentFileInput" type="file" name="file"
+               accept=".pdf,.docx,.txt,.md" required>
+        <span class="upload-cloud" aria-hidden="true">↑</span>
+        <span class="library-dropzone-copy">
+          <strong>Kéo thả tài liệu vào đây</strong>
+          <small>Hoặc nhấn để chọn file từ máy tính</small>
+          <em>PDF, Word DOCX, TXT hoặc MD · Tối đa {{ upload_max_mb }} MB · Chỉ tài khoản của bạn</em>
+        </span>
       </label>
       <div class="library-upload-controls">
         <select name="subject_id" aria-label="Chọn môn cho tài liệu">
