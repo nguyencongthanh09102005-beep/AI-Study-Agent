@@ -53,15 +53,14 @@ def _paragraph_html(paragraph, doc_part, image_budget):
     spans = []
     for run in paragraph.runs:
         content = escape(run.text)
-        if not content:
-            continue
-        if run.bold:
-            content = "<strong>" + content + "</strong>"
-        if run.italic:
-            content = "<em>" + content + "</em>"
-        if run.underline:
-            content = "<u>" + content + "</u>"
-        spans.append(content)
+        if content:
+            if run.bold:
+                content = "<strong>" + content + "</strong>"
+            if run.italic:
+                content = "<em>" + content + "</em>"
+            if run.underline:
+                content = "<u>" + content + "</u>"
+            spans.append(content)
         for blip in run._r.xpath(".//a:blip"):
             relation_id = blip.get(qn("r:embed"))
             part = doc_part.related_parts.get(relation_id) if relation_id else None
