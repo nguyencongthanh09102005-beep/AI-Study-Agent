@@ -284,6 +284,99 @@ def run():
                 later_attempt.status_code, later_attempt.get_data(as_text=True)[:600]
             )
 
+            # A real first submission saves the attempt to existing Quiz
+            # history and permanently unlocks this SAME prepared Quiz for
+            # future revision, without generating another question set.
+            from study_session_quiz_runtime import study_now
+            from unittest.mock import patch
+            current_slot = (study_now() - timedelta(minutes=1)).replace(
+                second=0, microsecond=0)
+            conn = project.db()
+            conn.execute("UPDATE study_tasks SET study_at=? WHERE id=?", (
+                current_slot.isoformat(timespec="minutes"),
+                task_rows[0]["id"],
+            ))
+            conn.commit()
+            conn.close()
+            room_before = client.get(first_status).get_json()
+            assert room_before["state"] == "available", room_before
+            with client.session_transaction() as sess:
+                csrf_for_start = sess["session_quiz_csrf"]
+            opened = client.post(
+                f"/quiz/{first_quiz}/start-session",
+                data={"csrf_token": csrf_for_start},
+            )
+            assert opened.status_code == 303, opened.get_data(as_text=True)
+            assert f'data-quiz-id="{first_quiz}"' in client.get("/quiz").get_data(as_text=True)
+            submitted = client.post("/api/quiz/submit", json={
+                "quiz_id": first_quiz, "answers": [0] * 15,
+                "request_id": "first7234revision"
+            })
+            assert submitted.status_code == 200, submitted.get_data(as_text=True)[:900]
+            assert submitted.get_json()["attempt_count"] == 1
+            assert len(calls) == len(task_rows) - 1 + len(task_rows) - 1
+            conn = project.db()
+            assert conn.execute(
+                "SELECT COUNT(*) FROM quizzes WHERE id=? AND user_id=?",
+                (first_quiz, student)
+            ).fetchone()[0] == 1
+            assert conn.execute(
+                "SELECT COUNT(*) FROM quiz_attempts WHERE quiz_id=? AND user_id=?",
+                (first_quiz, student)
+            ).fetchone()[0] == 1
+            months_later = current_slot + timedelta(days=90)
+            access_later = quiz_access(conn, project, student, first_quiz,
+                                       at=months_later)
+            assert access_later["allowed"] and access_later["review_unlocked"]
+            assert quiz_access(conn, project, other, first_quiz,
+                               at=months_later)["linked"] is False
+            conn.close()
+
+            # All real read/submit surfaces use the exact same server-side
+            # unlocking rule, and the study room displays revision status.
+            with patch("study_session_quiz_runtime.study_now",
+                       return_value=months_later):
+                previous_html = client.get("/quiz").get_data(as_text=True)
+                assert f'data-quiz-id="{first_quiz}"' in previous_html
+                assert f'data-quiz-id="{final_quiz}"' not in previous_html
+                assert "Đã làm" in previous_html
+                old_lesson = client.get(f"/quiz?task_id={task_rows[0]['id']}")
+                assert old_lesson.status_code == 200
+                assert "luôn mở để ôn lại kiến thức cũ" in old_lesson.get_data(as_text=True)
+                mobile_list = client.get("/api/mobile/quizzes").get_json()["quizzes"]
+                assert any(x["id"] == first_quiz and x["attempt_count"] == 1
+                           for x in mobile_list)
+                mobile_detail = client.get(f"/api/mobile/quizzes/{first_quiz}")
+                assert mobile_detail.status_code == 200
+                assert len(mobile_detail.get_json()["questions"]) == 15
+                assert "answer" not in mobile_detail.get_json()["questions"][0]
+                assert len(mobile_detail.get_json()["attempts"]) == 1
+                status_after = client.get(first_status).get_json()
+                assert status_after["state"] == "review", status_after
+                assert status_after["review_unlocked"] is True
+                assert status_after["attempt_count"] == 1
+                room_review = client.get(
+                    f"/study-plan/tasks/{task_rows[0]['id']}/learn")
+                assert room_review.status_code == 200
+                assert "Có thể ôn lại bất cứ lúc nào" in room_review.get_data(as_text=True)
+                second_submit = client.post("/api/quiz/submit", json={
+                    "quiz_id": first_quiz, "answers": [1] * 15,
+                    "request_id": "second7234revision"
+                })
+                assert second_submit.status_code == 200
+                assert second_submit.get_json()["attempt_count"] == 2
+                assert len(calls) == len(task_rows) - 1 + len(task_rows) - 1
+            conn = project.db()
+            assert conn.execute(
+                "SELECT COUNT(*) FROM quizzes WHERE id=? AND user_id=?",
+                (first_quiz, student)
+            ).fetchone()[0] == 1
+            assert conn.execute(
+                "SELECT COUNT(*) FROM quiz_attempts WHERE quiz_id=? AND user_id=?",
+                (first_quiz, student)
+            ).fetchone()[0] == 2
+            conn.close()
+
             # Approval revoked => neither quiz nor answer keys leak, even with
             # the previous grant; historical quiz and answers are preserved.
             conn = project.db()
