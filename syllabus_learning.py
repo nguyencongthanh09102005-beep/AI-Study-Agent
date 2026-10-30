@@ -48,6 +48,26 @@ def _lines(text):
     return [_clean(line) for line in (text or "").replace("\r", "\n").split("\n") if _clean(line)]
 
 
+def normalize_heading_prefix(line):
+    """Remove decorative PDF prefixes ONLY for chapter-heading recognition.
+
+    The original evidence remains untouched for citations, hashing and review.
+    Do not strip numbers in actual chapter titles or week ranges elsewhere.
+    """
+    value = _clean(line)
+    value = WEEK_PREFIX.sub("", value, count=1)
+    # List numbering may prefix an actual chapter title, e.g. "[1] Chương 1".
+    value = re.sub(
+        r"^(?:\\[\\d{1,2}\\]|\\(\\d{1,2}\\)|\\d{1,2}[.)])\\s+"
+        r"(?=(?:[^\\w\\s]*\\s*)?(?:chương|chapter|bài|lesson|unit|module)\\b)",
+        "", value, flags=re.I,
+    )
+    # '►', '.', '·', arrows, unicode bullets or combinations. Never remove
+    # letters/numbers: a normal heading must remain distinguishable.
+    value = re.sub(r"^[^\\w\\s]{1,16}\\s*", "", value)
+    return value
+
+
 def _is_teaching_heading(line):
     return bool(UNIT_HEADING.match(line) and not any(
         x in line.casefold() for x in NON_TEACHING
@@ -57,9 +77,9 @@ def _is_teaching_heading(line):
 def _heading_candidate(line, following=""):
     """Accept bullet and weekly timetable headings, preserving verbatim evidence."""
     weekly = bool(WEEK_PREFIX.match(line))
-    clean = WEEK_PREFIX.sub("", line, count=1) if weekly else line
-    listed = bool(BULLET_PREFIX.match(clean))
-    clean = BULLET_PREFIX.sub("", clean, count=1)
+    without_week = WEEK_PREFIX.sub("", line, count=1) if weekly else line
+    clean = normalize_heading_prefix(line)
+    listed = clean != without_week
     priority = 2 if weekly else (0 if listed else 1)
     if _is_teaching_heading(clean):
         title = clean
@@ -89,7 +109,7 @@ def _grounded_units(text):
         if candidate is None:
             continue
         title, priority = candidate
-        clean = BULLET_PREFIX.sub("", WEEK_PREFIX.sub("", line, count=1), count=1)
+        clean = normalize_heading_prefix(line)
         number = HEADING_NUMBER.match(clean)
         identity = number.group(0).casefold() if number else clean.casefold()
         earlier = selected.get(identity)
