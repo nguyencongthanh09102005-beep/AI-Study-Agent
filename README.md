@@ -1,6 +1,6 @@
 # AI Study Agent — Final MVP
 
-Hệ thống trợ lý học tập full-stack sử dụng Flask + SQLite + Gemini API.
+AI Study Agent là hệ thống trợ lý học tập cá nhân hóa theo đề cương, học liệu và tiến độ của từng sinh viên. Web và Mobile sử dụng Flask + SQLite; dịch vụ AI được tích hợp ở tầng xử lý phía sau.
 
 ## Chức năng
 
@@ -8,7 +8,7 @@ Hệ thống trợ lý học tập full-stack sử dụng Flask + SQLite + Gemin
 - Quản lý môn học: mã môn, tín chỉ, mục tiêu điểm và tiến độ tự động.
 - Upload PDF/TXT/Markdown; gắn hoặc đổi môn học cho tài liệu.
 - AI Chat dựa trên tài liệu; lịch sử từng cuộc trò chuyện được lưu trong SQLite.
-- Tạo Quiz bằng Gemini từ tài liệu, theo môn học hoặc ôn riêng các chủ đề đang yếu.
+- Tạo Quiz bằng AI từ tài liệu, theo môn học hoặc ôn riêng các chủ đề đang yếu.
 - Quiz lưu topic/chapter cho từng câu, cập nhật điểm yếu theo số lần đúng/sai và tự gỡ khỏi danh sách yếu khi đã trả lời đúng đủ lần.
 - AI Study Plan ưu tiên đề cương chuẩn dùng chung; nếu chưa có thì dùng đề cương cá nhân fallback, sau đó kết hợp tài liệu cá nhân, lịch sử Quiz, điểm yếu, mục tiêu điểm và Learning Profile để ưu tiên lộ trình.
 - Shared Knowledge theo môn là lớp kiến thức chuẩn dùng chung và ở giao diện sinh viên chỉ đọc. Nếu môn chưa có đề cương chuẩn, sinh viên có thể chọn một tài liệu cá nhân của chính mình làm đề cương fallback; file này vẫn riêng tư và không được đưa vào Shared Knowledge.
@@ -150,7 +150,7 @@ Mặc định `DEMO_ACCOUNT_ENABLED=0`, để tránh tự sinh tài khoản dùn
 
 ### Chất lượng Quiz
 
-Quiz yêu cầu đủ số câu hợp lệ từ Gemini. Nếu AI lỗi hoặc sinh thiếu, hệ thống báo lỗi để thử lại, **không tự bù bằng câu điền từ vô nghĩa**. Khi xóa Quiz hoặc tài liệu sinh Quiz, điểm yếu và nhiệm vụ Adaptive chưa hoàn thành được tính lại từ các lượt làm Quiz còn lại. Mobile thử khôi phục cookie session khi mở lại; nếu phiên không còn hợp lệ, người dùng đăng nhập lại.
+Quiz yêu cầu đủ số câu hợp lệ từ AI. Nếu AI lỗi hoặc sinh thiếu, hệ thống báo lỗi để thử lại, **không tự bù bằng câu điền từ vô nghĩa**. Khi xóa Quiz hoặc tài liệu sinh Quiz, điểm yếu và nhiệm vụ Adaptive chưa hoàn thành được tính lại từ các lượt làm Quiz còn lại. Mobile thử khôi phục cookie session khi mở lại; nếu phiên không còn hợp lệ, người dùng đăng nhập lại.
 
 ## Tải tài liệu và lỗi 413
 
@@ -159,7 +159,7 @@ Tệp PDF/TXT/MD được giới hạn mặc định theo `MAX_UPLOAD_MB=50` tro
 Giao diện Web kiểm tra dung lượng khi chọn file; nếu quá giới hạn, hệ thống hiển thị thông báo thay cho trang lỗi trắng. API Mobile trả JSON kèm mã HTTP 413.
 PDF ảnh scan vẫn chưa hỗ trợ OCR; tệp rất lớn có thể trích xuất chậm nên ưu tiên tài liệu PDF có chữ, hoặc chia theo chương.
 
-## Bật Gemini
+## Cấu hình dịch vụ AI (dành cho nhà phát triển)
 
 Mở `.env` và điền:
 
