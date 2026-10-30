@@ -72,7 +72,8 @@ def is_manual_roadmap_time(conn, user_id, task_id):
     """, (task_id, user_id)).fetchone():
         return True
     row = conn.execute("""
-        SELECT subject_id,roadmap_session_id,roadmap_session_signature,study_at
+        SELECT subject_id,roadmap_session_id,roadmap_session_signature,study_at,
+               roadmap_auto_study_at
         FROM study_tasks
         WHERE id=? AND user_id=? AND source='roadmap'
     """, (task_id, user_id)).fetchone()
@@ -102,7 +103,14 @@ def is_manual_roadmap_time(conn, user_id, task_id):
             str(lesson["date"]) + "T" + str(lesson["time"])
         ).isoformat(timespec="minutes")
         actual = _parse_time(row["study_at"])
-        return actual is None or actual.isoformat(timespec="minutes") != original
+        if actual is None:
+            return True
+        actual_at = actual.isoformat(timespec="minutes")
+        # The import scheduler may intentionally choose a free slot instead
+        # of the desired hour. That system assignment is not a manual edit.
+        if row["roadmap_auto_study_at"]:
+            return actual_at != row["roadmap_auto_study_at"]
+        return actual_at != original
     except (ValueError, TypeError, KeyError, StopIteration):
         return True
 
