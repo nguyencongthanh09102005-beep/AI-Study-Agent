@@ -84,7 +84,7 @@ def verify():
             assert "other_private.txt" not in body
             with admin_client.session_transaction() as ses:
                 csrf = ses["admin_csrf_token"]
-            hashes = {"source_hash":syllabus_hash(SYLLABUS),
+            hashes = {"source_hash":syllabus_hash(SYLLABUS.strip()),
                       f"hash_{doc_ids[0]}":syllabus_hash(DOC1),
                       f"hash_{doc_ids[1]}":syllabus_hash(DOC2)}
             assert admin_client.post(route, data={**hashes,"action":"analyze"}).status_code == 403
