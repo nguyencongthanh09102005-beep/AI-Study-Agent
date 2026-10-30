@@ -61,6 +61,8 @@ jobs:
           node tests/test_study_session_chat.js
           node tests/test_ai_bubble.js
           node tests/test_ai_bubble_resize.js
+          node --check static/js/admin_ai_hub.js
+          node tests/test_admin_ai_hub.js
           node --check static/js/quiz_preparation.js
           node --check static/js/quiz_learning_analytics.js
           node --check static/js/study_session_quiz_status.js
@@ -110,6 +112,9 @@ jobs:
 
       - name: Admin + Shared Knowledge cross-account tests
         run: python tests/test_admin_shared.py
+
+      - name: Unified Admin AI hub layout and permissions
+        run: python tests/test_admin_ai_hub.py
 
       - name: Global Web readability coverage
         run: python tests/test_web_readability.py
