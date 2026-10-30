@@ -352,6 +352,9 @@ def review_all_upcoming_lessons():
             other < r["id"] for other in conflicts[r["id"]]["with_ids"])]
         if not targets and affected:
             targets = affected[-1:]
+        # Ensure legacy courses also have an owned conversation so that
+        # the existing per-subject preview/confirm route can authorize them.
+        project.ensure_subject_chats(uid, conn)
         course_rows = conn.execute("""
             SELECT s.id,s.name,c.id AS conversation_id
             FROM subjects s LEFT JOIN chat_conversations c
@@ -388,8 +391,10 @@ def review_all_upcoming_lessons():
                 base = datetime.fromisoformat(task["study_at"])
                 for offset in range(1, 8*24*4 + 1):
                     candidate = base + timedelta(minutes=15*offset)
-                    if not (8 <= candidate.hour <= 22) or (
-                            candidate + timedelta(minutes=int(task["duration"]))).hour > 22:
+                    day_end = candidate.replace(hour=22, minute=0,
+                                                second=0, microsecond=0)
+                    if candidate.hour < 8 or (
+                            candidate + timedelta(minutes=int(task["duration"]))) > day_end:
                         continue
                     iso = candidate.isoformat(timespec="minutes")
                     if valid(iso):
