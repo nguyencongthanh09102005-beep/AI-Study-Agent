@@ -152,13 +152,25 @@
     </div>
     <div id="floatingAiSupportView" class="floating-ai-tab-view floating-ai-support-view" role="tabpanel" aria-labelledby="floatingAiTabSupport" hidden>
       <div class="floating-ai-support-heading">
-        <strong>🗓 Rà soát buổi học</strong>
-        <p>Kiểm tra các buổi chưa hoàn thành từ hôm nay đến hết lịch học tương lai, trên tất cả môn.</p>
+        <strong>✦ AI Hỗ trợ thời khóa biểu</strong>
+        <p>Nhắn yêu cầu tự nhiên. Xem trước và xác nhận trước khi thêm hoặc đổi lịch.</p>
       </div>
-      <button type="button" id="floatingAiScheduleButton" class="floating-ai-schedule-button">✦ Rà soát toàn bộ lịch học</button>
-      <div id="floatingAiSupportResults" class="floating-ai-support-results" role="region" aria-label="Kết quả rà soát lịch học" aria-live="polite">
-        <div class="floating-ai-support-empty">AI Study Agent sẽ chỉ đề xuất khi có buổi trùng lịch. Không tự ý đổi lịch của bạn.</div>
+      <div class="floating-ai-support-suggestions" aria-label="Câu gợi ý">
+        <button type="button" id="floatingAiScheduleButton" class="floating-ai-schedule-button">✦ Rà soát lịch trùng</button>
+        <button type="button" data-support-suggestion="Đổi lịch học ngày 31/10 đến 9h tối">Đổi giờ học</button>
+        <button type="button" data-support-suggestion="Cho buổi tự học môn Figma vào 7h tối ngày 1/11">Thêm buổi tự học</button>
       </div>
+      <div id="floatingAiSupportResults" class="floating-ai-support-results" role="log" aria-label="Hội thoại Hỗ trợ" aria-live="polite">
+        <p class="floating-ai-support-empty">Bạn có thể rà soát lịch, đổi giờ hoặc thêm buổi tự học.</p>
+      </div>
+      <form id="floatingAiSupportForm" class="floating-ai-compose">
+        <label class="sr-only" for="floatingAiSupportInput">Yêu cầu AI Hỗ trợ</label>
+        <textarea id="floatingAiSupportInput" maxlength="400" rows="2" placeholder="Ví dụ: Đổi lịch sử Đảng ngày 31/10 đến 9h tối..." required></textarea>
+        <div class="floating-ai-compose-footer">
+          <span id="floatingAiSupportStatus" role="status">Chưa kết nối</span>
+          <button id="floatingAiSupportSend" type="submit">Gửi ➤</button>
+        </div>
+      </form>
     </div>
     <div class="floating-ai-resize-guide" id="floatingAiResizeGuide">↗ Kéo góc hoặc cạnh để chỉnh kích thước</div>
     <div id="floatingAiResizeHorizontal" class="floating-ai-resize-edge floating-ai-resize-edge-horizontal" role="separator" tabindex="0" aria-label="Kéo cạnh cửa sổ để chỉnh chiều rộng" title="Giữ và kéo cạnh trái/phải để chỉnh chiều rộng"></div>
@@ -176,6 +188,7 @@
 {% if page not in ['chat', 'admin'] %}
 <script src="{{ url_for('static', filename='js/chat_format.js') }}"></script>
 <script src="{{ url_for('static', filename='js/ai_bubble_schedule.js') }}"></script>
+<script src="{{ url_for('static', filename='js/ai_support_chat.js') }}"></script>
 <script src="{{ url_for('static', filename='js/ai_bubble.js') }}"></script>
 {% endif %}
 {% block scripts %}{% endblock %}
