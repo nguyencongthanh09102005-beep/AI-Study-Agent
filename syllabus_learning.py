@@ -14,6 +14,11 @@ UNIT_HEADING = re.compile(
     r"(?:\d+(?:\.\d+)*|[IVXLCDM]+)\s*[:.\-–—)]?\s+(.{3,160})$",
     re.IGNORECASE,
 )
+SPLIT_UNIT_HEADING = re.compile(
+    r"^(?:chương|chapter|bài|lesson|unit|module)\s+"
+    r"(?:\d+(?:\.\d+)*|[IVXLCDM]+)\s*[:.\-–—)]?\s*$",
+    re.IGNORECASE,
+)
 NON_TEACHING = (
     "mục tiêu học phần", "chuẩn đầu ra", "tài liệu tham khảo",
     "tài liệu học tập", "thang điểm", "phương pháp đánh giá",
@@ -42,11 +47,26 @@ def _is_teaching_heading(line):
 
 def _grounded_units(text):
     units, seen = [], set()
-    for line in _lines(text):
-        if not _is_teaching_heading(line) or line.casefold() in seen:
+    lines = _lines(text)
+    for index, line in enumerate(lines):
+        if line.casefold() in seen:
+            continue
+        if _is_teaching_heading(line):
+            title = line
+        elif SPLIT_UNIT_HEADING.fullmatch(line) and index + 1 < len(lines):
+            # PDF text often places "Chương 1" and its actual title on
+            # separate lines. Keep the verbatim heading as source evidence.
+            following = lines[index + 1]
+            if (not 3 <= len(following) <= 160
+                    or SPLIT_UNIT_HEADING.fullmatch(following)
+                    or _is_teaching_heading(following)
+                    or any(x in following.casefold() for x in NON_TEACHING)):
+                continue
+            title = line.rstrip(" :.-–—)") + ". " + following
+        else:
             continue
         seen.add(line.casefold())
-        units.append({"title": line[:180], "evidence": line[:180]})
+        units.append({"title": title[:180], "evidence": line[:180]})
         if len(units) >= MAX_UNITS:
             break
     return units
