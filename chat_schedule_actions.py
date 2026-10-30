@@ -216,6 +216,8 @@ def list_schedule():
 def preview_schedule():
     uid = _user()
     _check_csrf()
+    # A new preview request invalidates any previously confirmed-looking card.
+    session.pop("chat_schedule_proposal", None)
     payload = request.get_json(silent=True) or {}
     if not isinstance(payload, dict):
         raise ScheduleProblem("Nội dung yêu cầu không hợp lệ.")
