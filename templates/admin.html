@@ -78,51 +78,88 @@
 {% if admin_view == 'documents' %}
 <section class="admin-section" id="admin-documents">
   <div class="admin-section-head"><div><h3>▤ Quản lý tài liệu dùng chung</h3><p>Admin tải file một lần; hệ thống trích xuất chữ và lưu sẵn để Study Agent tái sử dụng.</p></div></div>
-  <div class="soft-card" style="padding:15px 18px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-    <div style="flex:1;min-width:220px">
-      <strong style="color:#2c437d">✦ Phân loại tài liệu hàng loạt theo môn</strong>
-      <p style="font-size:12px;color:#687b9d;margin-top:4px">Chọn một môn để AI đề xuất chương cho tất cả file; Admin duyệt cùng lúc.</p>
-    </div>
-    <select id="bulkChapterSubject" aria-label="Chọn môn phân loại học liệu" style="padding:10px;border:1px solid #cfdaed;border-radius:9px;min-width:205px">
-      <option value="">Chọn môn học</option>
-      {% for item in subjects %}
-      <option value="{{ url_for('bulk_chapter.batch', subject_id=item.id) }}">{{ item.code }} · {{ item.name }}</option>
-      {% endfor %}
-    </select>
-    <button type="button" class="admin-primary" onclick="var s=document.getElementById('bulkChapterSubject');if(s.value){window.location.href=s.value}else{s.focus()}">✦ Phân loại toàn bộ</button>
-  </div>
-  <div class="soft-card" style="padding:15px 18px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-    <div style="flex:1;min-width:220px">
-      <strong>✦ AI phân tích đề cương chi tiết</strong>
-      <p style="font-size:12px;color:#687b9d;margin-top:4px">Đọc đề cương dài theo từng phần, xử lý tiêu đề có ký tự lạ và yêu cầu Admin duyệt kết quả trước khi sử dụng.</p>
-    </div>
-    <select id="syllabusAnalysisSubject" aria-label="Chọn môn phân tích đề cương" style="padding:10px;border:1px solid #cfdaed;border-radius:9px;min-width:205px">
-      <option value="">Chọn môn học</option>
-      {% for item in subjects %}
-      <option value="{{ url_for('admin_syllabus.review', subject_id=item.id) }}">{{ item.code }} · {{ item.name }}</option>
-      {% endfor %}
-    </select>
-    <button type="button" class="admin-primary" onclick="var s=document.getElementById('syllabusAnalysisSubject');if(s.value){window.location.href=s.value}else{s.focus()}">Phân tích đề cương</button>
-  </div>
-  <div class="admin-content-grid">
-    <form class="soft-card admin-form-card" method="post" enctype="multipart/form-data" action="{{ url_for('admin_add_document') }}" id="adminUploadForm" data-max-mb="{{ upload_max_mb }}">
-      <h4>↑ Tải tài liệu chung</h4>
-      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-      <label for="sharedSubject">Thuộc môn học <span>*</span></label>
-      <select id="sharedSubject" name="shared_subject_id" required>
+  <section class="soft-card admin-ai-hub" id="adminAiHub" aria-labelledby="adminAiHubTitle">
+    <header class="admin-ai-hub-header">
+      <div>
+        <span class="admin-ai-hub-kicker">QUẢN LÝ HỌC LIỆU BẰNG AI</span>
+        <h3 id="adminAiHubTitle">Chuẩn bị học liệu cho môn học</h3>
+        <p>Chọn một môn, kiểm tra đề cương, sau đó phân loại tài liệu theo chương. AI chỉ đưa ra đề xuất; Admin là người xác nhận.</p>
+      </div>
+      <span class="admin-ai-hub-tag">2 bước</span>
+    </header>
+    <div class="admin-ai-course-picker">
+      <label for="adminAiSubject">Môn học cần xử lý</label>
+      <select id="adminAiSubject" aria-describedby="adminAiHelp">
         <option value="">Chọn môn học</option>
-        {% for item in subjects %}<option value="{{ item.id }}">{{ item.code }} · {{ item.name }}</option>{% endfor %}
+        {% for item in subjects %}
+        <option value="{{ item.id }}"
+          data-syllabus-url="{{ url_for('admin_syllabus.review', subject_id=item.id) }}"
+          data-bulk-url="{{ url_for('bulk_chapter.batch', subject_id=item.id) }}"
+          data-has-syllabus="{{ '1' if item.syllabus_text else '0' }}"
+          data-document-count="{{ item.document_count }}">{{ item.code }} · {{ item.name }}</option>
+        {% endfor %}
       </select>
-      <label for="adminUploadFile">Tài liệu học tập <span>*</span></label>
-      <input id="adminUploadFile" type="file" name="file" accept=".pdf,.docx,.txt,.md" required>
-      <span class="admin-form-hint">PDF / DOCX / TXT / MD · Tối đa {{ upload_max_mb }} MB · PDF scan ảnh chưa hỗ trợ OCR</span>
-      <label class="admin-checkbox"><input type="checkbox" name="is_syllabus" value="1"> Đặt làm đề cương chuẩn của môn</label>
+    </div>
+    <div class="admin-ai-steps">
+      <article class="admin-ai-step">
+        <div class="admin-ai-step-heading">
+          <span class="admin-ai-step-number">01</span>
+          <div>
+            <h4>Phân tích đề cương</h4>
+            <p>Nhận diện chương, bài và kiểm tra kết quả trước khi duyệt.</p>
+          </div>
+        </div>
+        <p class="admin-ai-step-state" id="adminAiSyllabusState">Chưa chọn môn học</p>
+        <button class="admin-ai-action admin-ai-action-primary" id="adminAiSyllabus" type="button" disabled>
+          ✦ Phân tích đề cương <span aria-hidden="true">→</span>
+        </button>
+      </article>
+      <article class="admin-ai-step">
+        <div class="admin-ai-step-heading">
+          <span class="admin-ai-step-number">02</span>
+          <div>
+            <h4>Phân loại tài liệu theo chương</h4>
+            <p>AI gợi ý chương cho các file; Admin kiểm tra và duyệt hàng loạt.</p>
+          </div>
+        </div>
+        <p class="admin-ai-step-state" id="adminAiBulkState">Chưa chọn môn học</p>
+        <button class="admin-ai-action admin-ai-action-secondary" id="adminAiBulk" type="button" disabled>
+          ✦ Phân loại toàn bộ <span aria-hidden="true">→</span>
+        </button>
+      </article>
+    </div>
+    <p class="admin-ai-help" id="adminAiHelp" role="status" aria-live="polite">Chọn môn học để xem các bước quản lý học liệu.</p>
+  </section>
+  <div class="admin-documents-stack">
+    <form class="soft-card admin-form-card admin-upload-card" method="post" enctype="multipart/form-data" action="{{ url_for('admin_add_document') }}" id="adminUploadForm" data-max-mb="{{ upload_max_mb }}">
+      <div class="admin-upload-heading">
+        <h4>↑ Tải tài liệu dùng chung</h4>
+        <p>Tải đề cương hoặc học liệu vào đúng môn trước khi phân tích bằng AI.</p>
+      </div>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="admin-upload-fields">
+        <div class="admin-upload-field">
+          <label for="sharedSubject">Môn học <span aria-hidden="true">*</span></label>
+          <select id="sharedSubject" name="shared_subject_id" required>
+            <option value="">Chọn môn học</option>
+            {% for item in subjects %}<option value="{{ item.id }}">{{ item.code }} · {{ item.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="admin-upload-field">
+          <label for="adminUploadFile">Chọn tài liệu <span aria-hidden="true">*</span></label>
+          <input id="adminUploadFile" type="file" name="file" accept=".pdf,.docx,.txt,.md" required>
+          <span class="admin-form-hint">PDF, DOCX, TXT, MD · Tối đa {{ upload_max_mb }} MB</span>
+        </div>
+        <div class="admin-upload-submit">
+          <label class="admin-checkbox"><input type="checkbox" name="is_syllabus" value="1"> Đây là đề cương chuẩn của môn</label>
+          <button class="admin-primary" type="submit">↑ Tải lên tài liệu</button>
+        </div>
+      </div>
       <p id="adminFileError" class="admin-file-error" role="alert" hidden></p>
-      <button class="admin-primary" type="submit">↑ Tải lên & xử lý tài liệu</button>
-      <p class="admin-form-hint">Tài liệu được lưu chung, không lấy từ thư mục cá nhân của sinh viên.</p>
+      <p class="admin-form-hint">PDF scan ảnh chưa hỗ trợ OCR. Tài liệu được lưu dùng chung theo mã môn học.</p>
     </form>
     <div class="soft-card admin-table-card">
-      <div class="admin-card-title"><strong>Tài liệu đã xử lý</strong><small>Chung cho sinh viên cùng mã môn</small></div>
+      <div class="admin-card-title"><strong>Tài liệu trong kho</strong><small>{{ documents|length }} file gần đây · dùng chung theo mã môn</small></div>
       <div class="admin-table-scroll"><table class="admin-table">
         <thead><tr><th>Tài liệu</th><th>Môn học</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
         <tbody>
@@ -130,7 +167,7 @@
           <tr>
             <td><strong class="admin-filename">{{ item.original_name }}</strong><small>{{ item.created_at[:10] }}</small></td>
             <td><span class="admin-code">{{ item.subject_code }}</span></td>
-            <td>{% if item.is_syllabus %}<span class="admin-success">✓ Đề cương</span>{% else %}<span class="admin-success">✓ Đã đọc</span>{% endif %}</td>
+            <td>{% if item.is_syllabus %}<span class="admin-success">✓ Đề cương</span>{% else %}<span class="admin-success">✓ Đã trích xuất</span>{% endif %}</td>
             <td><div class="admin-actions">
               <a href="{{ url_for('shared_document_file', doc_id=item.id) }}" target="_blank" rel="noopener">Xem</a>
               {% if not item.is_syllabus %}<a href="{{ url_for('chapter_material.admin_chapter_mapping', document_id=item.id) }}">Gắn chương</a>{% endif %}
