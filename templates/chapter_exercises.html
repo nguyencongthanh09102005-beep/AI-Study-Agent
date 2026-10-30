@@ -26,7 +26,7 @@
           <button class="soft-primary" type="submit" name="action" value="evaluate" {% if not evidence_ready %}disabled title="Cần học liệu chung được Admin duyệt để nhận xét có căn cứ"{% endif %}>✦ Nộp và nhờ AI nhận xét</button>
         </div>
         {% if evidence_ready %}
-        <p style="font-size:12px;color:#697e9e;line-height:1.6;margin-top:8px">Khi yêu cầu nhận xét, bài làm và các đoạn học liệu đã duyệt sẽ được gửi tới Gemini. AI chỉ gợi ý để bạn tự sửa, không chấm điểm chính thức.</p>
+        <p style="font-size:12px;color:#697e9e;line-height:1.6;margin-top:8px">Khi bạn yêu cầu nhận xét, AI sẽ đối chiếu bài làm với học liệu đã duyệt và gợi ý cách cải thiện. Phần nhận xét không phải điểm chính thức.</p>
         {% else %}
         <p style="font-size:12px;color:#9a6326;margin-top:8px">Chưa có học liệu chung được duyệt đúng chương. Bạn vẫn lưu bài làm được; nút AI sẽ khả dụng khi Admin bổ sung học liệu.</p>
         {% endif %}
@@ -63,7 +63,7 @@
         </div>
       {% elif not item.stale and item.feedback_status != 'reviewed' %}
         <p style="font-size:12px;color:#617492">
-          {% if item.feedback_status == 'missing_sources' %}Chưa có nguồn duyệt hợp lệ để AI nhận xét.{% elif item.feedback_status == 'unavailable' %}Gemini chưa trả nhận xét đủ dẫn chứng; bài làm vẫn đã lưu.{% else %}Bài làm đã lưu, chưa yêu cầu AI nhận xét.{% endif %}
+          {% if item.feedback_status == 'missing_sources' %}Chưa có nguồn duyệt hợp lệ để AI nhận xét.{% elif item.feedback_status == 'unavailable' %}AI chưa đưa ra nhận xét đủ dẫn chứng; bài làm của bạn vẫn được lưu.{% else %}Bài làm đã lưu, chưa yêu cầu AI nhận xét.{% endif %}
         </p>
         {% if evidence_ready %}
         <form method="post" action="{{ url_for('chapter_exercise.exercises',subject_id=subject.id,chapter_number=chapter_number) }}">
