@@ -132,7 +132,7 @@ def run():
             payload.update({f"title_{i}":item["title"] for i,item in enumerate(draft)})
             assert admin.post(url,data=payload).status_code == 303
             conn = project.db()
-            verified = approved_shared_units(conn,shared_id,SYLLABUS)
+            verified = approved_shared_units(conn,shared_id,OFFICIAL_TEXT)
             assert verified and len(verified) == 4
             assert verified[-1]["evidence"] == UNUSUAL
             source,_,_=official_syllabus(conn,shared_id)
