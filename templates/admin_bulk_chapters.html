@@ -29,7 +29,7 @@
       <input type="hidden" name="source_hash" value="{{ source_hash }}">
       {% for d in documents %}<input type="hidden" name="hash_{{ d.id }}" value="{{ d.hash }}">{% endfor %}
       <strong style="display:block;color:#2a437e;margin-bottom:7px">Bước 1 · Đề xuất chương cho tất cả học liệu</strong>
-      <p style="color:#62789c;font-size:13px;line-height:1.6">Tối đa 6 file trong một yêu cầu Gemini, chỉ phân tích file chưa có gợi ý hợp lệ theo phiên bản đề cương này. Có thể phát sinh nhiều lượt gọi API; quá trình không tự duyệt.</p>
+      <p style="color:#62789c;font-size:13px;line-height:1.6">Hệ thống phân tích tối đa 6 tài liệu mỗi lượt, ưu tiên các file chưa có gợi ý phù hợp với đề cương hiện tại. Các đề xuất cần được quản trị viên kiểm tra và xác nhận.</p>
       <button class="soft-primary" type="submit" name="action" value="analyze" {% if truncated %}disabled{% endif %}>✦ Phân tích toàn bộ bằng AI</button>
     </form>
     <form method="post">
