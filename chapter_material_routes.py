@@ -265,6 +265,8 @@ def admin_chapter_mapping(document_id):
             "admin_chapter_mapping.html", page="admin", document=document,
             source_name=source_name, chapters=chapters,
             source_present=bool(source_hash and valid),
+            syllabus_uploaded=bool(source_text.strip()),
+            syllabus_preview="\n".join(source_text.splitlines()[:18])[:1200],
             ai_by_key=ai_by_key, ai_analyzed=ai_valid,
             stale=bool(saved and not selected and any(row["syllabus_hash"] != source_hash
                                                       for row in saved)),
