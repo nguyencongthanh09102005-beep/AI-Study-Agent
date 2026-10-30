@@ -68,7 +68,7 @@ def list_chapter_options(project, conn, uid, subject_id):
 
     options = []
     for index, section in enumerate(parse_chapter_details(source, units)):
-        key = chapter_key(section["evidence"])
+        key = chapter_key(section["evidence"]) or str(index + 1)
         rows = approved_document_rows(conn, shared["id"], key, fingerprint)
         ready = prepared_sources(rows)
         options.append({
@@ -135,7 +135,7 @@ def resolve_lesson_context(project, conn, uid, subject_id, chapter_number,
     if not official_text or official_hash != fingerprint:
         raise LessonContextError("Đề cương chung đã thay đổi; hãy xác nhận lại.", 409)
 
-    key = chapter_key(section["evidence"])
+    key = chapter_key(section["evidence"]) or str(chapter_number)
     rows = approved_document_rows(conn, shared["id"], key, fingerprint)
     sources = prepared_sources(rows, question=question)
     if not sources:
