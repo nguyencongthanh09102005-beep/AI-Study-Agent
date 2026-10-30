@@ -546,7 +546,7 @@ function SubjectSelector({ subjects, selectedId, onSelect }) {
 }
 
 // Hiển thị Markdown cơ bản trong phản hồi AI mà không cần thư viện ngoài.
-// React Native Text không tự định dạng dấu **in đậm** từ Gemini.
+// React Native Text không tự định dạng dấu **in đậm** từ câu trả lời AI.
 function ChatFormattedText({ value, style }) {
   const rows = String(value ?? '').split(/\r?\n/);
   return (
