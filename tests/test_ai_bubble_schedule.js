@@ -15,7 +15,19 @@ assert.equal(api.isRequest("Lịch học của tui có buổi nào trùng giờ 
 assert.equal(api.isRequest("Đổi lịch học ngày mai sang giờ trống"),true);
 assert.equal(api.isRequest("Lịch sử Đảng Cộng sản Việt Nam là gì?"),false);
 assert.equal(api.isRequest("Phân tích phép biện chứng duy vật"),false);
-assert.match(chat,/FloatingAiSchedule\?\.attach/);
+assert.match(chat,/FloatingAiSupport\\?\\.attach/);
+const support=fs.readFileSync(path.join(__dirname,"../static/js/ai_support_chat.js"),"utf8");
+const newCtx={window:{}};
+vm.runInNewContext(support,newCtx);
+assert.equal(typeof newCtx.window.FloatingAiSupport.attach,"function");
+assert.match(base,/ai_support_chat.js/);
+assert.match(base,/id="floatingAiSupportInput"/);
+assert.match(support,/\\/api\\/chat\\/support\\/create\\/preview/);
+assert.match(support,/\\/api\\/chat\\/support\\/create\\/confirm/);
+assert.match(support,/\\/api\\/chat\\/support\\/upload/);
+assert.match(support,/\\/api\\/chat\\/schedule\\/preview/);
+assert.match(support,/X-CSRF-Token/);
+assert.doesNotMatch(support,/innerHTML\\s*=/);
 assert.doesNotMatch(chat,/scheduleFeature\?\.isRequest\(question\)/,
   "Academic Chat must not silently redirect requests to Support");
 assert.match(chat,/floatingAiTabSupport/);
@@ -29,4 +41,4 @@ assert.match(source,/\/api\/chat\/schedule\/preview/);
 assert.match(source,/\/api\/chat\/schedule\/confirm/);
 assert.match(source,/X-CSRF-Token/);
 assert.doesNotMatch(source,/innerHTML\s*=/);
-console.log("Floating AI schedule PASS: dedicated Support tab, global review, safe one-click confirmation");
+console.log("Floating AI Support PASS: conversation, suggested actions, explicit confirmations, inline file upload");
