@@ -112,6 +112,27 @@ def _date_time(message):
         return None
 
 
+def _suggest_self_study_evening(conn, uid, minutes=60):
+    """Find a Mon–Sat 19:00–22:00 free slot; do not reserve anything."""
+    rows = _tasks(conn, uid)
+    now = local_now()
+    for offset in range(0, 31):
+        day = (now + timedelta(days=offset)).date()
+        if day.weekday() == 6:
+            continue
+        for hour, minute in ((19, 0), (20, 0), (21, 0)):
+            proposed = datetime.combine(day, datetime.min.time()).replace(
+                hour=hour, minute=minute
+            )
+            if proposed <= now + timedelta(minutes=20):
+                continue
+            collisions, _ = _conflicts(rows, -1, proposed, minutes)
+            if not collisions and proposed + timedelta(minutes=minutes) <= proposed.replace(
+                    hour=22, minute=0):
+                return proposed
+    return None
+
+
 def _self_study_topic(raw):
     # Extract an optional title after "môn" rather than allowing an
     # instruction to create an arbitrary study subject.
@@ -174,13 +195,26 @@ def message():
         elif (any(p in normalized for p in ("tu hoc", "hoc them", "them buoi", "tao buoi"))):
             parsed = _date_time(raw)
             topic = _self_study_topic(raw)
+            requested_date = re.search(r"\\b\\d{1,2}[/-]\\d{1,2}\\b", raw)
+            if not parsed and topic and not requested_date:
+                proposed = _suggest_self_study_evening(conn, uid)
+                if proposed:
+                    parsed = (proposed, False)
+                    suggested_evening = True
+                else:
+                    suggested_evening = False
+            else:
+                suggested_evening = False
             if not parsed or not topic:
                 answer = "Hãy cho biết nội dung tự học, ngày và giờ. Ví dụ: Cho buổi tự học môn Figma vào 7h tối ngày 1/11."
                 result = {"intent":"question"}
             else:
                 when, inferred = parsed
                 subject = _match_subject(topic, subjects)
-                answer = ("Tui đã chuẩn bị buổi tự học. Bạn có thể chọn hoặc tải tài liệu và xem trước khi xác nhận."
+                answer = (("Tui gợi ý tự học lúc " + when.strftime("%H:%M ngày %d/%m/%Y") +
+                           ". Bạn có thể đổi giờ, chọn hoặc tải tài liệu trước khi xác nhận."
+                           if suggested_evening else
+                           "Tui đã chuẩn bị buổi tự học. Bạn có thể chọn hoặc tải tài liệu và xem trước khi xác nhận.")
                           + (" Chủ nhật là ngày nghỉ mặc định; bạn vẫn được chủ động chọn." if when.weekday()==6 else ""))
                 result = {"intent":"create","topic":topic,
                           "subject_id":subject["id"] if subject else None,
