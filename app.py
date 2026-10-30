@@ -2286,8 +2286,10 @@ def gemini_generate(prompt):
                 )
 
                 if status not in transient_statuses:
-                    # 400/401/403... không retry vì thường là cấu hình/key.
-                    return None, last_error
+                    # 400/401/403: log provider details privately, never display
+                    # model names, API metadata or provider credentials in UI.
+                    print("AI provider request failed:", last_error)
+                    return None, "Dịch vụ AI hiện chưa khả dụng. Vui lòng thử lại sau."
 
                 # Retry model chính với exponential backoff + jitter.
                 if model_index == 0 and attempt < max_attempts - 1:
@@ -2326,10 +2328,11 @@ def gemini_generate(prompt):
                 last_error = f"{model}: không đọc được phản hồi Gemini - {exc}"
                 break
 
+    if last_error:
+        print("AI provider exhausted retries:", last_error)
     return None, (
         "AI đang bận hoặc kết nối chưa ổn định. "
-        "Hệ thống đã thử model chính và model dự phòng."
-        + (f" Chi tiết: {last_error}" if last_error else "")
+        "Vui lòng thử lại sau."
     )
 
 def gemini_subject_answer(
