@@ -341,7 +341,9 @@ def review_all_upcoming_lessons():
             if row["done"]:
                 continue
             span = _interval(row)
-            if span and span[0] >= current:
+            # Include every unfinished session dated today, even if its
+            # planned start has passed; never include an earlier calendar day.
+            if span and span[0].date() >= current.date():
                 future.append(row)
         conflicts = find_study_conflicts(future)
         # Each overlap appears symmetrically; choose the higher task ID to
