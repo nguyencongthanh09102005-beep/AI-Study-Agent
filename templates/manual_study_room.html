@@ -15,7 +15,7 @@
     <span class="manual-room-eyebrow">KHÔNG GIAN HỌC CÁ NHÂN · RIÊNG TƯ</span>
     <h2>{{ info.title }}</h2>
     <p>{{ info.subject_name }} · {{ info.study_at[:16]|replace('T',' ') }} · {{ info.duration }} phút</p>
-    <p class="manual-room-subtitle">Các câu hỏi AI chỉ lấy ngữ cảnh từ file cá nhân bạn chọn, không dùng chung với sinh viên khác. Khi bạn bấm Hỏi AI hoặc Chuẩn bị Quiz, nội dung trích xuất của file sẽ được gửi tới Gemini để xử lý.</p>
+    <p class="manual-room-subtitle">AI chỉ sử dụng nội dung từ tài liệu bạn chọn trong buổi học này, không trộn với tài liệu của sinh viên khác. Bấm Hỏi AI hoặc Chuẩn bị Quiz để bắt đầu.</p>
     <form method="post" action="{{ url_for('toggle_study_task',task_id=info.id) }}">
       <button class="ghost-action" type="submit">{{ '↺ Đánh dấu chưa hoàn thành' if info.done else '✓ Đánh dấu hoàn thành buổi học' }}</button>
     </form>
@@ -71,12 +71,12 @@
         <a class="soft-primary manual-room-quiz-link"
            href="{{ url_for('quiz',quiz_id=info.quiz_id) }}">▶ Mở Quiz đã chuẩn bị</a>
         {% else %}
-        <p>{% if info.quiz_requested %}Bạn đã yêu cầu Quiz cho buổi này, nhưng chưa có bài hợp lệ. Có thể thử lại.{% else %}Chỉ tạo khi bạn bấm chuẩn bị để tiết kiệm quota Gemini.{% endif %}</p>
+        <p>{% if info.quiz_requested %}Bạn đã yêu cầu Quiz cho buổi này, nhưng chưa có bài hợp lệ. Có thể thử lại.{% else %}Chỉ tạo khi bạn yêu cầu, tránh tạo lại bài kiểm tra không cần thiết.{% endif %}</p>
         <form method="post" action="{{ url_for('manual_lesson.prepare_quiz',task_id=info.id) }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
           <button type="submit" class="soft-primary manual-room-prepare">✦ Chuẩn bị Quiz 10 câu</button>
         </form>
-        <p class="manual-room-small">Việc chuẩn bị có thể cần thời gian để Gemini tạo và kiểm tra câu hỏi. Không tự tạo lại khi tải trang.</p>
+        <p class="manual-room-small">AI sẽ tạo và kiểm tra câu hỏi khi bạn yêu cầu. Tải lại trang không tự tạo thêm bài kiểm tra.</p>
         {% endif %}
       </section>
       {% if info.note %}
