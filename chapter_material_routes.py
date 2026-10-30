@@ -13,7 +13,7 @@ from ai_chapter_suggestions import chapter_ai_prompt, validate_ai_suggestions
 from course_path_learning import (
     match_course_materials, parse_chapter_details, personal_course_documents, _terms,
 )
-from syllabus_learning import extract_syllabus_units, syllabus_hash
+from syllabus_learning import extract_syllabus_units, syllabus_hash, normalize_heading_prefix
 from syllabus_routes import _source, ensure_syllabus_schema
 
 chapter_material_bp = Blueprint("chapter_material", __name__)
@@ -22,11 +22,7 @@ CHAPTER_KEY_RE = re.compile(r"^(?:chương|chapter|bài|lesson|unit|module)\s+(\
 
 
 def chapter_key(evidence):
-    raw = (evidence or "").strip()
-    # Syllabus PDFs may use bullets in a contents list or a leading
-    # "1 - 3" week range in the teaching timetable.
-    raw = re.sub(r"^\d{1,2}\s*[-–]\s*\d{1,2}\s+", "", raw)
-    raw = re.sub(r"^[•●▪◦*+\-–—]\s+", "", raw)
+    raw = normalize_heading_prefix(evidence)
     found = CHAPTER_KEY_RE.match(raw)
     return found.group(1) if found else ""
 
@@ -143,10 +139,13 @@ def admin_chapter_mapping(document_id):
         source_text, source_hash, source_name = official_syllabus(
             conn, document["shared_subject_id"],
         )
-        units = extract_syllabus_units(source_text)
+        from admin_syllabus_analysis import approved_shared_units
+        units = (approved_shared_units(
+            conn, document["shared_subject_id"], source_text
+        ) or extract_syllabus_units(source_text))
         valid = {}
         for unit in units:
-            key = chapter_key(unit["evidence"])
+            key = chapter_key(unit["evidence"]) or chapter_key(unit["title"])
             if key and key not in valid:
                 valid[key] = unit
 
