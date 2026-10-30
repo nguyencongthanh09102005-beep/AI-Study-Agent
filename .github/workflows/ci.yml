@@ -47,6 +47,11 @@ jobs:
       - name: Initialize SQLite schema
         run: python -c "import app; app.init_db(); print('DB init OK')"
 
+      - name: Verify support creation, file upload and private learning isolation
+        run: |
+          python -m py_compile learning_streams.py support_schedule_chat.py
+          python tests/test_support_study_streams.py
+
       - name: Check JavaScript syntax
         run: |
           node --check static/js/quiz.js
@@ -121,9 +126,7 @@ jobs:
         run: python tests/test_admin_ai_hub.py
 
       - name: Chat bubble safe schedule proposals and updates
-        run: |
-          python tests/test_chat_schedule_actions.py
-          python tests/test_support_study_streams.py
+        run: python tests/test_chat_schedule_actions.py
 
       - name: Global Web readability coverage
         run: python tests/test_web_readability.py
