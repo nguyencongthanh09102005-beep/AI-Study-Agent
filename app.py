@@ -1715,11 +1715,18 @@ def record_quiz_learning_signal(
     topic,
     chapter,
     is_correct,
-    question_text=""
+    question_text="", stream="academic"
 ):
     """Ghi nhận tín hiệu học theo chủ đề/chương thay vì lưu nguyên câu hỏi."""
     if not subject_id:
         return
+    # SQL identifiers are chosen only from trusted, fixed literals.
+    if stream == "self_study":
+        from learning_streams import ensure_private_weakness_schema
+        ensure_private_weakness_schema(conn)
+        table = "self_study_weaknesses"
+    else:
+        table = "learning_weaknesses"
 
     topic = re.sub(
         r"\s+",
@@ -1742,9 +1749,9 @@ def record_quiz_learning_signal(
         return
 
     row = conn.execute(
-        """
+        f"""
         SELECT id,miss_count,correct_count
-        FROM learning_weaknesses
+        FROM {table}
         WHERE user_id=? AND subject_id=? AND topic_key=?
         """,
         (user_id, subject_id, topic_key)
@@ -1752,8 +1759,8 @@ def record_quiz_learning_signal(
 
     if row:
         conn.execute(
-            """
-            UPDATE learning_weaknesses
+            f"""
+            UPDATE {table}
             SET miss_count=?,
                 correct_count=?,
                 topic=?,
@@ -1775,7 +1782,7 @@ def record_quiz_learning_signal(
         # Câu đúng ngay lần đầu không nên xuất hiện trong "Phần cần ôn thêm".
         conn.execute(
             """
-            INSERT INTO learning_weaknesses(
+            INSERT INTO {table}(
                 user_id,subject_id,topic_key,topic,chapter,
                 miss_count,correct_count,last_seen_at
             ) VALUES(?,?,?,?,?,?,?,?)
@@ -1805,7 +1812,7 @@ def rebuild_subject_learning_signals(conn, user_id, subject_id):
 
     attempts = conn.execute(
         """
-        SELECT q.payload, qa.answers_json
+        SELECT q.id AS quiz_id, q.payload, qa.answers_json
         FROM quiz_attempts qa
         JOIN quizzes q ON q.id=qa.quiz_id AND q.user_id=qa.user_id
         WHERE qa.user_id=? AND q.subject_id=?
@@ -1814,12 +1821,17 @@ def rebuild_subject_learning_signals(conn, user_id, subject_id):
         (user_id, subject_id)
     ).fetchall()
 
-    conn.execute(
-        "DELETE FROM learning_weaknesses WHERE user_id=? AND subject_id=?",
-        (user_id, subject_id)
-    )
+    from learning_streams import academic_quiz, ensure_private_weakness_schema
+    ensure_private_weakness_schema(conn)
+    for table in ("learning_weaknesses", "self_study_weaknesses"):
+        conn.execute(
+            f"DELETE FROM {table} WHERE user_id=? AND subject_id=?",
+            (user_id, subject_id)
+        )
 
     for attempt in attempts:
+        stream = ("academic" if academic_quiz(conn, user_id, attempt["quiz_id"])
+                  else "self_study")
         try:
             questions = json.loads(attempt["payload"] or "[]")
             answers = json.loads(attempt["answers_json"] or "[]")
@@ -1842,7 +1854,7 @@ def rebuild_subject_learning_signals(conn, user_id, subject_id):
                 str(question.get("topic") or ""),
                 str(question.get("chapter") or ""),
                 chosen == expected,
-                str(question.get("question") or "")
+                str(question.get("question") or ""), stream=stream
             )
 
     sync_adaptive_review_task(conn, user_id, subject_id)
@@ -5343,6 +5355,14 @@ def api_subject_learning_insights(subject_id):
         return jsonify({"error": "Không tìm thấy môn học."}), 404
 
     profile = ensure_learning_profile(conn, uid)
+    from learning_streams import ensure_private_weakness_schema
+    ensure_private_weakness_schema(conn)
+    private_weaknesses = conn.execute("""
+        SELECT topic,chapter,miss_count,correct_count,last_seen_at
+        FROM self_study_weaknesses
+        WHERE user_id=? AND subject_id=? AND miss_count>correct_count
+        ORDER BY (miss_count-correct_count) DESC,last_seen_at DESC LIMIT 12
+    """, (uid, subject_id)).fetchall()
     weaknesses = conn.execute(
         """
         SELECT id,topic,chapter,miss_count,correct_count,last_seen_at
@@ -5407,6 +5427,7 @@ def api_subject_learning_insights(subject_id):
             "best_score": float(quiz_stats["best_score"] or 0)
         },
         "weaknesses": [dict(row) for row in weaknesses],
+        "self_study_weaknesses": [dict(row) for row in private_weaknesses],
         "adaptive_task": dict(adaptive_task) if adaptive_task else None,
         "mastery": {
             "active_count": int(mastery_stats["active_count"] or 0),
@@ -6334,9 +6355,11 @@ def submit_quiz():
     normalized_answers = []
     subject_id = quiz_row["subject_id"]
 
+    from learning_streams import academic_quiz
+    stream = "academic" if academic_quiz(conn, uid, quiz_id) else "self_study"
     active_before = (
         get_active_weakness_rows(conn, uid, subject_id, limit=100)
-        if subject_id
+        if subject_id and stream == 'academic'
         else []
     )
     active_before_map = {
@@ -6387,7 +6410,7 @@ def submit_quiz():
             str(question.get("topic") or ""),
             str(question.get("chapter") or ""),
             is_correct,
-            str(question.get("question") or "")
+            str(question.get("question") or ""), stream=stream
         )
 
     score = round(
@@ -6467,19 +6490,14 @@ def submit_quiz():
             for key in new_keys[:8]
         ]
 
-        adaptive_task = sync_adaptive_review_task(
-            conn,
-            uid,
-            subject_id
-        )
+        adaptive_task = (sync_adaptive_review_task(
+            conn, uid, subject_id
+        ) if stream == "academic" else None)
 
         # Task thích nghi cũng là một phần của lộ trình, nên tính lại tiến độ
         # sau khi đồng bộ task để Dashboard/Kế hoạch phản ánh đúng trạng thái mới.
-        recalculate_subject_progress(
-            uid,
-            subject_id,
-            conn
-        )
+        if stream == "academic":
+            recalculate_subject_progress(uid, subject_id, conn)
 
         weakness_rows = get_active_weakness_rows(
             conn,
