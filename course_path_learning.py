@@ -11,7 +11,12 @@ from datetime import date, timedelta
 PLAN_VERSION = 5
 
 TOPIC_RE = re.compile(r"^(\d+(?:\.\d+){1,3})[.)]?\s+(.{3,200})$")
-CHAPTER_RE = re.compile(r"^(?:chương|chapter|bài|lesson|unit|module)\s+(\d+)\b", re.I)
+CHAPTER_RE = re.compile(
+    r"^(?:\d{1,2}\s*[-–]\s*\d{1,2}\s+)?"
+    r"(?:[•●▪◦*+\-–—]\s+)?"
+    r"(?:chương|chapter|bài|lesson|unit|module)\s+(\d+)\b",
+    re.I,
+)
 CLO_RE = re.compile(r"\bCLO\s*[-:]?\s*\d+\b", re.I)
 BULLET_RE = re.compile(r"^[•●▪◦*+\-–—]\s*")
 COURSE_END_RE = re.compile(
