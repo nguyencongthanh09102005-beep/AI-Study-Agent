@@ -111,10 +111,10 @@ document.addEventListener("DOMContentLoaded", () => {
     messages.appendChild(box);
     messages.scrollTop = messages.scrollHeight;
   }
-  const scheduleFeature = window.FloatingAiSchedule?.attach({
-    results: supportResults,
-    actionButton: document.getElementById("floatingAiScheduleButton"),
-    setStatus
+  // Support has its own conversational, confirmation-gated workspace.
+  // The learning conversation stays unchanged and source-grounded.
+  const supportFeature = window.FloatingAiSupport?.attach({
+    results: supportResults, setStatus
   });
 
   // Learning stays the unchanged, source-grounded Chat. Support is a separate
