@@ -227,7 +227,7 @@ def match_course_materials(section, documents):
         content = document.get("text") or ""
         name = document.get("name") or ""
         best_matches = set()
-        for _, passage in _phrases(content):
+        for _, passage in _phrases(content, size=1800, overlap=180):
             matches = search_terms & _terms(passage)
             if len(matches) > len(best_matches):
                 best_matches = matches
