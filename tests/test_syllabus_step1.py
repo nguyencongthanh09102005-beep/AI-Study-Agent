@@ -37,6 +37,45 @@ Thấu cảm và xác định vấn đề
     assert "Thấu cảm và xác định vấn đề" in split_units[1]["title"]
     # Never convert administrative syllabus sections into learning chapters.
     assert extract_syllabus_units("Chương 1\nChuẩn đầu ra học phần") == []
+    # The real Design Thinking test PDF contains bullet TOC chapters and
+    # a second-page timetable whose week ranges precede wrapped headings.
+    actual_pdf_shape = """ĐỀ CƯƠNG CHI TIẾT HỌC PHẦN: TƯ DUY THIẾT KẾ
+• Chương 1: Tổng Quan Về Tư Duy Thiết Kế & Đổi Mới Sáng Tạo
+• Chương 2: Thấu Cảm & Xác Định Vấn Đề
+• Chương 3: Phát Họa Ý Tưởng & Kỹ Thuật Sáng Tạo
+• Chương 4: Tạo Mẫu Nhanh & Kiểm Thử
+• Chương 5: Mô Hình Kinh Doanh Sáng Tạo & Triển Khai
+CLO 1
+CLO 2
+5. Kế Hoạch Giảng Dạy Chi Tiết (15 Tuần)
+1 - 3 Chương 1: Tổng Quan Về Tư Duy Thiết Kế &
+Đổi Mới Sáng Tạo
+Triết lý HCD và đổi mới sáng tạo
+4 - 6 Chương 2: Thấu Cảm (Empathize) & Xác
+Định Vấn Đề (Define)
+Phỏng vấn sâu và Empathy Map
+7 - 9 Chương 3: Phát Họa Ý Tưởng (Ideate) & Kỹ
+Thuật Sáng Tạo
+Brainstorming và SCAMPER
+10 - 12 Chương 4: Tạo Mẫu Nhanh (Prototype) &
+Kiểm Thử (Test)
+Low/High-Fi Prototype
+13 - 15 Chương 5: Mô Hình Kinh Doanh Sáng Tạo &
+Triển Khai Dự Án
+Lean Canvas và Pitching
+6. Danh Mục Tài Liệu Học Tập & Tham Khảo
+"""
+    from chapter_material_routes import chapter_key
+    from course_path_learning import parse_chapter_details
+    syllabus_units = extract_syllabus_units(actual_pdf_shape)
+    assert len(syllabus_units) == 5, syllabus_units
+    assert [chapter_key(unit["evidence"]) for unit in syllabus_units] == list("12345")
+    assert all(unit["evidence"][0].isdigit() for unit in syllabus_units)
+    assert "Đổi Mới Sáng Tạo" in syllabus_units[0]["title"]
+    assert "Định Vấn Đề" in syllabus_units[1]["title"]
+    detailed = parse_chapter_details(actual_pdf_shape, syllabus_units)
+    assert len(detailed) == 5
+    assert [unit["chapter"] for unit in detailed] == [u["title"] for u in syllabus_units]
     assert extract_syllabus_units("1. Mục tiêu\n2. Tài liệu tham khảo") == []
     fake = '{"chapters":[{"evidence":"Chương 99. Giả mạo"}]}'
     assert len(extract_syllabus_units(sample, fake)) == 3
