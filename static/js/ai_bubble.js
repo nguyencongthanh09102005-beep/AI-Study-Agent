@@ -104,6 +104,15 @@ document.addEventListener("DOMContentLoaded", () => {
     messages.appendChild(box);
     messages.scrollTop = messages.scrollHeight;
   }
+  const scheduleFeature = window.FloatingAiSchedule?.attach({
+    messages,
+    actionButton: document.getElementById("floatingAiScheduleButton"),
+    getConversationId: () => conversationId,
+    getSubjectId: () => subjectId || (isLesson ? lesson.subjectId : null),
+    appendMessage,
+    setStatus
+  });
+
   function renderHistory(rows) {
     clear();
     if (!Array.isArray(rows) || !rows.length) {
@@ -174,6 +183,7 @@ document.addEventListener("DOMContentLoaded", () => {
     return number(parsed) ? parsed : null;
   }
   async function selectCourse(id) {
+    scheduleFeature?.reset();
     const chosen = courses.find(c => Number(c.subject_id) === Number(id));
     const token = ++requestToken;
     conversationId = null;
@@ -461,6 +471,12 @@ document.addEventListener("DOMContentLoaded", () => {
     e.preventDefault();
     const question = input.value.trim();
     if (busy || disabled || !number(conversationId) || !question) return;
+    if (scheduleFeature?.isRequest(question)) {
+      appendMessage("user", question);
+      input.value = "";
+      await scheduleFeature.open();
+      return;
+    }
     const canResume = !disabled;
     let invalidated = false;
     busy = true; enable(false);
