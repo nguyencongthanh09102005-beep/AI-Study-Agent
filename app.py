@@ -1153,7 +1153,11 @@ def get_shared_subject_context(user_id, subject_id, query="", max_chars=5500):
 
     syllabus_text = shared_syllabus or personal_syllabus
     if syllabus_text:
-        clipped = syllabus_text[:max_chars]
+        from chat_retrieval import retrieve
+        source_budget = min(2200, max(350, max_chars // 2))
+        found = retrieve([{"name":"syllabus","text":syllabus_text}], query,
+                         max_chars=source_budget, max_passages=1)
+        clipped = found[0][1] if found else ""
         if shared_syllabus:
             parts.append(f"ĐỀ CƯƠNG CHUẨN CỦA MÔN:\n{clipped}")
             source_labels.append("Đề cương chuẩn của môn")
