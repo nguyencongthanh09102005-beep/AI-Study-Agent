@@ -29,6 +29,7 @@ Chuẩn đầu ra học phần
 CLO1
 """
 UNUSUAL = "PHẦN IV: ỨNG DỤNG VÀ KIỂM THỬ"
+OFFICIAL_TEXT = SYLLABUS.strip()
 
 
 def run():
@@ -97,7 +98,7 @@ def run():
             assert url in admin_html
             with admin.session_transaction() as sess:
                 csrf = sess["admin_csrf_token"]
-            source_hash = syllabus_hash(SYLLABUS)
+            source_hash = syllabus_hash(OFFICIAL_TEXT)
             assert admin.post(url,data={"action":"analyze","source_hash":source_hash}).status_code == 403
             assert admin.post(url,data={"action":"analyze","source_hash":"changed",
                                         "csrf_token":csrf}).status_code == 409
@@ -115,7 +116,7 @@ def run():
                     })
             assert response.status_code == 303 and len(calls) == 1
             conn = project.db()
-            assert approved_shared_units(conn,shared_id,SYLLABUS) is None
+            assert approved_shared_units(conn,shared_id,OFFICIAL_TEXT) is None
             state = conn.execute("SELECT status,draft_json FROM admin_syllabus_analysis "
                                  "WHERE shared_subject_id=?",(shared_id,)).fetchone()
             assert state["status"] == "draft"
@@ -154,7 +155,7 @@ def run():
 
             conn=project.db()
             conn.execute("UPDATE shared_subjects SET syllabus_text=? WHERE id=?",
-                         (SYLLABUS+"\nChương 5. Môn học đổi cấu trúc",shared_id))
+                         (OFFICIAL_TEXT+"\nChương 5. Môn học đổi cấu trúc",shared_id))
             conn.commit()
             assert approved_shared_units(conn,shared_id,
                 SYLLABUS+"\nChương 5. Môn học đổi cấu trúc") is None
