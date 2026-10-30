@@ -241,7 +241,8 @@ def learning_path(subject_id):
                     ensure_chapter_material_schema(conn)
                     linked_by_chapter = {}
                     for index, unit in enumerate(units):
-                        key = chapter_key(unit["evidence"])
+                        key = (chapter_key(unit["evidence"])
+                               or chapter_key(unit["title"]) or str(index + 1))
                         if key:
                             linked_by_chapter[index + 1] = [
                                 {"id": row["id"], "name": row["original_name"],
