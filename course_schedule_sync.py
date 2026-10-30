@@ -9,6 +9,7 @@ import json
 from datetime import datetime, time, timedelta
 
 from study_schedule_conflicts import _interval
+from adaptive_review_schedule import local_now
 
 
 def ensure_session_schedule_schema(conn):
@@ -158,7 +159,8 @@ def import_roadmap_lessons(conn, user_id, subject_id, sessions, created_at,
     # All validation above finishes before we consider changing any tasks.
     prepared.sort(key=lambda row: row[0])
     linked = scheduled_lessons(conn, user_id, subject_id)
-    now = reference_time or datetime.now()
+    # Study times are Vietnam-local naive datetimes, not server UTC.
+    now = reference_time or local_now()
     if not isinstance(now, datetime) or now.tzinfo is not None:
         raise ValueError("Giờ hiện tại không hợp lệ.")
     future_floor = _ceil_quarter(now + timedelta(minutes=15))
