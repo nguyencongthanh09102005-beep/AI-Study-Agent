@@ -178,7 +178,8 @@ def run():
             })
             assert failed.status_code==303
             err_page=client.get(failed.headers["Location"]).get_data(as_text=True)
-            assert "Gemini chưa tạo đủ" in err_page
+            assert "AI chưa tạo đủ" in err_page
+            assert "Gemini" not in err_page
             assert "Quiz lỗi nhưng vẫn có lịch" in err_page
             assert conn.execute("SELECT count(*) FROM study_tasks WHERE user_id=?",
                                 (user,)).fetchone()[0]==3
