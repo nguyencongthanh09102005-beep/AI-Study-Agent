@@ -1,0 +1,27 @@
+const assert=require("node:assert/strict");
+const fs=require("node:fs");
+const vm=require("node:vm");
+const path=require("node:path");
+
+const source=fs.readFileSync(path.join(__dirname,"../static/js/ai_bubble_schedule.js"),"utf8");
+const chat=fs.readFileSync(path.join(__dirname,"../static/js/ai_bubble.js"),"utf8");
+const base=fs.readFileSync(path.join(__dirname,"../templates/base.html"),"utf8");
+const css=fs.readFileSync(path.join(__dirname,"../static/css/ai_bubble.css"),"utf8");
+const ctx={window:{}};
+vm.runInNewContext(source,ctx);
+const api=ctx.window.FloatingAiSchedule;
+assert.equal(typeof api.attach,"function");
+assert.equal(api.isRequest("Lịch học của tui có buổi nào trùng giờ không?"),true);
+assert.equal(api.isRequest("Đổi lịch học ngày mai sang giờ trống"),true);
+assert.equal(api.isRequest("Lịch sử Đảng Cộng sản Việt Nam là gì?"),false);
+assert.equal(api.isRequest("Phân tích phép biện chứng duy vật"),false);
+assert.match(chat,/FloatingAiSchedule\?\.attach/);
+assert.match(chat,/scheduleFeature\?\.isRequest\(question\)/);
+assert.match(base,/id="floatingAiScheduleButton"/);
+assert.match(base,/ai_bubble_schedule.js/);
+assert.match(css,/floating-ai-schedule-card/);
+assert.match(source,/\/api\/chat\/schedule\/preview/);
+assert.match(source,/\/api\/chat\/schedule\/confirm/);
+assert.match(source,/X-CSRF-Token/);
+assert.doesNotMatch(source,/innerHTML\s*=/);
+console.log("Floating AI schedule PASS: natural-language routing, safe UI and explicit confirmation");
