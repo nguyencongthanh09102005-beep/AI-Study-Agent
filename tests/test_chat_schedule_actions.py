@@ -71,6 +71,16 @@ def check():
                 no_login=project.app.test_client()
                 assert no_login.get(f"/api/chat/schedule?conversation_id={convo}").status_code==401
                 assert stranger.get(f"/api/chat/schedule?conversation_id={convo}").status_code==404
+                review=web.get("/api/chat/schedule/review")
+                assert review.status_code==200,review.get_data(as_text=True)
+                review_data=review.get_json()
+                assert review_data["scan_scope"]=="all_future_incomplete"
+                assert review_data["checked_count"]==4,review_data
+                assert review_data["conflict_count"]==1,review_data
+                assert review_data["next_conflict"]["id"]==other,review_data
+                assert review_data["next_conflict"]["conversation_id"]==other_convo
+                assert review_data["next_conflict"]["subject_name"]=="Lịch sử Đảng"
+                assert review_data["next_conflict"]["suggested_at"]==at(20)
                 listing=web.get(f"/api/chat/schedule?conversation_id={convo}")
                 assert listing.status_code==200,listing.get_data(as_text=True)
                 data=listing.get_json()
@@ -128,6 +138,11 @@ def check():
                 assert moved["study_at"]==at(20)
                 assert moved["note"]=="Do not change"
                 assert moved["duration"]==45 and moved["done"]==0
+                # After resolving the cross-course collision, review must
+                # return no proposals (without another Gemini call).
+                after_review=web.get("/api/chat/schedule/review")
+                assert after_review.status_code==200
+                assert after_review.get_json()["conflict_count"]==0
                 assert is_manual_roadmap_time(conn,uid,roadmap)
                 assert conn.execute("SELECT study_at FROM study_tasks WHERE id=?",
                                     (other,)).fetchone()[0]==at(19,15)
