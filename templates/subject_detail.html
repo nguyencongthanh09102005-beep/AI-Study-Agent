@@ -31,7 +31,7 @@
   <div class="proactive-agent-main">
     <span class="proactive-agent-avatar">🤖</span>
     <div class="proactive-agent-copy">
-      <div class="proactive-agent-kicker"><span>PERSONAL STUDY AGENT · ĐỢT 8</span><b>Đánh giá từ dữ liệu học thật</b></div>
+      <div class="proactive-agent-kicker"><span>TRỢ LÝ HỌC TẬP</span><b>Đánh giá từ dữ liệu học thật</b></div>
       <h3>{{ adaptive_decision.title }}</h3>
       <p>{{ adaptive_decision.reason }}</p>
       <div class="proactive-agent-meta">
@@ -45,7 +45,7 @@
           <li>{{ evidence }}</li>
           {% endfor %}
         </ul>
-        <small style="color:#697a93">Kết luận được tính từ Quiz, điểm yếu và kế hoạch riêng của tài khoản này; không suy đoán bằng AI sinh văn bản.</small>
+        <small style="color:#697a93">Gợi ý dựa trên kết quả luyện tập, những nội dung cần ôn và lịch học của bạn.</small>
       </details>
     </div>
   </div>
@@ -88,7 +88,7 @@
 {% endif %}
 {% if adaptive_plan_proposal %}
 <section class="soft-card" id="adaptivePlanProposal" style="margin:0 0 20px;padding:20px">
-  <div class="mini-section-head"><h3>🗓 Đề xuất điều chỉnh kế hoạch · Đợt 8.3</h3><span>Chờ sinh viên quyết định</span></div>
+  <div class="mini-section-head"><h3>🗓 Gợi ý điều chỉnh lịch học</h3><span>Chờ sinh viên quyết định</span></div>
   <p style="line-height:1.65;color:#475a7b;margin:10px 0">
     Buổi theo lộ trình <strong>{{ adaptive_plan_proposal.title }}</strong> đang được xếp trước khi bạn kịp ôn điểm yếu.
     Agent đề xuất dời buổi này sang khung giờ trống <strong>sau buổi ôn</strong>.
@@ -97,7 +97,7 @@
   <div style="display:flex;flex-wrap:wrap;gap:12px;margin:14px 0">
     <div style="background:#f1f4fa;padding:12px;border-radius:10px"><small>Giờ hiện tại</small><br><strong>{{ adaptive_plan_proposal.old_text }}</strong></div>
     <div style="background:#e9f5ef;padding:12px;border-radius:10px"><small>Giờ đề xuất</small><br><strong>{{ adaptive_plan_proposal.new_text }}</strong></div>
-    <div style="background:#f1f4fa;padding:12px;border-radius:10px"><small>Buổi ôn Adaptive</small><br><strong>{{ adaptive_plan_proposal.review_text }}</strong></div>
+    <div style="background:#f1f4fa;padding:12px;border-radius:10px"><small>Buổi ôn điểm yếu</small><br><strong>{{ adaptive_plan_proposal.review_text }}</strong></div>
   </div>
   {% if adaptive_plan_proposal.dismissed %}
     <p style="color:#63738b">Bạn đã chọn giữ lịch cũ cho đề xuất này. Nếu dữ liệu Quiz hoặc lịch thay đổi, Agent sẽ đánh giá lại.</p>
@@ -160,10 +160,10 @@
   <article class="soft-card agent-panel course-chapter-panel">
     <div class="panel-head">
       <div><span class="panel-kicker">HỌC LIỆU THEO ĐỀ CƯƠNG</span><h3>📚 Tài liệu theo chương</h3></div>
-      <span class="shared-badge">{{ chapter_items|length }} chương</span>
+      <span class="shared-badge">{% if chapter_items %}{{ chapter_items|length }} chương{% else %}Chưa xác nhận{% endif %}</span>
     </div>
-    <p class="course-chapter-intro">Chỉ hiển thị chương đã xác nhận và tài liệu chung đã được Admin gắn đúng chương. Không tự tạo file hoặc chương mới.</p>
-    <p style="margin:8px 0 15px"><a href="{{ url_for('clo_review.overview',subject_id=subject.id) }}" style="font-size:13px;color:#465bb8;font-weight:800">🎯 Xem chuẩn đầu ra CLO và minh chứng tiến bộ →</a></p>
+    <p class="course-chapter-intro">Các chương và tài liệu được sắp xếp theo đề cương học tập của môn.</p>
+    <p style="margin:8px 0 15px"><a href="{{ url_for('clo_review.overview',subject_id=subject.id) }}" style="font-size:13px;color:#465bb8;font-weight:800">🎯 Xem mục tiêu môn học và tiến độ →</a></p>
     {% if chapter_items %}
     <div class="course-chapter-list">
       {% for chapter in chapter_items[:4] %}
@@ -183,7 +183,7 @@
     </div>
     <a class="ghost-action course-all-chapters" href="{{ url_for('course_path.learning_path', subject_id=subject.id) }}">Xem tất cả chương và lộ trình →</a>
     {% else %}
-    <div class="empty-agent">Chưa có danh sách chương đã xác nhận cho phiên bản đề cương này. Hãy phân tích và xác nhận đề cương trước khi xem tài liệu theo chương.</div>
+    <div class="empty-agent">Bạn chưa xác nhận danh sách chương. Hãy xem lại đề cương để tiếp tục.</div>
     <a class="ghost-action course-all-chapters" href="{{ url_for('syllabus.review', subject_id=subject.id) }}">Phân tích và xác nhận đề cương →</a>
     {% endif %}
     {% if shared_items %}
