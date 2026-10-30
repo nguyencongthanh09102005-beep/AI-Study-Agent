@@ -117,6 +117,9 @@ jobs:
       - name: Student-facing copy and release-label regression
         run: python tests/test_student_copy_release_labels.py
 
+      - name: Provider-neutral AI Study Agent interface and API errors
+        run: python tests/test_ai_provider_branding.py
+
       - name: Study Plan layout and task action regressions
         run: |
           python tests/test_study_plan_ui.py
