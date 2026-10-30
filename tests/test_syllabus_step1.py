@@ -22,6 +22,21 @@ Chương 2. Danh sách liên kết
 Chương 3. Ngăn xếp
 """
     assert len(extract_syllabus_units(sample)) == 3
+    # Real PDFs often split the numeric heading from its title.
+    split_lines = """ĐỀ CƯƠNG CHI TIẾT HỌC PHẦN
+Chương 1
+Tổng quan về tư duy thiết kế
+1.1. Khái niệm
+Chương 2:
+Thấu cảm và xác định vấn đề
+2.1. Nghiên cứu người dùng
+"""
+    split_units = extract_syllabus_units(split_lines)
+    assert [x["evidence"] for x in split_units] == ["Chương 1", "Chương 2:"]
+    assert "Tổng quan về tư duy thiết kế" in split_units[0]["title"]
+    assert "Thấu cảm và xác định vấn đề" in split_units[1]["title"]
+    # Never convert administrative syllabus sections into learning chapters.
+    assert extract_syllabus_units("Chương 1\nChuẩn đầu ra học phần") == []
     assert extract_syllabus_units("1. Mục tiêu\n2. Tài liệu tham khảo") == []
     fake = '{"chapters":[{"evidence":"Chương 99. Giả mạo"}]}'
     assert len(extract_syllabus_units(sample, fake)) == 3
