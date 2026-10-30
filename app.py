@@ -2069,112 +2069,31 @@ def extract_text(path: Path):
     return ""
 
 def get_subject_context(user_id, subject_id, query, max_chars=10000):
-    """
-    Lấy ngữ cảnh CHỈ từ tài liệu của môn đang chat.
-    Trả về (context, source_names).
-    """
+    """Find relevant passages anywhere in all stored personal course files."""
     if not subject_id:
         return "", []
-
+    from chat_retrieval import retrieve
     conn = db()
-    rows = conn.execute(
-        """
-        SELECT original_name, extracted_text
-        FROM documents
-        WHERE user_id=? AND subject_id=?
-        ORDER BY id DESC
-        """,
-        (user_id, subject_id)
-    ).fetchall()
-    conn.close()
-
-    rows = [row for row in rows if (row["extracted_text"] or "").strip()]
-    if not rows:
-        return "", []
-
-    stop_words = {
-        "là", "gì", "có", "và", "của", "cho", "với", "trong", "một",
-        "những", "các", "này", "đó", "được", "về", "theo", "tại", "khi",
-        "ai", "em", "tui", "mình", "hãy", "giúp", "cho", "biết"
-    }
-
-    terms = {
-        token.lower()
-        for token in re.findall(r"[\wÀ-ỹ]+", query, flags=re.UNICODE)
-        if len(token) >= 2 and token.lower() not in stop_words
-    }
-
-    query_lower = (query or "").lower()
-    document_intent = any(
-        phrase in query_lower
-        for phrase in (
-            "tóm tắt", "tài liệu", "file", "nội dung", "bài giảng",
-            "chương", "đã tải", "đã up", "trong bài"
-        )
-    )
-
-    scored_docs = []
-
-    for row in rows:
-        text_value = row["extracted_text"] or ""
-        lowered = text_value.lower()
-        score = sum(lowered.count(term) for term in terms)
-
-        if document_intent:
-            score += 1
-
-        paragraphs = [
-            p.strip()
-            for p in re.split(r"\n{2,}|(?<=[.!?])\s+", text_value)
-            if len(p.strip()) >= 30
-        ]
-
-        paragraph_scores = []
-        for paragraph in paragraphs:
-            p_lower = paragraph.lower()
-            p_score = sum(p_lower.count(term) for term in terms)
-            if p_score > 0:
-                paragraph_scores.append((p_score, paragraph))
-
-        paragraph_scores.sort(key=lambda item: item[0], reverse=True)
-
-        if paragraph_scores:
-            snippet_parts = []
-            snippet_length = 0
-            for _, paragraph in paragraph_scores[:5]:
-                if snippet_length + len(paragraph) > 2600:
-                    break
-                snippet_parts.append(paragraph)
-                snippet_length += len(paragraph)
-            snippet = "\n".join(snippet_parts)
-        else:
-            snippet = text_value[:1800]
-
-        scored_docs.append((score, row["original_name"], snippet))
-
-    scored_docs.sort(key=lambda item: item[0], reverse=True)
-
-    # Nếu có tài liệu, vẫn đưa một lượng ngữ cảnh nhỏ cho Gemini.
-    # Gemini sẽ tự quyết định ngữ cảnh có đủ để trả lời hay phải dùng kiến thức chung.
-    selected = scored_docs[:4]
-    context_parts = []
-    source_names = []
-    total = 0
-
-    for _, name, snippet in selected:
-        if not snippet:
+    try:
+        rows = conn.execute("""
+            SELECT original_name,extracted_text FROM documents
+            WHERE user_id=? AND subject_id=? ORDER BY id DESC
+        """, (user_id,subject_id)).fetchall()
+    finally:
+        conn.close()
+    documents = [{"name":r["original_name"],"text":r["extracted_text"]}
+                 for r in rows if (r["extracted_text"] or "").strip()]
+    selected = retrieve(documents,query,max_chars=max(500,max_chars-800),
+                        max_passages=5)
+    parts, source_names, used = [], [], 0
+    for name, excerpt in selected:
+        value = f"FILE: {name}\n{excerpt}"
+        if used + len(value) > max_chars:
             continue
-
-        remaining = max_chars - total
-        if remaining <= 0:
-            break
-
-        clipped = snippet[:remaining]
-        context_parts.append(f"FILE: {name}\n{clipped}")
+        parts.append(value)
         source_names.append(name)
-        total += len(clipped)
-
-    return "\n\n".join(context_parts), source_names
+        used += len(value)
+    return "\n\n".join(parts), list(dict.fromkeys(source_names))
 
 def local_ai_answer(question, context, source_names=None):
     source_names = source_names or []
