@@ -127,14 +127,16 @@
         <button type="button" id="floatingAiClose" class="floating-ai-close" aria-label="Thu nhỏ Chat AI">−</button>
       </div>
     </header>
+    <div class="floating-ai-tabs" role="tablist" aria-label="Chế độ trợ lý">
+      <button type="button" id="floatingAiTabStudy" role="tab" aria-controls="floatingAiStudyView" aria-selected="true" class="active">📚 Học tập</button>
+      <button type="button" id="floatingAiTabSupport" role="tab" aria-controls="floatingAiSupportView" aria-selected="false">✦ Hỗ trợ</button>
+    </div>
+    <div id="floatingAiStudyView" class="floating-ai-tab-view" role="tabpanel" aria-labelledby="floatingAiTabStudy">
     <div id="floatingAiMode" class="floating-ai-mode" role="status" aria-live="polite">Đang tải trợ lý...</div>
     <label id="floatingAiCourseLabel" class="floating-ai-course-label" for="floatingAiCourse">
       Chọn môn học
       <select id="floatingAiCourse" aria-label="Chọn môn để hỏi AI"></select>
     </label>
-    <div class="floating-ai-quick-actions">
-      <button type="button" id="floatingAiScheduleButton" class="floating-ai-schedule-button" title="Kiểm tra trùng giờ và đổi lịch ngay trong Chat">🗓 Kiểm tra lịch học</button>
-    </div>
     <div id="floatingAiMessages" class="floating-ai-messages" role="log" aria-live="polite" aria-label="Lịch sử Chat AI">
       <p class="floating-ai-empty">Chọn môn hoặc mở một buổi học để trò chuyện với AI.</p>
     </div>
@@ -147,9 +149,23 @@
       </div>
     </form>
     <a id="floatingAiFullChat" class="floating-ai-full-link" href="{{ url_for('chat') }}">Mở Chat AI đầy đủ ↗</a>
+    </div>
+    <div id="floatingAiSupportView" class="floating-ai-tab-view floating-ai-support-view" role="tabpanel" aria-labelledby="floatingAiTabSupport" hidden>
+      <div class="floating-ai-support-heading">
+        <strong>🗓 Rà soát buổi học</strong>
+        <p>Kiểm tra các buổi chưa hoàn thành từ hôm nay đến hết lịch học tương lai, trên tất cả môn.</p>
+      </div>
+      <button type="button" id="floatingAiScheduleButton" class="floating-ai-schedule-button">✦ Rà soát toàn bộ lịch học</button>
+      <div id="floatingAiSupportResults" class="floating-ai-support-results" role="region" aria-label="Kết quả rà soát lịch học" aria-live="polite">
+        <div class="floating-ai-support-empty">AI Study Agent sẽ chỉ đề xuất khi có buổi trùng lịch. Không tự ý đổi lịch của bạn.</div>
+      </div>
+    </div>
+    <div class="floating-ai-resize-guide" id="floatingAiResizeGuide">↗ Kéo góc hoặc cạnh để chỉnh kích thước</div>
+    <div id="floatingAiResizeHorizontal" class="floating-ai-resize-edge floating-ai-resize-edge-horizontal" role="separator" tabindex="0" aria-label="Kéo cạnh cửa sổ để chỉnh chiều rộng" title="Giữ và kéo cạnh trái/phải để chỉnh chiều rộng"></div>
+    <div id="floatingAiResizeVertical" class="floating-ai-resize-edge floating-ai-resize-edge-vertical" role="separator" tabindex="0" aria-label="Kéo cạnh trên để chỉnh chiều cao" title="Giữ và kéo cạnh trên để chỉnh chiều cao"></div>
     <div id="floatingAiResize" class="floating-ai-resize-handle" role="separator" tabindex="0"
          aria-orientation="vertical" aria-label="Đổi kích thước Chat AI. Kéo góc này, hoặc dùng phím mũi tên để chỉnh."
-         title="Kéo để chỉnh chiều rộng và chiều cao · Phím mũi tên để chỉnh"></div>
+         title="Kéo góc để chỉnh chiều rộng và chiều cao · Phím mũi tên để chỉnh"></div>
   </section>
 </div>
 {% endif %}
