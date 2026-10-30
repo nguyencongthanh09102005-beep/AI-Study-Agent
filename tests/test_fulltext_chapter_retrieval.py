@@ -41,5 +41,26 @@ found = match_course_materials(section, [
     {"id":19,"name":"giao-trinh.txt","text":text,"kind":"personal"}
 ])
 assert len(found)==1 and found[0]["id"]==19
+# A textbook may contain several distant chapters, not only one late topic.
+keywords = [
+    ("thietkedongcam","nghiencuuhanhvi"),
+    ("khaosatnguoidung","phongvansau"),
+    ("sangkiencongnghe","phamvinghiencuu"),
+    ("lapkehoachmau","thunghiemmau"),
+    ("doimoisangtao","phanichkhanang"),
+    ("danhgiachatluong","hoanthienketqua"),
+]
+many = {}
+blocks = []
+for i, (first, second) in enumerate(keywords, 1):
+    many[str(i)]={"title":"Chương "+str(i)+" "+first,
+                  "topics":[second]}
+    blocks.append(("Phần giới thiệu khác biệt. "*120) +
+                  "Nội dung liên quan "+first+" và "+second+
+                  " dùng để kiểm tra hoạt động phân loại học liệu.\n")
+selected_many = select_chapter_excerpts("".join(blocks),many)
+assert len(selected_many)<=5600
+for first,second in keywords:
+    assert first in selected_many and second in selected_many, (first,second)
 assert EXCERPT_VERSION.startswith("chapter-fulltext")
 print("Long chapter materials PASS: late-text classification, quoted evidence, roadmap materials")
