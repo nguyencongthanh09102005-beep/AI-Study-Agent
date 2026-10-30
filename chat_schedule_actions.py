@@ -320,3 +320,102 @@ def confirm_schedule():
         raise
     finally:
         conn.close()
+
+
+@chat_schedule_bp.route("/api/chat/schedule/review", methods=["GET"])
+def review_all_upcoming_lessons():
+    """Review every unfinished *future* lesson across the student's subjects.
+
+    Return one conflict to resolve at a time. Subsequent reviews run against
+    freshly saved data, so resolving one collision cannot auto-move another.
+    The actual edit still goes through the existing scoped preview/confirm API.
+    """
+    uid = _user()
+    project = _project()
+    conn = project.db()
+    try:
+        rows = _tasks(conn, uid)
+        current = local_now()
+        future = []
+        for row in rows:
+            if row["done"]:
+                continue
+            span = _interval(row)
+            if span and span[0] >= current:
+                future.append(row)
+        conflicts = find_study_conflicts(future)
+        # Each overlap appears symmetrically; choose the higher task ID to
+        # move for a stable, single proposal per initial conflicting pair.
+        affected = [r for r in future if r["id"] in conflicts]
+        affected.sort(key=lambda r: (r["study_at"], r["id"]))
+        targets = [r for r in affected if any(
+            other < r["id"] for other in conflicts[r["id"]]["with_ids"])]
+        if not targets and affected:
+            targets = affected[-1:]
+        course_rows = conn.execute("""
+            SELECT s.id,s.name,c.id AS conversation_id
+            FROM subjects s LEFT JOIN chat_conversations c
+              ON c.subject_id=s.id AND c.user_id=s.user_id
+            WHERE s.user_id=?
+            ORDER BY c.id ASC
+        """, (uid,)).fetchall()
+        courses = {}
+        for row in course_rows:
+            courses.setdefault(row["id"], row)
+        proposals = []
+        for task in targets:
+            course = courses.get(task["subject_id"])
+            if not course or not course["conversation_id"]:
+                # Don't expose a proposal that can't be confirmed securely.
+                continue
+            conflict = conflicts[task["id"]]
+            proposed_at = conflict["suggested_at"]
+            # Find the first conflict-free, roadmap-order-safe slot. Usually
+            # the existing same-day suggestion works without any extra search.
+            def valid(iso):
+                try:
+                    start = _datetime(iso)
+                    overlapping, _ = _conflicts(future, task["id"], start,
+                                                int(task["duration"]))
+                    if overlapping:
+                        return False
+                    _validate_limits(conn, uid, task, start, future)
+                    return True
+                except (ScheduleProblem, TypeError, ValueError):
+                    return False
+            if not proposed_at or not valid(proposed_at):
+                proposed_at = ""
+                base = datetime.fromisoformat(task["study_at"])
+                for offset in range(1, 8*24*4 + 1):
+                    candidate = base + timedelta(minutes=15*offset)
+                    if not (8 <= candidate.hour <= 22) or (
+                            candidate + timedelta(minutes=int(task["duration"]))).hour > 22:
+                        continue
+                    iso = candidate.isoformat(timespec="minutes")
+                    if valid(iso):
+                        proposed_at = iso
+                        break
+            proposals.append({
+                "id": task["id"],
+                "conversation_id": course["conversation_id"],
+                "subject_id": task["subject_id"],
+                "subject_name": course["name"],
+                "title": task["title"],
+                "study_at": task["study_at"][:16],
+                "suggested_at": proposed_at,
+                "duration": task["duration"],
+                "conflict_titles": conflict["with_titles"][:3]
+            })
+            # The UI shows exactly one actionable conflict at a time.
+            break
+        if not session.get("chat_schedule_csrf"):
+            session["chat_schedule_csrf"] = secrets.token_urlsafe(32)
+        return jsonify({
+            "checked_count": len(future),
+            "conflict_count": len(targets),
+            "next_conflict": proposals[0] if proposals else None,
+            "csrf_token": session["chat_schedule_csrf"],
+            "scan_scope": "all_future_incomplete"
+        })
+    finally:
+        conn.close()
