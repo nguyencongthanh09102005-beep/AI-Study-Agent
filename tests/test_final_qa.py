@@ -109,13 +109,20 @@ def check_adaptive_delete():
     })
     assert wrong.status_code == 200, wrong.get_data(as_text=True)
     assert wrong.get_json()["weakness_count"] == 1
-    assert wrong.get_json()["adaptive_task"] is not None
+    # A manually created Quiz is self-study; it must NOT spawn an official
+    # adaptive task or contaminate syllabus-linked progress.
+    assert wrong.get_json()["adaptive_task"] is None
+    assert wrong.get_json()["learning_stream"] == "self_study"
 
     deleted = client.post(f"/quiz/{quiz_id}/delete")
     assert deleted.status_code in (302, 303)
     conn = project.db()
     assert conn.execute(
         "SELECT COUNT(*) FROM learning_weaknesses WHERE user_id=? AND subject_id=?",
+        (user_id, subject_id),
+    ).fetchone()[0] == 0
+    assert conn.execute(
+        "SELECT COUNT(*) FROM self_study_weaknesses WHERE user_id=? AND subject_id=?",
         (user_id, subject_id),
     ).fetchone()[0] == 0
     assert conn.execute(
