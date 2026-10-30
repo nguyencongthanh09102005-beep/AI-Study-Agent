@@ -41,13 +41,14 @@ def run():
                 INSERT INTO quizzes(user_id,subject_id,document_id,title,payload,created_at)
                 VALUES(?,?,NULL,'Quiz buổi 1',?,?)
             """,(uid,sid,json.dumps(source,ensure_ascii=False),project.now())).lastrowid
-            from study_session_quiz import ensure_session_quiz_schema
-            ensure_session_quiz_schema(conn)
+            # Mark the synthetic prior quiz as academic review evidence without
+            # pretending it is linked to an actual timetable session.
+            from quiz_review_progress import ensure_review_baseline_schema
+            ensure_review_baseline_schema(conn)
             conn.execute("""
-                INSERT INTO quiz_session_links(
-                    quiz_id,task_id,user_id,subject_id,chapter_number,
-                    session_title,session_signature,source_signature,source_ids_json,created_at)
-                VALUES(?,NULL,?,?,1,'Buổi 1','test-session','test-source','[]',?)
+                INSERT INTO quiz_review_baselines(
+                    quiz_id,user_id,subject_id,snapshot_json,created_at)
+                VALUES(?,?,?,'[]',?)
             """,(prior,uid,sid,project.now()))
             conn.commit();conn.close()
             client=project.app.test_client()
