@@ -1,6 +1,6 @@
 /* Phase 7.6: submit durable server-side AI preparation job once.
    Student can navigate away or close the tab; the persistent server worker
-   continues while the server runs. No browser request loop calls Gemini. */
+   continues while the server runs. No browser request loop invokes the AI provider. */
 document.addEventListener("DOMContentLoaded", () => {
   "use strict";
   const root = document.getElementById("quizPreparation");
