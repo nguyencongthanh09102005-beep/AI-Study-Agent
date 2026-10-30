@@ -78,6 +78,19 @@
 {% if admin_view == 'documents' %}
 <section class="admin-section" id="admin-documents">
   <div class="admin-section-head"><div><h3>▤ Quản lý tài liệu dùng chung</h3><p>Admin tải file một lần; hệ thống trích xuất chữ và lưu sẵn để Study Agent tái sử dụng.</p></div></div>
+  <div class="soft-card" style="padding:15px 18px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <div style="flex:1;min-width:220px">
+      <strong style="color:#2c437d">✦ Phân loại tài liệu hàng loạt theo môn</strong>
+      <p style="font-size:12px;color:#687b9d;margin-top:4px">Chọn một môn để AI đề xuất chương cho tất cả file; Admin duyệt cùng lúc.</p>
+    </div>
+    <select id="bulkChapterSubject" aria-label="Chọn môn phân loại học liệu" style="padding:10px;border:1px solid #cfdaed;border-radius:9px;min-width:205px">
+      <option value="">Chọn môn học</option>
+      {% for item in subjects %}
+      <option value="{{ url_for('bulk_chapter.batch', subject_id=item.id) }}">{{ item.code }} · {{ item.name }}</option>
+      {% endfor %}
+    </select>
+    <button type="button" class="admin-primary" onclick="var s=document.getElementById('bulkChapterSubject');if(s.value){window.location.href=s.value}else{s.focus()}">✦ Phân loại toàn bộ</button>
+  </div>
   <div class="admin-content-grid">
     <form class="soft-card admin-form-card" method="post" enctype="multipart/form-data" action="{{ url_for('admin_add_document') }}" id="adminUploadForm" data-max-mb="{{ upload_max_mb }}">
       <h4>↑ Tải tài liệu chung</h4>
