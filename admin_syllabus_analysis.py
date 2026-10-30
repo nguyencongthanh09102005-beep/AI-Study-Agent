@@ -41,7 +41,7 @@ def approved_shared_units(conn, shared_subject_id, source_text):
         SELECT source_hash,approved_json,status FROM admin_syllabus_analysis
         WHERE shared_subject_id=?
     """, (shared_subject_id,)).fetchone()
-    if not row or row["source_hash"] != syllabus_hash(source_text) or row["status"] != "approved":
+    if not row or row["source_hash"] != syllabus_hash(source_text):
         return None
     try:
         units = json.loads(row["approved_json"])
@@ -235,9 +235,13 @@ def review(subject_id):
                     ON CONFLICT(shared_subject_id) DO UPDATE SET
                         source_hash=excluded.source_hash,
                         draft_json=excluded.draft_json,
-                        approved_json=excluded.approved_json,
+                        approved_json=CASE
+                            WHEN admin_syllabus_analysis.source_hash=excluded.source_hash
+                            THEN admin_syllabus_analysis.approved_json ELSE '[]' END,
                         status=excluded.status,updated_at=excluded.updated_at,
-                        approved_by=NULL
+                        approved_by=CASE
+                            WHEN admin_syllabus_analysis.source_hash=excluded.source_hash
+                            THEN admin_syllabus_analysis.approved_by ELSE NULL END
                 """, (subject_id, fingerprint,
                       json.dumps(proposals, ensure_ascii=False),
                       status, project.now()))
