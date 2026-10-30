@@ -1204,7 +1204,12 @@ def get_shared_subject_context(user_id, subject_id, query="", max_chars=5500):
         remaining = max_chars - total
         if remaining <= 0:
             break
-        clipped = content[:remaining]
+        from chat_retrieval import retrieve
+        found = retrieve([{"name": title, "text": content}], query,
+                         max_chars=max(200, remaining - 80), max_passages=1)
+        clipped = found[0][1] if found else ""
+        if not clipped:
+            continue
         parts.append(
             f"KIẾN THỨC CHUNG - {title} ({source_type or 'note'}):\n{clipped}"
         )
