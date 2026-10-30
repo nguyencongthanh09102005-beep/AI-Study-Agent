@@ -19,6 +19,14 @@ def check_quiz_generation():
         assert project.build_quiz("Đám mây hỗ trợ cung cấp tài nguyên điện toán.", 10) == []
 
         def fake_ai(prompt):
+            if "người kiểm định độc lập" in prompt:
+                checks = json.loads(prompt.split(
+                    "CÂU HỎI CẦN KIỂM ĐỊNH (KHÔNG CÓ ĐÁP ÁN TỪ NGƯỜI RA ĐỀ):\n")[-1])
+                return json.dumps({"checks": [
+                    {"id": item["id"], "answer": 0,
+                     "quote": "Kiến thức điện toán đám mây."}
+                    for item in checks
+                ]}, ensure_ascii=False), None
             count_match = re.search(r"Tạo đúng (\d+) câu", prompt)
             group_match = re.search(r"cho NHÓM (\d+)", prompt)
             assert count_match and group_match, "Quiz prompt format changed"
