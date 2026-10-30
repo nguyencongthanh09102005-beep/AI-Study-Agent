@@ -39,6 +39,8 @@ from syllabus_routes import syllabus_bp
 app.register_blueprint(syllabus_bp)
 from course_path_routes import course_path_bp
 app.register_blueprint(course_path_bp)
+from admin_syllabus_analysis import admin_syllabus_bp
+app.register_blueprint(admin_syllabus_bp)
 from chapter_material_routes import chapter_material_bp
 app.register_blueprint(chapter_material_bp)
 from bulk_chapter_mapping import bulk_chapter_bp
