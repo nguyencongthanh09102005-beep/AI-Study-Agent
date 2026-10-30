@@ -138,6 +138,15 @@ def run():
             try:
                 import re
                 def mixed_ai(prompt):
+                    if "người kiểm định độc lập" in prompt:
+                        candidates = json.loads(
+                            prompt.split("CÂU HỎI CẦN KIỂM ĐỊNH (KHÔNG CÓ ĐÁP ÁN TỪ NGƯỜI RA ĐỀ):\n")[-1]
+                        )
+                        return json.dumps({"checks": [
+                            {"id": item["id"], "answer": 0,
+                             "quote": "Node có dữ liệu và con trỏ next để duyệt danh sách đơn."}
+                            for item in candidates
+                        ]}, ensure_ascii=False), None
                     n = int(re.search(r"Tạo đúng (\d+) câu", prompt).group(1))
                     batch = int(re.search(r"cho NHÓM (\d+)", prompt).group(1))
                     questions = []
