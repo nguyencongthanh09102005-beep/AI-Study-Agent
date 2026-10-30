@@ -64,6 +64,7 @@ jobs:
           node --check static/js/admin_ai_hub.js
           node tests/test_admin_ai_hub.js
           node --check static/js/ai_bubble_schedule.js
+          node --check static/js/ai_support_chat.js
           node tests/test_ai_bubble_schedule.js
           node --check static/js/quiz_preparation.js
           node --check static/js/quiz_learning_analytics.js
@@ -120,7 +121,8 @@ jobs:
         run: python tests/test_admin_ai_hub.py
 
       - name: Chat bubble safe schedule proposals and updates
-        run: python tests/test_chat_schedule_actions.py
+        run: |
+          python tests/test_chat_schedule_actions.py
           python tests/test_support_study_streams.py
 
       - name: Global Web readability coverage
