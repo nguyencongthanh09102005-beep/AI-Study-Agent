@@ -77,7 +77,7 @@ with patch.object(project,"gemini_generate",fake_model):
 assert len(result)==10,(len(result),calls)
 assert calls["review"]>=2 and calls["generate"]>=2,calls
 assert not any("Bước 1, câu 0" in q["question"] for q in result)
-assert all(q["answer"]==0 for q in result)
+assert all(q["options"][q["answer"]]=="Dữ liệu và con trỏ next" for q in result)
 
 with patch.object(project,"gemini_generate",
                   side_effect=lambda prompt: (json.dumps(
