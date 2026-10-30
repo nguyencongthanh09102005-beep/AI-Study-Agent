@@ -131,6 +131,7 @@ jobs:
           python tests/test_adaptive_phase8.py
           python tests/test_phase9_schedule_safety.py
           python tests/test_phase9_chat_safety.py
+          python tests/test_chat_retrieval_verified.py
           python tests/test_phase9_integration.py
           python tests/test_course_overview_refresh.py
           python tests/test_document_library_folders.py
