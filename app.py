@@ -1863,15 +1863,22 @@ def rebuild_subject_learning_signals(conn, user_id, subject_id):
     recalculate_subject_progress(user_id, subject_id, conn)
 
 
-def get_active_weakness_rows(conn, user_id, subject_id, limit=12):
+def get_active_weakness_rows(conn, user_id, subject_id, limit=12, stream="academic"):
     """Các chủ đề vẫn còn yếu: số lần sai đang lớn hơn số lần làm đúng."""
     if not subject_id:
         return []
 
+    if stream == "self_study":
+        from learning_streams import ensure_private_weakness_schema
+        ensure_private_weakness_schema(conn)
+        table = "self_study_weaknesses"
+    else:
+        table = "learning_weaknesses"
+
     return conn.execute(
-        """
+        f"""
         SELECT id,topic_key,topic,chapter,miss_count,correct_count,last_seen_at
-        FROM learning_weaknesses
+        FROM {table}
         WHERE user_id=? AND subject_id=?
           AND miss_count > correct_count
         ORDER BY (miss_count - correct_count * 0.5) DESC,
@@ -6360,8 +6367,8 @@ def submit_quiz():
     from learning_streams import academic_quiz
     stream = "academic" if academic_quiz(conn, uid, quiz_id) else "self_study"
     active_before = (
-        get_active_weakness_rows(conn, uid, subject_id, limit=100)
-        if subject_id and stream == 'academic'
+        get_active_weakness_rows(conn, uid, subject_id, limit=100, stream=stream)
+        if subject_id
         else []
     )
     active_before_map = {
@@ -6464,7 +6471,7 @@ def submit_quiz():
             conn,
             uid,
             subject_id,
-            limit=100
+            limit=100, stream=stream
         )
         active_after_map = {
             row["topic_key"]: {
@@ -6505,13 +6512,14 @@ def submit_quiz():
             conn,
             uid,
             subject_id,
-            limit=8
+            limit=8, stream=stream
         )
         weaknesses = [dict(row) for row in weakness_rows]
         # The UI shows only eight examples, but the total MUST count all
         # currently active weak topics (not just the preview rows).
-        weakness_count = conn.execute("""
-            SELECT COUNT(*) FROM learning_weaknesses
+        table = "learning_weaknesses" if stream == "academic" else "self_study_weaknesses"
+        weakness_count = conn.execute(f"""
+            SELECT COUNT(*) FROM {table}
             WHERE user_id=? AND subject_id=? AND miss_count>correct_count
         """, (uid, subject_id)).fetchone()[0]
 
@@ -6551,7 +6559,8 @@ def submit_quiz():
         "resolved_topics": resolved_topics,
         "adaptive_task": adaptive_task,
         "learning_updated": bool(subject_id),
-        "adaptive_learning": bool(subject_id),
+        "adaptive_learning": bool(subject_id and stream == "academic"),
+        "learning_stream": stream,
         "analysis": analysis,
         "review_comparison": review_comparison,
     }
