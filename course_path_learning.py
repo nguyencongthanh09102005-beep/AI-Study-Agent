@@ -219,11 +219,19 @@ def personal_course_documents(conn, user_id, subject_id, exclude_document_id,
 def match_course_materials(section, documents):
     """Only return genuinely subject-scoped files with topical text evidence."""
     search_terms = _terms(section["chapter"] + " " + " ".join(section["topics"][:8]))
+    from chapter_fulltext_retrieval import _phrases
     ranked = []
     for document in documents:
-        content = (document.get("text") or "")[:18000]
+        # Require topical overlap inside one local passage; combining a term
+        # on page 1 with an unrelated term on page 180 is not evidence.
+        content = document.get("text") or ""
         name = document.get("name") or ""
-        matches = search_terms & _terms(content)
+        best_matches = set()
+        for _, passage in _phrases(content):
+            matches = search_terms & _terms(passage)
+            if len(matches) > len(best_matches):
+                best_matches = matches
+        matches = best_matches
         if len(matches) < 2:
             continue
         title_matches = search_terms & _terms(name)
