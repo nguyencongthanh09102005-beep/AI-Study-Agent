@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+{% block title %}Phân tích đề cương chi tiết · {{ subject.name }}{% endblock %}
+{% block page_title %}Phân tích đề cương chi tiết{% endblock %}
+{% block page_desc %}Regex + AI có kiểm chứng · Admin xác nhận trước khi sử dụng{% endblock %}
+{% block content %}
+<section class="soft-card" style="max-width:1050px;margin:auto;padding:24px">
+  <a class="back-link" href="{{ url_for('admin_shared_documents') }}">← Quản lý tài liệu chung</a>
+  <h2>{{ subject.code }} · {{ subject.name }}</h2>
+  <p><strong>Đề cương đang dùng:</strong> {{ filename }}</p>
+  {% if notice %}<p role="status" style="padding:12px;background:#e7f6ee;border-radius:9px">{{ notice }}</p>{% endif %}
+  {% if error %}<p role="alert" style="padding:12px;background:#fff0ed;border-radius:9px">{{ error }}</p>{% endif %}
+  {% if stale %}<p role="alert">Đề cương đã thay đổi; kết quả phân tích phiên bản cũ không được sử dụng.</p>{% endif %}
+  {% if not has_source %}
+    <p>Chưa có đề cương chuẩn. Vào Quản lý tài liệu chung, tải file PDF/DOCX và chọn “Đặt làm đề cương chuẩn của môn”.</p>
+  {% else %}
+    <section style="padding:15px;border:1px solid #dbe4f5;border-radius:12px;margin:16px 0">
+      <h3>Bước 1 · Kiểm tra đề cương gốc</h3>
+      <p>Regex đã nhận diện {{ detected|length }} tiêu đề chương/bài. Nếu PDF có ký tự lạ, AI sẽ tìm thêm nhưng chỉ nhận những dòng có thật trong văn bản trích xuất.</p>
+      <details>
+        <summary>Xem văn bản trích xuất (đoạn đầu)</summary>
+        <pre style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:290px;overflow:auto">{{ source_preview }}</pre>
+      </details>
+      <p style="font-size:13px;color:#657593">PDF scan ảnh chưa có OCR. AI chỉ phân tích phần chữ đã trích xuất; bảng, sơ đồ và định dạng phức tạp vẫn cần Admin đối chiếu file gốc.</p>
+      <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="source_hash" value="{{ fingerprint }}">
+        <input type="hidden" name="action" value="analyze">
+        <button type="submit" class="soft-primary">✦ Phân tích toàn bộ đề cương bằng AI</button>
+      </form>
+      <p style="font-size:12px;color:#657593">Chỉ gọi Gemini khi Admin bấm nút. Chia văn bản trích xuất thành nhiều phần để tránh bỏ sót cuối file; có thể phát sinh nhiều lượt gọi API.</p>
+    </section>
+    {% if review_status != 'none' %}
+      <section style="padding:15px;border:1px solid #dbe4f5;border-radius:12px;margin:16px 0">
+        <h3>Bước 2 · Xem và xác nhận kết quả</h3>
+        {% if review_status == 'approved' %}
+          <p role="status">✓ Đã được Admin xác nhận: {{ approved|length }} chương, đúng phiên bản đề cương hiện tại.</p>
+        {% elif review_status == 'draft_partial' %}
+          <p role="alert" style="color:#93521a">AI chưa đọc hết các phần (hoặc API chưa cấu hình). Chưa cho xác nhận để tránh thiếu chương.</p>
+        {% else %}
+          <p>Đây là bản nháp. Kiểm tra từng dòng bằng chứng và chỉnh tên chương nếu cần trước khi xác nhận.</p>
+        {% endif %}
+        {% if review_status == 'approved' %}
+          {% for item in approved %}
+          <article style="margin:10px 0;padding:12px;background:#f0f6ff;border-radius:10px">
+            <strong>{{ loop.index }}. {{ item.title }}</strong>
+            <p style="font-size:13px;color:#536d99">Nguồn nguyên văn: “{{ item.evidence }}”</p>
+          </article>
+          {% endfor %}
+        {% else %}
+          <form method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="source_hash" value="{{ fingerprint }}">
+            <input type="hidden" name="action" value="confirm">
+            {% for item in draft %}
+            <article style="margin:10px 0;padding:12px;background:#f0f6ff;border-radius:10px">
+              <label style="display:flex;gap:10px;align-items:center">
+                <input type="checkbox" name="include" value="{{ loop.index0 }}" checked>
+                <strong>Giữ chương/bài {{ loop.index }}</strong>
+              </label>
+              <label for="unitTitle{{ loop.index0 }}" style="display:block;margin:7px 0">Tên hiển thị (Admin có thể chỉnh)</label>
+              <input id="unitTitle{{ loop.index0 }}" name="title_{{ loop.index0 }}" maxlength="180" value="{{ item.title }}" style="width:100%;max-width:850px;padding:10px;border:1px solid #bdcce8;border-radius:7px">
+              <p style="font-size:13px;color:#536d99;overflow-wrap:anywhere">Bằng chứng nguyên văn: “{{ item.evidence }}”</p>
+            </article>
+            {% else %}
+              <p>Không tìm thấy chương đáng tin cậy. Hãy xem lại văn bản trích xuất hoặc PDF gốc.</p>
+            {% endfor %}
+            <button type="submit" class="soft-primary" {% if review_status != 'draft' or not draft %}disabled{% endif %}>✓ Admin xác nhận đề cương chuẩn</button>
+          </form>
+        {% endif %}
+      </section>
+    {% endif %}
+  {% endif %}
+</section>
+{% endblock %}
