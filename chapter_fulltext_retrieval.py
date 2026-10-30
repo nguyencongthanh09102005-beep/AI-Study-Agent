@@ -10,8 +10,8 @@ import unicodedata
 
 EXCERPT_VERSION = "chapter-fulltext-v2"
 EXCERPT_LIMIT = 5600
-PASSAGE_SIZE = 1750
-OVERLAP = 160
+PASSAGE_SIZE = 720
+OVERLAP = 90
 STOP = {
     "chương", "bài", "phần", "nội", "dung", "và", "của", "các",
     "trong", "theo", "cho", "một", "được", "học", "là", "về",
@@ -45,7 +45,7 @@ def _phrases(text, size=PASSAGE_SIZE, overlap=OVERLAP):
 def select_chapter_excerpts(text, chapters, max_chars=EXCERPT_LIMIT):
     """Return verbatim passages chosen from anywhere in the file.
 
-    Allocate a passage per matching chapter before filling with other good
+    Allocate a short passage per matching chapter before filling with other good
     passages, so a file containing several distant chapters retains coverage.
     No match: sample beginning/middle/end as *unverified* inspection context,
     never claim chapter support from the sampling alone.
