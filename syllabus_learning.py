@@ -19,6 +19,15 @@ SPLIT_UNIT_HEADING = re.compile(
     r"(?:\d+(?:\.\d+)*|[IVXLCDM]+)\s*[:.\-–—)]?\s*$",
     re.IGNORECASE,
 )
+BULLET_PREFIX = re.compile(r"^[•●▪◦*+\-–—]\s+")
+WEEK_PREFIX = re.compile(
+    r"^\d{1,2}\s*[-–]\s*\d{1,2}\s+(?=(?:chương|chapter|bài|lesson|unit|module)\s+\d)",
+    re.IGNORECASE,
+)
+HEADING_NUMBER = re.compile(
+    r"^(?:chương|chapter|bài|lesson|unit|module)\s+(\d+)\b",
+    re.IGNORECASE,
+)
 NON_TEACHING = (
     "mục tiêu học phần", "chuẩn đầu ra", "tài liệu tham khảo",
     "tài liệu học tập", "thang điểm", "phương pháp đánh giá",
@@ -45,31 +54,53 @@ def _is_teaching_heading(line):
     ))
 
 
+def _heading_candidate(line, following=""):
+    """Accept bullet and weekly timetable headings, preserving verbatim evidence."""
+    weekly = bool(WEEK_PREFIX.match(line))
+    clean = WEEK_PREFIX.sub("", line, count=1) if weekly else line
+    listed = bool(BULLET_PREFIX.match(clean))
+    clean = BULLET_PREFIX.sub("", clean, count=1)
+    priority = 2 if weekly else (0 if listed else 1)
+    if _is_teaching_heading(clean):
+        title = clean
+        # PDFs may wrap a week-table heading midway through its title.
+        if (weekly and following and len(following) <= 70
+                and clean.rstrip().split()[-1].casefold() in
+                    {"&", "và", "xác", "kỹ", "tạo", "đổi", "triển"}
+                and not re.match(r"^(?:\d|[•●▪◦*+\-–—])", following)
+                and not any(x in following.casefold() for x in NON_TEACHING)):
+            title += " " + following
+        return title[:180], priority
+    if SPLIT_UNIT_HEADING.fullmatch(clean) and 3 <= len(following) <= 160:
+        if (not SPLIT_UNIT_HEADING.fullmatch(following)
+                and not _is_teaching_heading(following)
+                and not any(x in following.casefold() for x in NON_TEACHING)):
+            return (clean.rstrip(" :.-–—)") + ". " + following)[:180], priority
+    return None
+
+
 def _grounded_units(text):
-    units, seen = [], set()
     lines = _lines(text)
-    for index, line in enumerate(lines):
-        if line.casefold() in seen:
+    selected = {}
+    for position, line in enumerate(lines):
+        candidate = _heading_candidate(
+            line, lines[position + 1] if position + 1 < len(lines) else ""
+        )
+        if candidate is None:
             continue
-        if _is_teaching_heading(line):
-            title = line
-        elif SPLIT_UNIT_HEADING.fullmatch(line) and index + 1 < len(lines):
-            # PDF text often places "Chương 1" and its actual title on
-            # separate lines. Keep the verbatim heading as source evidence.
-            following = lines[index + 1]
-            if (not 3 <= len(following) <= 160
-                    or SPLIT_UNIT_HEADING.fullmatch(following)
-                    or _is_teaching_heading(following)
-                    or any(x in following.casefold() for x in NON_TEACHING)):
-                continue
-            title = line.rstrip(" :.-–—)") + ". " + following
-        else:
-            continue
-        seen.add(line.casefold())
-        units.append({"title": title[:180], "evidence": line[:180]})
-        if len(units) >= MAX_UNITS:
-            break
-    return units
+        title, priority = candidate
+        clean = BULLET_PREFIX.sub("", WEEK_PREFIX.sub("", line, count=1), count=1)
+        number = HEADING_NUMBER.match(clean)
+        identity = number.group(1) if number else clean.casefold()
+        earlier = selected.get(identity)
+        # The detailed 15-week timetable is a better source than a contents
+        # bullet. Never turn the same chapter into two study chapters.
+        if earlier is None or priority > earlier[0]:
+            selected[identity] = (priority, position, {
+                "title": title, "evidence": line[:180]
+            })
+    return [item[2] for item in
+            sorted(selected.values(), key=lambda x: x[1])[:MAX_UNITS]]
 
 
 def _llm_candidates(response):
