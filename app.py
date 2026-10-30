@@ -2394,6 +2394,7 @@ nhưng phải nằm bên trong chuỗi JSON escape đúng quy tắc. Cấu trúc
 {{
   "mode": "document", "shared" hoặc "general",
   "sources": ["ten_file_1.pdf"],
+  "citations": [{{"source": "ten_file_1.pdf", "quote": "một câu nguyên văn có thật trong đoạn nguồn"}}],
   "answer": "Nội dung trả lời"
 }}
 """.strip()
