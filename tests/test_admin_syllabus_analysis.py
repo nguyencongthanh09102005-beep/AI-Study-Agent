@@ -76,7 +76,7 @@ def run():
             shared_id = conn.execute(
                 "INSERT INTO shared_subjects(subject_key,code,name,syllabus_text,"
                 "admin_managed,created_at,updated_at) VALUES(?,?,?,?,1,?,?)",
-                ("TESTAI-SYLL","TESTAI-SYLL","Đồ án dữ liệu",SYLLABUS,stamp,stamp)
+                (project._normalize_subject_key("TESTAI-SYLL","Đồ án dữ liệu"),"TESTAI-SYLL","Đồ án dữ liệu",SYLLABUS,stamp,stamp)
             ).lastrowid
             own_subject = conn.execute(
                 "INSERT INTO subjects(user_id,name,code,created_at) VALUES(?,?,?,?)",
