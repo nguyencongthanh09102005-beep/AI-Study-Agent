@@ -105,8 +105,13 @@ def summarize_clo_evidence(conn, uid, subject_id, details):
         WHERE q.user_id=? AND q.subject_id=?
         ORDER BY qa.id DESC LIMIT 250
     """,(uid,subject_id)).fetchall()
+    from learning_streams import academic_quiz
     seen=set()
     for row in rows:
+        # CLO achievement is based solely on verified course-session Quiz
+        # and academic review evidence, never optional uploaded PDFs.
+        if not academic_quiz(conn, uid, row["quiz_id"]):
+            continue
         if row["quiz_id"] in seen:
             continue
         seen.add(row["quiz_id"])
