@@ -69,7 +69,6 @@ def verify():
     assert 'id="plannerTimetableGrid"' in html
     assert "Thời khóa biểu tuần" in html
     assert "Giờ học nằm trên từng thẻ" not in html
-        assert "Thời khóa biểu tuần" in html
     assert "study_timetable_periods.js" in html
     assert 'data-task-title="Ôn chương IaaS"' in html
     assert 'data-subject-name="Điện toán đám mây"' in html
