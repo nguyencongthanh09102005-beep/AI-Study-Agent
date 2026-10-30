@@ -448,6 +448,15 @@ jobs:
                   project.now()
               )
           ).lastrowid
+          # This scenario tests academic adaptive signals: mark the sample
+          # quiz as syllabus-review evidence, not a self-study upload.
+          from quiz_review_progress import ensure_review_baseline_schema
+          ensure_review_baseline_schema(conn)
+          conn.execute("""
+              INSERT INTO quiz_review_baselines(
+                  quiz_id,user_id,subject_id,snapshot_json,created_at)
+              VALUES(?,?,?,'[]',?)
+          """,(quiz_a_id,user_a_id,subject_a_id,project.now()))
           conn.commit()
           conn.close()
 
