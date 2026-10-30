@@ -9,7 +9,7 @@ import re
 from datetime import date, timedelta
 from syllabus_learning import normalize_heading_prefix
 
-PLAN_VERSION = 5
+PLAN_VERSION = 6
 
 TOPIC_RE = re.compile(r"^(\d+(?:\.\d+){1,3})[.)]?\s+(.{3,200})$")
 CHAPTER_RE = re.compile(
@@ -321,6 +321,23 @@ def build_course_roadmap(chapters, documents, profile, weaknesses=None, start_da
             max(1, (len(chapter["topics"]) + chunk_size - 1) // chunk_size)
             for chapter in chapters
         ]
+    def suggested_day(index):
+        """Academic lessons fall on Mon–Sat, never Sunday by default."""
+        candidate = base_date
+        remaining = index
+        while candidate.weekday() == 6:
+            candidate += timedelta(days=1)
+        while remaining:
+            candidate += timedelta(days=1)
+            if candidate.weekday() != 6:
+                remaining -= 1
+        return candidate
+
+    # Official classes are daytime; user-chosen times in the calendar override
+    # these suggestions and must never be silently overwritten by re-import.
+    if has_credits:
+        preferred_time = "08:00"
+
     for chapter, slots in zip(chapters, allocations):
         topic_items = chapter["topics"]
         topic_chunks = _learning_chunks(topic_items, slots) if has_credits else (
@@ -365,7 +382,7 @@ def build_course_roadmap(chapters, documents, profile, weaknesses=None, start_da
                 "unit_id": chapter["unit_id"],
                 "chapter": chapter["chapter"],
                 "source_evidence": chapter["evidence"],
-                "date": (base_date + timedelta(days=len(sessions))).isoformat(),
+                "date": (suggested_day(len(sessions)) if has_credits else base_date + timedelta(days=len(sessions))).isoformat(),
                 "time": preferred_time,
                 "duration": daily_minutes,
                 "title": (f'{chapter["chapter"]} — Buổi {index+1}/{len(topic_chunks)}')[:180],
@@ -399,7 +416,7 @@ def build_course_roadmap(chapters, documents, profile, weaknesses=None, start_da
             "unit_id": last["unit_id"],
             "chapter": last["chapter"],
             "source_evidence": last["evidence"],
-            "date": (base_date + timedelta(days=len(sessions))).isoformat(),
+            "date": (suggested_day(len(sessions)) if has_credits else base_date + timedelta(days=len(sessions))).isoformat(),
             "time": preferred_time,
             "duration": max(daily_minutes, 90),
             "title": "Ôn tập tổng hợp và kiểm tra cuối môn",
