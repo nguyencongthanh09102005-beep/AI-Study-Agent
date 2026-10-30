@@ -2142,12 +2142,12 @@ def local_ai_answer(question, context, source_names=None):
                 source_line
                 + "\n\n"
                 + best[:1500]
-                + "\n\nĐây là phản hồi dự phòng cục bộ vì Gemini chưa khả dụng."
+                + "\n\nĐây là trích đoạn dự phòng vì AI tạm thời chưa phản hồi."
             )
 
     return (
-        "Gemini hiện chưa khả dụng nên hệ thống chưa thể trả lời bằng kiến thức chung. "
-        "Hãy kiểm tra GEMINI_API_KEY hoặc kết nối mạng rồi thử lại."
+        "AI tạm thời chưa khả dụng nên hệ thống chưa thể trả lời bằng kiến thức chung. "
+        "Vui lòng kiểm tra kết nối mạng và thử lại sau."
     )
 
 def gemini_generate(prompt):
@@ -2163,7 +2163,7 @@ def gemini_generate(prompt):
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
 
     if not api_key:
-        return None, "Chưa cấu hình GEMINI_API_KEY trong file .env."
+        return None, "Dịch vụ AI chưa được cấu hình. Vui lòng liên hệ quản trị viên."
 
     if requests is None:
         return None, "Thiếu thư viện requests."
@@ -2215,7 +2215,7 @@ def gemini_generate(prompt):
         for attempt in range(max_attempts):
             remaining = deadline - time.monotonic()
             if remaining <= 0.5:
-                return None, "Gemini phản hồi quá thời gian chờ tổng. Hãy thử lại."
+                return None, "AI phản hồi quá thời gian chờ. Vui lòng thử lại."
             url = (
                 "https://generativelanguage.googleapis.com/v1beta/"
                 f"models/{model}:generateContent"
@@ -5978,7 +5978,7 @@ def quiz():
         if not questions:
             return redirect(url_for(
                 "quiz",
-                generation_error="Không tạo đủ câu hỏi hợp lệ. Kiểm tra tài liệu và kết nối Gemini rồi thử lại."
+                generation_error="Chưa tạo đủ câu hỏi hợp lệ. Vui lòng kiểm tra tài liệu và thử lại."
             ))
         return redirect(url_for("quiz"))
 
@@ -8179,7 +8179,7 @@ def api_mobile_quiz_generate():
     if not questions:
         conn.close()
         return jsonify({
-            "error": "Chưa đủ tài liệu, dữ liệu điểm yếu hoặc Gemini chưa tạo đủ câu hỏi hợp lệ. Hãy kiểm tra nguồn học và thử lại."
+            "error": "Chưa đủ tài liệu, dữ liệu điểm yếu hoặc AI chưa tạo đủ câu hỏi hợp lệ. Hãy kiểm tra nguồn học và thử lại."
         }), 400
 
     cursor = conn.execute(
