@@ -52,6 +52,8 @@ def _scope(conn, uid, conversation_id):
 
 
 def _tasks(conn, uid):
+    from course_schedule_sync import ensure_session_schedule_schema
+    ensure_session_schedule_schema(conn)
     return conn.execute("""
         SELECT id,subject_id,title,study_at,duration,done,source,
                roadmap_session_id
