@@ -59,8 +59,10 @@ def scheduled_lessons(conn, user_id, subject_id):
 
 # A preferred time is a preference, never an unconditional appointment.
 # The actual timetable is built from all of this student's existing tasks.
-DAY_START = time(7, 0)
-DAY_END = time(22, 30)
+OFFICIAL_WINDOWS = ((time(7, 30), time(11, 30)), (time(13, 0), time(17, 0)))
+# Self-study suggestions use 19:00–22:00; imported official lessons never
+# occupy the evening automatically. Sunday is a day off for both.
+SELF_STUDY_WINDOW = (time(19, 0), time(22, 0))
 BREAK_MINUTES = 15
 MAX_SEARCH_DAYS = 180
 
@@ -72,29 +74,30 @@ def _ceil_quarter(value):
 
 
 def _free_study_slot(preferred, duration_minutes, occupied, earliest):
-    """Nearest available 15-minute slot, daytime only, with a study break.
+    """First valid daytime slot Mon–Sat, no Sunday, with a 15-minute break.
 
-    First search the requested day, then future days. No API/LLM call or
-    invented external availability: only study_tasks belonging to this user.
+    Respect preferred date and morning/afternoon whenever possible; do not
+    schedule official study at night. Manually changed tasks are never moved.
     """
     duration = timedelta(minutes=duration_minutes)
     pause = timedelta(minutes=BREAK_MINUTES)
     starting_day = max(preferred.date(), earliest.date())
     for offset in range(MAX_SEARCH_DAYS):
         day = starting_day + timedelta(days=offset)
-        first = _ceil_quarter(max(
-            datetime.combine(day, DAY_START), earliest
-        ))
-        latest = datetime.combine(day, DAY_END) - duration
+        if day.weekday() == 6:
+            continue
         choices = []
-        cursor = first
-        while cursor <= latest:
-            choices.append(cursor)
-            cursor += timedelta(minutes=15)
+        for window_start, window_end in OFFICIAL_WINDOWS:
+            cursor = _ceil_quarter(max(datetime.combine(day, window_start),
+                                       earliest))
+            latest = datetime.combine(day, window_end) - duration
+            while cursor <= latest:
+                choices.append(cursor)
+                cursor += timedelta(minutes=15)
         target = datetime.combine(day, preferred.time())
         choices.sort(key=lambda candidate: (
             abs((candidate - target).total_seconds()),
-            candidate < target, candidate,
+            candidate,
         ))
         for candidate in choices:
             end = candidate + duration
@@ -103,8 +106,8 @@ def _free_study_slot(preferred, duration_minutes, occupied, earliest):
                    for busy_start, busy_end in occupied):
                 return candidate
     raise ValueError(
-        "Không còn giờ trống phù hợp trong 180 ngày tới. "
-        "Hãy kiểm tra các buổi học, deadline và giờ học ưu tiên."
+        "Không còn giờ trống chính khóa từ thứ Hai đến thứ Bảy "
+        "trong 180 ngày tới. Hãy kiểm tra thời khóa biểu hoặc tự chọn giờ."
     )
 
 
@@ -205,11 +208,11 @@ def import_roadmap_lessons(conn, user_id, subject_id, sessions, created_at,
             continue
 
         preferred = datetime.fromisoformat(study_at)
-        earliest = max(datetime.combine(preferred.date(), DAY_START),
+        earliest = max(datetime.combine(preferred.date(), OFFICIAL_WINDOWS[0][0]),
                        future_floor)
         if previous_start is not None:
             earliest = max(earliest, datetime.combine(
-                previous_start.date() + timedelta(days=1), DAY_START))
+                previous_start.date() + timedelta(days=1), OFFICIAL_WINDOWS[0][0]))
         assigned = _free_study_slot(preferred, duration, occupied, earliest)
         assigned_at = assigned.isoformat(timespec="minutes")
         if old:
