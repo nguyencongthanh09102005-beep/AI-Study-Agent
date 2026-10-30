@@ -41,6 +41,8 @@ from course_path_routes import course_path_bp
 app.register_blueprint(course_path_bp)
 from chapter_material_routes import chapter_material_bp
 app.register_blueprint(chapter_material_bp)
+from bulk_chapter_mapping import bulk_chapter_bp
+app.register_blueprint(bulk_chapter_bp)
 from chapter_exercise_routes import chapter_exercise_bp
 app.register_blueprint(chapter_exercise_bp)
 from clo_review_routes import clo_review_bp
