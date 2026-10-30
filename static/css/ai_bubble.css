@@ -138,3 +138,25 @@
  .floating-ai-window-button,.floating-ai-resize-handle{display:none!important}
  .floating-ai-message-body .chat-data-table{width:max(100%,560px);min-width:560px}
 }
+
+
+/* Inline schedule tools: no navigation out of the floating assistant. */
+.floating-ai-quick-actions{display:flex;align-items:center;padding:7px 12px;background:#f3f6ff;border-bottom:1px solid #e3e9fb}
+.floating-ai-schedule-button{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:5px 12px;border:1px solid #d5def6;background:#fff;border-radius:999px;color:#425ab2;font-weight:750;font-size:12px;cursor:pointer}
+.floating-ai-schedule-button:not(:disabled):hover{background:#e6ecff}
+.floating-ai-schedule-button:disabled{opacity:.55;cursor:wait}
+.floating-ai-schedule-card{box-sizing:border-box;flex:none;width:100%;max-width:100%;min-width:0;padding:13px;border-radius:14px;border:1px solid #cbd9fb;background:#fff;color:#2a416f;box-shadow:0 6px 20px rgba(43,71,136,.07);display:flex;flex-direction:column;gap:10px;font-size:12px}
+.floating-ai-schedule-head{display:flex;align-items:flex-start;gap:12px;justify-content:space-between}
+.floating-ai-schedule-head strong{font-size:13px;line-height:1.5;color:#2b4384}
+.floating-ai-schedule-close{border:0;background:#eef2fb;color:#5d6e96;border-radius:8px;padding:3px 10px;font-size:18px;line-height:1.2;cursor:pointer}
+.floating-ai-schedule-summary{margin:0;line-height:1.6;font-size:12px}
+.floating-ai-schedule-hint{margin:0;line-height:1.5;font-size:11.5px;color:#66799e;overflow-wrap:anywhere}
+.floating-ai-schedule-label{display:flex;flex-direction:column;gap:5px;font-size:11.5px;font-weight:750;color:#334c7f;min-width:0}
+.floating-ai-schedule-select,.floating-ai-schedule-time{box-sizing:border-box;min-width:0;width:100%;max-width:100%;min-height:40px;padding:7px 9px;border:1px solid #d1dbef;border-radius:10px;background:#f9fbff;color:#2d4272;font-size:12px;font-weight:500}
+.floating-ai-schedule-select:focus-visible,.floating-ai-schedule-time:focus-visible,.floating-ai-schedule-card button:focus-visible{outline:2px solid #6677e7;outline-offset:2px}
+.floating-ai-schedule-suggestion{align-self:stretch;min-height:33px;border-radius:9px;background:#eaf1ff;color:#3c5ac0;border:1px solid #d4dffd;font-size:11.5px;font-weight:750;cursor:pointer}
+.floating-ai-schedule-preview,.floating-ai-schedule-confirm{min-height:40px;border-radius:11px;padding:9px;border:0;color:#fff;font-weight:750;font-size:12px;background:linear-gradient(125deg,#6d9cff,#5d58eb);cursor:pointer}
+.floating-ai-schedule-confirm{background:#167b5e}
+.floating-ai-schedule-card button:disabled{opacity:.65;cursor:wait}
+.floating-ai-schedule-result{margin:0;font-size:11.5px;color:#37588b;line-height:1.65}
+.floating-ai-schedule-card [hidden]{display:none!important}
