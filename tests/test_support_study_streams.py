@@ -71,6 +71,14 @@ def check():
             info=msg.get_json()
             assert info["intent"]=="create",info
             assert info["topic"]=="Figma" and info["study_at"]==iso
+            recommended=client.post("/api/chat/support/message",json={
+                "message":"Cho tui tự học môn Figma"
+            },headers=headers)
+            assert recommended.status_code==200,recommended.get_data(as_text=True)
+            hint=recommended.get_json()
+            assert hint["intent"]=="create" and hint["topic"]=="Figma",hint
+            hinted_time=__import__("datetime").datetime.fromisoformat(hint["study_at"])
+            assert hinted_time.weekday()!=6 and 19<=hinted_time.hour<22
             upload=client.post("/api/chat/support/upload",
                 data={"file":(io.BytesIO(b"Figma frames and component exercises"),"figma.txt")},
                 headers=headers, content_type="multipart/form-data")
