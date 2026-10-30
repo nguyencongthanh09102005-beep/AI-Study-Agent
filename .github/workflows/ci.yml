@@ -63,6 +63,8 @@ jobs:
           node tests/test_ai_bubble_resize.js
           node --check static/js/admin_ai_hub.js
           node tests/test_admin_ai_hub.js
+          node --check static/js/ai_bubble_schedule.js
+          node tests/test_ai_bubble_schedule.js
           node --check static/js/quiz_preparation.js
           node --check static/js/quiz_learning_analytics.js
           node --check static/js/study_session_quiz_status.js
@@ -115,6 +117,9 @@ jobs:
 
       - name: Unified Admin AI hub layout and permissions
         run: python tests/test_admin_ai_hub.py
+
+      - name: Chat bubble safe schedule proposals and updates
+        run: python tests/test_chat_schedule_actions.py
 
       - name: Global Web readability coverage
         run: python tests/test_web_readability.py
