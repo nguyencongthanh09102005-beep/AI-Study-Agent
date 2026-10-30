@@ -160,3 +160,52 @@
 .floating-ai-schedule-card button:disabled{opacity:.65;cursor:wait}
 .floating-ai-schedule-result{margin:0;font-size:11.5px;color:#37588b;line-height:1.65}
 .floating-ai-schedule-card [hidden]{display:none!important}
+
+
+/* Clear learning/support separation without shrinking the Chat's usable area. */
+.floating-ai-tabs{flex:none;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;padding:9px 11px;background:#f5f7ff;border-bottom:1px solid #e4eafa}
+.floating-ai-tabs button{min-height:39px;border:1px solid transparent;border-radius:11px;background:transparent;color:#7180a6;font-size:13px;font-weight:800;cursor:pointer}
+.floating-ai-tabs button.active{background:#fff;border-color:#dce4f8;box-shadow:0 3px 9px rgba(67,94,161,.08);color:#405ec1}
+.floating-ai-tabs button:focus-visible{outline:2px solid #6e83e8;outline-offset:1px}
+.floating-ai-tab-view{flex:1;min-height:0;min-width:0;display:flex;flex-direction:column}
+.floating-ai-tab-view[hidden]{display:none!important}
+.floating-ai-support-view{padding:0;background:#f8faff}
+.floating-ai-support-heading{flex:none;padding:17px 15px 10px}
+.floating-ai-support-heading strong{display:block;color:#284377;font-size:15px;font-weight:850}
+.floating-ai-support-heading p{font-size:12px;color:#7182a5;line-height:1.6;margin:6px 0 0}
+.floating-ai-support-view>.floating-ai-schedule-button{margin:0 15px 13px;min-height:42px;border:0;border-radius:12px;background:linear-gradient(135deg,#688dff,#655be8);color:white;font-size:13px;font-weight:850;justify-content:center}
+.floating-ai-support-view>.floating-ai-schedule-button:not(:disabled):hover{background:linear-gradient(135deg,#5e84f4,#514dd6)}
+.floating-ai-support-results{flex:1;min-height:0;padding:15px;overflow-y:auto;background:#fff;display:flex;flex-direction:column;gap:13px;overscroll-behavior:contain}
+.floating-ai-support-empty,.floating-ai-review-empty{color:#65799d;font-size:12.5px;line-height:1.6;margin:0}
+.floating-ai-review-summary{display:flex;flex-direction:column;gap:5px;border-radius:12px;padding:13px;background:#edf3ff;color:#2d5188;font-size:13px}
+.floating-ai-review-summary strong{font-weight:850}
+.floating-ai-review-summary span{font-size:11px;color:#627ba6}
+.floating-ai-review-success{margin:0;color:#168469;background:#edfaf4;border:1px solid #d2ede0;border-radius:10px;padding:9px;font-size:12px;line-height:1.5}
+.floating-ai-review-card{border:1px solid #dce5f7;border-radius:14px;display:flex;flex-direction:column;gap:13px;padding:14px;background:#fff}
+.floating-ai-review-subject{font-size:13px;font-weight:850;color:#233f78;overflow-wrap:anywhere;line-height:1.5}
+.floating-ai-review-warning{margin:0;color:#98572c;font-size:12px;line-height:1.5}
+.floating-ai-review-times{display:flex;align-items:center;gap:9px}
+.floating-ai-review-time{flex:1;min-width:0;padding:9px;border-radius:11px;background:#f3f6fc;display:flex;flex-direction:column;gap:5px}
+.floating-ai-review-time small{font-size:10px;color:#7180a4;font-weight:750}
+.floating-ai-review-time strong{font-size:12px;color:#2c467d;overflow-wrap:anywhere}
+.floating-ai-review-arrow{color:#647acc}
+.floating-ai-resize-guide{flex:none;background:#f8faff;padding:4px 30px;text-align:center;color:#8291ae;font-size:10px;line-height:1.3;border-top:1px solid #e5ebf7;user-select:none}
+/* More visible corner grip and two dedicated edge grips. */
+.floating-ai-resize-handle{width:29px;height:29px;left:0;bottom:0;border-radius:0 10px 0 17px;background:#e7edff;box-shadow:inset -1px 1px 0 #d2defb}
+.floating-ai-resize-handle::after{left:7px;bottom:7px;width:15px;height:15px;opacity:1;background:repeating-linear-gradient(135deg,transparent 0 3px,#5572cb 3px 5px,transparent 5px 7px)}
+.floating-ai-root[data-side="left"] .floating-ai-resize-handle{left:auto;right:0;border-radius:10px 0 17px 0}
+.floating-ai-root[data-side="left"] .floating-ai-resize-handle::after{right:7px;left:auto}
+.floating-ai-resize-edge{position:absolute;z-index:5;touch-action:none;user-select:none}
+.floating-ai-resize-edge-horizontal{top:38%;left:0;width:11px;height:100px;cursor:ew-resize;background:transparent;border-radius:0 9px 9px 0}
+.floating-ai-resize-edge-horizontal::after{content:"";position:absolute;width:4px;height:49px;border-radius:5px;background:#b6c3e5;top:25px;left:2px}
+.floating-ai-root[data-side="left"] .floating-ai-resize-edge-horizontal{left:auto;right:0;border-radius:9px 0 0 9px}
+.floating-ai-root[data-side="left"] .floating-ai-resize-edge-horizontal::after{left:auto;right:2px}
+.floating-ai-resize-edge-vertical{top:0;left:calc(50% - 54px);width:108px;height:10px;cursor:ns-resize;border-radius:0 0 9px 9px;background:transparent}
+.floating-ai-resize-edge-vertical::after{content:"";position:absolute;left:30px;top:2px;width:48px;height:4px;background:#b6c3e5;border-radius:5px}
+.floating-ai-resize-edge:hover{background:rgba(113,142,224,.16)}
+.floating-ai-resize-edge:focus-visible{outline:3px solid #6b80fd;outline-offset:1px}
+@media(max-width:600px){
+ .floating-ai-resize-guide,.floating-ai-resize-edge{display:none!important}
+ .floating-ai-support-heading{padding:15px}
+ .floating-ai-support-results{padding:12px}
+}
