@@ -2774,7 +2774,13 @@ Cấu trúc:
                 if len(result) >= batch_size:
                     break
 
-            return result
+            # A second model pass sees the question/options but NOT the
+            # generator's answer key. Require identical independent answer
+            # and an actual quotation in the exact supplied study source.
+            # Unverified items are discarded before any score/weakness data
+            # is created; never silently fall back to the unverified key.
+            from quiz_answer_verification import verify_quiz_batch
+            return verify_quiz_batch(result, document_content, gemini_generate)
 
         except (
             ValueError,
