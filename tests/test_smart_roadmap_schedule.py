@@ -11,6 +11,7 @@ from adaptive_plan_phase8 import is_manual_roadmap_time, lock_manual_roadmap_tim
 from course_path_routes import ensure_roadmap_schema
 from course_schedule_sync import (
     _free_study_slot, import_roadmap_lessons, session_signature,
+    ensure_session_schedule_schema,
 )
 from study_schedule_conflicts import find_study_conflicts
 
@@ -49,6 +50,7 @@ def test():
             project.init_db()
             conn = project.db()
             ensure_roadmap_schema(conn)
+            ensure_session_schedule_schema(conn)
             student = conn.execute("""
                 INSERT INTO users(name,email,password_hash,role,created_at)
                 VALUES('Student A','schedule-smart-a@test.local','hash','student','now')
