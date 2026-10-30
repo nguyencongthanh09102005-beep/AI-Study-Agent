@@ -275,10 +275,7 @@ window.FloatingAiSupport = (function () {
     });
     reviewButton?.addEventListener("click",()=>send("Rà soát có buổi học nào trùng không?"));
     document.querySelectorAll("[data-support-suggestion]").forEach(b=>{
-      b.addEventListener("click",()=>{
-        input.value=b.dataset.supportSuggestion;
-        input.focus();
-      });
+      b.addEventListener("click",()=>send(b.dataset.supportSuggestion));
     });
     return {ready:load(),send};
   }
