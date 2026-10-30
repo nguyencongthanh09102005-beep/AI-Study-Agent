@@ -58,13 +58,13 @@ def normalize_heading_prefix(line):
     value = WEEK_PREFIX.sub("", value, count=1)
     # List numbering may prefix an actual chapter title, e.g. "[1] Chương 1".
     value = re.sub(
-        r"^(?:\\[\\d{1,2}\\]|\\(\\d{1,2}\\)|\\d{1,2}[.)])\\s+"
-        r"(?=(?:[^\\w\\s]*\\s*)?(?:chương|chapter|bài|lesson|unit|module)\\b)",
+        r"^(?:\[\d{1,2}\]|\(\d{1,2}\)|\d{1,2}[.)])\s+"
+        r"(?=(?:[^\w\s]*\s*)?(?:chương|chapter|bài|lesson|unit|module)\b)",
         "", value, flags=re.I,
     )
     # '►', '.', '·', arrows, unicode bullets or combinations. Never remove
     # letters/numbers: a normal heading must remain distinguishable.
-    value = re.sub(r"^[^\\w\\s]{1,16}\\s*", "", value)
+    value = re.sub(r"^[^\w\s]{1,16}\s*", "", value)
     return value
 
 
