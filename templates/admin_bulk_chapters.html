@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+{% block title %}Phân loại học liệu hàng loạt · {{ subject.name }}{% endblock %}
+{% block page_title %}Phân loại học liệu hàng loạt{% endblock %}
+{% block page_desc %}AI đề xuất cho toàn bộ file trong môn · Admin duyệt một lần{% endblock %}
+{% block content %}
+<section class="soft-card" style="max-width:1200px;margin:0 auto;padding:24px">
+  <a class="back-link" href="{{ url_for('admin_shared_documents') }}">← Tài liệu dùng chung</a>
+  <h2 style="margin:15px 0 8px;color:#283f77">{{ subject.code }} · {{ subject.name }}</h2>
+  <p style="color:#607496;font-size:13px;line-height:1.75">
+    Đề cương: <strong>{{ syllabus_name }}</strong> · {{ chapters|length }} chương · {{ documents|length }} file học liệu.
+    Phân tích AI chỉ gợi ý có dẫn chứng; mọi liên kết chỉ công bố khi Admin bấm <strong>Xác nhận tất cả liên kết</strong>.
+    Tệp đã duyệt sẽ được giữ nguyên cho đến khi bạn xác nhận thay đổi.
+  </p>
+  {% if notice %}<p role="status" style="padding:12px 14px;background:#edf8f1;color:#176847;border-radius:11px">{{ notice }}</p>{% endif %}
+  {% if truncated %}
+    <p role="alert" style="padding:12px;background:#fff2e2;border-radius:10px;color:#85541f">
+      Môn có hơn 24 học liệu. Vui lòng sử dụng Gắn chương từng file cho phần còn lại; chức năng hàng loạt chưa hỗ trợ duyệt toàn bộ an toàn.
+    </p>
+  {% endif %}
+  {% if not chapters %}
+    <p role="alert" style="padding:16px;background:#fff4e8;color:#87491c;border-radius:10px">
+      Chưa nhận diện được chương trong đề cương chung. Hãy kiểm tra đề cương trước khi phân loại file.
+    </p>
+  {% elif not documents %}
+    <p>Chưa có học liệu chương. Hãy tải các file riêng của chương lên từ trang Quản lý tài liệu dùng chung.</p>
+  {% else %}
+    <form method="post" style="padding:16px;background:#f1f5ff;border:1px solid #dbe5fa;border-radius:14px;margin:18px 0">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="source_hash" value="{{ source_hash }}">
+      {% for d in documents %}<input type="hidden" name="hash_{{ d.id }}" value="{{ d.hash }}">{% endfor %}
+      <strong style="display:block;color:#2a437e;margin-bottom:7px">Bước 1 · Đề xuất chương cho tất cả học liệu</strong>
+      <p style="color:#62789c;font-size:13px;line-height:1.6">Tối đa 6 file trong một yêu cầu Gemini, chỉ phân tích file chưa có gợi ý hợp lệ theo phiên bản đề cương này. Có thể phát sinh nhiều lượt gọi API; quá trình không tự duyệt.</p>
+      <button class="soft-primary" type="submit" name="action" value="analyze" {% if truncated %}disabled{% endif %}>✦ Phân tích toàn bộ bằng AI</button>
+    </form>
+    <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="source_hash" value="{{ source_hash }}">
+      {% for d in documents %}<input type="hidden" name="hash_{{ d.id }}" value="{{ d.hash }}">{% endfor %}
+      <h3 style="color:#29447b;margin:20px 0 7px">Bước 2 · Kiểm tra và xác nhận một lượt</h3>
+      <p style="font-size:13px;color:#667b9b;line-height:1.7">
+        Đã duyệt được đánh dấu sẵn. Gợi ý AI có trích dẫn sẽ được đánh dấu sẵn để bạn kiểm tra;
+        bạn có thể bỏ chọn hoặc chọn thêm chương. Một file có thể thuộc nhiều chương.
+      </p>
+      <div style="display:grid;gap:14px;margin-top:17px">
+      {% for d in documents %}
+        <article style="border:1px solid #dbe4f2;border-radius:14px;background:#fbfcff;padding:18px">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
+            <div>
+              <strong style="font-size:14px;color:#293e76;overflow-wrap:anywhere">{{ loop.index }}. {{ d.name }}</strong>
+              <p style="margin:5px 0;color:#7688a3;font-size:12px">
+                {{ '✓ Đã phân tích AI, chờ Admin kiểm tra' if d.analyzed else 'Chưa được AI phân tích' }}
+                · {{ d.approved|length }} chương đã duyệt
+              </p>
+            </div>
+            <a href="{{ url_for('chapter_material.admin_chapter_mapping', document_id=d.id) }}" style="color:#465bb7;font-size:12px;font-weight:700">Sửa riêng file này →</a>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:8px;margin-top:12px">
+          {% for key, chapter in chapters.items() %}
+            <label style="display:flex;align-items:flex-start;gap:9px;border-radius:10px;border:1px solid #e2e8f4;padding:10px;background:#fff;cursor:pointer">
+              <input type="checkbox" name="chapter_{{ d.id }}" value="{{ key }}"
+                {% if key in d.approved or key in d.suggestions %}checked{% endif %}
+                style="margin-top:4px;flex-shrink:0;width:17px;height:17px">
+              <span style="min-width:0">
+                <span style="display:block;font-size:13px;color:#344c80;font-weight:700">Chương {{ key }} · {{ chapter.title }}</span>
+                {% if key in d.approved %}
+                  <small style="display:block;color:#16704b;margin-top:5px">✓ Admin đã duyệt trước đó</small>
+                {% endif %}
+                {% if key in d.suggestions %}
+                  <small style="display:block;color:#8b6227;margin-top:5px">✦ AI đề xuất từ nguồn: “{{ d.suggestions[key] }}”</small>
+                {% endif %}
+              </span>
+            </label>
+          {% endfor %}
+          </div>
+        </article>
+      {% endfor %}
+      </div>
+      <p style="font-size:12px;color:#6a7a94;line-height:1.7;margin:16px 0">
+        Việc bỏ chọn một chương đã duyệt sẽ gỡ liên kết của file với chương đó sau khi bạn xác nhận.
+        Các file không thuộc môn này không bị tác động.
+      </p>
+      <button class="soft-primary" type="submit" name="action" value="confirm" {% if truncated %}disabled{% endif %}>✓ Xác nhận tất cả liên kết</button>
+    </form>
+  {% endif %}
+</section>
+{% endblock %}
