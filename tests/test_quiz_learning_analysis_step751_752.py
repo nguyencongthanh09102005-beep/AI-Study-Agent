@@ -132,6 +132,16 @@ def check():
             """, (student, course, "Quiz thử nghiệm",
                   json.dumps(questions, ensure_ascii=False),
                   project.now())).lastrowid
+            # This scenario checks academic/adaptive weakness analytics.
+            # Explicitly tag synthetic Quiz fixtures as course review evidence.
+            # Generic uploaded-document quizzes now belong to private practice.
+            from quiz_review_progress import ensure_review_baseline_schema
+            ensure_review_baseline_schema(conn)
+            conn.execute("""
+                INSERT INTO quiz_review_baselines(
+                    quiz_id,user_id,subject_id,snapshot_json,created_at)
+                VALUES(?,?,?,'[]',?)
+            """,(quiz,student,course,project.now()))
             conn.commit()
             conn.close()
 
@@ -236,6 +246,11 @@ def check():
                 VALUES(?,?,NULL,?,?,?)
             """, (student, course, "Kiểm thử 9 điểm yếu",
                   json.dumps(nine, ensure_ascii=False), project.now())).lastrowid
+            conn.execute("""
+                INSERT INTO quiz_review_baselines(
+                    quiz_id,user_id,subject_id,snapshot_json,created_at)
+                VALUES(?,?,?,'[]',?)
+            """,(quiz_nine,student,course,project.now()))
             conn.commit()
             conn.close()
             many = client.post("/api/quiz/submit", json={
