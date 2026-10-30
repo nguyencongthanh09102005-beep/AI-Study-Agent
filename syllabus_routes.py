@@ -151,7 +151,7 @@ def review(subject_id):
                           if shared_id else None)
                 if cached is not None:
                     units = cached
-                    source_notice = ("Đã dùng đề cương được Admin duyệt đúng phiên bản; không gọi Gemini lại." if admin_approved is not None else "Đã dùng lại phân tích đề cương chung đúng phiên bản; không gọi Gemini lại.")
+                    source_notice = ("Đã tải danh sách chương từ đề cương được quản trị viên duyệt. Hãy kiểm tra và xác nhận." if admin_approved is not None else "Đã tìm thấy danh sách chương đã phân tích. Hãy kiểm tra và xác nhận.")
                 else:
                     started = time.perf_counter()
                     model_response = None
