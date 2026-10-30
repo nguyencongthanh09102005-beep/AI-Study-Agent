@@ -98,6 +98,7 @@ jobs:
           python -m py_compile chapter_exercise_routes.py
           python tests/test_chapter_exercises_c1.py
           python tests/test_bulk_chapter_mapping.py
+          python tests/test_fulltext_chapter_retrieval.py
           python -m py_compile clo_review_routes.py
           python tests/test_clo_evidence_c2.py
           python tests/test_agent_personalization_c3.py
@@ -140,6 +141,7 @@ jobs:
           python tests/test_study_session_tracking.py
           python tests/test_study_session_quiz_step71.py
           python tests/test_study_session_quiz_step7234.py
+          python tests/test_quiz_answer_verification.py
           python tests/test_quiz_learning_analysis_step751_752.py
           python tests/test_adaptive_review_step753.py
           python tests/test_quiz_review_progress_step754.py
