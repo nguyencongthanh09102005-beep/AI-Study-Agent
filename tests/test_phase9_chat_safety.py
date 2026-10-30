@@ -58,7 +58,7 @@ def run():
 
         project.gemini_generate=lambda prompt: (None,"offline")
         answer,sources,mode=project.gemini_subject_answer("Lịch sử","Tóm tắt","",[])
-        assert "GEMINI" in answer.upper() or "AI" in answer
+        assert "AI" in answer and "GEMINI" not in answer.upper()
     finally:
         project.gemini_generate=orig
 
