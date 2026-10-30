@@ -160,9 +160,9 @@ def verify():
             assert "Cấu trúc node" in body
             assert "Mục tiêu buổi học" in body
             assert "Hoạt động học tập" in body
-            assert "19:00" in body
-            assert "Slide Node cá nhân.pdf" in body
-            assert f"/uploads/private631.pdf" in body
+            assert before["study_at"][11:16] in body
+            assert "Slide Node cá nhân.pdf" not in body
+            assert "/uploads/private631.pdf" not in body
             assert 'data-chat-enabled="0"' in body
             assert 'id="floatingAiBubble"' in body
             assert 'id="floatingAiPanel"' in body
