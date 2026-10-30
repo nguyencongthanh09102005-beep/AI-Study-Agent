@@ -1783,7 +1783,7 @@ def record_quiz_learning_signal(
         # Chỉ tạo weakness mới khi sinh viên thực sự trả lời sai.
         # Câu đúng ngay lần đầu không nên xuất hiện trong "Phần cần ôn thêm".
         conn.execute(
-            """
+            f"""
             INSERT INTO {table}(
                 user_id,subject_id,topic_key,topic,chapter,
                 miss_count,correct_count,last_seen_at
