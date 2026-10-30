@@ -71,7 +71,8 @@ def _match_subject(sentence, subjects):
 
 
 def _date_time(message):
-    text = _fold(message)
+    text = unicodedata.normalize("NFD", str(message or "").lower())
+    text = "".join(ch for ch in text if not unicodedata.combining(ch)).replace("đ","d")
     # User examples: "31/10 đến 9h tối", "7h tối ngày 1/11".
     match_date = re.search(r"\b(\d{1,2})[/-](\d{1,2})(?:[/-](\d{4}))?\b", text)
     if not match_date:
