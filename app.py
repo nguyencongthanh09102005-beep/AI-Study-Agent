@@ -2083,7 +2083,6 @@ def get_subject_context(user_id, subject_id, query, max_chars=10000):
         FROM documents
         WHERE user_id=? AND subject_id=?
         ORDER BY id DESC
-        LIMIT 8
         """,
         (user_id, subject_id)
     ).fetchall()
