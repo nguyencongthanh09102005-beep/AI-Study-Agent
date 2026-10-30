@@ -4713,7 +4713,23 @@ def admin_add_document():
                 r"chuẩn đầu ra(?: học phần)?|course syllabus|course outline)\b",
                 extracted
             ))
-            if len(distinct_chapters) < 2 and not is_course_outline:
+            # A genuine syllabus can use "Phần", "Chủ đề", unusual Unicode
+            # or a semester table rather than literal "Chương". Give Admin
+            # a route to AI review instead of rejecting an unfamiliar layout,
+            # but still reject obvious single-chapter teaching slides.
+            metadata_clues = [
+                r"(?i)\b(?:học phần|course|module)\b",
+                r"(?i)\b(?:tín chỉ|credits?)\b",
+                r"(?i)\b(?:CLO\s*\d+|chuẩn đầu ra)\b",
+                r"(?i)\b(?:kế hoạch giảng dạy|tuần học|teaching plan)\b",
+                r"(?i)\b(?:phương pháp đánh giá|đánh giá học phần)\b",
+                r"(?i)\b(?:nội dung học phần|nội dung giảng dạy)\b",
+            ]
+            resembles_syllabus = (
+                len(extracted) >= 300 and
+                sum(bool(re.search(pattern, extracted)) for pattern in metadata_clues) >= 2
+            )
+            if len(distinct_chapters) < 2 and not is_course_outline and not resembles_syllabus:
                 target.unlink(missing_ok=True)
                 return redirect(url_for(
                     "admin_shared_documents",
