@@ -1,217 +1,161 @@
-/* Schedule actions inside the floating chat: deterministic, no model-generated writes.
-   Every change is previewed and explicitly confirmed against the live database. */
+/* Support tab: check all upcoming unfinished study sessions, across every course.
+   Show exactly one collision proposal at a time. One visible confirmation
+   triggers server-side preview and explicit confirm; no generative AI edits. */
 window.FloatingAiSchedule = (function () {
   "use strict";
+
+  // Retained for other consumers, but academic questions are never intercepted.
   function isRequest(text) {
     const q = String(text || "").toLocaleLowerCase("vi-VN");
     return /trùng lịch|trùng giờ|đụng lịch|đụng giờ|lịch bị trùng|lịch trùng|kiểm tra lịch|xem lịch học|lịch học của (tôi|mình|tui|em)|đổi lịch|dời lịch|sửa lịch|chỉnh lịch|chuyển lịch|đổi giờ học|chỉnh giờ học|dời giờ học|dời buổi học|đổi buổi học|giờ trống|thời khóa biểu|sắp xếp lịch/.test(q);
   }
 
-  function attach(options) {
-    const {messages, actionButton, getConversationId, getSubjectId,
-           appendMessage, setStatus} = options;
-    let active = null;
+  function attach({results, actionButton, setStatus}) {
+    if (!results || !actionButton) {
+      return {open:async()=>{},reset:()=>{},isRequest};
+    }
     let pending = false;
-
-    const el = (name, className, label) => {
-      const node = document.createElement(name);
-      if (className) node.className = className;
-      if (label) node.textContent = label;
+    let generation = 0;
+    const el = (tag, klass, value) => {
+      const node = document.createElement(tag);
+      if (klass) node.className = klass;
+      if (value != null) node.textContent = String(value);
       return node;
     };
-    function textDate(iso) {
-      if (typeof iso !== "string" || iso.length < 16) return "Chưa có giờ";
-      return iso.slice(8,10) + "/" + iso.slice(5,7) + "/" +
-        iso.slice(0,4) + " · " + iso.slice(11,16);
-    }
-    async function json(url, opts = {}) {
-      const response = await fetch(url, {credentials:"same-origin", ...opts});
+    const date = iso => (typeof iso === "string" && iso.length >= 16)
+      ? iso.slice(8,10)+"/"+iso.slice(5,7)+"/"+iso.slice(0,4)+" · "+iso.slice(11,16)
+      : "Chưa xác định";
+    async function api(url, options = {}) {
+      const response = await fetch(url, {credentials:"same-origin",...options});
       const value = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        const problem = new Error(value.error || "Không thể xử lý lịch học.");
-        problem.suggested_at = value.suggested_at || "";
-        throw problem;
-      }
+      if (!response.ok) throw Error(value.error || "Chưa kiểm tra được lịch học.");
       return value;
     }
-    function post(path, csrf, body) {
-      return json(path, {
+    function post(url, csrf, body) {
+      return api(url, {
         method:"POST",
         headers:{"Content-Type":"application/json","X-CSRF-Token":csrf},
         body:JSON.stringify(body)
       });
     }
-    async function conversationForSubject() {
-      const current = getConversationId();
-      if (Number.isSafeInteger(current) && current > 0) return current;
-      const subject = getSubjectId();
-      if (!Number.isSafeInteger(subject) || subject <= 0) throw new Error("Hãy chọn môn học trước.");
-      const chats = await json("/api/chats");
-      const chosen = Array.isArray(chats) ? chats.find(
-        x => Number(x.subject_id) === subject && Number(x.id) > 0) : null;
-      if (!chosen) throw new Error("Không tìm thấy cuộc trò chuyện của môn học này.");
-      return Number(chosen.id);
+    function clear() {results.replaceChildren();}
+    function message(text, icon="calendar-check") {
+      const note = el("p","floating-ai-review-empty",text);
+      note.dataset.status=icon;
+      results.appendChild(note);
     }
     function reset() {
-      active?.remove();
-      active=null;
+      generation++;
+      clear();
+      message("Chọn “Rà soát toàn bộ lịch học” để kiểm tra các buổi chưa hoàn thành.");
     }
-    async function open() {
+    async function open(success) {
       if (pending) return;
       pending=true;
-      if (actionButton) actionButton.disabled=true;
-      const oldSubject=getSubjectId();
-      setStatus("Đang kiểm tra lịch học...");
+      const token=++generation;
+      actionButton.disabled=true;
+      clear();
+      message("Đang rà soát toàn bộ lịch học...");
       try {
-        const conversation = await conversationForSubject();
-        const data = await json("/api/chat/schedule?conversation_id=" +
-          encodeURIComponent(conversation));
-        if (getSubjectId() !== oldSubject) return;
-        reset();
+        const data=await api("/api/chat/schedule/review");
+        if (token!==generation) return;
+        clear();
+        const count=Number(data.conflict_count||0);
+        const heading=el("div","floating-ai-review-summary");
+        heading.appendChild(el("strong",null,count
+          ? "⚠ Có "+count+" buổi cần rà soát"
+          : "✓ Không có buổi học trùng giờ"));
+        heading.appendChild(el("span",null,
+          "Đã kiểm tra "+Number(data.checked_count||0)+" buổi học sắp tới"));
+        results.appendChild(heading);
+        if (success) {
+          const done=el("p","floating-ai-review-success",success);
+          results.appendChild(done);
+        }
+        const task=data.next_conflict;
+        if (!count) {
+          message("Các buổi chưa hoàn thành trong lịch tương lai không bị trùng giờ.");
+          setStatus("Đã rà soát lịch học");
+          return;
+        }
+        if (!task) {
+          message("Chưa thể đề xuất giờ an toàn cho những buổi trùng. Hãy kiểm tra dữ liệu môn học và thử lại.");
+          return;
+        }
+        const card=el("article","floating-ai-review-card");
+        card.appendChild(el("div","floating-ai-review-subject",
+                            task.subject_name+" · "+task.title));
+        const overlaps=Array.isArray(task.conflict_titles)?task.conflict_titles:[];
+        if (overlaps.length) card.appendChild(el("p","floating-ai-review-warning",
+          "Trùng với: "+overlaps.join(", ")));
+        const times=el("div","floating-ai-review-times");
+        const oldTime=el("div","floating-ai-review-time");
+        oldTime.appendChild(el("small",null,"LỊCH HIỆN TẠI"));
+        oldTime.appendChild(el("strong",null,date(task.study_at)));
+        times.appendChild(oldTime);
+        times.appendChild(el("span","floating-ai-review-arrow","→"));
+        const newTime=el("div","floating-ai-review-time");
+        newTime.appendChild(el("small",null,"GIỜ TRỐNG ĐỀ XUẤT"));
+        newTime.appendChild(el("strong",null,
+          task.suggested_at?date(task.suggested_at):"Chưa có"));
+        times.appendChild(newTime);card.appendChild(times);
 
-        const card=el("section","floating-ai-schedule-card");
-        card.setAttribute("aria-label","Kiểm tra và đổi lịch học");
-        active=card;
-        const head=el("div","floating-ai-schedule-head");
-        const heading=el("strong",null,"🗓 Lịch học · "+data.subject_name);
-        const dismiss=el("button","floating-ai-schedule-close","×");
-        dismiss.type="button";dismiss.setAttribute("aria-label","Đóng đề xuất lịch");
-        dismiss.addEventListener("click",reset);
-        head.append(heading,dismiss);card.appendChild(head);
-        const conflicts=Number(data.conflict_count || 0);
-        card.appendChild(el("p","floating-ai-schedule-summary",conflicts
-          ? "⚠ Có "+conflicts+" buổi trùng giờ. Chọn buổi để xem và đổi sang giờ trống."
-          : "Không có buổi trùng giờ trong môn này. Bạn vẫn có thể chọn một buổi để đổi giờ."));
-        if (data.limited) card.appendChild(el("p","floating-ai-schedule-hint",
-          "Danh sách chỉ hiển thị một phần lịch. Các giờ bận khác vẫn được kiểm tra."));
-        const tasks=Array.isArray(data.tasks)?data.tasks:[];
-        if (!tasks.length) {
-          card.appendChild(el("p","floating-ai-schedule-hint",
-            "Môn này chưa có buổi học chưa hoàn thành để đổi lịch."));
-          messages.appendChild(card);messages.scrollTop=messages.scrollHeight;
-          setStatus("Đã kiểm tra lịch");return;
-        }
-        const label=el("label","floating-ai-schedule-label","Chọn buổi học");
-        const selector=el("select","floating-ai-schedule-select");
-        selector.setAttribute("aria-label","Chọn buổi cần đổi giờ");
-        for (const task of tasks) {
-          const option=el("option",null,
-            (task.conflict_titles?.length ? "⚠ " : "") +
-            task.title+" · "+textDate(task.study_at));
-          option.value=String(task.id);
-          selector.appendChild(option);
-        }
-        label.appendChild(selector);card.appendChild(label);
-        const note=el("p","floating-ai-schedule-hint");
-        card.appendChild(note);
-        const timeLabel=el("label","floating-ai-schedule-label","Chọn ngày và giờ mới");
-        const time=el("input","floating-ai-schedule-time");
-        time.type="datetime-local";time.required=true;
-        timeLabel.appendChild(time);card.appendChild(timeLabel);
-        const suggestion=el("button","floating-ai-schedule-suggestion");
-        suggestion.type="button";suggestion.hidden=true;
-        card.appendChild(suggestion);
-        const preview=el("button","floating-ai-schedule-preview","Kiểm tra giờ mới");
-        preview.type="button";card.appendChild(preview);
-        const result=el("p","floating-ai-schedule-result");
-        result.setAttribute("role","status");card.appendChild(result);
-        const confirm=el("button","floating-ai-schedule-confirm","✓ Xác nhận đổi lịch");
-        confirm.type="button";confirm.hidden=true;card.appendChild(confirm);
-        let proposal=null;
-        const selectedTask=()=>tasks.find(x=>String(x.id)===selector.value);
-        function resetProposal() {
-          proposal=null;confirm.hidden=true;result.textContent="";
-        }
-        function chooseTask() {
-          resetProposal();
-          const task=selectedTask();
-          if (!task) return;
-          time.value=task.suggested_at || task.study_at;
-          const overlaps=Array.isArray(task.conflict_titles)?task.conflict_titles:[];
-          note.textContent=overlaps.length
-            ? "Trùng với: "+overlaps.join(", ")+". Giờ hiện tại: "+textDate(task.study_at)
-            : "Giờ hiện tại: "+textDate(task.study_at);
-          suggestion.hidden=!task.suggested_at;
-          if (task.suggested_at) {
-            suggestion.textContent="Dùng giờ trống gợi ý: "+textDate(task.suggested_at);
-            suggestion.dataset.at=task.suggested_at;
-          }
-        }
-        selector.addEventListener("change",chooseTask);
-        time.addEventListener("input",resetProposal);
-        suggestion.addEventListener("click",()=>{
-          if (!suggestion.dataset.at) return;
-          time.value=suggestion.dataset.at;
-          resetProposal();
-        });
-        preview.addEventListener("click",async()=>{
-          const task=selectedTask();
-          if(!task||!time.value) {result.textContent="Vui lòng chọn giờ mới.";return;}
-          resetProposal();
-          preview.disabled=true;
-          result.textContent="Đang kiểm tra giờ trống...";
-          const requestedTime=time.value;
-          const requestedTask=task.id;
-          try {
-            const value=await post("/api/chat/schedule/preview",data.csrf_token,{
-              conversation_id:conversation,task_id:requestedTask,study_at:requestedTime
-            });
-            if(card!==active || time.value!==requestedTime ||
-               selectedTask()?.id!==requestedTask) return;
-            proposal=value;
-            result.textContent="Từ "+textDate(value.old_study_at)+" → "+
-              textDate(value.new_study_at)+". Chưa lưu lịch.";
-            confirm.hidden=false;
-          } catch (error) {
-            if(card!==active) return;
-            result.textContent=error.message;
-            if(error.suggested_at) {
-              suggestion.hidden=false;
-              suggestion.dataset.at=error.suggested_at;
-              suggestion.textContent="Dùng giờ trống gợi ý: "+
-                textDate(error.suggested_at);
+        if (task.suggested_at) {
+          const confirm=el("button","floating-ai-schedule-confirm","✓ Xác nhận đổi giờ");
+          confirm.type="button";
+          const feedback=el("p","floating-ai-schedule-result","");
+          feedback.setAttribute("role","status");
+          confirm.addEventListener("click",async()=>{
+            if (pending) return;
+            pending=true;
+            confirm.disabled=true;actionButton.disabled=true;
+            feedback.textContent="Đang kiểm tra và cập nhật giờ học...";
+            try {
+              // Both requests are initiated by a user's single explicit click.
+              // The second call never runs if a stale schedule fails preview.
+              const preview=await post("/api/chat/schedule/preview",data.csrf_token,{
+                conversation_id:task.conversation_id,
+                task_id:task.id,study_at:task.suggested_at
+              });
+              if (token!==generation) return;
+              const saved=await post("/api/chat/schedule/confirm",data.csrf_token,{
+                conversation_id:task.conversation_id,
+                proposal_id:preview.proposal_id
+              });
+              if (token!==generation) return;
+              feedback.textContent="✓ Đã cập nhật lịch học.";
+              pending=false;
+              await open("Đã đổi “"+saved.title+"” sang "+date(saved.study_at)+".");
+            } catch(error) {
+              if (token===generation) {
+                feedback.textContent=error.message+
+                  " Lịch chưa thay đổi, hãy rà soát lại.";
+                setStatus("Chưa đổi lịch");
+              }
+            } finally {
+              pending=false;
+              confirm.disabled=false;actionButton.disabled=false;
             }
-          } finally { preview.disabled=false; }
-        });
-        confirm.addEventListener("click",async()=>{
-          if(!proposal||confirm.disabled) return;
-          if (proposal.new_study_at!==time.value ||
-              Number(proposal.task_id)!==selectedTask()?.id) {
-            resetProposal();
-            result.textContent="Giờ học đã thay đổi. Vui lòng xem trước lại.";
-            return;
-          }
-          confirm.disabled=true;
-          try {
-            const saved=await post("/api/chat/schedule/confirm",data.csrf_token,{
-              conversation_id:conversation,proposal_id:proposal.proposal_id
-            });
-            if(card!==active) return;
-            reset();
-            appendMessage("assistant","✓ Đã đổi lịch “"+saved.title+"” từ "+
-              textDate(saved.old_study_at)+" sang "+textDate(saved.study_at)+
-              ". Lịch học đã được cập nhật; các buổi khác được giữ nguyên.");
-            setStatus("Đã cập nhật lịch học");
-          } catch(error) {
-            if(card!==active) return;
-            resetProposal();
-            result.textContent=error.message+" Hãy kiểm tra lại giờ trước khi lưu.";
-            setStatus("Chưa đổi lịch");
-          } finally {confirm.disabled=false;}
-        });
-        chooseTask();
-        messages.appendChild(card);messages.scrollTop=messages.scrollHeight;
-        setStatus("Đã kiểm tra lịch");
+          });
+          card.appendChild(confirm);
+          card.appendChild(feedback);
+        } else {
+          card.appendChild(el("p","floating-ai-review-warning",
+            "Chưa có giờ trống phù hợp để tự đề xuất cho buổi này."));
+        }
+        results.appendChild(card);
+        setStatus("Đã rà soát lịch học");
       } catch(error) {
-        appendMessage("error",error.message);
-        setStatus("Không kiểm tra được lịch");
+        if (token!==generation) return;
+        clear();message(error.message);
+        setStatus("Rà soát chưa thành công");
       } finally {
         pending=false;
-        if(actionButton) actionButton.disabled=false;
+        actionButton.disabled=false;
       }
     }
-    actionButton?.addEventListener("click",open);
-    return {open, reset, isRequest};
+    actionButton.addEventListener("click",()=>{open();});
+    return {open,reset,isRequest};
   }
   return {attach,isRequest};
 })();
