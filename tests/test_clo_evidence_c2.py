@@ -78,11 +78,19 @@ BT02: Vẽ node.
                 "question":f"Câu {i} Big O?","chapter":"Chương 1",
                 "topic":"Big O","answer":0,"options":["A","B","C","D"]
             } for i in range(6)]
+            from study_session_quiz import ensure_session_quiz_schema
+            ensure_session_quiz_schema(conn)
             def make_attempt(uid,sid,answers):
                 quiz=conn.execute("""
                     INSERT INTO quizzes(user_id,subject_id,title,payload,created_at)
                     VALUES(?,?,?,?,?)
                 """,(uid,sid,"Quiz Chương 1",json.dumps(quiz_questions),now)).lastrowid
+                conn.execute("""
+                    INSERT INTO quiz_session_links(
+                        quiz_id,task_id,user_id,subject_id,chapter_number,
+                        session_title,session_signature,source_signature,source_ids_json,created_at)
+                    VALUES(?,NULL,?,?,1,'Bài chính khóa 1','test-session','test-source','[]',?)
+                """,(quiz,uid,sid,now))
                 conn.execute("""
                     INSERT INTO quiz_attempts(
                         user_id,quiz_id,score,correct_count,total_questions,
