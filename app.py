@@ -2364,6 +2364,8 @@ QUY TẮC NGUỒN RẤT QUAN TRỌNG:
 4. Khi mode = "general", sources phải là mảng rỗng.
 5. Không được giả vờ thông tin nằm trong tài liệu/đề cương nếu nguồn không hỗ trợ.
 6. Không sao chép nguyên văn dài từ nguồn.
+7. Nếu mode = "document" hoặc "shared", thêm citations chứa nguồn và một trích dẫn nguyên văn 20-400 ký tự có trong NGỮ CẢNH ĐƯỢC CUNG CẤP. Nếu không tìm được bằng chứng, chọn mode="general" và không gắn nguồn; không giả vờ đã đọc tài liệu.
+8. Chỉ trả lời theo tài liệu khi đoạn trích thực sự hỗ trợ nội dung. Trích dẫn có thật không đồng nghĩa suy luận đúng; tránh khẳng định vượt quá bằng chứng.
 
 CÁC FILE CÁ NHÂN ĐƯỢC CUNG CẤP:
 {sources_text}
