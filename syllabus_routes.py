@@ -143,11 +143,15 @@ def review(subject_id):
                     """,(subject_id,uid)).fetchone()
                     shared_id = link["shared_subject_id"] if link else None
                 from shared_analysis_cache import cached_units, save_units
-                cached = (cached_units(conn, shared_id, text, project.now())
+                from admin_syllabus_analysis import approved_shared_units
+                admin_approved = (approved_shared_units(conn, shared_id, text)
+                                  if shared_id else None)
+                cached = (admin_approved if admin_approved is not None else
+                          cached_units(conn, shared_id, text, project.now())
                           if shared_id else None)
                 if cached is not None:
                     units = cached
-                    source_notice = "Đã dùng lại phân tích đề cương chung đúng phiên bản; không gọi Gemini lại."
+                    source_notice = ("Đã dùng đề cương được Admin duyệt đúng phiên bản; không gọi Gemini lại." if admin_approved is not None else "Đã dùng lại phân tích đề cương chung đúng phiên bản; không gọi Gemini lại.")
                 else:
                     started = time.perf_counter()
                     model_response = None
