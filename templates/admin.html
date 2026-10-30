@@ -185,6 +185,7 @@
 {% endif %}
 {% endblock %}
 {% block scripts %}
+<script src="{{ url_for('static', filename='js/admin_ai_hub.js') }}"></script>
 <script>
 (function(){
   var subjectForm = document.getElementById('adminSubjectForm');
