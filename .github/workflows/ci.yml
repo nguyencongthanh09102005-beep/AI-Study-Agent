@@ -121,6 +121,7 @@ jobs:
 
       - name: Chat bubble safe schedule proposals and updates
         run: python tests/test_chat_schedule_actions.py
+          python tests/test_support_study_streams.py
 
       - name: Global Web readability coverage
         run: python tests/test_web_readability.py
