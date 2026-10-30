@@ -22,7 +22,12 @@ CHAPTER_KEY_RE = re.compile(r"^(?:chương|chapter|bài|lesson|unit|module)\s+(\
 
 
 def chapter_key(evidence):
-    found = CHAPTER_KEY_RE.match((evidence or "").strip())
+    raw = (evidence or "").strip()
+    # Syllabus PDFs may use bullets in a contents list or a leading
+    # "1 - 3" week range in the teaching timetable.
+    raw = re.sub(r"^\d{1,2}\s*[-–]\s*\d{1,2}\s+", "", raw)
+    raw = re.sub(r"^[•●▪◦*+\-–—]\s+", "", raw)
+    found = CHAPTER_KEY_RE.match(raw)
     return found.group(1) if found else ""
 
 
