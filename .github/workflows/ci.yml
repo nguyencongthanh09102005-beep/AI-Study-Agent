@@ -92,6 +92,7 @@ jobs:
           python tests/test_course_path_step2.py
           python -m py_compile chapter_exercise_routes.py
           python tests/test_chapter_exercises_c1.py
+          python tests/test_bulk_chapter_mapping.py
           python -m py_compile clo_review_routes.py
           python tests/test_clo_evidence_c2.py
           python tests/test_agent_personalization_c3.py
