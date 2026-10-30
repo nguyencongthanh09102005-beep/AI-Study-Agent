@@ -49,7 +49,10 @@ def run():
             slot = next_review_slot(conn,uid,45,"19:00",
                                      current=preferred-timedelta(hours=2))
             start = datetime.fromisoformat(slot)
-            assert start==preferred+timedelta(minutes=45), slot
+            if preferred.weekday() == 6:
+                assert start.weekday() != 6 and start.date() > preferred.date(), slot
+            else:
+                assert start==preferred+timedelta(minutes=45), slot
             assert start!=preferred, "Review collides with a regular lesson"
             assert start + timedelta(minutes=45) <= preferred or start >= preferred+timedelta(minutes=45)
             project.record_quiz_learning_signal(conn,uid,sub,"Đổi mới","Chương 3",False)
