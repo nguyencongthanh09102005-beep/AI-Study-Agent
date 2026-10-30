@@ -84,6 +84,8 @@ def run():
                 prompts.append(prompt)
                 return json.dumps({
                     "mode":"document","sources":["chuong2.txt"],
+                    "citations":[{"source":"chuong2.txt",
+                                  "quote":"Danh sách liên kết đơn (singly linked list) gồm các node liên kết theo con trỏ next."}],
                     "answer":"Danh sách liên kết đơn có các node chứa liên kết next."
                 },ensure_ascii=False),None
             try:
