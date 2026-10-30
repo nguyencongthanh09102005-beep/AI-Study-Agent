@@ -176,7 +176,8 @@ def test():
                 [(datetime(2026, 11, 3, 7), datetime(2026, 11, 3, 22, 30))],
                 NOW,
             )
-            assert next_day == datetime(2026, 11, 4, 19)
+            assert next_day == datetime(2026, 11, 4, 16, 15)
+            assert next_day.weekday() != 6  # official lessons never use Sunday
             conn.close()
     finally:
         project.DB_PATH = previous
