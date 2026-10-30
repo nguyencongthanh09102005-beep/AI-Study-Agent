@@ -42,9 +42,9 @@ def ensure_roadmap_schema(conn):
 def _course_documents(project, conn, user_id, subject_id, shared_subject,
                       syllabus_id, source_text):
     """Only unique private study documents; never offer the syllabus as a slide."""
-    return personal_course_documents(
-        conn, user_id, subject_id, syllabus_id, source_text
-    )
+    # The official roadmap uses only verified syllabus and approved shared
+    # chapter materials. Student PDFs remain in the separate self-study stream.
+    return []
 
 @course_path_bp.route("/subjects/<int:subject_id>/learning-path", methods=["GET", "POST"])
 def learning_path(subject_id):
@@ -218,19 +218,13 @@ def learning_path(subject_id):
                                     notice="Đã xây dựng lộ trình từ đề cương đã xác nhận."), code=303)
 
         sessions = saved_sessions if fresh else []
-        # Filter older saved plans dynamically, without deleting the user's PDFs.
-        if sessions:
-            valid_private = {
-                d["id"] for d in personal_course_documents(
-                    conn, uid, subject_id,
-                    subject["personal_syllabus_document_id"], text
-                )
-            }
-            for lesson in sessions:
-                lesson["materials"] = [
-                    doc for doc in lesson.get("materials", [])
-                    if doc.get("kind") != "personal" or doc.get("id") in valid_private
-                ]
+        # Never attach a private upload to an academic roadmap. Existing
+        # saved test data are filtered at read time, not deleted from storage.
+        for lesson in sessions:
+            lesson["materials"] = [
+                doc for doc in lesson.get("materials", [])
+                if doc.get("kind") != "personal"
+            ]
         # Show confirmed shared materials live, even when Admin approves/revokes
         # a document after the student's roadmap was generated.
         if sessions and source_kind == "shared":
@@ -253,10 +247,8 @@ def learning_path(subject_id):
                     for lesson in sessions:
                         existing = lesson.get("materials") or []
                         confirmed = linked_by_chapter.get(lesson["unit_id"], [])
-                        # Only personal suggestions plus explicitly reviewed shared files.
-                        lesson["materials"] = [
-                            doc for doc in existing if doc.get("kind") == "personal"
-                        ] + confirmed
+                        # Official schedule consumes Admin-approved resources only.
+                        lesson["materials"] = confirmed
         linked = scheduled_lessons(conn, uid, subject_id) if sessions else {}
         schedule_status = {
             int(lesson["session_id"]): (
