@@ -29,20 +29,22 @@ def extract_docx_text(path, max_chars=100000):
     chunks = []
     total = 0
     for child in doc.element.body.iterchildren():
-        if total >= max_chars:
+        if max_chars is not None and total >= max_chars:
             break
         if child.tag == qn("w:p"):
             part = Paragraph(child, doc).text.strip()
         elif child.tag == qn("w:tbl"):
             tbl = Table(child, doc)
             part = "\n".join(" | ".join(cell.text.strip() for cell in row.cells)
-                             for row in tbl.rows[:200])
+                             for row in tbl.rows)
         else:
             continue
         if part:
-            chunks.append(part[:max_chars - total])
-            total += min(len(part), max_chars - total) + 1
-    return "\n".join(chunks)[:max_chars]
+            selected = (part if max_chars is None else part[:max_chars - total])
+            chunks.append(selected)
+            total += len(selected) + 1
+    output = "\n".join(chunks)
+    return output if max_chars is None else output[:max_chars]
 
 
 def _paragraph_html(paragraph, doc_part, image_budget):
