@@ -26,14 +26,19 @@
       <button type="submit" class="soft-primary">📚 {{ 'Tạo lại lộ trình theo đề cương' if sessions else 'Xây dựng lộ trình từng chương' }}</button>
     </form>
     {% if sessions %}
-      <p style="color:#62779d"><strong>{{ sessions|length }} buổi học</strong> · xếp theo thứ tự đề cương · ngày học dự kiến từ thời điểm tạo.</p>
+      <p style="color:#62779d"><strong>{{ sessions|length }} buổi học</strong> · xếp theo thứ tự đề cương. Ngày/giờ dự kiến sẽ được hệ thống tự điều chỉnh theo lịch trống khi đưa vào kế hoạch.</p>
       <div style="background:#edf3ff;border:1px solid #cbd8fb;border-radius:14px;padding:16px;margin:14px 0">
         <strong style="color:#293f7c">Đợt 6.1 · Kết nối với Kế hoạch học</strong>
-        <p style="color:#455b87;font-size:13px;line-height:1.7">Bấm một lần để thêm các buổi chưa có vào Kế hoạch học. Bấm lại sẽ không nhân đôi; các buổi đã đổi lịch hoặc đánh dấu hoàn thành được giữ nguyên. Ngày/giờ hiện tại là gợi ý, bạn có thể sửa trên trang Kế hoạch học. Đồng bộ hai chiều và thời khóa biểu theo giờ sẽ làm ở phần tiếp theo.</p>
+        <p style="color:#455b87;font-size:13px;line-height:1.7">Khi đưa vào kế hoạch, hệ thống sẽ tìm giờ trống gần giờ học ưu tiên nhất, kiểm tra tất cả môn học, chừa 15 phút nghỉ giữa các buổi và tránh xếp giờ quá khuya. Các buổi đã hoàn thành, giờ bạn tự chỉnh, deadline và công việc thủ công không bị thay đổi. Nếu lịch cũ vẫn bị trùng giờ, bạn có thể chủ động yêu cầu sắp xếp lại các buổi từ lộ trình chưa hoàn thành.</p>
         <form method="post" style="margin:10px 0;display:inline-block">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
           <input type="hidden" name="action" value="schedule">
           <button type="submit" class="soft-primary">📅 Đưa các buổi vào Kế hoạch học</button>
+        </form>
+        <form method="post" style="margin:10px 0;display:inline-block">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="action" value="reflow">
+          <button type="submit" style="border:1px solid #adc0ef;background:#fff;border-radius:9px;padding:10px 14px;color:#324eaa;font-weight:750">↻ Tự xếp lại giờ trống cho lịch cũ</button>
         </form>
         <a href="{{ url_for('study_plan', subject_id=subject.id) }}" style="display:inline-block;margin-left:12px;color:#415bc6;font-weight:700">Xem Kế hoạch học →</a>
       </div>
@@ -62,7 +67,12 @@
             <div style="margin-top:9px"><a href="{{ url_for('chapter_material.student_chapter', subject_id=subject.id, chapter_number=lesson.unit_id) }}" style="color:#435bc9;font-weight:700">📖 Mở bài học và học liệu Chương {{ lesson.unit_id }} →</a></div>
             <h3 style="color:#253c75;margin:8px 0">{{ lesson.title }}</h3>
           </div>
-          <span style="background:#e6edff;padding:8px 12px;border-radius:10px;color:#314781;font-size:13px">{{ lesson.date }} · {{ lesson.time }} · {{ lesson.duration }} phút</span>
+          {% set booked = actual_schedule.get(lesson.session_id) %}
+          {% if booked %}
+          <span style="background:#def5e8;padding:8px 12px;border-radius:10px;color:#186747;font-size:13px">Đã xếp: {{ booked.study_at[:10] }} · {{ booked.study_at[11:16] }} · {{ booked.duration }} phút</span>
+          {% else %}
+          <span style="background:#e6edff;padding:8px 12px;border-radius:10px;color:#314781;font-size:13px">Dự kiến: {{ lesson.date }} · {{ lesson.time }} · {{ lesson.duration }} phút</span>
+          {% endif %}
         </div>
         <div style="color:#647897;font-size:13px;margin-bottom:12px">Dẫn chứng đề cương: {{ lesson.source_evidence }}</div>
         <h4 style="color:#324a80;margin:12px 0 6px">Nội dung cần học</h4>
