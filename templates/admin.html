@@ -91,6 +91,19 @@
     </select>
     <button type="button" class="admin-primary" onclick="var s=document.getElementById('bulkChapterSubject');if(s.value){window.location.href=s.value}else{s.focus()}">✦ Phân loại toàn bộ</button>
   </div>
+  <div class="soft-card" style="padding:15px 18px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <div style="flex:1;min-width:220px">
+      <strong>✦ AI phân tích đề cương chi tiết</strong>
+      <p style="font-size:12px;color:#687b9d;margin-top:4px">Đọc đề cương dài theo từng phần, xử lý tiêu đề có ký tự lạ và yêu cầu Admin duyệt kết quả trước khi sử dụng.</p>
+    </div>
+    <select id="syllabusAnalysisSubject" aria-label="Chọn môn phân tích đề cương" style="padding:10px;border:1px solid #cfdaed;border-radius:9px;min-width:205px">
+      <option value="">Chọn môn học</option>
+      {% for item in subjects %}
+      <option value="{{ url_for('admin_syllabus.review', subject_id=item.id) }}">{{ item.code }} · {{ item.name }}</option>
+      {% endfor %}
+    </select>
+    <button type="button" class="admin-primary" onclick="var s=document.getElementById('syllabusAnalysisSubject');if(s.value){window.location.href=s.value}else{s.focus()}">Phân tích đề cương</button>
+  </div>
   <div class="admin-content-grid">
     <form class="soft-card admin-form-card" method="post" enctype="multipart/form-data" action="{{ url_for('admin_add_document') }}" id="adminUploadForm" data-max-mb="{{ upload_max_mb }}">
       <h4>↑ Tải tài liệu chung</h4>
