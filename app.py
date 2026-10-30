@@ -2069,20 +2069,20 @@ def allowed_file(filename):
 def extract_text(path: Path):
     ext = path.suffix.lower()
     if ext in {".txt", ".md"}:
-        return path.read_text(encoding="utf-8", errors="ignore")[:100000]
+        return path.read_text(encoding="utf-8", errors="ignore")
     if ext == ".docx":
         try:
             from syllabus_file_preview import extract_docx_text
-            return extract_docx_text(path)
+            return extract_docx_text(path, max_chars=None)
         except Exception:
             return ""
     if ext == ".pdf" and PdfReader:
         try:
             reader = PdfReader(str(path))
             chunks = []
-            for page in reader.pages[:80]:
+            for page in reader.pages:
                 chunks.append(page.extract_text() or "")
-            return "\n".join(chunks)[:100000]
+            return "\n".join(chunks)
         except Exception:
             return ""
     return ""
