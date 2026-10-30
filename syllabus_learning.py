@@ -91,7 +91,7 @@ def _grounded_units(text):
         title, priority = candidate
         clean = BULLET_PREFIX.sub("", WEEK_PREFIX.sub("", line, count=1), count=1)
         number = HEADING_NUMBER.match(clean)
-        identity = number.group(1) if number else clean.casefold()
+        identity = number.group(0).casefold() if number else clean.casefold()
         earlier = selected.get(identity)
         # The detailed 15-week timetable is a better source than a contents
         # bullet. Never turn the same chapter into two study chapters.
