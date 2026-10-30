@@ -131,7 +131,7 @@ def generate_for_lesson(project, uid, task_id):
     except Exception:
         questions = []
     if not questions or len(questions) != 10:
-        message = "Gemini chưa tạo đủ 10 câu hợp lệ. Bạn có thể thử chuẩn bị lại sau."
+        message = "AI chưa tạo đủ 10 câu hỏi hợp lệ. Bạn có thể thử chuẩn bị lại sau."
         conn = project.db()
         try:
             if context(project,conn,uid,task_id):
@@ -245,7 +245,7 @@ def ask(task_id):
     try:
         reply, error = project.gemini_generate(prompt)
     except Exception:
-        reply, error = None, "Gemini tạm thời không phản hồi."
+        reply, error = None, "AI tạm thời không phản hồi."
     result = {"task_id": task_id, "question": question}
     if reply:
         result["response"] = str(reply)[:1800]  # Cookie session has a ~4 KB limit.
