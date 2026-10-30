@@ -1118,7 +1118,17 @@ def get_shared_subject_context(user_id, subject_id, query="", max_chars=5500):
     source_labels = []
     total = 0
 
-    shared_syllabus = (shared["syllabus_text"] or "").strip()
+    # The shared_subjects field is only a short preview. Prefer the complete
+    # extracted official file for retrieval when the admin uploaded one.
+    official = conn.execute("""
+        SELECT extracted_text FROM shared_documents
+        WHERE shared_subject_id=? AND is_syllabus=1
+        ORDER BY id DESC LIMIT 1
+    """, (shared["id"],)).fetchone()
+    shared_syllabus = (
+        (official["extracted_text"] if official else "")
+        or shared["syllabus_text"] or ""
+    ).strip()
     personal_syllabus = ""
     personal_syllabus_name = ""
 
