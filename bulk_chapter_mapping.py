@@ -5,6 +5,7 @@ import sys
 
 from flask import Blueprint, current_app, redirect, render_template, request, session, url_for
 from ai_chapter_suggestions import validate_ai_suggestions
+from chapter_fulltext_retrieval import select_chapter_excerpts, EXCERPT_VERSION
 from chapter_material_routes import chapter_key, ensure_chapter_material_schema, official_syllabus
 from course_path_learning import parse_chapter_details
 from syllabus_learning import extract_syllabus_units, syllabus_hash
@@ -35,7 +36,7 @@ def batch_prompt(rows, chapters, code):
     outline = [{"key": k, "name": v["title"], "topics": v.get("topics", [])[:6]}
                for k, v in chapters.items()]
     docs = [{"document_id": int(row["id"]),
-             "text": (row["extracted_text"] or "")[:EXCERPT_LIMIT]} for row in rows]
+             "text": select_chapter_excerpts(row["extracted_text"] or "", chapters, EXCERPT_LIMIT)} for row in rows]
     return (
         "Bạn phân loại nhiều tài liệu học thuật theo CHƯƠNG CÓ SẴN trong đề cương. "
         "Mỗi tài liệu có thể liên quan nhiều chương, nhưng chỉ đề xuất khi tài liệu "
@@ -75,7 +76,7 @@ def parse_batch(raw, rows, chapters):
             continue
         validated = validate_ai_suggestions(
             json.dumps({"suggestions": item.get("suggestions")}, ensure_ascii=False),
-            chapters, (allowed[doc_id]["extracted_text"] or "")[:EXCERPT_LIMIT]
+            chapters, select_chapter_excerpts(allowed[doc_id]["extracted_text"] or "", chapters, EXCERPT_LIMIT)
         )
         if validated is not None:
             result[doc_id] = validated
@@ -106,16 +107,18 @@ def listed_documents(conn, subject_id, source_hash):
     output = []
     for row in found:
         content_hash = syllabus_hash(row["extracted_text"] or "")
+        cache_hash = syllabus_hash(EXCERPT_VERSION + "\n" + (row["extracted_text"] or ""))
         prior = cached.get(row["id"])
         fresh = bool(prior and prior["source_hash"] == source_hash
-                     and prior["document_hash"] == content_hash)
+                     and prior["document_hash"] == cache_hash)
         try:
             suggestions = json.loads(prior["suggestions_json"]) if fresh else []
         except (ValueError, TypeError):
             suggestions, fresh = [], False
         output.append({
             "id": row["id"], "name": row["original_name"],
-            "hash": content_hash, "approved": approved.get(row["id"], set()),
+            "hash": content_hash, "cache_hash": cache_hash,
+            "approved": approved.get(row["id"], set()),
             "suggestions": {v["key"]: v["evidence"] for v in suggestions
                             if isinstance(v, dict) and "key" in v and "evidence" in v},
             "analyzed": fresh, "row": row,
@@ -182,7 +185,7 @@ def batch(subject_id):
                                 document_hash=excluded.document_hash,
                                 suggestions_json=excluded.suggestions_json,
                                 analyzed_at=excluded.analyzed_at
-                        """, (d["id"],subject_id,source_hash,d["hash"],
+                        """, (d["id"],subject_id,source_hash,d["cache_hash"],
                               json.dumps(validated[d["id"]],ensure_ascii=False),project.now()))
                         count += 1
                     conn.commit()
