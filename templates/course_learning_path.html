@@ -9,7 +9,7 @@
 <section class="soft-card" style="max-width:1050px;margin:0 auto;padding:26px">
   <a class="back-link" href="{{ url_for('subject_detail', subject_id=subject.id) }}">← Quay lại môn học</a>
   <h2 style="color:#263d79;margin:12px 0">{{ subject.name }}</h2>
-  <p style="color:#67799e;line-height:1.7">Bước 2: Đề cương đã xác nhận → tiểu mục từng chương → hoạt động học → gợi ý tài liệu đúng môn → điểm kiểm tra chương.</p>
+  <p style="color:#67799e;line-height:1.7">Lộ trình gồm các buổi học theo thứ tự chương, kèm nội dung, mục tiêu, tài liệu và bài kiểm tra.</p>
   {% if notice %}<p role="status" style="background:#e9f8ee;color:#176945;border-radius:10px;padding:12px">{{ notice }}</p>{% endif %}
   {% if stale %}<p role="alert" style="background:#fff2e4;color:#8d4b1b;border-radius:10px;padding:12px">Đề cương hoặc danh sách chương đã thay đổi. Lộ trình cũ không còn hợp lệ, hãy tạo lại.</p>{% endif %}
   <div style="padding:16px;background:#f1f4fd;border-radius:12px;margin:15px 0">
@@ -28,7 +28,7 @@
     {% if sessions %}
       <p style="color:#62779d"><strong>{{ sessions|length }} buổi học</strong> · xếp theo thứ tự đề cương. Ngày/giờ dự kiến sẽ được hệ thống tự điều chỉnh theo lịch trống khi đưa vào kế hoạch.</p>
       <div style="background:#edf3ff;border:1px solid #cbd8fb;border-radius:14px;padding:16px;margin:14px 0">
-        <strong style="color:#293f7c">Đợt 6.1 · Kết nối với Kế hoạch học</strong>
+        <strong style="color:#293f7c">📅 Sắp xếp lịch học từ lộ trình</strong>
         <p style="color:#455b87;font-size:13px;line-height:1.7">Khi đưa vào kế hoạch, hệ thống sẽ tìm giờ trống gần giờ học ưu tiên nhất, kiểm tra tất cả môn học, chừa 15 phút nghỉ giữa các buổi và tránh xếp giờ quá khuya. Các buổi đã hoàn thành, giờ bạn tự chỉnh, deadline và công việc thủ công không bị thay đổi. Nếu lịch cũ vẫn bị trùng giờ, bạn có thể chủ động yêu cầu sắp xếp lại các buổi từ lộ trình chưa hoàn thành.</p>
         <form method="post" style="margin:10px 0;display:inline-block">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
