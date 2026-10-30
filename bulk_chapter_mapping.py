@@ -15,11 +15,14 @@ BATCH_SIZE = 6
 EXCERPT_LIMIT = 5600
 
 
-def chapter_index(text):
+def chapter_index(text, conn=None, shared_subject_id=None):
+    from admin_syllabus_analysis import approved_shared_units
+    approved = (approved_shared_units(conn, shared_subject_id, text)
+                if conn is not None and shared_subject_id is not None else None)
     valid = {}
-    for item in extract_syllabus_units(text):
-        key = chapter_key(item["evidence"])
-        if key and key not in valid:
+    for index, item in enumerate(approved or extract_syllabus_units(text), 1):
+        key = chapter_key(item["evidence"]) or chapter_key(item["title"]) or str(index)
+        if key not in valid:
             valid[key] = dict(item)
     if valid:
         sections = parse_chapter_details(text, list(valid.values()))
@@ -139,7 +142,7 @@ def batch(subject_id):
             return "Không tìm thấy môn chung.", 404
         ensure_chapter_material_schema(conn)
         source, source_hash, syllabus_name = official_syllabus(conn, subject_id)
-        chapters = chapter_index(source)
+        chapters = chapter_index(source, conn, subject_id)
         docs, truncated = listed_documents(conn, subject_id, source_hash)
         if request.method == "POST":
             if not project.admin_csrf_valid():
