@@ -1173,7 +1173,7 @@ def get_shared_subject_context(user_id, subject_id, query="", max_chars=5500):
         FROM shared_knowledge
         WHERE shared_subject_id=?
         ORDER BY id DESC
-        LIMIT 12
+
         """,
         (shared["id"],)
     ).fetchall()
