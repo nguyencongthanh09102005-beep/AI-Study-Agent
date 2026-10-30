@@ -99,7 +99,7 @@ def learning_path(subject_id):
             if not secrets.compare_digest(request.form.get("csrf_token", ""), token):
                 return "Phiên biểu mẫu không hợp lệ.", 403
             action = request.form.get("action")
-            if action == "schedule":
+            if action in ("schedule", "reflow"):
                 # Import is explicit: creating a roadmap alone never creates
                 # or deletes Study Plan tasks, and old/stale plans are rejected.
                 if not fresh:
@@ -109,7 +109,8 @@ def learning_path(subject_id):
                     ), code=303)
                 try:
                     summary = import_roadmap_lessons(
-                        conn, uid, subject_id, saved_sessions, project.now()
+                        conn, uid, subject_id, saved_sessions, project.now(),
+                        reschedule_existing=(action == "reflow"),
                     )
                 except ValueError as exc:
                     return redirect(url_for(
@@ -127,6 +128,16 @@ def learning_path(subject_id):
                     message += (
                         f" Có {summary['changed']} buổi đã thay đổi nội dung; "
                         "lịch cũ được giữ để bạn rà soát, không tự ghi đè."
+                    )
+                if summary["moved"]:
+                    message += (
+                        f" Đã tự chuyển {summary['moved']} buổi chưa học sang "
+                        "khung giờ trống, không đụng lịch bạn tự chỉnh."
+                    )
+                if summary["created"]:
+                    message += (
+                        " Giờ học được chọn theo lịch trống của tất cả các môn "
+                        "và giờ học ưu tiên; xem giờ chính thức trong thẻ buổi học."
                     )
                 # Detect collisions across all subjects after import, but do
                 # not automatically reschedule any existing lesson.
@@ -257,7 +268,7 @@ def learning_path(subject_id):
         return render_template(
             "course_learning_path.html", page="subjects", subject=subject,
             syllabus_name=syllabus_name, units=units, sessions=sessions,
-            schedule_status=schedule_status,
+            schedule_status=schedule_status, actual_schedule=linked,
             stale=bool(plan_row and not fresh),
             notice=request.args.get("notice", "")[:400], csrf_token=token,
             prepare_quizzes=request.args.get("prepare_quizzes") == "1",
