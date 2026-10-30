@@ -16,12 +16,17 @@ assert.equal(api.isRequest("Đổi lịch học ngày mai sang giờ trống"),t
 assert.equal(api.isRequest("Lịch sử Đảng Cộng sản Việt Nam là gì?"),false);
 assert.equal(api.isRequest("Phân tích phép biện chứng duy vật"),false);
 assert.match(chat,/FloatingAiSchedule\?\.attach/);
-assert.match(chat,/scheduleFeature\?\.isRequest\(question\)/);
+assert.doesNotMatch(chat,/scheduleFeature\?\.isRequest\(question\)/,
+  "Academic Chat must not silently redirect requests to Support");
+assert.match(chat,/floatingAiTabSupport/);
+assert.match(base,/id="floatingAiSupportView"/);
+assert.match(base,/id="floatingAiStudyView"/);
 assert.match(base,/id="floatingAiScheduleButton"/);
 assert.match(base,/ai_bubble_schedule.js/);
 assert.match(css,/floating-ai-schedule-card/);
+assert.match(source,/\/api\/chat\/schedule\/review/);
 assert.match(source,/\/api\/chat\/schedule\/preview/);
 assert.match(source,/\/api\/chat\/schedule\/confirm/);
 assert.match(source,/X-CSRF-Token/);
 assert.doesNotMatch(source,/innerHTML\s*=/);
-console.log("Floating AI schedule PASS: natural-language routing, safe UI and explicit confirmation");
+console.log("Floating AI schedule PASS: dedicated Support tab, global review, safe one-click confirmation");
