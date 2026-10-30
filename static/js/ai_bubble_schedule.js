@@ -4,7 +4,7 @@ window.FloatingAiSchedule = (function () {
   "use strict";
   function isRequest(text) {
     const q = String(text || "").toLocaleLowerCase("vi-VN");
-    return /trùng lịch|trùng giờ|đụng lịch|đụng giờ|lịch bị trùng|kiểm tra lịch|xem lịch học|lịch học của (tôi|mình|tui|em)|đổi lịch|dời lịch|chuyển lịch|đổi giờ học|dời giờ học|giờ trống|thời khóa biểu|sắp xếp lịch/.test(q);
+    return /trùng lịch|trùng giờ|đụng lịch|đụng giờ|lịch bị trùng|lịch trùng|kiểm tra lịch|xem lịch học|lịch học của (tôi|mình|tui|em)|đổi lịch|dời lịch|sửa lịch|chỉnh lịch|chuyển lịch|đổi giờ học|chỉnh giờ học|dời giờ học|dời buổi học|đổi buổi học|giờ trống|thời khóa biểu|sắp xếp lịch/.test(q);
   }
 
   function attach(options) {
