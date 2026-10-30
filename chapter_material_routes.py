@@ -144,8 +144,9 @@ def admin_chapter_mapping(document_id):
             conn, document["shared_subject_id"], source_text
         ) or extract_syllabus_units(source_text))
         valid = {}
-        for unit in units:
-            key = chapter_key(unit["evidence"]) or chapter_key(unit["title"])
+        for index, unit in enumerate(units, 1):
+            key = (chapter_key(unit["evidence"])
+                   or chapter_key(unit["title"]) or str(index))
             if key and key not in valid:
                 valid[key] = unit
 
