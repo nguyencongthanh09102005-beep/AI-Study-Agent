@@ -1,4 +1,4 @@
-// Trình bày Markdown cơ bản từ Gemini mà không phụ thuộc CDN/thư viện ngoài.
+// Trình bày Markdown cơ bản từ phản hồi AI mà không phụ thuộc CDN/thư viện ngoài.
 // Quan trọng: luôn escape HTML của nội dung AI trước khi thêm thẻ trình bày.
 (function () {
   "use strict";
