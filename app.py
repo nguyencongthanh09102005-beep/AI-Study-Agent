@@ -2407,6 +2407,17 @@ nhưng phải nằm bên trong chuỗi JSON escape đúng quy tắc. Cấu trúc
             answer, used_sources, mode = parse_free_chat_response(
                 raw, source_names, shared_source_names
             )
+            if mode in ("document", "shared"):
+                from chat_retrieval import evidence_from_context
+                from chat_response_validation import verify_source_citations
+                selected_context = context if mode == "document" else shared_context
+                evidence = evidence_from_context(selected_context, used_sources, mode)
+                verified = verify_source_citations(raw, mode, used_sources, evidence)
+                used_sources = list(dict.fromkeys(x["source"] for x in verified))
+                quotes = "\n".join(
+                    f'- {x["source"]}: “{x["quote"]}”' for x in verified[:3]
+                )
+                answer += "\n\nDẫn chứng nguyên văn từ học liệu:\n" + quotes
             if mode == "document":
                 joined = ", ".join(f'"{name}"' for name in used_sources)
                 return f"Dựa trên tài liệu cá nhân {joined}:\\n\\n".replace(
