@@ -323,7 +323,8 @@ def student_chapter(subject_id, chapter_number):
             official_text, official_hash, _ = official_syllabus(conn, shared["id"])
             mapping_allowed = bool(official_text and official_hash == fingerprint)
         if mapping_allowed:
-            key = chapter_key(section["evidence"])
+            key = (chapter_key(section["evidence"])
+                   or chapter_key(section["chapter"]) or str(chapter_number))
             for row in approved_document_rows(conn, shared["id"], key, fingerprint):
                 materials.append({
                     "id": row["id"], "name": row["original_name"],
