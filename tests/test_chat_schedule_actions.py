@@ -143,6 +143,19 @@ def check():
                 after_review=web.get("/api/chat/schedule/review")
                 assert after_review.status_code==200
                 assert after_review.get_json()["conflict_count"]==0
+                # Completed lessons and earlier calendar dates are outside
+                # Support's review, even when they clash with one another.
+                completed_a=task(uid,sid,"Đã học A",at(14))
+                completed_b=task(uid,other_sid,"Đã học B",at(14))
+                previous=(local_now()-timedelta(days=2)).date().isoformat()+"T19:00"
+                task(uid,sid,"Lịch cũ A",previous)
+                task(uid,other_sid,"Lịch cũ B",previous)
+                conn.execute("UPDATE study_tasks SET done=1 WHERE id IN (?,?)",
+                             (completed_a,completed_b))
+                conn.commit()
+                filtered_review=web.get("/api/chat/schedule/review").get_json()
+                assert filtered_review["checked_count"]==4,filtered_review
+                assert filtered_review["conflict_count"]==0,filtered_review
                 assert is_manual_roadmap_time(conn,uid,roadmap)
                 assert conn.execute("SELECT study_at FROM study_tasks WHERE id=?",
                                     (other,)).fetchone()[0]==at(19,15)
