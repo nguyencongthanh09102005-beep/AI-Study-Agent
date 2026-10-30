@@ -150,11 +150,14 @@ window.FloatingAiSchedule = (function () {
           resetProposal();
           preview.disabled=true;
           result.textContent="Đang kiểm tra giờ trống...";
+          const requestedTime=time.value;
+          const requestedTask=task.id;
           try {
             const value=await post("/api/chat/schedule/preview",data.csrf_token,{
-              conversation_id:conversation,task_id:task.id,study_at:time.value
+              conversation_id:conversation,task_id:requestedTask,study_at:requestedTime
             });
-            if(card!==active) return;
+            if(card!==active || time.value!==requestedTime ||
+               selectedTask()?.id!==requestedTask) return;
             proposal=value;
             result.textContent="Từ "+textDate(value.old_study_at)+" → "+
               textDate(value.new_study_at)+". Chưa lưu lịch.";
@@ -172,6 +175,12 @@ window.FloatingAiSchedule = (function () {
         });
         confirm.addEventListener("click",async()=>{
           if(!proposal||confirm.disabled) return;
+          if (proposal.new_study_at!==time.value ||
+              Number(proposal.task_id)!==selectedTask()?.id) {
+            resetProposal();
+            result.textContent="Giờ học đã thay đổi. Vui lòng xem trước lại.";
+            return;
+          }
           confirm.disabled=true;
           try {
             const saved=await post("/api/chat/schedule/confirm",data.csrf_token,{
