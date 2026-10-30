@@ -16,8 +16,18 @@
   {% if stale %}<p role="alert" style="color:#8e5312;padding:12px;background:#fff3e3;border-radius:10px">Đề cương chuẩn đã được thay đổi. Liên kết cũ không còn hiệu lực; vui lòng xác nhận lại.</p>{% endif %}
   {% if not source_present %}
     <div style="padding:20px;border:1px solid #e4e9f2;border-radius:12px">
-      <h3 style="margin:0 0 9px;color:#243d74">Chưa có đề cương chuẩn có thể phân tích</h3>
+      {% if syllabus_uploaded %}
+      <h3 style="margin:0 0 9px;color:#243d74">Đã tải đề cương chuẩn nhưng chưa nhận diện được tiêu đề chương</h3>
+      <p>File <strong>{{ source_name }}</strong> đã được lưu và trích xuất chữ. Tuy nhiên bộ phân tích chưa tìm thấy tiêu đề chương/bài đủ rõ để gắn tài liệu. <strong>Không cần tải lại các slide.</strong></p>
+      <p>Hãy kiểm tra đề cương có các tiêu đề như <strong>Chương 1. Tên chương</strong>, <strong>Bài 1: Tên bài</strong> hay không. Nếu PDF có tiêu đề nằm ở bảng, chia thành nhiều dòng hoặc dùng cách đánh số khác, cần kiểm tra văn bản đã trích xuất trước khi điều chỉnh cấu trúc. Không tự tạo chương không có trong đề cương.</p>
+      <details style="margin:12px 0">
+        <summary style="cursor:pointer;font-weight:750;color:#385291">Xem phần đầu văn bản hệ thống đã đọc được</summary>
+        <pre style="margin-top:10px;white-space:pre-wrap;overflow-wrap:anywhere;max-height:270px;overflow:auto;background:#f3f6fc;border-radius:9px;padding:13px;font-size:12px;color:#415577">{{ syllabus_preview }}</pre>
+      </details>
+      {% else %}
+      <h3 style="margin:0 0 9px;color:#243d74">Chưa có đề cương chuẩn được trích xuất</h3>
       <p>Hãy trở về Quản lý tài liệu chung, tải file đề cương tổng của môn và đánh dấu <strong>Đặt làm đề cương chuẩn của môn</strong>. Sau đó mở lại trang này.</p>
+      {% endif %}
       <a class="soft-primary" href="{{ url_for('admin_shared_documents') }}">Quản lý tài liệu</a>
     </div>
   {% else %}
