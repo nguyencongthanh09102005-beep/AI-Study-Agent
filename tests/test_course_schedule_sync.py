@@ -95,7 +95,7 @@ Chương 2. Danh sách liên kết
             url = f"/subjects/{subject}/learning-path"
             html = client.get(url).get_data(as_text=True)
             assert 'value="schedule"' in html
-            assert "Kết nối với Kế hoạch học" in html
+            assert "Sắp xếp lịch học từ lộ trình" in html
             with client.session_transaction() as sess:
                 token = sess["syllabus_csrf_token"]
             assert client.post(url, data={"action": "schedule"}).status_code == 403
