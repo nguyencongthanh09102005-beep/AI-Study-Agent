@@ -7,6 +7,7 @@ import hashlib
 import json
 import re
 from datetime import date, timedelta
+from syllabus_learning import normalize_heading_prefix
 
 PLAN_VERSION = 5
 
@@ -99,7 +100,7 @@ def parse_chapter_details(text, units):
     for index, section in enumerate(sections):
         end = sections[index+1]["start"] if index+1 < len(sections) else len(lines)
         body = lines[section["start"]+1:end]
-        chapter_match = CHAPTER_RE.match(section["evidence"])
+        chapter_match = CHAPTER_RE.match(normalize_heading_prefix(section["evidence"]))
         chapter_num = chapter_match.group(1) if chapter_match else ""
         values = {name: [] for name, _ in SECTION_PATTERNS}
         clos = []
@@ -112,7 +113,7 @@ def parse_chapter_details(text, units):
             if COURSE_END_RE.match(line):
                 break
             # A different chapter heading is a hard boundary, even if not approved.
-            if CHAPTER_RE.match(line):
+            if CHAPTER_RE.match(normalize_heading_prefix(line)):
                 break
 
             if line.casefold().startswith("thời lượng:"):
