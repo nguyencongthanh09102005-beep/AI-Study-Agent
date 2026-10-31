@@ -210,6 +210,29 @@ export const api = {
 
   studyRoom: (taskId) =>
     request(`/api/mobile/study-room/${taskId}`),
+  sessionQuizStatus: taskId =>
+    request(`/api/mobile/study-room/${taskId}/quiz-status`),
+
+  sessionQuizStart: (taskId, csrf) =>
+    request(`/api/mobile/study-room/${taskId}/quiz-start`, {
+      method:'POST',
+      headers:{'X-Quiz-CSRF':csrf},
+      body:JSON.stringify({}),
+    }),
+
+  quizPreparation: subjectId =>
+    request(`/api/mobile/subjects/${subjectId}/quiz-preparation`),
+
+  quizPreparationAction: (subjectId, action, csrf) =>
+    request(`/api/mobile/subjects/${subjectId}/quiz-preparation`, {
+      method:'POST',
+      headers:{'X-Quiz-CSRF':csrf},
+      body:JSON.stringify({action}),
+    }),
+
+  quizReview: quizId =>
+    request(`/api/mobile/quizzes/${quizId}/review`),
+
 
   studyTimer: (taskId, action, csrf) =>
     request(`/api/mobile/study-room/${taskId}/timer`, {
