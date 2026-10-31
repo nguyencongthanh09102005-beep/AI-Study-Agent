@@ -13,6 +13,8 @@ import {
 } from 'react-native';
 import { api, API_BASE_URL } from './src/api';
 import * as DocumentPicker from 'expo-document-picker';
+import FloatingStudyChat from './src/FloatingStudyChat';
+import StudyRoom from './src/StudyRoom';
 const {
   localDateKey, addDays, getWeekDates, getPlanOverview,
   getVisiblePlanTasks, splitReminders,
@@ -61,7 +63,7 @@ function ErrorCard({ message }) {
   );
 }
 
-function HomeScreen({ dashboard, setTab, loading, onLogout }) {
+function HomeScreen({ dashboard, setTab, loading, onLogout, onOpenStudy }) {
   const user = dashboard?.user || {};
   const subjects = dashboard?.subjects || [];
   const tasks = dashboard?.tasks || [];
@@ -118,7 +120,9 @@ function HomeScreen({ dashboard, setTab, loading, onLogout }) {
 
       <Text style={styles.sectionTitle}>Việc cần làm</Text>
       {tasks.length ? tasks.slice(0, 5).map((task) => (
-        <View key={task.id} style={styles.card}>
+        <TouchableOpacity key={task.id} style={styles.card}
+          disabled={task.source !== 'roadmap' || !task.roadmap_session_id}
+          onPress={() => onOpenStudy(task.id)}>
           <View style={styles.rowBetween}>
             <Text style={[styles.cardTitle, { flex: 1 }]}>{task.title}</Text>
             <Text style={styles.time}>{String(task.study_at || '').slice(11, 16)}</Text>
@@ -127,7 +131,9 @@ function HomeScreen({ dashboard, setTab, loading, onLogout }) {
             {task.subject_name || 'Tự học'} · {task.duration} phút
             {task.source === 'adaptive' ? ' · Adaptive' : ''}
           </Text>
-        </View>
+          {task.source === 'roadmap' && !!task.roadmap_session_id &&
+            <Text style={styles.smallActionText}>Vào không gian học tập →</Text>}
+        </TouchableOpacity>
       )) : <View style={styles.card}><Text style={styles.muted}>Chưa có nhiệm vụ học nào.</Text></View>}
 
       <Text style={styles.sectionTitle}>Tiến độ môn học</Text>
@@ -185,11 +191,12 @@ function SubjectForm({ initial, onSave, onCancel, busy }) {
   );
 }
 
-function SubjectsScreen({ subjects, userName, refreshData }) {
+function SubjectsScreen({ subjects, userName, refreshData, onOpenStudy }) {
   const [mode, setMode] = useState('list');
   const [selectedId, setSelectedId] = useState(null);
   const [editing, setEditing] = useState(null);
   const [detail, setDetail] = useState(null);
+  const [roadmap, setRoadmap] = useState(null);
   const [documents, setDocuments] = useState([]);
   const [docPreview, setDocPreview] = useState(null);
   const [sharedDocPreview, setSharedDocPreview] = useState(null);
@@ -201,9 +208,12 @@ function SubjectsScreen({ subjects, userName, refreshData }) {
     setBusy(true);
     setError('');
     try {
-      const [subjectData, documentData] = await Promise.all([
+      const [subjectData, documentData, roadmapData] = await Promise.all([
         api.subjectDetail(id), api.documents(),
+        api.roadmap(id).catch(err => ({ready:false,notice:err.message,
+          chapters:[],sessions:[]})),
       ]);
+      setRoadmap(roadmapData);
       setSelectedId(id);
       setDetail(subjectData);
       setDocuments(documentData.documents || []);
@@ -432,6 +442,39 @@ function SubjectsScreen({ subjects, userName, refreshData }) {
             syllabus.syllabus_source === 'personal' ? 'Đề cương cá nhân' : 'Chưa chọn'
           }</Text>
           {!!syllabus.syllabus_source_name && <Text style={styles.muted}>{syllabus.syllabus_source_name}</Text>}
+        </View>
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>📖 Đề cương, CLO & lộ trình chính thức</Text>
+          <Text style={styles.muted}>{roadmap?.ready
+            ? 'Lộ trình đã được xác nhận từ đề cương.'
+            : roadmap?.notice || 'Chưa có lộ trình được xác nhận. Hãy tạo từ Web.'}</Text>
+          {(roadmap?.chapters || []).map((chapter, index) => (
+            <View key={'chapter-'+index} style={{marginTop:9}}>
+              <Text style={styles.cardTitle}>{chapter.title}</Text>
+              {!!chapter.topics?.length && <Text style={styles.muted}>
+                {chapter.topics.map(t=>typeof t==='string'?t:t?.title||'').filter(Boolean).join(' · ').slice(0,240)}
+              </Text>}
+            </View>
+          ))}
+          {!!roadmap?.sessions?.length && <Text style={[styles.cardTitle,{marginTop:13}]}>
+            Lộ trình theo buổi ({roadmap.sessions.length})
+          </Text>}
+          {(roadmap?.sessions || []).map((lesson,index)=>(
+            <TouchableOpacity key={'lesson-'+index}
+              style={{paddingVertical:11,borderTopWidth:1,borderTopColor:'#E6EAF5'}}
+              disabled={!lesson.scheduled_task_id}
+              onPress={()=>onOpenStudy(lesson.scheduled_task_id)}>
+              <Text style={styles.cardTitle}>{lesson.title}</Text>
+              <Text style={styles.muted}>
+                Chương {lesson.unit_id} · {lesson.study_at
+                  ? lesson.study_at.replace('T',' ').slice(0,16)
+                  : 'Chưa đưa vào thời khóa biểu'}
+              </Text>
+              <Text style={styles.smallActionText}>
+                {lesson.scheduled_task_id ? 'Vào học →' : 'Tạo lịch cho buổi này trên Web'}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
         <View style={styles.actionRow}>
           <TouchableOpacity style={styles.smallAction} onPress={() => { setEditing(sub); setMode('form'); }}><Text style={styles.smallActionText}>✎ Sửa môn</Text></TouchableOpacity>
@@ -913,7 +956,7 @@ function QuizScreen({ subjects, userName, refreshData }) {
   );
 }
 
-function PlanScreen({ plan, subjects, userName, refreshData }) {
+function PlanScreen({ plan, subjects, userName, refreshData, onOpenStudy }) {
   const [local, setLocal] = useState(plan || {});
   const [mode, setMode] = useState('list');
   const [planView, setPlanView] = useState('week');
@@ -1251,6 +1294,12 @@ function PlanScreen({ plan, subjects, userName, refreshData }) {
                 {String(task.study_at || '').replace('T', ' ').slice(0, 16)} · {task.subject_name || 'Tự học'} · {task.duration} phút
               </Text>
               {!!task.note && <Text style={styles.planTaskNote} numberOfLines={3}>{task.note}</Text>}
+              {task.source === 'roadmap' && !!task.roadmap_session_id &&
+                <TouchableOpacity onPress={() => onOpenStudy(task.id)}
+                  accessibilityRole="button" accessibilityLabel={'Bắt đầu học: '+task.title}
+                  style={{paddingVertical:7}}>
+                  <Text style={styles.smallActionText}>▶ Bắt đầu học →</Text>
+                </TouchableOpacity>}
               {task.source === 'adaptive' && <Text style={styles.planAdaptiveTag}>✦ Ôn tập điểm yếu</Text>}
             </View>
             <View style={styles.planTaskActions}>
@@ -1482,6 +1531,18 @@ export default function App() {
   const [subjects, setSubjects] = useState([]);
   const [plan, setPlan] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [activeStudyTask, setActiveStudyTask] = useState(null);
+  const [activeLesson, setActiveLesson] = useState(null);
+
+  const openStudyRoom = taskId => {
+    setActiveLesson(null);
+    setActiveStudyTask(taskId);
+  };
+  const closeStudyRoom = () => {
+    setActiveLesson(null);
+    setActiveStudyTask(null);
+    refreshData().catch(() => {});
+  };
 
   const refreshData = async () => {
     setLoading(true);
@@ -1529,6 +1590,8 @@ export default function App() {
     } finally {
       setLoggedIn(false);
       setTab('home');
+      setActiveStudyTask(null);
+      setActiveLesson(null);
       setDashboard(null);
       setSubjects([]);
       setPlan(null);
@@ -1544,20 +1607,26 @@ export default function App() {
   const userName = dashboard?.user?.name || '';
 
   const screen = useMemo(() => {
+    if (activeStudyTask) return (
+      <StudyRoom key={activeStudyTask} taskId={activeStudyTask}
+        onBack={closeStudyRoom} onContext={setActiveLesson}
+        onOpenQuiz={() => {closeStudyRoom();setTab('quiz');}} />
+    );
     if (tab === 'profile') return <ProfileScreen userName={userName} refreshData={refreshData} onBack={() => setTab('home')} />;
-    if (tab === 'subjects') return <SubjectsScreen subjects={subjects} userName={userName} refreshData={refreshData} />;
+    if (tab === 'subjects') return <SubjectsScreen subjects={subjects} userName={userName} refreshData={refreshData} onOpenStudy={openStudyRoom} />;
     if (tab === 'agent') return <AgentScreen subjects={subjects} userName={userName} />;
     if (tab === 'quiz') return <QuizScreen subjects={subjects} userName={userName} refreshData={refreshData} />;
-    if (tab === 'plan') return <PlanScreen plan={plan} subjects={subjects} userName={userName} refreshData={refreshData} />;
+    if (tab === 'plan') return <PlanScreen plan={plan} subjects={subjects} userName={userName} refreshData={refreshData} onOpenStudy={openStudyRoom} />;
     return (
       <HomeScreen
         dashboard={dashboard}
         setTab={setTab}
         loading={loading}
         onLogout={handleLogout}
+        onOpenStudy={openStudyRoom}
       />
     );
-  }, [tab, subjects, dashboard, plan, loading, userName, loggedIn]);
+  }, [tab, subjects, dashboard, plan, loading, userName, loggedIn, activeStudyTask]);
 
   if (checkingSession) {
     return (
@@ -1596,6 +1665,7 @@ export default function App() {
           </TouchableOpacity>
         ))}
       </View>
+      <FloatingStudyChat subjects={subjects} lesson={activeLesson}/>
     </SafeAreaView>
   );
 }
