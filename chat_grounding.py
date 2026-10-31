@@ -42,7 +42,7 @@ def citation_hints(question, personal_context, personal_names,
                     if len(quote) < 30 or len(quote) > 220:
                         continue
                     score = len(keywords & tokens(quote))
-                    if score < 2:
+                    if score < 1:
                         continue
                     pool.append((score, kind, name, quote))
     pool.sort(key=lambda item: -item[0])
