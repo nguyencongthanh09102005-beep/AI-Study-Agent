@@ -282,7 +282,7 @@ def run():
             assert f'data-quiz-id="{first_quiz}"' not in locked_html
             assert f'data-quiz-id="{final_quiz}"' not in locked_html
             assert client.get(f"/api/mobile/quizzes/{first_quiz}").status_code == 409
-            assert client.get(f"/api/mobile/quizzes/{first_quiz}/review").status_code == 403
+            assert client.get(f"/api/mobile/quizzes/{first_quiz}/review").status_code == 409
             assert client.post(mobile_start,json={}).status_code == 403
             locked_mobile = client.post(mobile_start,json={},
                 headers={"X-Quiz-CSRF":mobile_csrf})
@@ -357,6 +357,8 @@ def run():
                 headers={"X-Quiz-CSRF":csrf_for_start})
             assert opened_mobile.status_code == 200, opened_mobile.get_data(as_text=True)
             assert opened_mobile.get_json()["quiz_id"] == first_quiz
+            # The timed grant unlocks questions, not the answer key.
+            assert client.get(f"/api/mobile/quizzes/{first_quiz}/review").status_code == 403
             opened = client.post(
                 f"/quiz/{first_quiz}/start-session",
                 data={"csrf_token": csrf_for_start},
