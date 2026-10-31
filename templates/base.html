@@ -133,11 +133,19 @@
     </div>
     <div id="floatingAiStudyView" class="floating-ai-tab-view" role="tabpanel" aria-labelledby="floatingAiTabStudy">
     <div id="floatingAiMode" class="floating-ai-mode" role="status" aria-live="polite">Đang tải trợ lý...</div>
+     <div id="floatingAiLearningMode" class="floating-ai-learning-modes" role="group" aria-label="Chế độ học tập" hidden>
+       <button type="button" id="floatingAiFreeMode" aria-pressed="true" class="active">💬 Hỏi đáp tự do</button>
+       <button type="button" id="floatingAiChapterMode" aria-pressed="false">📖 Học theo chương</button>
+     </div>
     <label id="floatingAiCourseLabel" class="floating-ai-course-label" for="floatingAiCourse">
       Chọn môn học
       <select id="floatingAiCourse" aria-label="Chọn môn để hỏi AI"></select>
     </label>
-    <div id="floatingAiMessages" class="floating-ai-messages" role="log" aria-live="polite" aria-label="Lịch sử Chat AI">
+    <label id="floatingAiChapterLabel" class="floating-ai-course-label" for="floatingAiChapter" hidden>
+       Chương học
+       <select id="floatingAiChapter" aria-label="Chọn chương học trong bong bóng Chat AI"></select>
+     </label>
+     <div id="floatingAiMessages" class="floating-ai-messages" role="log" aria-live="polite" aria-label="Lịch sử Chat AI">
       <p class="floating-ai-empty">Chọn môn hoặc mở một buổi học để trò chuyện với AI.</p>
     </div>
     <form id="floatingAiForm" class="floating-ai-compose">
