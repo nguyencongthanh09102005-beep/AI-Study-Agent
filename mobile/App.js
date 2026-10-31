@@ -186,6 +186,12 @@ function SubjectsScreen({ subjects, userName, refreshData, onOpenStudy, onOpenQu
   const [docSummary, setDocSummary] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+  const [courseFilter, setCourseFilter] = useState('all');
+  const [expanded, setExpanded] = useState({
+    roadmap:false, personal:false, shared:false, weaknesses:false
+  });
+  const toggleSection = key => setExpanded(old => ({...old,[key]:!old[key]}));
 
   const loadDetail = async (id) => {
     setBusy(true);
@@ -197,6 +203,7 @@ function SubjectsScreen({ subjects, userName, refreshData, onOpenStudy, onOpenQu
           chapters:[],sessions:[]})),
       ]);
       setRoadmap(roadmapData);
+      setExpanded({roadmap:false,personal:false,shared:false,weaknesses:false});
       setSelectedId(id);
       setDetail(subjectData);
       setDocuments(documentData.documents || []);
@@ -426,8 +433,13 @@ function SubjectsScreen({ subjects, userName, refreshData, onOpenStudy, onOpenQu
           }</Text>
           {!!syllabus.syllabus_source_name && <Text style={styles.muted}>{syllabus.syllabus_source_name}</Text>}
         </View>
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>📖 Đề cương, CLO & lộ trình chính thức</Text>
+        <TouchableOpacity style={styles.settingsEntry} onPress={() => toggleSection('roadmap')}
+          accessibilityRole="button" accessibilityState={{expanded:expanded.roadmap}}>
+          <Text style={styles.settingsEntryText}>📖 Đề cương & lộ trình</Text>
+          <Text style={styles.settingsChevron}>{expanded.roadmap ? '⌃' : '›'}</Text>
+        </TouchableOpacity>
+        {expanded.roadmap && <View style={styles.card}>
+          <Text style={styles.cardTitle}>Đề cương, CLO & lộ trình chính thức</Text>
           <Text style={styles.muted}>{roadmap?.ready
             ? 'Lộ trình đã được xác nhận từ đề cương.'
             : roadmap?.notice || 'Chưa có lộ trình được xác nhận. Hãy tạo từ Web.'}</Text>
@@ -458,7 +470,7 @@ function SubjectsScreen({ subjects, userName, refreshData, onOpenStudy, onOpenQu
               </Text>
             </TouchableOpacity>
           ))}
-        </View>
+        </View>}
         <TouchableOpacity style={styles.primaryButton} onPress={() => onOpenQuiz(sub.id)}
           accessibilityRole="button">
           <Text style={styles.primaryButtonText}>✓ Làm Quiz & Ôn điểm yếu</Text>
@@ -467,7 +479,13 @@ function SubjectsScreen({ subjects, userName, refreshData, onOpenStudy, onOpenQu
           <TouchableOpacity style={styles.smallAction} onPress={() => { setEditing(sub); setMode('form'); }}><Text style={styles.smallActionText}>✎ Sửa môn</Text></TouchableOpacity>
           <TouchableOpacity style={[styles.smallAction, styles.deleteAction]} onPress={confirmDeleteSubject}><Text style={styles.deleteActionText}>Xóa môn</Text></TouchableOpacity>
         </View>
-        <Text style={styles.sectionTitle}>Tài liệu cá nhân ({docs.length})</Text>
+        <TouchableOpacity style={styles.settingsEntry} onPress={() => toggleSection('personal')}
+          accessibilityRole="button" accessibilityState={{expanded:expanded.personal}}>
+          <Text style={styles.settingsEntryText}>📄 Tài liệu cá nhân ({docs.length})</Text>
+          <Text style={styles.settingsChevron}>{expanded.personal ? '⌃' : '›'}</Text>
+        </TouchableOpacity>
+        {expanded.personal && <>
+        <Text style={styles.sectionTitle}>Tài liệu cá nhân</Text>
         <TouchableOpacity style={styles.primaryButton} disabled={busy} onPress={pickFile}>
           <Text style={styles.primaryButtonText}>＋ Tải lên PDF / TXT / MD</Text>
         </TouchableOpacity>
@@ -501,7 +519,14 @@ function SubjectsScreen({ subjects, userName, refreshData, onOpenStudy, onOpenQu
             <Text style={styles.secondaryActionText}>Bỏ chọn đề cương cá nhân</Text>
           </TouchableOpacity>
         ) : null}
-        <Text style={styles.sectionTitle}>Tài liệu dùng chung ({(detail.shared_documents || []).length})</Text>
+        </>}
+        <TouchableOpacity style={styles.settingsEntry} onPress={() => toggleSection('shared')}
+          accessibilityRole="button" accessibilityState={{expanded:expanded.shared}}>
+          <Text style={styles.settingsEntryText}>📚 Tài liệu chung ({(detail.shared_documents || []).length})</Text>
+          <Text style={styles.settingsChevron}>{expanded.shared ? '⌃' : '›'}</Text>
+        </TouchableOpacity>
+        {expanded.shared && <>
+        <Text style={styles.sectionTitle}>Tài liệu dùng chung</Text>
         <Text style={styles.muted}>Được quản trị viên tải và xử lý sẵn theo mã môn; bạn có quyền xem nhưng không thể sửa.</Text>
         {(detail.shared_documents || []).length ? detail.shared_documents.map((doc) => (
           <View key={'shared-' + doc.id} style={styles.card}>
@@ -512,23 +537,46 @@ function SubjectsScreen({ subjects, userName, refreshData, onOpenStudy, onOpenQu
             </TouchableOpacity>
           </View>
         )) : <Text style={styles.muted}>Chưa có tài liệu chung cho mã môn này.</Text>}
+        </>}
+        <TouchableOpacity style={styles.settingsEntry} onPress={() => toggleSection('weaknesses')}
+          accessibilityRole="button" accessibilityState={{expanded:expanded.weaknesses}}>
+          <Text style={styles.settingsEntryText}>🎯 Điểm yếu cần ôn</Text>
+          <Text style={styles.settingsChevron}>{expanded.weaknesses ? '⌃' : '›'}</Text>
+        </TouchableOpacity>
+        {expanded.weaknesses && <>
         <Text style={styles.sectionTitle}>Điểm yếu đang cần ôn</Text>
         {(detail.weaknesses || []).length ? detail.weaknesses.map((w, i) => (
           <View key={i} style={styles.card}><Text style={styles.cardTitle}>{w.topic}</Text><Text style={styles.muted}>{w.chapter || 'Chưa phân chương'}</Text></View>
         )) : <Text style={styles.muted}>Chưa có điểm yếu cần ôn.</Text>}
+        </>}
       </ScrollView>
     );
   }
 
   return (
     <ScrollView contentContainerStyle={styles.page}>
-      <Header title="Môn học" subtitle="Quản lý môn, tài liệu và đề cương cá nhân" userName={userName} />
+      <Header title="Môn học" subtitle="Lộ trình và tài liệu học tập" userName={userName} />
+      <TextInput value={search} onChangeText={setSearch} style={styles.loginInput}
+        placeholder="⌕ Tìm môn học..." placeholderTextColor="#7B8DAC" />
+      <View style={styles.actionRow}>
+        {[['all','Tất cả'],['ongoing','Đang học'],['completed','Đã hoàn thành']].map(([key,label])=>(
+          <TouchableOpacity key={key} onPress={()=>setCourseFilter(key)}
+            style={[styles.smallAction,courseFilter===key&&{backgroundColor:'#6567E8'}]}>
+            <Text style={[styles.smallActionText,courseFilter===key&&{color:'#FFFFFF'}]}>{label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
       <ErrorCard message={error} />
       <TouchableOpacity style={styles.primaryButton} onPress={() => { setEditing(null); setError(''); setMode('form'); }}>
         <Text style={styles.primaryButtonText}>＋ Tạo môn học</Text>
       </TouchableOpacity>
       {busy && <ActivityIndicator />}
-      {subjects.map((item) => (
+      {subjects.filter(item => {
+        const matchesName = String(item.name||'').toLowerCase().includes(search.trim().toLowerCase());
+        const progress = Number(item.progress || 0);
+        return matchesName && (courseFilter==='all' ||
+          (courseFilter==='completed'?progress>=100:progress<100));
+      }).map((item) => (
         <TouchableOpacity key={item.id} style={styles.subjectCard} onPress={() => loadDetail(item.id)}>
           <View style={styles.subjectIcon}><Text style={{ fontSize: 24 }}>📘</Text></View>
           <View style={{ flex: 1 }}>
