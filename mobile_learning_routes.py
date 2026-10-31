@@ -85,9 +85,8 @@ def _verified_course(conn, project, uid, subject_id):
 
 def _safe_items(lesson):
     # Never expose raw stale material associations or unseen student files.
-    keys = ("session_id", "unit_id", "title", "duration",
-            "topics", "objectives", "activities", "suggested_date",
-            "suggested_time", "type", "focus")
+    keys = ("session_id", "unit_id", "title", "duration", "chapter",
+            "topics", "objectives", "activities", "clo_refs", "date", "time")
     return {key: lesson[key] for key in keys if key in lesson}
 
 
