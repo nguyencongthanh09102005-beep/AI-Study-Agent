@@ -2376,6 +2376,13 @@ def gemini_subject_answer(
     """
     source_names = source_names or []
     shared_source_names = shared_source_names or []
+    from chat_grounding import brief_greeting, citation_hints
+    if brief_greeting(question):
+        # A short conversational greeting doesn't call for a PDF quotation.
+        return (
+            f"Tui đây! Bạn muốn hỏi gì về môn {subject_name}?",
+            [], "general"
+        )
     sources_text = ", ".join(source_names) if source_names else "Không có"
     shared_sources_text = (
         ", ".join(shared_source_names)
@@ -2443,6 +2450,14 @@ nhưng phải nằm bên trong chuỗi JSON escape đúng quy tắc. Cấu trúc
   "answer": "Nội dung trả lời"
 }}
 """.strip()
+
+    # Suggest verified verbatim quotes, not fabricated explanations. Every
+    # model citation must still pass source-scoped validation below.
+    quote_examples = citation_hints(
+        question, context, source_names, shared_context, shared_source_names
+    )
+    if quote_examples:
+        prompt += "\n\n" + quote_examples
 
     from chat_ai_recovery import generate_verified
     from chat_response_validation import (
@@ -5708,9 +5723,14 @@ def api_chat():
     history_rows = history_for_mode(
         conn, uid, conversation_id, lesson_context
     )
+    from chat_grounding import is_unverified_fallback
+    # Failed responses remain visible, but must never be fed to Gemini as
+    # trusted AI explanations for subsequent questions.
     conversation_history = "\n".join(
         f"{'Bạn' if row['role']=='user' else 'AI'}: {row['content']}"
         for row in history_rows
+        if not (row["role"] == "assistant" and
+                is_unverified_fallback(row["content"]))
     )
     conn.close()
 
