@@ -48,7 +48,7 @@ Mở Android Emulator rồi bấm `a` trong terminal Expo.
 
 ## Lưu ý
 
-- Nếu chạy trên điện thoại thật, đổi `API_BASE_URL` trong `src/api.js` thành IP LAN của máy chạy Flask, ví dụ `http://192.168.1.10:5000`.
+- Nếu chạy trên iPhone thật, vào **Cài đặt kết nối** ngay trên màn hình đăng nhập, nhập IPv4 LAN thực của máy chạy Flask (ví dụ `http://192.168.1.10:5000`) và bấm **Kiểm tra và lưu kết nối**. Thay đổi này chỉ tạm thời; muốn giữ qua lần mở app sau, ghi URL thật vào `mobile/.env`.
 - Khi deploy thật, dùng domain HTTPS thay cho địa chỉ local.
 
 
@@ -86,3 +86,16 @@ Mở Android Emulator rồi bấm `a` trong terminal Expo.
 - Thử cả iPhone và Android nếu có máy; kiểm tra bàn phím khi mở Chat, kéo bong bóng và thay đổi hướng màn hình.
 
 Giới hạn: Bong bóng chỉ nổi **bên trong AI Study Agent**, không phủ lên ứng dụng khác. Expo build và CI không thay thế kiểm thử cảm ứng/thiết bị thật.
+
+
+## Giao diện tối giản (2026-10-31)
+
+- Thanh điều hướng dưới: **Tổng quan – Môn học – Lịch học – Cá nhân** (4 tab).
+- AI Chat giữ bong bóng kéo được trên mọi tab; thẻ gợi ý trên Tổng quan mở thẳng bong bóng, không còn tab Chat trùng lặp.
+- Quiz không bị xóa: mở ở chi tiết môn học qua **Làm Quiz & Ôn điểm yếu**, từ Không gian học tập hoặc Cá nhân → **Kết quả Quiz & điểm yếu**. Giữ các API làm/lưu Quiz hiện tại.
+- Màn hình Môn học có ô tìm kiếm và lọc theo tiến độ; trong chi tiết môn, đề cương/lộ trình, tài liệu và điểm yếu được mở khi cần.
+- Cá nhân hiển thị mục cài đặt; phần sửa phong cách, giờ học, mục tiêu chỉ mở khi chọn **Tùy chỉnh học tập**.
+- Đăng nhập chỉ giữ tên, email, mật khẩu, đăng ký dạng liên kết và **Cài đặt kết nối máy chủ**. IP không còn hiện trên giao diện đăng nhập.
+- Màn hình Cài đặt kết nối chấp nhận 401 từ `/api/mobile/session` như một kết nối thành công khi chưa đăng nhập, nhưng không coi HTTP 500 là thành công.
+
+**Giới hạn:** Địa chỉ kết nối chỉnh trong app chưa được lưu bền vững sau khi ứng dụng đóng hoàn toàn; cấu hình chính thức vẫn là `EXPO_PUBLIC_API_URL` trong `mobile/.env`. Không chuyển các luồng học liệu cá nhân hay Chat sang backend thứ hai.
