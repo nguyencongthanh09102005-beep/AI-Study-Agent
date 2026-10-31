@@ -8125,6 +8125,7 @@ def api_mobile_chat_history(subject_id):
     conn.close()
 
     return jsonify({
+        "conversation_id": conversation["id"],
         "subject_id": subject_id,
         "subject_name": conversation["subject_name"],
         "messages": [dict(row) for row in rows]
