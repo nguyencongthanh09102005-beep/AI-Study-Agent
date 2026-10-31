@@ -113,7 +113,8 @@ def run():
                 text=bad.get_json()["answer"]
                 assert "FABRICATED_DATA_42" not in text
                 assert "fictional.pdf" not in text
-                assert "Trích đoạn tham khảo" in text
+                assert "chưa tạo được câu trả lời" in text
+                assert "Danh sách liên kết đơn có các node" not in text
             finally:
                 project.gemini_generate=orig
 
