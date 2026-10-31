@@ -13,7 +13,7 @@ const flask=read("app.py");
 for(const keyword of [
   "import FloatingStudyChat", "import StudyRoom",
   "onOpenStudy", "onContext={setActiveLesson}",
-  "<FloatingStudyChat subjects={subjects} lesson={activeLesson}/>",
+  "<FloatingStudyChat subjects={subjects} lesson={activeLesson}",
   "api.roadmap(id)", "roadmap?.sessions",
   "findTaskConflicts", "Tạo Quiz ôn điểm yếu",
 ])assert(app.includes(keyword),"Missing Mobile integration: "+keyword);
