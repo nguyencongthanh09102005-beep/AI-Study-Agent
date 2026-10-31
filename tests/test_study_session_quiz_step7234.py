@@ -365,12 +365,21 @@ def run():
             )
             assert opened.status_code == 303, opened.get_data(as_text=True)
             assert f'data-quiz-id="{first_quiz}"' in client.get("/quiz").get_data(as_text=True)
-            submitted = client.post("/api/quiz/submit", json={
+            # Mobile submission shares Web scoring, adaptive updates and
+            # the persistent request receipt. Duplicate retries cannot grade twice.
+            mobile_submission = {
                 "quiz_id": first_quiz, "answers": [0] * 15,
                 "request_id": "first7234revision"
-            })
+            }
+            submitted = client.post("/api/mobile/quiz/submit",
+                                    json=mobile_submission)
             assert submitted.status_code == 200, submitted.get_data(as_text=True)[:900]
             assert submitted.get_json()["attempt_count"] == 1
+            retried = client.post("/api/mobile/quiz/submit",
+                                  json=mobile_submission)
+            assert retried.status_code == 200
+            assert retried.get_json()["attempt_id"] == submitted.get_json()["attempt_id"]
+            assert retried.get_json()["attempt_count"] == 1
             reviewed_mobile = client.get(f"/api/mobile/quizzes/{first_quiz}/review")
             assert reviewed_mobile.status_code == 200
             assert reviewed_mobile.get_json()["attempt"]["id"] == submitted.get_json()["attempt_id"]
