@@ -180,18 +180,49 @@ def run():
             final_status = f"/api/study-plan/tasks/{task_rows[-1]['id']}/quiz-status"
             assert client.get(endpoint).status_code == 401
             assert client.get(first_status).status_code == 401
+            mobile_first = f"/api/mobile/study-room/{task_rows[0]['id']}/quiz-status"
+            mobile_final = f"/api/mobile/study-room/{task_rows[-1]['id']}/quiz-status"
+            mobile_start = f"/api/mobile/study-room/{task_rows[0]['id']}/quiz-start"
+            mobile_prepare = f"/api/mobile/subjects/{subject}/quiz-preparation"
+            assert client.get(mobile_first).status_code == 401
+            assert client.post(mobile_start,json={}).status_code == 401
+            assert client.get(mobile_prepare).status_code == 401
             login(client, other)
             assert client.get(endpoint).status_code == 404
             assert client.get(first_status).status_code == 404
+            assert client.get(mobile_first).status_code == 404
+            assert client.get(mobile_prepare).status_code == 404
             login(client, admin)
             assert client.get(endpoint).status_code == 403
             assert client.get(first_status).status_code == 403
+            assert client.get(mobile_first).status_code == 403
+            assert client.get(mobile_prepare).status_code == 403
             login(client, student)
             route = f"/subjects/{subject}/learning-path"
             assert client.get(route).status_code == 200
             unprepared = client.get(first_status)
             assert unprepared.status_code == 200, unprepared.get_data(as_text=True)
             assert unprepared.get_json()["state"] == "unprepared"
+            mobile_unprepared = client.get(mobile_first)
+            assert mobile_unprepared.status_code == 200
+            assert mobile_unprepared.get_json()["state"] == "unprepared"
+            assert "questions" not in mobile_unprepared.get_json()
+            mobile_prepare_state = client.get(mobile_prepare)
+            assert mobile_prepare_state.status_code == 200
+            mobile_csrf = mobile_prepare_state.get_json()["quiz_csrf"]
+            assert mobile_csrf
+            assert client.post(mobile_prepare,json={"action":"start"}).status_code == 403
+            assert client.post(mobile_prepare,json={"action":"invalid"},
+                headers={"X-Quiz-CSRF":mobile_csrf}).status_code == 400
+            import unittest.mock as mocking
+            with mocking.patch("quiz_preparation_jobs.enqueue",return_value="queued") as queued,\
+                 mocking.patch("quiz_preparation_jobs.start_local_worker") as started:
+                queued_resp = client.post(mobile_prepare,json={"action":"start"},
+                    headers={"X-Quiz-CSRF":mobile_csrf})
+                assert queued_resp.status_code == 200
+                assert queued_resp.get_json()["state"] == "queued"
+                queued.assert_called_once()
+                started.assert_called_once()
             room = client.get(f"/study-plan/tasks/{task_rows[0]['id']}/learn")
             assert room.status_code == 200
             assert "Quiz của buổi học này" in room.get_data(as_text=True)
@@ -217,7 +248,13 @@ def run():
             assert ready_first.status_code == 200
             assert ready_first.get_json()["count"] == 15
             assert ready_first.get_json()["state"] == "locked"
-            assert "questions" not in ready_first.get_json()
+            ready_mobile = client.get(mobile_first)
+            assert ready_mobile.status_code == 200
+            assert ready_mobile.get_json()["count"] == 15
+            assert ready_mobile.get_json()["state"] == "locked"
+            assert "questions" not in ready_mobile.get_json()
+            assert client.get(mobile_final).get_json()["count"] == 60
+            assert "questions" not in ready_mobile.get_json()
             assert "payload" not in ready_first.get_json()
             ready_final = client.get(final_status)
             assert ready_final.status_code == 200
@@ -245,6 +282,11 @@ def run():
             assert f'data-quiz-id="{first_quiz}"' not in locked_html
             assert f'data-quiz-id="{final_quiz}"' not in locked_html
             assert client.get(f"/api/mobile/quizzes/{first_quiz}").status_code == 409
+            assert client.get(f"/api/mobile/quizzes/{first_quiz}/review").status_code == 403
+            assert client.post(mobile_start,json={}).status_code == 403
+            locked_mobile = client.post(mobile_start,json={},
+                headers={"X-Quiz-CSRF":mobile_csrf})
+            assert locked_mobile.status_code == 409
             blocked = client.post("/api/quiz/submit", json={
                 "quiz_id": first_quiz, "answers": [0]*15
             })
@@ -311,6 +353,10 @@ def run():
             assert room_before["state"] == "available", room_before
             with client.session_transaction() as sess:
                 csrf_for_start = sess["session_quiz_csrf"]
+            opened_mobile = client.post(mobile_start,json={},
+                headers={"X-Quiz-CSRF":csrf_for_start})
+            assert opened_mobile.status_code == 200, opened_mobile.get_data(as_text=True)
+            assert opened_mobile.get_json()["quiz_id"] == first_quiz
             opened = client.post(
                 f"/quiz/{first_quiz}/start-session",
                 data={"csrf_token": csrf_for_start},
@@ -323,6 +369,14 @@ def run():
             })
             assert submitted.status_code == 200, submitted.get_data(as_text=True)[:900]
             assert submitted.get_json()["attempt_count"] == 1
+            reviewed_mobile = client.get(f"/api/mobile/quizzes/{first_quiz}/review")
+            assert reviewed_mobile.status_code == 200
+            assert reviewed_mobile.get_json()["attempt"]["id"] == submitted.get_json()["attempt_id"]
+            assert len(reviewed_mobile.get_json()["correct_answers"]) == 15
+            assert len(reviewed_mobile.get_json()["explanations"]) == 15
+            login(client,other)
+            assert client.get(f"/api/mobile/quizzes/{first_quiz}/review").status_code == 404
+            login(client,student)
             assert len(calls) == len(task_rows) - 1 + len(task_rows) - 1
             conn = project.db()
             assert conn.execute(
