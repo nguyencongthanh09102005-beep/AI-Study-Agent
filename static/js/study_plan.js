@@ -69,10 +69,38 @@ document.addEventListener("DOMContentLoaded", () => {
     showConflictNotice();
     taskStudyAt.focus();
   });
-  taskForm?.addEventListener("submit", (event) => {
+  // Native confirm() blocked the page and exposed the localhost address.
+  // Preserve the form's normal submit, selected submitter and validation.
+  let conflictDecisionPending = false;
+  let conflictSubmitApproved = false;
+  taskForm?.addEventListener("submit", async (event) => {
+    if (conflictSubmitApproved) return;
     const {conflicts} = inspectTime();
-    if (conflicts.length && !window.confirm("Có " + conflicts.length +
-      " buổi bị trùng giờ. Bạn có chắc muốn giữ khung giờ này?")) event.preventDefault();
+    if (!conflicts.length) return;
+    event.preventDefault();
+    if (conflictDecisionPending) return;
+    const submitter = event.submitter;
+    const state = [taskForm.action, taskStudyAt?.value, taskDuration?.value].join("|");
+    conflictDecisionPending = true;
+    try {
+      const accepted = await window.AppDialogs.confirm({
+        title: "Lịch học bị trùng giờ",
+        message: "Có " + conflicts.length +
+          " buổi bị trùng giờ. Bạn có chắc muốn giữ khung giờ này?",
+        confirmLabel: "Giữ khung giờ",
+        kind: "warning"
+      });
+      // Do not save stale form values if inputs changed while modal was open.
+      if (!accepted ||
+          state !== [taskForm.action, taskStudyAt?.value, taskDuration?.value].join("|"))
+        return;
+      conflictSubmitApproved = true;
+      if (submitter && submitter.form === taskForm) taskForm.requestSubmit(submitter);
+      else taskForm.requestSubmit();
+    } finally {
+      conflictSubmitApproved = false;
+      conflictDecisionPending = false;
+    }
   });
 
 
