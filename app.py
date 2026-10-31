@@ -7369,6 +7369,9 @@ def api_mobile_dashboard():
         return error
 
     conn = db()
+    # Older SQLite installations may predate roadmap columns.
+    from course_schedule_sync import ensure_session_schedule_schema
+    ensure_session_schedule_schema(conn)
     recalculate_all_subject_progress(uid, conn)
 
     user = conn.execute(
@@ -8299,6 +8302,9 @@ def api_mobile_study_plan():
         return error
 
     conn = db()
+    # Older SQLite installations may predate roadmap columns.
+    from course_schedule_sync import ensure_session_schedule_schema
+    ensure_session_schedule_schema(conn)
 
     if request.method == "GET":
         profile = ensure_learning_profile(conn, uid)
