@@ -9,8 +9,35 @@ export const API_BASE_URL = (
   configuredBaseUrl || 'http://10.0.2.2:5000'
 ).replace(/\/$/, '');
 
+// Runtime override is intentionally temporary: configure mobile/.env for a
+// permanent development URL. Never store credentials in the address.
+let activeBaseUrl = API_BASE_URL;
+export const getApiBaseUrl = () => activeBaseUrl;
+export function setApiBaseUrl(value) {
+  const normalized = String(value || '').trim().replace(/\/+$/, '');
+  if (!/^https?:\/\/[a-z0-9.-]+(?::\d{1,5})?$/i.test(normalized)) {
+    throw new Error('Địa chỉ hợp lệ có dạng http://192.168.1.10:5000');
+  }
+  activeBaseUrl = normalized;
+  return activeBaseUrl;
+}
+export async function testApiConnection(candidate) {
+  const value = String(candidate || getApiBaseUrl()).trim().replace(/\/+$/, '');
+  if (!/^https?:\/\/[a-z0-9.-]+(?::\d{1,5})?$/i.test(value)) {
+    throw new Error('Địa chỉ máy chủ chưa đúng định dạng.');
+  }
+  // HTTP 401 is a VALID connection test: user may not be logged in.
+  const response = await fetch(value + '/api/mobile/session', {
+    method:'GET', credentials:'include'
+  });
+  if (response.status !== 200 && response.status !== 401) {
+    throw new Error('Flask phản hồi HTTP ' + response.status + '. Kiểm tra đường dẫn.');
+  }
+  return true;
+}
+
 async function request(path, options = {}) {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetch(`${activeBaseUrl}${path}`, {
     credentials: 'include',
     ...options,
     headers: options.body instanceof FormData
