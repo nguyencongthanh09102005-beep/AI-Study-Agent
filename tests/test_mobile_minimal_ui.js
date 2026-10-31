@@ -13,7 +13,7 @@ assert(tabBlock, "Bottom tab definition missing");
 const tabs=[...tabBlock[1].matchAll(/\['([^']+)',/g)].map(m=>m[1]);
 assert.deepEqual(tabs,["home","subjects","plan","profile"]);
 assert(!tabs.includes("agent")&&!tabs.includes("quiz"));
-assert(app.includes("<FloatingStudyChat subjects={subjects} lesson={activeLesson}/>"),
+assert(app.includes("<FloatingStudyChat subjects={subjects} lesson={activeLesson}"),
   "Keep floating AI globally accessible");
 assert(bubble.includes("api.studyChat"),"Keep verified session Chat");
 assert(app.includes("onOpenQuiz={openQuiz}"),"Quiz entry point in course details");
