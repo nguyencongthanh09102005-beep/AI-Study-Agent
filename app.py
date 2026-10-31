@@ -61,6 +61,8 @@ from chat_schedule_actions import chat_schedule_bp
 app.register_blueprint(chat_schedule_bp)
 from support_schedule_chat import support_chat_bp
 app.register_blueprint(support_chat_bp)
+from mobile_learning_routes import mobile_learning_bp
+app.register_blueprint(mobile_learning_bp)
 # Khi thiếu SECRET_KEY, dùng khóa ngẫu nhiên chỉ cho phiên chạy hiện tại.
 # Khi triển khai cần đặt SECRET_KEY bí mật, ổn định trong biến môi trường.
 app.secret_key = os.getenv("SECRET_KEY") or secrets.token_hex(32)
