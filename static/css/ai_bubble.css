@@ -29,14 +29,8 @@
 .floating-ai-close{width:32px;height:32px;display:grid;place-items:center;border:0;border-radius:9px;background:#e9eefe;color:#435a91;cursor:pointer;font-size:24px}
 .floating-ai-mode{flex:none;padding:10px 13px;background:#eef3ff;border-bottom:1px solid #e3eafa;color:#4e659b;font-size:11px;line-height:1.6}
 .floating-ai-mode.warning{background:#fff5e7;color:#855c20}
-.floating-ai-learning-modes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;padding:7px 12px 4px;background:#f7f9ff}
-.floating-ai-learning-modes button{min-height:34px;border:1px solid #dce4f8;border-radius:9px;background:#fff;color:#506693;font:700 11px/1.35 inherit;cursor:pointer}
-.floating-ai-learning-modes button.active{background:#eaf0ff;color:#3655bd;border-color:#aebfeb}
-.floating-ai-learning-modes button:focus-visible{outline:2px solid #6e83e8;outline-offset:2px}
 .floating-ai-course-label{display:flex;align-items:center;gap:8px;padding:9px 12px;font-size:11px;font-weight:800;color:#4e6596}
 .floating-ai-course-label>select{flex:1;min-width:0;padding:8px;border-radius:9px;border:1px solid #cedbf3;background:#fff;color:#304a7a}
-#floatingAiChapterLabel{padding-top:4px}
-#floatingAiLearningMode[hidden],#floatingAiChapterLabel[hidden]{display:none!important}
 .floating-ai-messages{flex:1;min-height:0;overflow:auto;padding:14px 12px;display:flex;flex-direction:column;gap:11px;background:#f7f9ff;overscroll-behavior:contain}
 .floating-ai-empty{margin:auto;color:#7183a5;font-size:12px;text-align:center;line-height:1.65}
 .floating-ai-message{max-width:95%;border-radius:13px;border:1px solid #dce5fb;background:#fff;padding:11px 13px;color:#2c4479;font-size:12.5px;line-height:1.65;overflow-wrap:anywhere;align-self:flex-start}
