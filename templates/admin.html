@@ -57,7 +57,9 @@
                   data-code="{{ item.code or '' }}" data-name="{{ item.name }}"
                   data-description="{{ item.description or '' }}" aria-label="Sửa môn {{ item.name }}">✎ Sửa</button>
                 <form method="post" action="{{ url_for('admin_delete_subject', subject_id=item.id) }}"
-                  onsubmit="return confirm('Xóa môn học này và TOÀN BỘ tài liệu dùng chung?\\n\\nDữ liệu học tập và tài liệu cá nhân của sinh viên sẽ được giữ nguyên.');">
+                  data-confirm-title="Xóa môn học chung?"
+                  data-confirm-message="Xóa môn này và TOÀN BỘ tài liệu dùng chung? Dữ liệu học tập và tài liệu cá nhân của sinh viên được giữ nguyên."
+                  data-confirm-label="Xóa môn" data-confirm-kind="danger">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                   <input type="hidden" name="confirm_code" value="{{ item.code }}">
                   <button type="submit" class="admin-delete-btn" aria-label="Xóa môn {{ item.name }}">× Xóa</button>
@@ -171,7 +173,9 @@
             <td><div class="admin-actions">
               <a href="{{ url_for('shared_document_file', doc_id=item.id) }}" target="_blank" rel="noopener">Xem</a>
               {% if not item.is_syllabus %}<a href="{{ url_for('chapter_material.admin_chapter_mapping', document_id=item.id) }}">Gắn chương</a>{% endif %}
-              <form method="post" action="{{ url_for('admin_delete_document', doc_id=item.id) }}" onsubmit="return confirm('Xóa tài liệu chung này khỏi tất cả sinh viên?');"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit">Xóa</button></form>
+              <form method="post" action="{{ url_for('admin_delete_document', doc_id=item.id) }}" data-confirm-title="Xóa tài liệu chung?"
+                    data-confirm-message="Xóa tài liệu chung này khỏi tất cả sinh viên?"
+                    data-confirm-label="Xóa tài liệu" data-confirm-kind="danger"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit">Xóa</button></form>
             </div></td>
           </tr>
         {% else %}
