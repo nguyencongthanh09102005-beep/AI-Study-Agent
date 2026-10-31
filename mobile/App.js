@@ -64,7 +64,7 @@ function ErrorCard({ message }) {
   );
 }
 
-function HomeScreen({ dashboard, setTab, loading, onOpenStudy, onAskAI }) {
+function HomeScreen({ dashboard, setTab, loading, onOpenStudy, onAskAI, onOpenQuiz }) {
   const user = dashboard?.user || {};
   const subjects = dashboard?.subjects || [];
   const tasks = dashboard?.tasks || [];
@@ -86,7 +86,8 @@ function HomeScreen({ dashboard, setTab, loading, onOpenStudy, onAskAI }) {
       {dashboard?.next_best_action && (
         <TouchableOpacity style={styles.recommendCard}
           onPress={() => {
-            if (dashboard.next_best_action.kind === 'weakness') setTab('quiz');
+            if (dashboard.next_best_action.kind === 'weakness')
+              onOpenQuiz(dashboard.next_best_action.subject_id || null);
             else if (['task','deadline','plan'].includes(dashboard.next_best_action.kind)) setTab('plan');
             else onAskAI();
           }}>
@@ -1731,6 +1732,7 @@ export default function App() {
         loading={loading}
         onOpenStudy={openStudyRoom}
         onAskAI={() => setChatOpenSignal(value => value+1)}
+        onOpenQuiz={openQuiz}
       />
     );
   }, [tab, subjects, dashboard, plan, loading, userName, loggedIn,
