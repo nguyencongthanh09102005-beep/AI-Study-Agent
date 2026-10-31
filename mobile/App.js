@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -770,7 +770,7 @@ function AgentScreen({ subjects, userName }) {
   );
 }
 
-function QuizScreen({ subjects, userName, refreshData, initialSubjectId, onBack }) {
+function QuizScreen({ subjects, userName, refreshData, initialSubjectId, initialQuizId, onBack }) {
   const [subjectId, setSubjectId] = useState(initialSubjectId || subjects[0]?.id || null);
   const [quiz, setQuiz] = useState(null);
   const [answers, setAnswers] = useState([]);
@@ -783,11 +783,30 @@ function QuizScreen({ subjects, userName, refreshData, initialSubjectId, onBack 
   const [count, setCount] = useState(10);
   const [selectedDoc, setSelectedDoc] = useState(null);
   const [tab, setTab] = useState('create');
+  const [currentQuestion,setCurrentQuestion] = useState(0);
+  const submitKey=useRef('');
 
   useEffect(() => {
     if (initialSubjectId) setSubjectId(initialSubjectId);
     else if (!subjectId && subjects[0]?.id) setSubjectId(subjects[0].id);
   }, [subjects, initialSubjectId, subjectId]);
+
+  useEffect(()=>{
+    if(!Number.isSafeInteger(initialQuizId)||initialQuizId<=0) return;
+    let active=true;
+    setLoading(true);setError('');
+    api.quizDetail(initialQuizId).then(body=>{
+      if(!active)return;
+      setQuiz(body);
+      setAnswers(Array(body.questions?.length||0).fill(null));
+      setCurrentQuestion(0);
+      submitKey.current='';
+      setResult(null);
+      setTab('take');
+    }).catch(err=>{if(active)setError(err.message||'Quiz đang khóa.');})
+      .finally(()=>{if(active)setLoading(false);});
+    return()=>{active=false;};
+  },[initialQuizId]);
 
   const refreshQuizList = async () => {
     const [data, docsData] = await Promise.all([
@@ -821,6 +840,8 @@ function QuizScreen({ subjects, userName, refreshData, initialSubjectId, onBack 
       const data = await api.quizGenerate(subjectId, count, mode, selectedDoc);
       setQuiz(data);
       setAnswers(Array(data.questions?.length || 0).fill(null));
+      setCurrentQuestion(0);
+      submitKey.current='';
       setTab('take');
       await refreshQuizList();
     } catch (err) {
@@ -838,6 +859,8 @@ function QuizScreen({ subjects, userName, refreshData, initialSubjectId, onBack 
       const data = await api.quizDetail(id);
       setQuiz(data);
       setAnswers(Array(data.questions?.length || 0).fill(null));
+      setCurrentQuestion(0);
+      submitKey.current='';
       setTab('take');
     } catch (err) {
       setError(err.message || 'Không đọc được Quiz.');
@@ -846,31 +869,55 @@ function QuizScreen({ subjects, userName, refreshData, initialSubjectId, onBack 
     }
   };
 
-  const submit = async () => {
-    if (!quiz?.quiz_id || loading) return;
-    const unanswered = answers.filter(value => value === null || value === undefined).length;
-    if (unanswered) {
-      setError(`Còn ${unanswered} câu chưa trả lời. Hoàn thành tất cả câu hỏi trước khi nộp.`);
+  const submit=()=>{
+    if(!quiz?.quiz_id || loading)return;
+    const firstUnanswered=answers.findIndex(value=>value===null||value===undefined);
+    if(firstUnanswered>=0){
+      setCurrentQuestion(firstUnanswered);
+      setError('Vui lòng trả lời đủ '+answers.length+' câu trước khi nộp.');
       return;
     }
-    setLoading(true);
-    setError('');
-    try {
-      const data = await api.quizSubmit(quiz.quiz_id, answers);
-      setResult(data);
+    Alert.alert('Xác nhận nộp Quiz',
+      'Bạn đã trả lời đủ '+answers.length+' câu. Nộp bài để chấm và cập nhật điểm yếu?',
+      [{text:'Kiểm tra lại',style:'cancel'},
+       {text:'Nộp bài',onPress:async()=>{
+         if(loading)return;
+         setLoading(true);setError('');
+         if(!submitKey.current) submitKey.current='mobile_'
+           +Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,14);
+         try{
+           const data=await api.quizSubmit(quiz.quiz_id,answers,submitKey.current);
+           setResult(data);
+           setCurrentQuestion(0);
+           setTab('result');
+           await Promise.all([refreshQuizList(),refreshData()]);
+           submitKey.current='';
+         }catch(err){setError(err.message||'Không nộp được Quiz. Có thể thử lại.');}
+         finally{setLoading(false);}
+       }}]);
+  };
+  const viewReview=async (id)=>{
+    setLoading(true);setError('');
+    try{
+      const [q,review]=await Promise.all([api.quizDetail(id),api.quizReview(id)]);
+      setQuiz(q);
+      setResult({...review.attempt,
+        correct_answers:review.correct_answers,
+        explanations:review.explanations});
+      const previous=JSON.parse(review.attempt.answers_json||'[]');
+      setAnswers(Array.isArray(previous)?previous:[]);
+      setCurrentQuestion(0);
       setTab('result');
-      await Promise.all([refreshQuizList(), refreshData()]);
-    } catch (err) {
-      setError(err.message || 'Không nộp được Quiz.');
-    } finally {
-      setLoading(false);
-    }
+    }catch(err){setError(err.message||'Chưa xem được bài đã nộp.');}
+    finally{setLoading(false);}
   };
 
   const changeSubject = (id) => {
     setSubjectId(id);
     setQuiz(null);
     setAnswers([]);
+    setCurrentQuestion(0);
+    submitKey.current='';
     setResult(null);
     setSelectedDoc(null);
     setError('');
@@ -940,11 +987,19 @@ function QuizScreen({ subjects, userName, refreshData, initialSubjectId, onBack 
           <Text style={styles.sectionTitle}>Lịch sử Quiz</Text>
           {!saved.length && <Text style={styles.muted}>Chưa có Quiz. Tạo Quiz để bắt đầu luyện tập.</Text>}
           {saved.filter(q => !subjectId || q.subject_id === subjectId).map(item => (
-            <TouchableOpacity key={item.id} style={styles.card} onPress={() => openQuiz(item.id)}>
+            <View key={item.id} style={styles.card}>
               <Text style={styles.cardTitle}>{item.title}</Text>
               <Text style={styles.muted}>Đã làm {item.attempt_count || 0} lần · Điểm cao nhất {item.best_score ?? '—'}%</Text>
-              <Text style={styles.smallActionText}>Làm Quiz →</Text>
-            </TouchableOpacity>
+              <View style={styles.actionRow}>
+                <TouchableOpacity style={styles.smallAction} onPress={() => openQuiz(item.id)}>
+                  <Text style={styles.smallActionText}>Làm Quiz →</Text>
+                </TouchableOpacity>
+                {item.attempt_count>0 &&
+                  <TouchableOpacity style={styles.smallAction} onPress={()=>viewReview(item.id)}>
+                    <Text style={styles.smallActionText}>Xem bài đã nộp</Text>
+                  </TouchableOpacity>}
+              </View>
+            </View>
           ))}
         </>
       )}
@@ -954,7 +1009,14 @@ function QuizScreen({ subjects, userName, refreshData, initialSubjectId, onBack 
             <Text style={styles.backLink}>← Danh sách Quiz</Text>
           </TouchableOpacity>
           <Text style={styles.sectionTitle}>{quiz.title}</Text>
-          {quiz.questions?.map((question, qIndex) => {
+          {!!quiz.questions?.length && <Text style={styles.muted}>
+            Câu {currentQuestion+1}/{quiz.questions.length}
+            {'  '}·{'  '}Đã trả lời {answers.filter(a=>a!==null&&a!==undefined).length}/{answers.length}
+          </Text>}
+          <Progress value={quiz.questions?.length?(
+            answers.filter(a=>a!==null&&a!==undefined).length*100/quiz.questions.length):0}/>
+          {quiz.questions?.slice(currentQuestion,currentQuestion+1).map((question) => {
+            const qIndex=currentQuestion;
             const chosen = answers[qIndex];
             const correct = tab === 'result' && result?.correct_answers
               ? Number(result.correct_answers[qIndex])
@@ -968,7 +1030,11 @@ function QuizScreen({ subjects, userName, refreshData, initialSubjectId, onBack 
                   <TouchableOpacity key={index} disabled={tab === 'result'}
                     style={[styles.option, chosen === index && styles.optionSelected,
                       tab === 'result' && index === correct && { borderColor: '#31A879', backgroundColor: '#EAFAF2' }]}
-                    onPress={() => setAnswers(old => old.map((v, n) => n === qIndex ? index : v))}>
+                    onPress={() => {
+                      submitKey.current='';
+                      setAnswers(old => old.map((v, n) => n === qIndex ? index : v));
+                      setError('');
+                    }}>
                     <Text style={[styles.optionLetter, chosen === index && styles.optionLetterSelected]}>
                       {String.fromCharCode(65 + index)}
                     </Text>
@@ -984,6 +1050,18 @@ function QuizScreen({ subjects, userName, refreshData, initialSubjectId, onBack 
               </View>
             );
           })}
+          <View style={[styles.actionRow,{justifyContent:'space-between'}]}>
+            <TouchableOpacity disabled={currentQuestion===0}
+              style={[styles.smallAction,currentQuestion===0&&{opacity:0.35}]}
+              onPress={()=>setCurrentQuestion(i=>Math.max(0,i-1))}>
+              <Text style={styles.smallActionText}>← Câu trước</Text>
+            </TouchableOpacity>
+            <TouchableOpacity disabled={currentQuestion+1>=(quiz.questions?.length||0)}
+              style={[styles.smallAction,currentQuestion+1>=(quiz.questions?.length||0)&&{opacity:0.35}]}
+              onPress={()=>setCurrentQuestion(i=>Math.min(quiz.questions.length-1,i+1))}>
+              <Text style={styles.smallActionText}>Câu tiếp →</Text>
+            </TouchableOpacity>
+          </View>
           {tab === 'take' && (
             <TouchableOpacity style={styles.primaryButton} disabled={loading} onPress={submit}>
               <Text style={styles.primaryButtonText}>Nộp bài ({answers.filter(a => a !== null).length}/{answers.length})</Text>
@@ -995,6 +1073,8 @@ function QuizScreen({ subjects, userName, refreshData, initialSubjectId, onBack 
               <Text style={styles.muted}>Điểm yếu cần ôn: {result.weakness_count || 0}. Lộ trình Adaptive đã cập nhật.</Text>
               <TouchableOpacity style={styles.secondaryAction} onPress={() => {
                 setAnswers(Array(quiz.questions?.length || 0).fill(null));
+                setCurrentQuestion(0);
+                submitKey.current='';
                 setResult(null);
                 setTab('take');
               }}>
@@ -1623,10 +1703,12 @@ export default function App() {
   const [activeStudyTask, setActiveStudyTask] = useState(null);
   const [activeLesson, setActiveLesson] = useState(null);
   const [quizSubjectId, setQuizSubjectId] = useState(null);
+  const [quizToOpenId,setQuizToOpenId]=useState(null);
   const [showConnectionSettings, setShowConnectionSettings] = useState(false);
   const [chatOpenSignal, setChatOpenSignal] = useState(0);
-  const openQuiz = subjectId => {
+  const openQuiz = (subjectId, quizId=null) => {
     setQuizSubjectId(subjectId || null);
+    setQuizToOpenId(quizId || null);
     setActiveStudyTask(null);
     setActiveLesson(null);
     setTab('quiz');
@@ -1689,6 +1771,7 @@ export default function App() {
       setLoggedIn(false);
       setTab('home');
       setQuizSubjectId(null);
+      setQuizToOpenId(null);
       setActiveStudyTask(null);
       setActiveLesson(null);
       setDashboard(null);
@@ -1709,7 +1792,10 @@ export default function App() {
     if (activeStudyTask) return (
       <StudyRoom key={activeStudyTask} taskId={activeStudyTask}
         onBack={closeStudyRoom} onContext={setActiveLesson}
-        onOpenQuiz={() => openQuiz(activeLesson?.subjectId)} />
+        onOpenQuiz={info => openQuiz(
+          info?.subjectId || activeLesson?.subjectId,
+          info?.quizId || null
+        )} />
     );
     if (tab === 'profile') return (
       <ProfileScreen userName={userName} email={dashboard?.user?.email}
@@ -1722,7 +1808,8 @@ export default function App() {
       onOpenStudy={openStudyRoom} onOpenQuiz={openQuiz} />;
     if (tab === 'agent') return <AgentScreen subjects={subjects} userName={userName} />;
     if (tab === 'quiz') return <QuizScreen subjects={subjects}
-      initialSubjectId={quizSubjectId} onBack={() => setTab('subjects')}
+      initialSubjectId={quizSubjectId} initialQuizId={quizToOpenId}
+      onBack={() => {setQuizToOpenId(null);setTab('subjects');}}
       userName={userName} refreshData={refreshData} />;
     if (tab === 'plan') return <PlanScreen plan={plan} subjects={subjects} userName={userName} refreshData={refreshData} onOpenStudy={openStudyRoom} />;
     return (
