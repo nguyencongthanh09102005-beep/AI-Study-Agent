@@ -66,6 +66,7 @@ jobs:
           node tests/test_study_session_chat.js
           node tests/test_ai_bubble.js
           node tests/test_ai_bubble_resize.js
+          node tests/test_floating_chat_mode_parity.js
           node --check static/js/admin_ai_hub.js
           node tests/test_admin_ai_hub.js
           node --check static/js/ai_bubble_schedule.js
