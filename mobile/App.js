@@ -890,8 +890,12 @@ function QuizScreen({ subjects, userName, refreshData, initialSubjectId, initial
            setResult(data);
            setCurrentQuestion(0);
            setTab('result');
-           await Promise.all([refreshQuizList(),refreshData()]);
            submitKey.current='';
+           try{
+             await Promise.all([refreshQuizList(),refreshData()]);
+           }catch(_refreshError){
+             setError('Bài đã nộp thành công. Chưa làm mới được danh sách Quiz; bạn có thể mở lại sau.');
+           }
          }catch(err){setError(err.message||'Không nộp được Quiz. Có thể thử lại.');}
          finally{setLoading(false);}
        }}]);
@@ -1070,7 +1074,16 @@ function QuizScreen({ subjects, userName, refreshData, initialSubjectId, initial
           {tab === 'result' && result && (
             <View style={styles.insightCard}>
               <Text style={styles.insightTitle}>Kết quả: {result.correct_count}/{result.total_questions} · {result.score}%</Text>
-              <Text style={styles.muted}>Điểm yếu cần ôn: {result.weakness_count || 0}. Lộ trình Adaptive đã cập nhật.</Text>
+              <Text style={styles.muted}>Điểm yếu cần ôn: {result.weakness_count ?? '—'}.
+                {result.learning_updated ? ' Tiến độ đã đồng bộ với Web.' : ''}</Text>
+              {!!result.resolved_topics?.length &&
+                <Text style={[styles.muted,{color:'#18805C'}]}>
+                  Tiến bộ: {result.resolved_topics.slice(0,4).join(' · ')}
+                </Text>}
+              {!!result.new_weakness_topics?.length &&
+                <Text style={styles.muted}>
+                  Cần ôn thêm: {result.new_weakness_topics.slice(0,4).join(' · ')}
+                </Text>}
               <TouchableOpacity style={styles.secondaryAction} onPress={() => {
                 setAnswers(Array(quiz.questions?.length || 0).fill(null));
                 setCurrentQuestion(0);
