@@ -10,6 +10,27 @@ import {
 } from 'react-native';
 import { api } from './api';
 
+// A safe escape-first Text renderer, never renders model HTML or WebView.
+function ChatBody({value,style}) {
+  return <Text style={style}>
+    {String(value || '').split(/\\r?\\n/).map((line,i,rows)=>{
+      const heading=line.match(/^\\s{0,3}#{1,6}\\s+(.*)$/);
+      const bullet=!heading&&line.match(/^\\s*[-*+•]\\s+(.+)$/);
+      const numbered=!heading&&!bullet&&line.match(/^\\s*(\\d+[.)])\\s+(.+)$/);
+      const text=heading?heading[1]:bullet?'• '+bullet[1]:
+        numbered?numbered[1]+' '+numbered[2]:line;
+      return <Text key={i} style={heading?{fontWeight:'800'}:undefined}>
+        {text.split(/(\\*\\*[^*\\n]+\\*\\*)/g).map((part,j)=>
+          part.startsWith('**')&&part.endsWith('**')&&part.length>4?
+            <Text key={j} style={{fontWeight:'700'}}>{part.slice(2,-2)}</Text>:
+            <Text key={j}>{part}</Text>
+        )}
+        {i<rows.length-1?'\\n':''}
+      </Text>;
+    })}
+  </Text>;
+}
+
 const BLUE = '#5969DB';
 const bounded = (v, a, b) => Math.max(a, Math.min(v, b));
 
@@ -183,9 +204,8 @@ export default function FloatingStudyChat({ subjects = [], lesson = null }) {
                 <View key={item.id || index}
                   style={[styles.message,item.role==='user'?styles.userMessage:styles.aiMessage]}>
                   {item.role!=='user' && <Text style={styles.author}>AI Study Agent</Text>}
-                  <Text style={[styles.messageText,item.role==='user'&&styles.userMessageText]}>
-                    {String(item.content || '')}
-                  </Text>
+                  <ChatBody value={item.content}
+                    style={[styles.messageText,item.role==='user'&&styles.userMessageText]} />
                 </View>
               ))}
               {(loading || sending) && <ActivityIndicator color={BLUE} style={{marginVertical:10}} />}
