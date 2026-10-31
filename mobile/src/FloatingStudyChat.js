@@ -34,8 +34,11 @@ function ChatBody({value,style}) {
 const BLUE = '#5969DB';
 const bounded = (v, a, b) => Math.max(a, Math.min(v, b));
 
-export default function FloatingStudyChat({ subjects = [], lesson = null }) {
+export default function FloatingStudyChat({ subjects = [], lesson = null, openSignal = 0 }) {
   const [opened, setOpened] = useState(false);
+  useEffect(() => {
+    if (openSignal > 0) setOpened(true);
+  }, [openSignal]);
   const [subjectId, setSubjectId] = useState(null);
   const [history, setHistory] = useState([]);
   const [value, setValue] = useState('');
