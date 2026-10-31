@@ -42,7 +42,10 @@ jobs:
         run: npx expo export --platform ios --output-dir dist-ci
 
       - name: Compile Flask backend
-        run: python -m py_compile app.py
+        run: python -m py_compile app.py mobile_learning_routes.py
+
+      - name: Mobile roadmap and session security
+        run: python tests/test_mobile_study_room.py
 
       - name: Initialize SQLite schema
         run: python -c "import app; app.init_db(); print('DB init OK')"
