@@ -11,7 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { api, API_BASE_URL } from './src/api';
+import { api, getApiBaseUrl, setApiBaseUrl, testApiConnection } from './src/api';
 import * as DocumentPicker from 'expo-document-picker';
 import FloatingStudyChat from './src/FloatingStudyChat';
 import StudyRoom from './src/StudyRoom';
@@ -63,7 +63,7 @@ function ErrorCard({ message }) {
   );
 }
 
-function HomeScreen({ dashboard, setTab, loading, onLogout, onOpenStudy }) {
+function HomeScreen({ dashboard, setTab, loading, onOpenStudy }) {
   const user = dashboard?.user || {};
   const subjects = dashboard?.subjects || [];
   const tasks = dashboard?.tasks || [];
@@ -71,20 +71,10 @@ function HomeScreen({ dashboard, setTab, loading, onLogout, onOpenStudy }) {
   return (
     <ScrollView contentContainerStyle={styles.page}>
       <Header
-        title={`Chào ${user.name || 'bạn'} 👋`}
-        subtitle="Study Agent đang dùng dữ liệu học tập thật từ Flask"
+        title={`Xin chào, ${(user.name || 'bạn').split(' ').slice(-1)[0]} 👋`}
+        subtitle="Hôm nay bạn muốn học gì?"
         userName={user.name}
       />
-
-      <View style={styles.mobileStatusRow}>
-        <Text style={styles.mobileStatusText}>Đồng bộ Web và iPhone</Text>
-        <TouchableOpacity onPress={() => setTab('profile')} style={styles.logoutButton}>
-          <Text style={styles.logoutButtonText}>⚙ Hồ sơ</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={onLogout} style={styles.logoutButton}>
-          <Text style={styles.logoutButtonText}>Đăng xuất</Text>
-        </TouchableOpacity>
-      </View>
 
       <View style={styles.homeMetricsRow}>
         <View style={styles.homeMetric}><Text style={styles.homeMetricValue}>{dashboard?.stats?.subject_count || 0}</Text><Text style={styles.homeMetricLabel}>Môn học</Text></View>
@@ -106,19 +96,11 @@ function HomeScreen({ dashboard, setTab, loading, onLogout, onOpenStudy }) {
         </TouchableOpacity>
       )}
 
-      <TouchableOpacity style={styles.heroCard} onPress={() => setTab('agent')}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.heroEyebrow}>TRỢ LÝ CÁ NHÂN</Text>
-          <Text style={styles.heroTitle}>Bạn đang cần hiểu lại phần nào?</Text>
-          <Text style={styles.heroText}>Agent kết hợp tài liệu, kiến thức chung, điểm yếu và tiến độ riêng của bạn.</Text>
-          <View style={styles.heroButton}><Text style={styles.heroButtonText}>Hỏi Study Agent →</Text></View>
-        </View>
-        <View style={styles.robot}><Text style={{ fontSize: 38 }}>🤖</Text></View>
-      </TouchableOpacity>
+      <Text style={styles.muted}>Bấm nút 🤖 ở góc màn hình để hỏi AI bất kỳ lúc nào.</Text>
 
       {loading && <ActivityIndicator />}
 
-      <Text style={styles.sectionTitle}>Việc cần làm</Text>
+      <Text style={styles.sectionTitle}>Lịch học hôm nay & sắp tới</Text>
       {tasks.length ? tasks.slice(0, 5).map((task) => (
         <TouchableOpacity key={task.id} style={styles.card}
           disabled={task.source !== 'roadmap' || !task.roadmap_session_id}
@@ -137,7 +119,7 @@ function HomeScreen({ dashboard, setTab, loading, onLogout, onOpenStudy }) {
       )) : <View style={styles.card}><Text style={styles.muted}>Chưa có nhiệm vụ học nào.</Text></View>}
 
       <Text style={styles.sectionTitle}>Tiến độ môn học</Text>
-      {subjects.map((item) => (
+      {subjects.slice(0, 3).map((item) => (
         <TouchableOpacity key={item.id} style={styles.card} onPress={() => setTab('subjects')}>
           <View style={styles.rowBetween}>
             <View style={{ flex: 1, paddingRight: 14 }}>
@@ -191,7 +173,7 @@ function SubjectForm({ initial, onSave, onCancel, busy }) {
   );
 }
 
-function SubjectsScreen({ subjects, userName, refreshData, onOpenStudy }) {
+function SubjectsScreen({ subjects, userName, refreshData, onOpenStudy, onOpenQuiz }) {
   const [mode, setMode] = useState('list');
   const [selectedId, setSelectedId] = useState(null);
   const [editing, setEditing] = useState(null);
@@ -476,6 +458,10 @@ function SubjectsScreen({ subjects, userName, refreshData, onOpenStudy }) {
             </TouchableOpacity>
           ))}
         </View>
+        <TouchableOpacity style={styles.primaryButton} onPress={() => onOpenQuiz(sub.id)}
+          accessibilityRole="button">
+          <Text style={styles.primaryButtonText}>✓ Làm Quiz & Ôn điểm yếu</Text>
+        </TouchableOpacity>
         <View style={styles.actionRow}>
           <TouchableOpacity style={styles.smallAction} onPress={() => { setEditing(sub); setMode('form'); }}><Text style={styles.smallActionText}>✎ Sửa môn</Text></TouchableOpacity>
           <TouchableOpacity style={[styles.smallAction, styles.deleteAction]} onPress={confirmDeleteSubject}><Text style={styles.deleteActionText}>Xóa môn</Text></TouchableOpacity>
@@ -734,8 +720,8 @@ function AgentScreen({ subjects, userName }) {
   );
 }
 
-function QuizScreen({ subjects, userName, refreshData }) {
-  const [subjectId, setSubjectId] = useState(subjects[0]?.id || null);
+function QuizScreen({ subjects, userName, refreshData, initialSubjectId, onBack }) {
+  const [subjectId, setSubjectId] = useState(initialSubjectId || subjects[0]?.id || null);
   const [quiz, setQuiz] = useState(null);
   const [answers, setAnswers] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -749,8 +735,9 @@ function QuizScreen({ subjects, userName, refreshData }) {
   const [tab, setTab] = useState('create');
 
   useEffect(() => {
-    if (!subjectId && subjects[0]?.id) setSubjectId(subjects[0].id);
-  }, [subjects, subjectId]);
+    if (initialSubjectId) setSubjectId(initialSubjectId);
+    else if (!subjectId && subjects[0]?.id) setSubjectId(subjects[0].id);
+  }, [subjects, initialSubjectId, subjectId]);
 
   const refreshQuizList = async () => {
     const [data, docsData] = await Promise.all([
@@ -848,7 +835,10 @@ function QuizScreen({ subjects, userName, refreshData }) {
 
   return (
     <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
-      <Header title="Quiz & điểm yếu" subtitle="Luyện tập theo đề cương, tài liệu và năng lực" userName={userName} />
+      <TouchableOpacity onPress={onBack} accessibilityRole="button">
+        <Text style={styles.backLink}>← Quay về môn học</Text>
+      </TouchableOpacity>
+      <Header title="Quiz & điểm yếu" subtitle="Luyện tập theo đề cương và năng lực" userName={userName} />
       <SubjectSelector subjects={subjects} selectedId={subjectId} onSelect={changeSubject} />
       <ErrorCard message={error} />
       {loading && <ActivityIndicator />}
