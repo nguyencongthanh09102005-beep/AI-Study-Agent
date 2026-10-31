@@ -78,6 +78,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Keep the floating Chat scoped to the same verified chapter across pages.
   // Server approval, ownership and syllabus are rechecked for every message.
+  function storeChatSubject(subjectId) {
+    try { sessionStorage.setItem("ai-study-active-subject-v1", String(subjectId)); }
+    catch (_error) {}
+  }
+  function getStoredChatSubject() {
+    try {
+      const id = Number(sessionStorage.getItem("ai-study-active-subject-v1"));
+      return Number.isSafeInteger(id) && id > 0 ? id : null;
+    } catch (_error) { return null; }
+  }
   function storeChatChapter(subjectId, chapterNumber) {
     try {
       const key = "ai-study-chat-chapter-v1:" + subjectId;
@@ -421,6 +431,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const requestedSubjectId = Number(
       new URLSearchParams(window.location.search).get("subject_id")
     );
+    const rememberedSubjectId = getStoredChatSubject();
 
     if (selectId && chats.some(chat => chat.id === Number(selectId))) {
       currentChatId = Number(selectId);
@@ -430,8 +441,11 @@ document.addEventListener("DOMContentLoaded", () => {
     ) {
       currentChatId = chats.find(chat => chat.subject_id === requestedSubjectId).id;
     } else if (!chats.some(chat => chat.id === Number(currentChatId))) {
-      currentChatId = chats[0]?.id || null;
+      const saved = chats.find(chat => chat.subject_id === rememberedSubjectId);
+      currentChatId = saved?.id || chats[0]?.id || null;
     }
+    const active = chats.find(chat => chat.id === Number(currentChatId));
+    if (active) storeChatSubject(active.subject_id);
 
     renderSubjectChats();
     renderModeCourses();
@@ -453,6 +467,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function rememberSelectedSubject(subjectId) {
+    storeChatSubject(subjectId);
     const url = new URL(window.location.href);
     url.searchParams.set("subject_id", String(subjectId));
     window.history.replaceState(null, "", url.pathname + url.search + url.hash);
