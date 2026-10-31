@@ -11,7 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { api, getApiBaseUrl, setApiBaseUrl, testApiConnection } from './src/api';
+import { api } from './src/api';
 import * as DocumentPicker from 'expo-document-picker';
 import FloatingStudyChat from './src/FloatingStudyChat';
 import StudyRoom from './src/StudyRoom';
@@ -64,7 +64,7 @@ function ErrorCard({ message }) {
   );
 }
 
-function HomeScreen({ dashboard, setTab, loading, onOpenStudy }) {
+function HomeScreen({ dashboard, setTab, loading, onOpenStudy, onAskAI }) {
   const user = dashboard?.user || {};
   const subjects = dashboard?.subjects || [];
   const tasks = dashboard?.tasks || [];
@@ -85,11 +85,11 @@ function HomeScreen({ dashboard, setTab, loading, onOpenStudy }) {
 
       {dashboard?.next_best_action && (
         <TouchableOpacity style={styles.recommendCard}
-          onPress={() => setTab(
-            dashboard.next_best_action.kind === 'weakness' ? 'quiz' :
-            ['task', 'deadline', 'plan'].includes(dashboard.next_best_action.kind)
-              ? 'plan' : 'agent'
-          )}>
+          onPress={() => {
+            if (dashboard.next_best_action.kind === 'weakness') setTab('quiz');
+            else if (['task','deadline','plan'].includes(dashboard.next_best_action.kind)) setTab('plan');
+            else onAskAI();
+          }}>
           <Text style={styles.eyebrow}>✦ STUDY AGENT ĐỀ XUẤT</Text>
           <Text style={styles.cardTitle}>{dashboard.next_best_action.title}</Text>
           <Text style={styles.muted}>{dashboard.next_best_action.reason}</Text>
@@ -1623,6 +1623,7 @@ export default function App() {
   const [activeLesson, setActiveLesson] = useState(null);
   const [quizSubjectId, setQuizSubjectId] = useState(null);
   const [showConnectionSettings, setShowConnectionSettings] = useState(false);
+  const [chatOpenSignal, setChatOpenSignal] = useState(0);
   const openQuiz = subjectId => {
     setQuizSubjectId(subjectId || null);
     setActiveStudyTask(null);
@@ -1729,6 +1730,7 @@ export default function App() {
         setTab={setTab}
         loading={loading}
         onOpenStudy={openStudyRoom}
+        onAskAI={() => setChatOpenSignal(value => value+1)}
       />
     );
   }, [tab, subjects, dashboard, plan, loading, userName, loggedIn,
@@ -1788,7 +1790,8 @@ export default function App() {
           </TouchableOpacity>
         ))}
       </View>
-      <FloatingStudyChat subjects={subjects} lesson={activeLesson}/>
+      <FloatingStudyChat subjects={subjects} lesson={activeLesson}
+        openSignal={chatOpenSignal}/>
     </SafeAreaView>
   );
 }
