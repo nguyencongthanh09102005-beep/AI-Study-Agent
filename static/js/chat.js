@@ -76,6 +76,16 @@ document.addEventListener("DOMContentLoaded", () => {
   let chapterEditorOpen = false;
   let chapterEditorPinned = false;
 
+  // Keep the floating Chat scoped to the same verified chapter across pages.
+  // Server approval, ownership and syllabus are rechecked for every message.
+  function storeChatChapter(subjectId, chapterNumber) {
+    try {
+      const key = "ai-study-chat-chapter-v1:" + subjectId;
+      if (chapterNumber) sessionStorage.setItem(key, String(chapterNumber));
+      else sessionStorage.removeItem(key);
+    } catch (_error) {}
+  }
+
   function updateLessonUI() {
     const current = getCurrentChat();
     const active = chatMode === "chapter" && lessonMode && current &&
@@ -124,6 +134,8 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function clearLessonMode() {
+    const current = getCurrentChat();
+    if (current) storeChatChapter(current.subject_id, null);
     modeSeq += 1;
     chatMode = "free";
     lessonMode = null;
@@ -207,6 +219,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (seq !== modeSeq || chatMode !== "chapter" ||
           getCurrentChat()?.subject_id !== detail.subject_id) return;
       lessonMode = detail;
+      storeChatChapter(detail.subject_id, detail.chapter_number);
       if (!chapterEditorPinned) chapterEditorOpen = false;
       updateLessonUrl();
       modeError = "";
