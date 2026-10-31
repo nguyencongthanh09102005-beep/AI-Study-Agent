@@ -17,7 +17,7 @@ import FloatingStudyChat from './src/FloatingStudyChat';
 import StudyRoom from './src/StudyRoom';
 const {
   localDateKey, addDays, getWeekDates, getPlanOverview,
-  getVisiblePlanTasks, splitReminders,
+  getVisiblePlanTasks, splitReminders, findTaskConflicts,
 } = require('./src/plan-utils');
 
 function localInputDate(days = 0, hour = 19, minute = 0) {
@@ -852,6 +852,18 @@ function QuizScreen({ subjects, userName, refreshData }) {
       <SubjectSelector subjects={subjects} selectedId={subjectId} onSelect={changeSubject} />
       <ErrorCard message={error} />
       {loading && <ActivityIndicator />}
+      {!!subjects.find(s=>s.id===subjectId)?.weaknesses?.length && (
+        <View style={[styles.card,{backgroundColor:'#F1F4FF'}]}>
+          <Text style={styles.cardTitle}>🎯 Điểm yếu cần củng cố</Text>
+          {subjects.find(s=>s.id===subjectId).weaknesses.slice(0,4).map((weak,i)=>(
+            <Text key={i} style={styles.muted}>• {weak.topic}{weak.chapter?' · '+weak.chapter:''}</Text>
+          ))}
+          <TouchableOpacity style={styles.secondaryAction}
+            onPress={()=>{setMode('weakness');setCount(10);setTab('create');}}>
+            <Text style={styles.secondaryActionText}>✦ Tạo Quiz ôn điểm yếu →</Text>
+          </TouchableOpacity>
+        </View>
+      )}
       <View style={styles.actionRow}>
         <Choice label="Tạo Quiz" active={tab === 'create'} onPress={() => { setTab('create'); setQuiz(null); setResult(null); }} />
         <Choice label={`Quiz đã lưu (${saved.length})`} active={tab === 'saved'} onPress={() => setTab('saved')} />
@@ -1094,15 +1106,29 @@ function PlanScreen({ plan, subjects, userName, refreshData, onOpenStudy }) {
           {entryField('Ngày giờ (YYYY-MM-DDTHH:MM)', taskAt, setTaskAt, '2026-10-15T19:00')}
           {entryField('Thời lượng (phút)', taskDuration, setTaskDuration, '45')}
           {entryField('Ghi chú', taskNote, setTaskNote, 'Nội dung cần ôn tập', true)}
-          <TouchableOpacity style={styles.primaryButton} disabled={busy} onPress={() => run(() => (
-            taskEdit ? api.updateTask(taskEdit.id, {
-              subject_id: selectedSubject, title: taskTitle, study_at: taskAt,
-              duration: Number(taskDuration), note: taskNote,
-            }) : api.createTask({
-              subject_id: selectedSubject, title: taskTitle, study_at: taskAt,
-              duration: Number(taskDuration), note: taskNote,
-            })
-          ))}>
+          {findTaskConflicts(local?.tasks || [],{
+            study_at:taskAt,duration:Number(taskDuration)
+          },taskEdit?.id).length>0 && (
+            <View style={[styles.card,{backgroundColor:'#FFF9E9',borderColor:'#EFCB85'}]}>
+              <Text style={[styles.cardTitle,{color:'#95611E'}]}>⚠ Phát hiện trùng giờ học</Text>
+              <Text style={styles.muted}>
+                {findTaskConflicts(local?.tasks || [],{
+                  study_at:taskAt,duration:Number(taskDuration)
+                },taskEdit?.id).slice(0,3).map(c=>c.title).join(', ')}
+              </Text>
+            </View>
+          )}
+          <TouchableOpacity style={styles.primaryButton} disabled={busy} onPress={() => {
+            const payload={subject_id:selectedSubject,title:taskTitle,
+              study_at:taskAt,duration:Number(taskDuration),note:taskNote};
+            const save=()=>run(()=>taskEdit
+              ?api.updateTask(taskEdit.id,payload):api.createTask(payload));
+            const conflicts=findTaskConflicts(local?.tasks||[],payload,taskEdit?.id);
+            if(!conflicts.length)return save();
+            Alert.alert('Lịch học trùng giờ',
+              'Có '+conflicts.length+' buổi trùng khung giờ đã chọn. Bạn vẫn muốn lưu?',
+              [{text:'Hủy',style:'cancel'},{text:'Giữ khung giờ',onPress:save}]);
+          }}>
             <Text style={styles.primaryButtonText}>{taskEdit ? 'Lưu buổi học' : 'Thêm buổi học'}</Text>
           </TouchableOpacity>
         </>
