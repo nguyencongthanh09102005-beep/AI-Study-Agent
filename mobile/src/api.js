@@ -162,12 +162,13 @@ export const api = {
       }),
     }),
 
-  quizSubmit: (quizId, answers) =>
+  quizSubmit: (quizId, answers, requestId) =>
     request('/api/mobile/quiz/submit', {
       method: 'POST',
       body: JSON.stringify({
         quiz_id: quizId,
         answers,
+        request_id: requestId,
       }),
     }),
 
