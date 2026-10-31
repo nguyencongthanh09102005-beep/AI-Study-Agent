@@ -15,6 +15,7 @@ import { api, getApiBaseUrl, setApiBaseUrl, testApiConnection } from './src/api'
 import * as DocumentPicker from 'expo-document-picker';
 import FloatingStudyChat from './src/FloatingStudyChat';
 import StudyRoom from './src/StudyRoom';
+import ConnectionSettings from './src/ConnectionSettings';
 const {
   localDateKey, addDays, getWeekDates, getPlanOverview,
   getVisiblePlanTasks, splitReminders, findTaskConflicts,
@@ -1384,7 +1385,7 @@ function PlanScreen({ plan, subjects, userName, refreshData, onOpenStudy }) {
   );
 }
 
-function ProfileScreen({ userName, refreshData, onBack }) {
+function ProfileScreen({ userName, email, refreshData, onOpenQuiz, onOpenConnection, onLogout }) {
   const [profile, setProfile] = useState({});
   const [style, setStyle] = useState('balanced');
   const [time, setTime] = useState('19:00');
@@ -1393,6 +1394,7 @@ function ProfileScreen({ userName, refreshData, onBack }) {
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [showLearningSettings, setShowLearningSettings] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -1429,8 +1431,32 @@ function ProfileScreen({ userName, refreshData, onBack }) {
 
   return (
     <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
-      <TouchableOpacity onPress={onBack}><Text style={styles.backLink}>← Trang chủ</Text></TouchableOpacity>
-      <Header title="Hồ sơ học tập" subtitle={userName} userName={userName} />
+      <Header title="Cá nhân" subtitle="Hồ sơ & cài đặt" userName={userName} />
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>👤 {userName || 'Sinh viên'}</Text>
+        {!!email && <Text style={styles.muted}>{email}</Text>}
+        <Text style={styles.muted}>Tài khoản sinh viên · Đồng bộ với Web</Text>
+      </View>
+      <Text style={styles.sectionTitle}>Học tập</Text>
+      <TouchableOpacity style={styles.settingsEntry} onPress={onOpenQuiz}>
+        <Text style={styles.settingsEntryText}>✓ Kết quả Quiz & điểm yếu</Text>
+        <Text style={styles.settingsChevron}>›</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.settingsEntry}
+        onPress={() => setShowLearningSettings(v => !v)}>
+        <Text style={styles.settingsEntryText}>⚙ Tùy chỉnh học tập</Text>
+        <Text style={styles.settingsChevron}>{showLearningSettings ? '⌃' : '›'}</Text>
+      </TouchableOpacity>
+      <Text style={styles.sectionTitle}>Ứng dụng</Text>
+      <TouchableOpacity style={styles.settingsEntry} onPress={onOpenConnection}>
+        <Text style={styles.settingsEntryText}>⌁ Cài đặt kết nối</Text>
+        <Text style={styles.settingsChevron}>›</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.settingsEntry} onPress={onLogout}>
+        <Text style={[styles.settingsEntryText,{color:'#B83F51'}]}>↪ Đăng xuất</Text>
+        <Text style={styles.settingsChevron}>›</Text>
+      </TouchableOpacity>
+      {showLearningSettings && <View style={styles.card}>
       <ErrorCard message={error} />
       <Text style={styles.fieldLabel}>Phong cách học</Text>
       <View style={styles.actionRow}>
@@ -1454,6 +1480,7 @@ function ProfileScreen({ userName, refreshData, onBack }) {
       <TouchableOpacity disabled={busy} style={styles.primaryButton} onPress={save}>
         <Text style={styles.primaryButtonText}>{busy ? 'Đang lưu...' : 'Lưu hồ sơ học tập'}</Text>
       </TouchableOpacity>
+      </View>}
     </ScrollView>
   );
 }
