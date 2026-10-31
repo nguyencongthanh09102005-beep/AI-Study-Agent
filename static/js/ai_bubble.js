@@ -21,11 +21,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const mode = document.getElementById("floatingAiMode");
   const courseLabel = document.getElementById("floatingAiCourseLabel");
   const courseSelect = document.getElementById("floatingAiCourse");
-  const learningModes = document.getElementById("floatingAiLearningMode");
-  const freeModeButton = document.getElementById("floatingAiFreeMode");
-  const chapterModeButton = document.getElementById("floatingAiChapterMode");
-  const chapterLabel = document.getElementById("floatingAiChapterLabel");
-  const chapterSelect = document.getElementById("floatingAiChapter");
   const messages = document.getElementById("floatingAiMessages");
   const form = document.getElementById("floatingAiForm");
   const input = document.getElementById("floatingAiInput");
@@ -49,9 +44,11 @@ document.addEventListener("DOMContentLoaded", () => {
   let loaded = false, busy = false, disabled = true, requestToken = 0;
   let conversationId = null, subjectId = null;
   let courses = [], approvedSourceNames = [];
-  // Both full Web Chat and the bubble send to /api/chat. They must also
-  // select the SAME server-verified chapter scope, not silently use free chat.
-  let chapterMode = "free", chapterScope = null, chapterOptions = [];
+  // Keep exactly the existing bubble UI. The full Web Chat's chapter choice
+  // is reused automatically; both surfaces call the same /api/chat backend.
+  let syncedChapter = null;
+  const ACTIVE_SUBJECT_KEY = "ai-study-active-subject-v1";
+  const CHAPTER_KEY_PREFIX = "ai-study-chat-chapter-v1:";
 
   const number = n => Number.isSafeInteger(n) && n > 0;
   function setStatus(value) { status.textContent = value; }
@@ -60,13 +57,10 @@ document.addEventListener("DOMContentLoaded", () => {
     mode.classList.toggle("warning", warning);
   }
   function enable(value) {
-    disabled = !value || (!isLesson && chapterMode === "chapter" && !chapterScope);
+    disabled = !value;
     input.disabled = disabled || busy;
     send.disabled = disabled || busy;
     courseSelect.disabled = busy;
-    if (chapterSelect) chapterSelect.disabled = busy || !chapterOptions.length;
-    if (freeModeButton) freeModeButton.disabled = busy;
-    if (chapterModeButton) chapterModeButton.disabled = busy;
   }
   async function api(url, options = {}) {
     const response = await fetch(url, {credentials: "same-origin", ...options});
@@ -212,128 +206,48 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  function chapterStorageKey(id) {
-    return "ai-study-chat-chapter-v1:" + id;
-  }
-  function rememberedChapter(id) {
+  function readSessionNumber(key) {
     try {
-      const value = Number(sessionStorage.getItem(chapterStorageKey(id)));
+      const value = Number(sessionStorage.getItem(key));
       return number(value) ? value : null;
     } catch (_error) { return null; }
   }
-  function saveChapter(id, selectedChapter) {
-    try {
-      if (number(selectedChapter)) {
-        sessionStorage.setItem(chapterStorageKey(id), String(selectedChapter));
-      } else {
-        sessionStorage.removeItem(chapterStorageKey(id));
-      }
-    } catch (_error) {}
+  function rememberSubject(id) {
+    try { sessionStorage.setItem(ACTIVE_SUBJECT_KEY, String(id)); }
+    catch (_error) {}
   }
-  function renderChapterControls() {
-    if (learningModes) learningModes.hidden = isLesson;
-    if (chapterLabel) chapterLabel.hidden = isLesson || chapterMode !== "chapter";
-    const free = chapterMode === "free";
-    freeModeButton?.classList.toggle("active", free);
-    chapterModeButton?.classList.toggle("active", !free);
-    freeModeButton?.setAttribute("aria-pressed", String(free));
-    chapterModeButton?.setAttribute("aria-pressed", String(!free));
-  }
-  function useFreeChat() {
-    if (busy || isLesson) return;
-    ++requestToken; // invalidate pending chapter approval checks
-    chapterMode = "free";
-    chapterScope = null;
-    chapterOptions = [];
-    if (number(subjectId)) saveChapter(subjectId, null);
-    renderChapterControls();
-    fullChatFor(subjectId, null);
-    setMode("Hỏi đáp tự do trong môn đã chọn · cùng dịch vụ với Chat Web.");
-    setStatus("Sẵn sàng");
-    enable(number(conversationId));
-  }
-  async function enterChapterChat(requestedChapter = null) {
-    if (busy || isLesson || !number(subjectId) || !number(conversationId)) return;
-    const token = ++requestToken;
-    const scopedSubject = subjectId;
-    chapterMode = "chapter";
-    chapterScope = null;
-    chapterOptions = [];
-    renderChapterControls();
+  async function restoreWebChatChapter(expectedSubject, token) {
+    const savedChapter = readSessionNumber(CHAPTER_KEY_PREFIX + expectedSubject);
+    if (!savedChapter) return;
+    // Never silently downgrade a chapter-scoped question to free Chat.
     enable(false);
-    setMode("Đang xác minh chương và học liệu được duyệt...");
-    setStatus("Đang tải chương...");
-    try {
-      const outline = await api("/api/chat/course-outline?subject_id=" +
-        encodeURIComponent(scopedSubject));
-      if (token !== requestToken || scopedSubject !== subjectId) return;
-      chapterOptions = Array.isArray(outline.chapters) ? outline.chapters : [];
-      chapterSelect.replaceChildren();
-      chapterOptions.forEach(item => {
-        const option = document.createElement("option");
-        option.value = String(item.chapter_number);
-        option.textContent = item.title + (item.available ? "" : " · Chưa có học liệu");
-        option.disabled = !item.available;
-        chapterSelect.appendChild(option);
-      });
-      const selected = chapterOptions.find(c =>
-        c.available && c.chapter_number === Number(requestedChapter)) ||
-        chapterOptions.find(c => c.available);
-      if (!selected) throw new Error("Môn này chưa có chương với học liệu đã được Admin duyệt.");
-      chapterSelect.value = String(selected.chapter_number);
-      await verifyChapter(selected.chapter_number, token, scopedSubject);
-    } catch (error) {
-      if (token !== requestToken || scopedSubject !== subjectId) return;
-      chapterScope = null;
-      enable(false);
-      setMode("Không thể bật Học theo chương: " + error.message, true);
-      setStatus("Chọn Hỏi đáp tự do hoặc kiểm tra tài liệu");
-    }
-  }
-  async function verifyChapter(chapterNumber, token = ++requestToken,
-                               scopedSubject = subjectId) {
-    chapterScope = null;
-    enable(false); // never downgrade an unverified chapter request to free chat
-    setStatus("Đang kiểm tra nguồn chương...");
+    setMode("Đang xác minh chương đã chọn từ Chat Web...");
+    setStatus("Đang kiểm tra học liệu...");
     try {
       const params = new URLSearchParams({
-        subject_id: String(scopedSubject),
-        chapter_number: String(chapterNumber)
+        subject_id: String(expectedSubject),
+        chapter_number: String(savedChapter)
       });
-      const detail = await api("/api/chat/lesson-context?" + params);
-      if (token !== requestToken || scopedSubject !== subjectId ||
-          chapterMode !== "chapter") return;
-      if (Number(detail.subject_id) !== scopedSubject ||
-          Number(detail.chapter_number) !== Number(chapterNumber)) {
-        throw new Error("Ngữ cảnh chương không khớp môn đã chọn.");
+      const verified = await api("/api/chat/lesson-context?" + params.toString());
+      if (token !== requestToken || subjectId !== expectedSubject) return;
+      if (Number(verified.subject_id) !== expectedSubject ||
+          Number(verified.chapter_number) !== savedChapter) {
+        throw new Error("Ngữ cảnh chương không khớp môn học.");
       }
-      chapterScope = detail;
-      saveChapter(scopedSubject, detail.chapter_number);
-      chapterSelect.value = String(detail.chapter_number);
-      fullChatFor(scopedSubject, detail.chapter_number);
-      setMode("✓ Học theo chương " + detail.chapter_number +
-        " · Nguồn đã duyệt · Chung bộ xử lý với Chat Web");
+      syncedChapter = verified;
+      fullChatFor(expectedSubject, savedChapter);
+      setMode("✓ Học theo chương " + savedChapter +
+        " · Dùng chung học liệu đã duyệt với Chat Web");
       setStatus("Sẵn sàng");
       enable(true);
     } catch (error) {
-      if (token !== requestToken || scopedSubject !== subjectId) return;
-      chapterScope = null;
+      if (token !== requestToken || subjectId !== expectedSubject) return;
+      syncedChapter = null;
+      fullChatFor(expectedSubject, savedChapter);
       enable(false);
-      setMode("Không thể xác minh học liệu chương: " + error.message, true);
-      setStatus("Chọn chương khác hoặc chuyển Hỏi đáp tự do");
+      setMode("Chương đang học cần xác minh lại: " + error.message, true);
+      setStatus("Mở Chat Web để kiểm tra chương");
     }
-  }
-  if (!isLesson) {
-    freeModeButton?.addEventListener("click", useFreeChat);
-    chapterModeButton?.addEventListener("click", () =>
-      enterChapterChat(rememberedChapter(subjectId)));
-    chapterSelect?.addEventListener("change", () => {
-      if (busy || chapterMode !== "chapter") return;
-      const chapterNumber = Number(chapterSelect.value);
-      if (!number(chapterNumber)) return;
-      ++requestToken;
-      verifyChapter(chapterNumber, requestToken, subjectId);
-    });
   }
 
   function pageSubjectHint() {
@@ -346,10 +260,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const chosen = courses.find(c => Number(c.subject_id) === Number(id));
     const token = ++requestToken;
     conversationId = null;
-    chapterMode = "free";
-    chapterScope = null;
-    chapterOptions = [];
-    renderChapterControls();
+    syncedChapter = null;
     enable(false);
     clear();
     if (!chosen) {
@@ -360,6 +271,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
     subjectId = chosen.subject_id;
+    rememberSubject(subjectId);
     scope.textContent = chosen.title;
     courseSelect.value = String(subjectId);
     fullChatFor(subjectId, null);
@@ -372,10 +284,9 @@ document.addEventListener("DOMContentLoaded", () => {
       renderHistory(history);
       setStatus("Sẵn sàng");
       enable(true);
-      // Full Web Chat stores its chapter choice only for this browser session.
-      // The server revalidates the current syllabus and approved documents.
-      const savedChapter = rememberedChapter(subjectId);
-      if (savedChapter) await enterChapterChat(savedChapter);
+      // The full Chat already chose the mode. Mirror it without new controls.
+      // The server validates chapter ownership and approved sources again.
+      await restoreWebChatChapter(subjectId, token);
     } catch (error) {
       if (token !== requestToken) return;
       empty(error.message);
@@ -402,7 +313,9 @@ document.addEventListener("DOMContentLoaded", () => {
         option.textContent = course.title;
         courseSelect.appendChild(option);
       }
-      const match = courses.find(c => c.subject_id === pageSubjectHint());
+      const preferredSubject = pageSubjectHint() ||
+        readSessionNumber(ACTIVE_SUBJECT_KEY);
+      const match = courses.find(c => c.subject_id === preferredSubject);
       await selectCourse(match?.subject_id || courses[0].subject_id);
     } catch (error) {
       empty(error.message);
@@ -412,7 +325,6 @@ document.addEventListener("DOMContentLoaded", () => {
   async function initialize() {
     if (loaded) return;
     loaded = true;
-    renderChapterControls();
     if (isLesson) await loadLesson();
     else await loadGeneral();
   }
@@ -664,13 +576,11 @@ document.addEventListener("DOMContentLoaded", () => {
     input.value="";
     setStatus("AI đang trả lời...");
     try {
-      const requestedChapter = isLesson ? lesson.chapter :
-        (chapterMode === "chapter" ? chapterScope?.chapter_number : null);
+      const selectedChapter = syncedChapter?.chapter_number || null;
       const payload = {
         conversation_id:conversation, question,
         ...(isLesson ? {lesson:{chapter_number:lesson.chapter,task_id:lesson.taskId}} :
-          (number(requestedChapter) ?
-            {lesson:{chapter_number:requestedChapter}} : {}))
+          (number(selectedChapter) ? {lesson:{chapter_number:selectedChapter}} : {}))
       };
       const data = await api("/api/chat", {
         method:"POST",
@@ -682,10 +592,10 @@ document.addEventListener("DOMContentLoaded", () => {
           data.lesson?.chapter_number !== lesson.chapter)) {
         throw new Error("Phản hồi không được xác thực cho đúng buổi học.");
       }
-      if (!isLesson && chapterMode === "chapter" &&
+      if (!isLesson && number(selectedChapter) &&
           (data.source_mode !== "chapter" ||
-           Number(data.lesson?.chapter_number) !== Number(requestedChapter))) {
-        throw new Error("Phản hồi không được xác thực cho đúng chương học.");
+           Number(data.lesson?.chapter_number) !== selectedChapter)) {
+        throw new Error("Phản hồi không được xác thực cho đúng chương.");
       }
       if (sentFor !== subjectId || conversation !== conversationId) return;
       appendMessage("assistant", data.answer || "Chưa có câu trả lời.");
