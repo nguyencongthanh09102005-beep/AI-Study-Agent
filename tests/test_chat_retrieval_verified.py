@@ -72,7 +72,9 @@ def check():
         answer,names,mode=project.gemini_subject_answer(
             "Triết học","Giải thích duyvat",context,["triethoc.txt"])
     assert "Không được hiển thị với nguồn" not in answer
-    assert "Trích đoạn tham khảo" in answer
+    assert "chưa tạo được câu trả lời" in answer
+    assert "Không được hiển thị với nguồn" not in answer
+    assert EVIDENCE not in answer
 
     prev_db,prev_upload=project.DB_PATH,project.UPLOAD_DIR
     with tempfile.TemporaryDirectory() as tmp:
