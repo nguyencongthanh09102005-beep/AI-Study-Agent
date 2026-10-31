@@ -48,8 +48,9 @@ def run():
             ["bai1.pdf"])
         assert "MỘT NỘI DUNG GIẢ MẠO" not in answer
         assert "nguon-bia.pdf" not in answer
-        assert "Trích đoạn tham khảo" in answer
-        assert "Đổi mới" in answer
+        assert "chưa tạo được câu trả lời" in answer
+        assert "MỘT NỘI DUNG GIẢ MẠO" not in answer
+        assert "Đổi mới" not in answer
 
         project.gemini_generate=lambda prompt: (
             '{"mode":"general","sources":[],"answer":"| Nội dung | Giải thích |\\n| --- | --- |\\n| A | B |"}',None)
