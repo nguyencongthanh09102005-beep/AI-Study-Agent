@@ -150,6 +150,8 @@ export default function StudyRoom({taskId,onBack,onOpenQuiz,onContext}) {
       {tab==='content'&&<>
         <ListBlock title="Mục tiêu buổi học" values={data.lesson.objectives}/>
         <ListBlock title="Tiểu mục cần học" values={data.lesson.topics}/>
+        {!!data.lesson.clo_refs?.length &&
+          <ListBlock title="Chuẩn đầu ra (CLO)" values={data.lesson.clo_refs}/>}
       </>}
       {tab==='documents'&&<ListBlock title="Học liệu dùng chung đã duyệt"
         values={data.sources?.map(item=>item.name)}
