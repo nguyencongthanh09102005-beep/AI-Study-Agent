@@ -59,7 +59,7 @@ Mở Android Emulator rồi bấm `a` trong terminal Expo.
 - **Kế hoạch học:** chuyển từ buổi học thuộc lộ trình sang Không gian học tập, cảnh báo trùng giờ trước khi thêm/sửa lịch; không tự chuyển giờ hay ghi đè lịch cũ.
 - **Không gian học tập:** mục tiêu, tiểu mục, hoạt động, CLO và tên các học liệu chung được duyệt; timer Bắt đầu/Tạm dừng/Tiếp tục/Hoàn thành đồng bộ trực tiếp với cùng bảng phiên học của Web. Nội dung sai chữ ký lộ trình bị từ chối.
 - **Bong bóng Chat AI:** nút 🤖 có thể kéo bên trong ứng dụng (iOS/Android Expo Go), nhấn mở khung chat, thu nhỏ không mất lịch sử. Chọn môn, sử dụng cùng `/api/mobile/chat` và lịch sử Web. Khi đang ở Không gian học tập có đủ nguồn được duyệt, Chat gửi câu hỏi vào bộ tutor `/api/chat` theo chính buổi học (có kiểm chứng nguồn).
-- **Quiz & điểm yếu:** giữ các màn hình tạo/làm Quiz theo môn và tài liệu, có lối tắt tạo Quiz ôn điểm yếu. Bài Quiz định sẵn **15 câu mỗi buổi / 60 câu cuối môn** vẫn dùng quy trình Web hiện tại, chưa chuyển toàn bộ giao diện làm bài có khóa thời gian sang Mobile.
+- **Quiz & điểm yếu:** Mobile có chế độ Quiz theo môn/tài liệu/điểm yếu và **Quiz theo buổi 15 câu, buổi tổng hợp 60 câu**. Không gian học tập hiển thị trạng thái khóa theo giờ từ Flask, chuẩn bị Quiz chạy qua hàng đợi dùng chung Web (có nút bắt đầu và tạm dừng), bấm mở Quiz chỉ được máy chủ cho phép. Màn hình Quiz hiển thị 1 câu/lượt, hỏi xác nhận trước khi nộp, dùng mã nộp idempotent để tránh cộng điểm yếu hai lần khi mạng chập chờn. Có thể xem lại đáp án/lời giải khi đã nộp thành công.
 
 ### Chạy trên iPhone thật qua Expo Go
 
@@ -99,3 +99,18 @@ Giới hạn: Bong bóng chỉ nổi **bên trong AI Study Agent**, không phủ
 - Màn hình Cài đặt kết nối chấp nhận 401 từ `/api/mobile/session` như một kết nối thành công khi chưa đăng nhập, nhưng không coi HTTP 500 là thành công.
 
 **Giới hạn:** Địa chỉ kết nối chỉnh trong app chưa được lưu bền vững sau khi ứng dụng đóng hoàn toàn; cấu hình chính thức vẫn là `EXPO_PUBLIC_API_URL` trong `mobile/.env`. Không chuyển các luồng học liệu cá nhân hay Chat sang backend thứ hai.
+
+
+### Nghiệm thu Quiz theo buổi trên Mobile (15/60)
+
+1. Đăng nhập bằng sinh viên có **đề cương đã xác nhận, lộ trình đã đồng bộ và học liệu chương được Admin duyệt**; mở một buổi học thuộc lộ trình.
+2. Nếu Quiz chưa chuẩn bị, chọn **Chuẩn bị Quiz bằng AI** một lần rồi xem tiến độ. Flask phải chạy một tiến trình worker liên tục (mặc định khi `python app.py`); không nhấn liên tục để tránh dùng quota API.
+3. Buổi học thường phải có **15 câu**; buổi cuối là **60 câu**. Không được có đáp án đúng trong JSON trạng thái hay JSON câu hỏi trước khi nộp.
+4. Hỏi Quiz **trước giờ học:** UI chỉ hiển thị khóa, API `quiz-start` trả lỗi 409; không mở được qua danh sách Quiz hoặc URL đoán.
+5. **Trong giờ học:** bấm **Bắt đầu Quiz theo buổi**, làm các câu theo từng trang và nộp sau khi xác nhận. Câu chưa trả lời phải bị ngăn nộp; sau khi nộp thì kết quả, điểm yếu và tiến độ đồng bộ trên Web.
+6. Vào **Quiz đã lưu → Xem bài đã nộp** để kiểm tra câu trả lời cũ, lời giải và đáp án đúng. Trước khi có bài nộp, API xem đáp án phải từ chối.
+7. **Thay đổi giờ học trên Web:** khóa Quiz tự dời theo giờ mới khi chưa mở; không phải tái tạo câu hỏi chỉ vì thay đổi giờ.
+8. Kiểm tra account khác, Admin, nguồn bị rút duyệt, buổi học bị xóa: không được xem được Quiz hoặc đáp án của người trước.
+9. Kiểm tra Mobile khi Wi-Fi mất trong lúc gửi Quiz; dùng lại nút nộp thì receipt cùng request ID không làm tăng số lượt nộp nếu yêu cầu đầu tiên đã được server ghi thành công.
+
+*Trạng thái nghiệm thu:* GitHub CI có kiểm tra backend/JS và iOS bundle. Các thao tác Expo Go trên điện thoại thật, bàn phím, cuộn 60 câu, thời gian khóa thực tế và kết nối Wi-Fi vẫn phải được thử trực tiếp trước khi coi là QA hoàn tất.
