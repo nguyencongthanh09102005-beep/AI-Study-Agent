@@ -17,7 +17,8 @@ for (const name of ["Start", "Pause", "Resume", "Finish"]) {
 assert.match(js, /"X-Study-CSRF": csrf/);
 assert.match(js, /"heartbeat"/);
 assert.match(js, /document.hidden/);
-assert.match(js, /window.confirm/);
+assert.match(js, /window\\.AppDialogs\\.confirm/);
+assert.doesNotMatch(js, /window\\.confirm\\s*\\(/);
 assert.match(js, /Number\.isFinite\(data.elapsed_seconds\)/);
 assert.match(routes, /verified_roadmap_task/);
 assert.match(routes, /BEGIN IMMEDIATE/);
