@@ -35,13 +35,12 @@ def check():
         answer, sources, mode = project.gemini_subject_answer(
             "Tư duy Thiết kế", "alo",
             "", [], shared_context="KIẾN THỨC CHUNG - " + CHAPTER +
-            " (shared_document):\\n" + QUOTE,
+            " (shared_document):" + chr(10) + QUOTE,
             shared_source_names=[CHAPTER]
         )
     assert "Tui đây!" in answer and sources == [] and mode == "general"
 
-    ctx = f"KIẾN THỨC CHUNG - {CHAPTER} (shared_document):\\n{QUOTE}"
-    ctx = ctx.replace("\\\\n", "\\n")
+    ctx = f"KIẾN THỨC CHUNG - {CHAPTER} (shared_document):" + chr(10) + QUOTE
     hints = citation_hints(QUESTION, "", [], ctx, [CHAPTER])
     assert CHAPTER in hints and QUOTE in hints, hints
     assert citation_hints("alo", "", [], ctx, [CHAPTER]) == ""
