@@ -62,7 +62,25 @@ function splitReminders(reminders = []) {
   };
 }
 
+function findTaskConflicts(tasks = [], proposal = {}, excludeId = null) {
+  const start = new Date(String(proposal.study_at || '')).getTime();
+  const duration = Number(proposal.duration || 0);
+  if (!Number.isFinite(start) || !Number.isFinite(duration) || duration < 1)
+    return [];
+  const end = start + duration * 60000;
+  return (Array.isArray(tasks) ? tasks : []).filter(item => {
+    if (String(item.id) === String(excludeId)) return false;
+    const otherStart = new Date(String(item.study_at || '')).getTime();
+    const otherDuration = Number(item.duration || 0);
+    return Number.isFinite(otherStart) && otherDuration > 0 &&
+      start < otherStart + otherDuration * 60000 && otherStart < end;
+  }).map(item => ({
+    id: item.id, title: item.title, study_at: item.study_at,
+    subject_name: item.subject_name || '',
+  }));
+}
+
 module.exports = {
   localDateKey, addDays, getWeekDates,
-  getPlanOverview, getVisiblePlanTasks, splitReminders,
+  getPlanOverview, getVisiblePlanTasks, splitReminders, findTaskConflicts,
 };
