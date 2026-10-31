@@ -177,6 +177,38 @@ export const api = {
   updateProfile: (payload) =>
     request('/api/mobile/profile', { method: 'PUT', body: JSON.stringify(payload) }),
 
+  // Official roadmap / learning session: source signatures are checked by Flask.
+  roadmap: (subjectId) =>
+    request(`/api/mobile/subjects/${subjectId}/roadmap`),
+
+  studyRoom: (taskId) =>
+    request(`/api/mobile/study-room/${taskId}`),
+
+  studyTimer: (taskId, action, csrf) =>
+    request(`/api/mobile/study-room/${taskId}/timer`, {
+      method: 'POST',
+      headers: { 'X-Study-CSRF': csrf },
+      body: JSON.stringify({ action }),
+    }),
+
+  // Reuse Web's stricter source-verified tutor when inside a roadmap session.
+  // The conversation id is read only from the student's own subject history.
+  studyChat: async (subjectId, message, taskId, chapterNumber) => {
+    const history = await request(`/api/mobile/chat/${subjectId}`);
+    const conversationId = history.conversation_id;
+    if (!Number.isSafeInteger(conversationId) || conversationId <= 0) {
+      throw new Error('Không xác định được hội thoại của môn học.');
+    }
+    return request('/api/chat', {
+      method: 'POST',
+      body: JSON.stringify({
+        conversation_id: conversationId,
+        question: message,
+        lesson: { chapter_number: chapterNumber, task_id: taskId },
+      }),
+    });
+  },
+
   studyPlan: () => request('/api/mobile/study-plan'),
 
   generateStudyPlan: (payload) =>
