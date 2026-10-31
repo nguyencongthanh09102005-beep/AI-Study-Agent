@@ -92,6 +92,7 @@ jobs:
         run: |
           node --check mobile/src/plan-utils.js
           node tests/test_mobile_plan_ui.js
+          node tests/test_mobile_learning_ui.js
 
       - name: Password eye toggle tests
         run: node tests/test_auth_password.js
