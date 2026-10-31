@@ -19,8 +19,9 @@ assert(bubble.includes("api.studyChat"),"Keep verified session Chat");
 assert(app.includes("onOpenQuiz={openQuiz}"),"Quiz entry point in course details");
 assert(app.includes("onOpenQuiz={() => openQuiz(null)}"),
   "Quiz history and weaknesses entry point in Profile");
-assert(app.includes("onOpenQuiz={() => openQuiz(activeLesson?.subjectId)}"),
-  "Session Quiz must retain current subject");
+assert(app.includes("info?.subjectId || activeLesson?.subjectId") &&
+  app.includes("info?.quizId || null"),
+  "Session Quiz must retain course and server-issued quiz ID");
 assert(app.includes("if (tab === 'quiz') return <QuizScreen"),
   "Quiz remains fully accessible by secondary navigation");
 assert(app.includes("if (tab === 'plan') return <PlanScreen"),
