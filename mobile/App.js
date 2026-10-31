@@ -1485,7 +1485,7 @@ function ProfileScreen({ userName, email, refreshData, onOpenQuiz, onOpenConnect
   );
 }
 
-function LoginScreen({ onLogin, onRegister }) {
+function LoginScreen({ onLogin, onRegister, onOpenConnection }) {
   const [signup, setSignup] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -1517,18 +1517,7 @@ function LoginScreen({ onLogin, onRegister }) {
         <View style={styles.logo}><Text style={{ fontSize: 34 }}>🎓</Text></View>
         <Text style={styles.loginTitle}>AI Study Agent</Text>
         <Text style={styles.loginSubtitle}>Học theo đề cương · AI cá nhân hóa</Text>
-        <View style={styles.authSegment}>
-          <TouchableOpacity style={[styles.authSegmentButton, !signup && styles.authSegmentSelected]}
-            accessibilityRole="button" accessibilityState={{ selected: !signup }}
-            onPress={() => { setSignup(false); setError(''); }}>
-            <Text style={[styles.authSegmentText, !signup && styles.authSegmentTextSelected]}>Đăng nhập</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.authSegmentButton, signup && styles.authSegmentSelected]}
-            accessibilityRole="button" accessibilityState={{ selected: signup }}
-            onPress={() => { setSignup(true); setError(''); }}>
-            <Text style={[styles.authSegmentText, signup && styles.authSegmentTextSelected]}>Đăng ký sinh viên</Text>
-          </TouchableOpacity>
-        </View>
+        <Text style={styles.loginModeTitle}>{signup ? 'Đăng ký sinh viên' : 'Đăng nhập'}</Text>
         {signup && <TextInput value={name} onChangeText={setName} style={styles.loginInput} placeholder="Họ và tên" />}
         <TextInput value={email} onChangeText={setEmail} autoCapitalize="none"
           keyboardType="email-address" autoComplete="email" style={styles.loginInput}
@@ -1558,9 +1547,17 @@ function LoginScreen({ onLogin, onRegister }) {
         <TouchableOpacity style={styles.primaryButton} onPress={submit} disabled={loading}>
           <Text style={styles.primaryButtonText}>{loading ? 'Đang xử lý...' : signup ? 'Tạo tài khoản' : 'Đăng nhập'}</Text>
         </TouchableOpacity>
-        <Text style={styles.loginHint}>Sinh viên dùng cùng tài khoản trên Web và iPhone.</Text>
-        <Text style={styles.loginAdminNote}>♜ Quản trị viên chỉ đăng nhập trên Web. Không có đăng ký Admin.</Text>
-        <Text style={styles.loginBackendHint}>Máy chủ: {API_BASE_URL}</Text>
+        <TouchableOpacity
+          onPress={() => { setSignup(v => !v); setError(''); }}
+          accessibilityRole="button" style={styles.loginLinkButton}>
+          <Text style={styles.loginLink}>
+            {signup ? 'Đã có tài khoản? Đăng nhập' : 'Chưa có tài khoản? Đăng ký sinh viên'}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={onOpenConnection}
+          accessibilityRole="button" style={styles.loginLinkButton}>
+          <Text style={styles.loginConnectionLink}>⚙ Cài đặt kết nối máy chủ</Text>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );
@@ -1576,6 +1573,14 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [activeStudyTask, setActiveStudyTask] = useState(null);
   const [activeLesson, setActiveLesson] = useState(null);
+  const [quizSubjectId, setQuizSubjectId] = useState(null);
+  const [showConnectionSettings, setShowConnectionSettings] = useState(false);
+  const openQuiz = subjectId => {
+    setQuizSubjectId(subjectId || null);
+    setActiveStudyTask(null);
+    setActiveLesson(null);
+    setTab('quiz');
+  };
 
   const openStudyRoom = taskId => {
     setActiveLesson(null);
@@ -1633,6 +1638,7 @@ export default function App() {
     } finally {
       setLoggedIn(false);
       setTab('home');
+      setQuizSubjectId(null);
       setActiveStudyTask(null);
       setActiveLesson(null);
       setDashboard(null);
@@ -1653,23 +1659,32 @@ export default function App() {
     if (activeStudyTask) return (
       <StudyRoom key={activeStudyTask} taskId={activeStudyTask}
         onBack={closeStudyRoom} onContext={setActiveLesson}
-        onOpenQuiz={() => {closeStudyRoom();setTab('quiz');}} />
+        onOpenQuiz={() => openQuiz(activeLesson?.subjectId)} />
     );
-    if (tab === 'profile') return <ProfileScreen userName={userName} refreshData={refreshData} onBack={() => setTab('home')} />;
-    if (tab === 'subjects') return <SubjectsScreen subjects={subjects} userName={userName} refreshData={refreshData} onOpenStudy={openStudyRoom} />;
+    if (tab === 'profile') return (
+      <ProfileScreen userName={userName} email={dashboard?.user?.email}
+        refreshData={refreshData} onOpenQuiz={() => openQuiz(null)}
+        onOpenConnection={() => setShowConnectionSettings(true)}
+        onLogout={handleLogout}/>
+    );
+    if (tab === 'subjects') return <SubjectsScreen subjects={subjects}
+      userName={userName} refreshData={refreshData}
+      onOpenStudy={openStudyRoom} onOpenQuiz={openQuiz} />;
     if (tab === 'agent') return <AgentScreen subjects={subjects} userName={userName} />;
-    if (tab === 'quiz') return <QuizScreen subjects={subjects} userName={userName} refreshData={refreshData} />;
+    if (tab === 'quiz') return <QuizScreen subjects={subjects}
+      initialSubjectId={quizSubjectId} onBack={() => setTab('subjects')}
+      userName={userName} refreshData={refreshData} />;
     if (tab === 'plan') return <PlanScreen plan={plan} subjects={subjects} userName={userName} refreshData={refreshData} onOpenStudy={openStudyRoom} />;
     return (
       <HomeScreen
         dashboard={dashboard}
         setTab={setTab}
         loading={loading}
-        onLogout={handleLogout}
         onOpenStudy={openStudyRoom}
       />
     );
-  }, [tab, subjects, dashboard, plan, loading, userName, loggedIn, activeStudyTask]);
+  }, [tab, subjects, dashboard, plan, loading, userName, loggedIn,
+      activeStudyTask, activeLesson?.subjectId, quizSubjectId]);
 
   if (checkingSession) {
     return (
@@ -1679,14 +1694,29 @@ export default function App() {
       </SafeAreaView>
     );
   }
-  if (!loggedIn) return <LoginScreen onLogin={handleLogin} onRegister={handleRegister} />;
+  if (showConnectionSettings) return (
+    <ConnectionSettings onBack={() => setShowConnectionSettings(false)}
+      onSaved={() => {
+        // New host requires a new login; never preserve old identity.
+        setLoggedIn(false);
+        setDashboard(null);
+        setSubjects([]);
+        setPlan(null);
+        setActiveStudyTask(null);
+        setActiveLesson(null);
+        setTab('home');
+        setShowConnectionSettings(false);
+      }}/>
+  );
+  if (!loggedIn) return <LoginScreen onLogin={handleLogin}
+    onRegister={handleRegister}
+    onOpenConnection={() => setShowConnectionSettings(true)} />;
 
   const tabs = [
-    ['home', '⌂', 'Trang chủ'],
-    ['subjects', '📚', 'Môn học'],
-    ['agent', '✦', 'Agent'],
-    ['quiz', '✓', 'Quiz'],
-    ['plan', '◷', 'Kế hoạch'],
+    ['home', '⌂', 'Tổng quan'],
+    ['subjects', '▤', 'Môn học'],
+    ['plan', '▦', 'Lịch học'],
+    ['profile', '♙', 'Cá nhân'],
   ];
 
   return (
@@ -1699,12 +1729,14 @@ export default function App() {
             key={key}
             style={styles.navItem}
             onPress={() => {
+              setActiveStudyTask(null);
+              setActiveLesson(null);
               setTab(key);
               refreshData().catch(() => {});
             }}
           >
-            <Text style={[styles.navIcon, tab === key && styles.navActive]}>{icon}</Text>
-            <Text style={[styles.navLabel, tab === key && styles.navActive]}>{label}</Text>
+            <Text style={[styles.navIcon, (tab === key || (tab === 'quiz' && key === 'subjects')) && styles.navActive]}>{icon}</Text>
+            <Text style={[styles.navLabel, (tab === key || (tab === 'quiz' && key === 'subjects')) && styles.navActive]}>{label}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -1800,16 +1832,25 @@ const styles = StyleSheet.create({
   navLabel: { fontSize: 10, color: '#637493', marginTop: 4, fontWeight: '700' },
   navActive: { color: '#5E66D8' },
   loginSafe: { flex: 1, backgroundColor: '#F6F8FC', justifyContent: 'center' },
-  loginWrap: { paddingHorizontal: 26, paddingTop: 80, paddingBottom: 80, alignItems: 'stretch' },
-  logo: { alignSelf: 'center', width: 72, height: 72, borderRadius: 24, backgroundColor: '#EBEDFF', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  loginWrap: { flexGrow: 1, paddingHorizontal: 26, paddingTop: 32, paddingBottom: 32, justifyContent: 'center', alignItems: 'stretch' },
+  logo: { alignSelf: 'center', width: 64, height: 64, borderRadius: 22, backgroundColor: '#EBEDFF', alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
   loginTitle: { textAlign: 'center', color: '#202943', fontSize: 28, fontWeight: '900' },
-  loginSubtitle: { textAlign: 'center', color: '#53678B', fontSize: 14, marginTop: 7, marginBottom: 23 },
+  loginSubtitle: { textAlign: 'center', color: '#53678B', fontSize: 14, marginTop: 7, marginBottom: 18 },
   loginInput: { height: 52, borderRadius: 15, backgroundColor: 'white', borderWidth: 1, borderColor: '#E4E7F0', paddingHorizontal: 15, marginBottom: 11, color: '#202943' },
   primaryButton: { height: 52, borderRadius: 15, backgroundColor: '#6567E8', alignItems: 'center', justifyContent: 'center', marginTop: 4 },
   primaryButtonText: { color: 'white', fontSize: 15, fontWeight: '900' },
   loginHint: { color: '#516585', textAlign: 'center', fontSize: 12, marginTop: 18 },
   loginAdminNote: { color: '#4D6290', textAlign: 'center', fontSize: 11.5, lineHeight: 18, marginTop: 11 },
   loginBackendHint: { color: '#677899', textAlign: 'center', fontSize: 10, marginTop: 10 },
+  loginModeTitle:{fontSize:17,fontWeight:'800',color:'#27304B',marginBottom:14},
+  loginLinkButton:{alignItems:'center',paddingVertical:11},
+  loginLink:{fontSize:13,fontWeight:'800',color:'#5C60D5'},
+  loginConnectionLink:{fontSize:12,color:'#687B9B',fontWeight:'700'},
+  settingsEntry:{minHeight:54,paddingHorizontal:16,paddingVertical:14,
+    borderRadius:14,backgroundColor:'#FFFFFF',borderWidth:1,borderColor:'#E8ECF6',
+    flexDirection:'row',alignItems:'center',marginBottom:9},
+  settingsEntryText:{color:'#2F436C',fontSize:14,fontWeight:'700',flex:1},
+  settingsChevron:{fontSize:22,color:'#8493AF',paddingHorizontal:4},
   authSegment: { flexDirection: 'row', padding: 5, borderRadius: 15, backgroundColor: '#E9EEFA', marginBottom: 20, gap: 5 },
   authSegmentButton: { flex: 1, paddingVertical: 13, borderRadius: 11, alignItems: 'center' },
   authSegmentSelected: { backgroundColor: '#6567E8' },
