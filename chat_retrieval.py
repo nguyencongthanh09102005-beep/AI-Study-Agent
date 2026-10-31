@@ -116,7 +116,7 @@ def evidence_from_context(context, names, kind):
         marker = re.compile(
             r"(?:^|\n\n)(?:ĐỀ CƯƠNG CHUẨN CỦA MÔN:|"
             r"ĐỀ CƯƠNG CÁ NHÂN FALLBACK \(([^\n]+)\):|"
-            r"KIẾN THỨC CHUNG - ([^\n]+?) \([^\n]*\):)\n", re.U,
+            r"KIẾN THỨC CHUNG - ([^\n]+) \([^()\n]+\):)\n", re.U,
         )
         matches = list(marker.finditer(context))
         for index, match in enumerate(matches):
