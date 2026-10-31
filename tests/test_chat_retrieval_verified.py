@@ -44,6 +44,24 @@ def check():
     except ValueError:
         pass
 
+    # Shared PDF titles often contain parentheses (e.g. chapter titles and "(1)").
+    # Recover the COMPLETE filename before validating quoted evidence.
+    complex_name = "Chương 2 - Thấu Cảm (Empathize) & Xác Định Vấn Đề (Define) (1).pdf"
+    mixed_shared_context = (
+        "ĐỀ CƯƠNG CHUẨN CỦA MÔN:\\nĐề cương chuẩn cho môn học.\\n\\n"
+        f"KIẾN THỨC CHUNG - {complex_name} (shared_document):\\n{EVIDENCE}"
+    ).replace("\\n", "\n")
+    shared_evidence = evidence_from_context(mixed_shared_context, [complex_name], "shared")
+    assert shared_evidence.get(complex_name) == [EVIDENCE], shared_evidence
+    shared_response = json.dumps({
+        "mode": "shared", "sources": [complex_name],
+        "citations": [{"source": complex_name, "quote": EVIDENCE}],
+        "answer": "Có giải thích theo nguồn đã được duyệt."
+    }, ensure_ascii=False)
+    assert verify_source_citations(
+        shared_response, "shared", [complex_name], shared_evidence
+    )
+
     with patch.object(project,"gemini_generate",return_value=(good,None)):
         answer, names, mode = project.gemini_subject_answer(
             "Triết học","Giải thích duyvat",context,["triethoc.txt"])
