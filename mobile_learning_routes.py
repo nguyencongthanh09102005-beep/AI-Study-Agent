@@ -233,3 +233,162 @@ def mobile_study_timer(task_id):
         return jsonify({"error": exc.message}), exc.status
     finally:
         conn.close()
+
+
+def _quiz_token():
+    token = session.get("session_quiz_csrf")
+    if not token:
+        token = secrets.token_hex(24)
+        session["session_quiz_csrf"] = token
+    return token
+
+
+def _valid_quiz_csrf():
+    expected = session.get("session_quiz_csrf") or ""
+    supplied = request.headers.get("X-Quiz-CSRF") or ""
+    return bool(expected and secrets.compare_digest(expected, supplied))
+
+
+@mobile_learning_bp.route("/api/mobile/study-room/<int:task_id>/quiz-status")
+def mobile_session_quiz_status(task_id):
+    """Never leak question payloads for pending or locked Quiz."""
+    project = _project()
+    uid, error = _student(project)
+    if error:
+        return error
+    conn = project.db()
+    try:
+        from chapter_chat_context import LessonContextError
+        from study_session_chat_context import verified_study_session
+        from study_session_quiz_runtime import per_lesson_quiz_status
+        verified_study_session(project, conn, uid, task_id)
+        data = per_lesson_quiz_status(conn, project, uid, task_id)
+        data["quiz_csrf"] = _quiz_token()
+        return jsonify(data)
+    except LessonContextError as exc:
+        return jsonify({"error": exc.message}), exc.status
+    finally:
+        conn.close()
+
+
+@mobile_learning_bp.route("/api/mobile/subjects/<int:subject_id>/quiz-preparation",
+                          methods=["GET", "POST"])
+def mobile_quiz_preparation(subject_id):
+    """Read real preparation progress, enqueue/resume or pause via opt-in."""
+    project = _project()
+    uid, error = _student(project)
+    if error:
+        return error
+    conn = project.db()
+    try:
+        from chapter_chat_context import LessonContextError
+        from study_session_quiz_runtime import (
+            ensure_quiz_runtime_schema, preparation_status
+        )
+        course = conn.execute(
+            "SELECT id FROM subjects WHERE user_id=? AND id=?",
+            (uid,subject_id)
+        ).fetchone()
+        if not course:
+            return jsonify({"error":"Môn học không thuộc tài khoản."}),404
+        ensure_quiz_runtime_schema(conn)
+        if request.method == "POST":
+            if not _valid_quiz_csrf():
+                return jsonify({"error":"Phiên xác nhận Quiz đã hết hạn."}),403
+            body = request.get_json(silent=True) or {}
+            action = body.get("action")
+            if action not in ("start","pause"):
+                return jsonify({"error":"Thao tác chuẩn bị Quiz không hợp lệ."}),400
+            if action == "start":
+                from quiz_preparation_jobs import enqueue, start_local_worker
+                state = enqueue(conn, project, uid, subject_id)
+                start_local_worker(project)
+            else:
+                from quiz_preparation_jobs import pause
+                state = pause(conn, uid, subject_id)
+            return jsonify({"state":state,"accepted":True})
+        items = preparation_status(conn,project,uid,subject_id)
+        from quiz_preparation_jobs import status as job_status
+        ready = sum(1 for item in items if item.get("status")=="ready")
+        return jsonify({
+            "total":len(items), "ready":ready, "items":items,
+            "done":bool(items) and ready==len(items),
+            "job":job_status(conn,uid,subject_id),
+            "quiz_csrf":_quiz_token()
+        })
+    except LessonContextError as exc:
+        conn.rollback()
+        return jsonify({"error":exc.message}),exc.status
+    finally:
+        conn.close()
+
+
+@mobile_learning_bp.route("/api/mobile/study-room/<int:task_id>/quiz-start",
+                          methods=["POST"])
+def mobile_start_session_quiz(task_id):
+    """Only start a prepared Quiz in the current server-approved time window."""
+    project = _project()
+    uid, error = _student(project)
+    if error:
+        return error
+    if not _valid_quiz_csrf():
+        return jsonify({"error":"Phiên xác nhận Quiz đã hết hạn."}),403
+    conn = project.db()
+    try:
+        from chapter_chat_context import LessonContextError
+        from study_session_chat_context import verified_study_session
+        from study_session_quiz_runtime import (
+            per_lesson_quiz_status,start_quiz
+        )
+        verified_study_session(project,conn,uid,task_id)
+        info = per_lesson_quiz_status(conn,project,uid,task_id)
+        quiz_id = info.get("quiz_id")
+        if not quiz_id or info.get("state") in ("blocked","unprepared"):
+            return jsonify({"error":info.get("reason") or "Quiz chưa được chuẩn bị."}),409
+        # No client-supplied quiz id is accepted. The current roadmap binding
+        # and saved, signed prepared Quiz determine what can be opened.
+        start_quiz(conn,project,uid,quiz_id)
+        conn.commit()
+        return jsonify({"quiz_id":quiz_id,"ready":True})
+    except LessonContextError as exc:
+        conn.rollback()
+        return jsonify({"error":exc.message}),exc.status
+    finally:
+        conn.close()
+
+
+@mobile_learning_bp.route("/api/mobile/quizzes/<int:quiz_id>/review")
+def mobile_review_quiz(quiz_id):
+    """Answer key unlocks only after a real owner-scoped submitted attempt."""
+    project = _project()
+    uid,error = _student(project)
+    if error:
+        return error
+    conn = project.db()
+    try:
+        from study_session_quiz_runtime import quiz_access
+        row = conn.execute("SELECT payload FROM quizzes WHERE user_id=? AND id=?",
+                           (uid,quiz_id)).fetchone()
+        if not row:
+            return jsonify({"error":"Không tìm thấy Quiz."}),404
+        gate = quiz_access(conn,project,uid,quiz_id)
+        if gate.get("linked") and not gate.get("allowed"):
+            return jsonify({"error":gate.get("reason","Nguồn Quiz không còn hợp lệ.")}),409
+        attempt = conn.execute(
+            "SELECT id,score,correct_count,total_questions,answers_json,created_at "
+            "FROM quiz_attempts WHERE user_id=? AND quiz_id=? "
+            "ORDER BY id DESC LIMIT 1", (uid,quiz_id)
+        ).fetchone()
+        if not attempt:
+            return jsonify({"error":"Chỉ được xem đáp án sau khi nộp bài."}),403
+        questions = json.loads(row["payload"] or "[]")
+        return jsonify({
+            "attempt":dict(attempt),
+            "correct_answers":[
+                int(q.get("answer")) if str(q.get("answer","")).isdigit() else -1
+                for q in questions
+            ],
+            "explanations":[str(q.get("explanation") or "") for q in questions],
+        })
+    finally:
+        conn.close()
