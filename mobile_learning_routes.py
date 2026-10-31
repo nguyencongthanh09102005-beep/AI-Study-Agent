@@ -295,7 +295,9 @@ def mobile_quiz_preparation(subject_id):
         if request.method == "POST":
             if not _valid_quiz_csrf():
                 return jsonify({"error":"Phiên xác nhận Quiz đã hết hạn."}),403
-            body = request.get_json(silent=True) or {}
+            body = request.get_json(silent=True)
+            if not isinstance(body,dict):
+                return jsonify({"error":"Thao tác chuẩn bị Quiz không hợp lệ."}),400
             action = body.get("action")
             if action not in ("start","pause"):
                 return jsonify({"error":"Thao tác chuẩn bị Quiz không hợp lệ."}),400
