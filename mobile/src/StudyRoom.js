@@ -34,6 +34,12 @@ export default function StudyRoom({taskId,onBack,onOpenQuiz,onContext}) {
   const [loading,setLoading] = useState(true);
   const [tab,setTab] = useState('content');
   const [clock,setClock] = useState(Date.now());
+  const [sessionQuiz,setSessionQuiz] = useState(null);
+  const [quizPreparation,setQuizPreparation] = useState(null);
+  const [quizBusy,setQuizBusy] = useState(false);
+  const [quizError,setQuizError] = useState('');
+  const quizCsrf=useRef('');
+  const quizActionPending=useRef(false);
   const flight=useRef(false);
   const csrf=useRef('');
   const lastSync=useRef(Date.now());
@@ -75,6 +81,78 @@ export default function StudyRoom({taskId,onBack,onOpenQuiz,onContext}) {
         csrf.current=fresh.timer_csrf;
       }catch(_error){}
     }finally{flight.current=false;setBusy(false);}
+  };
+
+  const refreshQuiz=async (subjectId=data?.task?.subject_id)=>{
+    if (!subjectId) return;
+    try {
+      const [state,prep]=await Promise.all([
+        api.sessionQuizStatus(taskId),
+        api.quizPreparation(subjectId)
+      ]);
+      setSessionQuiz(state);
+      setQuizPreparation(prep);
+      quizCsrf.current=state.quiz_csrf||prep.quiz_csrf||'';
+      setQuizError('');
+    } catch(err) {
+      setQuizError(err.message||'Không kiểm tra được tình trạng Quiz.');
+    }
+  };
+  useEffect(()=>{
+    if(!data?.task?.subject_id) return;
+    let active=true;
+    const id=data.task.subject_id;
+    // Readiness always comes from Flask; no local guess about unlock time.
+    const fetchStatus=async()=>{
+      try{
+        const [state,prep]=await Promise.all([
+          api.sessionQuizStatus(taskId),api.quizPreparation(id)
+        ]);
+        if(!active)return;
+        setSessionQuiz(state);
+        setQuizPreparation(prep);
+        quizCsrf.current=state.quiz_csrf||prep.quiz_csrf||'';
+        setQuizError('');
+      }catch(err){if(active)setQuizError(err.message||'Không đọc được Quiz.');}
+    };
+    fetchStatus();
+    return()=>{active=false;};
+  },[taskId,data?.task?.subject_id]);
+  useEffect(()=>{
+    if(!data?.task?.subject_id) return;
+    const state=quizPreparation?.job?.state;
+    if(!['queued','running'].includes(state))return;
+    const interval=setInterval(()=>refreshQuiz(),12000);
+    return()=>clearInterval(interval);
+  },[taskId,data?.task?.subject_id,quizPreparation?.job?.state]);
+
+  const quizQueue=async action=>{
+    if(!data?.task?.subject_id||quizActionPending.current||!quizCsrf.current)return;
+    quizActionPending.current=true;
+    setQuizBusy(true);
+    setQuizError('');
+    try{
+      await api.quizPreparationAction(
+        data.task.subject_id,action,quizCsrf.current
+      );
+      await refreshQuiz();
+    }catch(err){
+      setQuizError(err.message||'Không cập nhật được hàng đợi Quiz.');
+    }finally{setQuizBusy(false);quizActionPending.current=false;}
+  };
+  const beginSessionQuiz=async()=>{
+    if(quizActionPending.current||!quizCsrf.current||!sessionQuiz?.quiz_id)return;
+    quizActionPending.current=true;
+    setQuizBusy(true);
+    setQuizError('');
+    try{
+      const result=await api.sessionQuizStart(taskId,quizCsrf.current);
+      if(!result?.quiz_id)throw new Error('Quiz chưa có thể mở.');
+      onOpenQuiz({quizId:result.quiz_id,subjectId:data.task.subject_id});
+    }catch(err){
+      setQuizError(err.message||'Quiz vẫn bị khóa hoặc học liệu đã thay đổi.');
+      await refreshQuiz();
+    }finally{setQuizBusy(false);quizActionPending.current=false;}
   };
 
   useEffect(()=>{
@@ -157,8 +235,55 @@ export default function StudyRoom({taskId,onBack,onOpenQuiz,onContext}) {
         values={data.sources?.map(item=>item.name)}
         empty="Chưa có PDF chung được duyệt cho chương này. Không dùng tài liệu chưa duyệt làm dẫn chứng."/>}
       {tab==='activities'&&<ListBlock title="Hoạt động & thực hành" values={data.lesson.activities}/>}
-      <TouchableOpacity style={styles.quizLink} onPress={onOpenQuiz}>
-        <Text style={styles.quizText}>Đi tới Quiz và ôn tập điểm yếu →</Text>
+      <View style={styles.quizCard}>
+        <Text style={styles.heading}>✦ Quiz kiểm tra theo buổi</Text>
+        <Text style={styles.faint}>
+          {sessionQuiz?.is_final?'Buổi tổng hợp · 60 câu':'Buổi thường · 15 câu'}
+          {sessionQuiz?.count ? ' · '+sessionQuiz.count+' câu' : ''}
+        </Text>
+        {!sessionQuiz && <ActivityIndicator color="#5969DB" />}
+        {!!sessionQuiz && <>
+          <Text style={styles.detail}>{
+            sessionQuiz.state==='review'?'Đã nộp · có thể xem lại đáp án và ôn tập':
+            sessionQuiz.state==='active'?'Quiz đang mở trong khung giờ học':
+            sessionQuiz.state==='available'?'Đã đến giờ · có thể bắt đầu':
+            sessionQuiz.state==='locked'?'Quiz đã chuẩn bị nhưng chưa đến giờ mở':
+            sessionQuiz.state==='unprepared'?'Quiz chưa được chuẩn bị trên máy chủ':
+            sessionQuiz.reason || 'Học liệu chung của chương chưa đủ điều kiện'
+          }</Text>
+          {!!sessionQuiz.study_at &&
+            <Text style={styles.faint}>Khung giờ: {sessionQuiz.study_at.replace('T',' ')}
+              {sessionQuiz.ends_at ? ' – '+sessionQuiz.ends_at.slice(11,16):''}
+            </Text>}
+          {!!sessionQuiz.reason && <Text style={styles.faint}>{sessionQuiz.reason}</Text>}
+          {sessionQuiz.attempt_count>0&&
+            <Text style={styles.faint}>Đã nộp {sessionQuiz.attempt_count} lần · Điểm cao nhất {sessionQuiz.best_score??'—'}</Text>}
+          {['review','active','available'].includes(sessionQuiz.state) &&
+            <TouchableOpacity disabled={quizBusy} style={styles.action}
+              accessibilityRole="button" onPress={beginSessionQuiz}>
+              <Text style={styles.actionText}>{sessionQuiz.state==='review'?'Xem lại / Làm lại Quiz →':'Bắt đầu Quiz theo buổi →'}</Text>
+            </TouchableOpacity>}
+        </>}
+        {!!quizPreparation&&<Text style={styles.faint}>
+          Đã chuẩn bị {quizPreparation.ready||0}/{quizPreparation.total||0} Quiz
+          {quizPreparation.job?.state==='queued'?' · Đang xếp hàng':''}
+          {quizPreparation.job?.state==='running'?' · Đang tạo bằng AI':''}
+        </Text>}
+        {['queued','running'].includes(quizPreparation?.job?.state)?
+          <TouchableOpacity disabled={quizBusy} onPress={()=>quizQueue('pause')}
+            style={styles.outline}><Text style={styles.outlineText}>Tạm dừng chuẩn bị</Text></TouchableOpacity>:
+          sessionQuiz?.state==='unprepared'&&
+            <TouchableOpacity disabled={quizBusy} onPress={()=>quizQueue('start')}
+              style={styles.outline}><Text style={styles.outlineText}>Chuẩn bị Quiz bằng AI</Text></TouchableOpacity>}
+        <TouchableOpacity disabled={quizBusy} style={styles.quizLink}
+          onPress={()=>refreshQuiz()}>
+          <Text style={styles.quizText}>↻ Cập nhật trạng thái Quiz</Text>
+        </TouchableOpacity>
+        {!!quizError && <Text style={styles.error}>{quizError}</Text>}
+        {quizBusy&&<ActivityIndicator color="#5969DB"/>}
+      </View>
+      <TouchableOpacity style={styles.quizLink} onPress={()=>onOpenQuiz({subjectId:data.task.subject_id})}>
+        <Text style={styles.quizText}>Quiz khác & ôn điểm yếu →</Text>
       </TouchableOpacity>
       <Text style={styles.hint}>Bong bóng AI phía dưới sẽ hỏi theo đúng buổi học này khi có học liệu đã duyệt.</Text>
     </>}
@@ -195,6 +320,8 @@ const styles=StyleSheet.create({
   tabActive:{backgroundColor:'#FFFFFF'},
   tabText:{fontSize:12,fontWeight:'700',color:'#7786A8'},
   tabTextActive:{color:'#485EC4'},
+  quizCard:{backgroundColor:'#FFFFFF',borderRadius:18,padding:17,gap:11,
+    borderColor:'#DFE5F6',borderWidth:1},
   quizLink:{alignItems:'center',padding:14,backgroundColor:'#EAEFFF',borderRadius:12},
   quizText:{color:'#5266CC',fontWeight:'800'},
   hint:{fontSize:12,textAlign:'center',color:'#7180A2',lineHeight:19},
