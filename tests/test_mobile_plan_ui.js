@@ -70,7 +70,11 @@ assert.ok(app.includes("planView === 'list'"), 'List view must remain available'
 assert.ok(app.includes('getPlanOverview(tasks, selectedDate)'), 'Progress based on selected week');
 assert.ok(app.includes('splitReminders(reminders)'), 'Completed deadlines must be grouped');
 assert.ok(app.includes('accessibilityState={{ expanded: showCompletedReminders }}'));
-assert.ok(app.includes("Quản trị viên chỉ đăng nhập trên Web."));
+const connection = fs.readFileSync(
+  path.join(__dirname, '../mobile/src/ConnectionSettings.js'), 'utf8'
+);
+assert.ok(connection.includes("Quản trị viên chỉ đăng nhập trên Web."),
+  'Admin-only disclosure belongs to connection settings, not the login form');
 assert.ok(app.includes('secureTextEntry={!showPassword}'));
 assert.ok(app.includes('secureTextEntry={!showConfirm}'));
 assert.ok(!app.includes('onAdminRegister'), 'No self-service mobile Admin registration');
