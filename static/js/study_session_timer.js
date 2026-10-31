@@ -20,6 +20,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let elapsed = Math.max(0, Number(root.dataset.initialSeconds) || 0);
   let syncedAt = Date.now(), loading = true;
   let inFlight = false;
+  let finishConfirmationPending = false;
   const labels = {
     idle: "Chưa bắt đầu", running: "Đang học",
     paused: "Đã tạm dừng", completed: "Đã hoàn thành"
@@ -88,9 +89,21 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   async function sendAction(action) {
     if (loading || inFlight) return;
-    if (action === "finish" &&
-        !window.confirm("Hoàn thành buổi học này? Tiến độ trong Kế hoạch học sẽ được cập nhật.")) {
-      return;
+    if (action === "finish") {
+      if (finishConfirmationPending) return;
+      finishConfirmationPending = true;
+      let approved = false;
+      try {
+        approved = await window.AppDialogs.confirm({
+          title: "Hoàn thành buổi học?",
+          message: "Hoàn thành buổi học này? Tiến độ trong Kế hoạch học sẽ được cập nhật.",
+          confirmLabel: "Hoàn thành",
+          kind: "warning"
+        });
+      } finally {
+        finishConfirmationPending = false;
+      }
+      if (!approved || loading || inFlight) return;
     }
     inFlight = true;
     render();
