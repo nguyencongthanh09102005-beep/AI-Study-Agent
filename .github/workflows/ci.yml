@@ -94,6 +94,7 @@ jobs:
           node tests/test_mobile_plan_ui.js
           node tests/test_mobile_learning_ui.js
           node tests/test_mobile_minimal_ui.js
+          node tests/test_mobile_session_quiz_ui.js
 
       - name: Password eye toggle tests
         run: node tests/test_auth_password.js
