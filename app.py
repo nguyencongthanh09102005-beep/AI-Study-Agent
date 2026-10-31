@@ -2444,38 +2444,45 @@ nhưng phải nằm bên trong chuỗi JSON escape đúng quy tắc. Cấu trúc
 }}
 """.strip()
 
-    raw, error = gemini_generate(prompt)
+    from chat_ai_recovery import generate_verified
+    from chat_response_validation import (
+        parse_free_chat_response, verify_source_citations
+    )
+    from chat_retrieval import evidence_from_context
 
-    if raw:
-        from chat_response_validation import parse_free_chat_response
-        try:
-            answer, used_sources, mode = parse_free_chat_response(
-                raw, source_names, shared_source_names
+    def validate_chat_response(raw):
+        answer, used_sources, mode = parse_free_chat_response(
+            raw, source_names, shared_source_names
+        )
+        if mode in ("document", "shared"):
+            # Check only passages that the model actually received in its prompt.
+            selected_context = (
+                context[:9000] if mode == "document" else shared_context[:5500]
             )
-            if mode in ("document", "shared"):
-                from chat_retrieval import evidence_from_context
-                from chat_response_validation import verify_source_citations
-                selected_context = context if mode == "document" else shared_context
-                evidence = evidence_from_context(selected_context, used_sources, mode)
-                verified = verify_source_citations(raw, mode, used_sources, evidence)
-                used_sources = list(dict.fromkeys(x["source"] for x in verified))
-                quotes = "\n".join(
-                    f'- {x["source"]}: “{x["quote"]}”' for x in verified[:3]
-                )
-                answer += "\n\nDẫn chứng nguyên văn từ học liệu:\n" + quotes
-            if mode == "document":
-                joined = ", ".join(f'"{name}"' for name in used_sources)
-                return f"Dựa trên tài liệu cá nhân {joined}:\\n\\n".replace(
-                    "\\n", "\n") + answer, used_sources, "document"
-            if mode == "shared":
-                joined = ", ".join(f'"{name}"' for name in used_sources)
-                return f"Dựa trên kiến thức chung {joined}:\\n\\n".replace(
-                    "\\n", "\n") + answer, used_sources, "shared"
-            return answer, [], "general"
-        except ValueError as exc:
-            # Never expose malformed JSON or invented source names to students.
-            print("Gemini Chat JSON/provenance validation failed:", exc)
-            error = "Câu trả lời AI không hợp lệ hoặc nguồn không kiểm chứng được."
+            evidence = evidence_from_context(selected_context, used_sources, mode)
+            verified = verify_source_citations(raw, mode, used_sources, evidence)
+            used_sources = list(dict.fromkeys(x["source"] for x in verified))
+            quotes = "\n".join(
+                f'- {x["source"]}: “{x["quote"]}”' for x in verified[:3]
+            )
+            answer += "\n\nDẫn chứng nguyên văn từ học liệu:\n" + quotes
+        return answer, used_sources, mode
+
+    checked, error = generate_verified(
+        prompt, gemini_generate, validate_chat_response,
+        label="Gemini Chat"
+    )
+    if checked:
+        answer, used_sources, mode = checked
+        if mode == "document":
+            joined = ", ".join(f'"{name}"' for name in used_sources)
+            return f"Dựa trên tài liệu cá nhân {joined}:\\n\\n".replace(
+                "\\n", "\n") + answer, used_sources, "document"
+        if mode == "shared":
+            joined = ", ".join(f'"{name}"' for name in used_sources)
+            return f"Dựa trên kiến thức chung {joined}:\\n\\n".replace(
+                "\\n", "\n") + answer, used_sources, "shared"
+        return answer, [], "general"
 
     # Nếu Gemini/model dự phòng đều lỗi, vẫn cố gắng trả lời từ
     # tài liệu cá nhân hoặc kiến thức chung đã có trong hệ thống.
@@ -2506,19 +2513,16 @@ nhưng phải nằm bên trong chuỗi JSON escape đúng quy tắc. Cấu trúc
     if error:
         print("Gemini Chat fallback:", error)
 
-    # F4: make provenance and limitations obvious when using a local excerpt.
+    # A failed verification must not dump raw course PDFs as a Chat answer.
+    # Do not falsely attribute an unverified response to any source.
     if fallback_context:
-        fallback = (
-            "⚠ Trích đoạn tham khảo tự động từ học liệu đã lưu; "
-            "chưa phải câu trả lời AI được kiểm chứng. "
-            "Hãy đối chiếu tài liệu gốc.\\n\\n".replace("\\n", "\n")
-            + fallback
+        return (
+            "⚠ AI chưa tạo được câu trả lời có dẫn chứng kiểm chứng được. "
+            "Tài liệu của môn vẫn được lưu an toàn; hãy thử hỏi lại "
+            "hoặc xem nội dung trong mục Tài liệu của môn.",
+            [], "general"
         )
-    return (
-        fallback,
-        fallback_sources if fallback_context else [],
-        fallback_mode
-    )
+    return fallback, [], "general"
 
 
 def build_quiz(text, question_count=10, focus_topics=None, session_mode=False, avoid_questions=None):
@@ -5736,8 +5740,12 @@ def api_chat():
             question, lesson_context["sources"], conversation_history,
             profile=personal_context, session_scope=session_scope
         )
-        raw, ai_error = gemini_generate(prompt)
-        tutored = parse_tutor_answer(raw, lesson_context["sources"]) if raw else None
+        from chat_ai_recovery import generate_verified
+        tutored, ai_error = generate_verified(
+            prompt, gemini_generate,
+            lambda raw: parse_tutor_answer(raw, lesson_context["sources"]),
+            label="Chapter tutor"
+        )
         if not tutored:
             return jsonify({
                 "error": ("AI chưa trả được câu trả lời có dẫn chứng kiểm chứng "
