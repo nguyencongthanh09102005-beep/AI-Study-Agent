@@ -22,6 +22,20 @@ assert(bubble.includes("<Modal"),"Floating Chat should stay within Expo Go");
 assert(bubble.includes("api.chatHistory(scopedId)"),"Reuse one chat history");
 assert(bubble.includes("api.studyChat"),"Verified lesson route when in study room");
 assert(bubble.includes("api.chat(scopedId"),"Same subject Chat outside study room");
+assert(bubble.includes("MÔN ĐANG HỎI") && bubble.includes("currentSubject?.name"),
+  "Selected subject must remain identifiable by its full course name");
+assert(bubble.includes("showSubjectPicker") && bubble.includes("Đổi môn học trong Chat AI"),
+  "Course selector must open an accessible course picker");
+assert(bubble.includes("{s.name}") && bubble.includes("subjectOptionName"),
+  "Every selectable subject shows its full name, not a truncated chip");
+assert(bubble.includes("subjectOptionsScroll:{maxHeight:210}"),
+  "Long subject lists must scroll within the panel");
+assert(bubble.includes("setShowSubjectPicker(false);") &&
+  bubble.includes("setSubjectId(id);"),
+  "Selecting a new subject closes the picker and reloads scoped history");
+assert(!bubble.includes("subjectList:{maxHeight:54"),
+  "Clipped horizontal course chips must not reappear");
+
 assert(bubble.includes("lessonHasSources"),"Never claim unapproved lesson sources");
 assert(room.includes("api.studyRoom(taskId)"),"Load server-owned lesson");
 assert(room.includes("clo_refs"),"Display official CLO references");
