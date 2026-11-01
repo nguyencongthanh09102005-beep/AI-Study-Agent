@@ -1836,7 +1836,7 @@ export default function App() {
       />
     );
   }, [tab, subjects, dashboard, plan, loading, userName, loggedIn,
-      activeStudyTask, activeLesson?.subjectId, quizSubjectId]);
+      activeStudyTask, activeLesson?.subjectId, quizSubjectId, quizToOpenId]);
 
   if (checkingSession) {
     return (
