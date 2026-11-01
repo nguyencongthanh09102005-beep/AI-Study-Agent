@@ -3,7 +3,7 @@
 */
 import React,{useEffect,useRef,useState} from 'react';
 import {
-  ActivityIndicator, Alert, ScrollView, StyleSheet, Text,
+  ActivityIndicator, Alert, AppState, ScrollView, StyleSheet, Text,
   TouchableOpacity, View,
 } from 'react-native';
 import { api } from './api';
@@ -120,11 +120,45 @@ export default function StudyRoom({taskId,onBack,onOpenQuiz,onContext}) {
   },[taskId,data?.task?.subject_id]);
   useEffect(()=>{
     if(!data?.task?.subject_id) return;
-    const state=quizPreparation?.job?.state;
-    if(!['queued','running'].includes(state))return;
-    const interval=setInterval(()=>refreshQuiz(),12000);
+    const job=quizPreparation?.job?.state;
+    const lesson= sessionQuiz?.state;
+    // Both the timer and the unlock decision live on Flask. Poll modestly
+    // while relevant, including a prepared Quiz approaching its start time.
+    const intervalMs=['queued','running'].includes(job)?12000:
+      ['locked','available','active'].includes(lesson)?30000:null;
+    if(!intervalMs)return;
+    const interval=setInterval(()=>{
+      if(AppState.currentState==='active')refreshQuiz();
+    },intervalMs);
     return()=>clearInterval(interval);
-  },[taskId,data?.task?.subject_id,quizPreparation?.job?.state]);
+  },[taskId,data?.task?.subject_id,quizPreparation?.job?.state,sessionQuiz?.state]);
+
+  useEffect(()=>{
+    if(!data?.task?.subject_id)return;
+    let active=true;
+    const listener=AppState.addEventListener('change',state=>{
+      if(state!=='active')return;
+      // iOS pauses JS timers while the phone sleeps. Re-read real elapsed
+      // seconds and Quiz unlock on foreground; never fabricate lost time.
+      api.studyRoom(taskId).then(fresh=>{
+        if(!active)return;
+        setData(fresh);
+        csrf.current=fresh.timer_csrf||'';
+        lastSync.current=Date.now();
+        onContext?.({
+          taskId, subjectId:fresh.task.subject_id,
+          chapterNumber:fresh.lesson.unit_id,sources:fresh.sources||[]
+        });
+      }).catch(err=>{
+        if(!active)return;
+        setData(null);
+        onContext?.(null);
+        setError(err.message||'Buổi học không còn hợp lệ. Hãy mở lại từ lịch.');
+      });
+      refreshQuiz();
+    });
+    return()=>{active=false;listener.remove();};
+  },[taskId,data?.task?.subject_id]);
 
   const quizQueue=async action=>{
     if(!data?.task?.subject_id||quizActionPending.current||!quizCsrf.current)return;
