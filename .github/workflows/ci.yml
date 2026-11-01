@@ -190,6 +190,9 @@ jobs:
       - name: Final roles and manual deadline data-integrity audit
         run: python tests/test_final_integrity_audit.py
 
+      - name: Final cross-platform release acceptance
+        run: python tests/test_final_release_contract.py
+
       - name: Final QA regression tests
         run: python tests/test_final_qa.py
 
