@@ -460,6 +460,95 @@ def run():
             }).status_code == 404
             login(client, student)
 
+            # Mobile FINAL 60-question acceptance: actual locked -> open ->
+            # complete submit -> idempotent retry -> owner-scoped review.
+            # No network or paid AI generation: use the prepared final
+            # question set from this same validated academic course.
+            final_task_id = task_rows[-1]["id"]
+            final_start_endpoint = (
+                f"/api/mobile/study-room/{final_task_id}/quiz-start"
+            )
+            assert client.get(mobile_final).get_json()["count"] == 60
+            assert client.get(
+                f"/api/mobile/quizzes/{final_quiz}"
+            ).status_code == 409
+            conn = project.db()
+            conn.execute(
+                "UPDATE study_tasks SET study_at=? WHERE id=?",
+                (current_slot.isoformat(timespec="minutes"), final_task_id)
+            )
+            conn.commit()
+            conn.close()
+            final_status = client.get(mobile_final)
+            assert final_status.status_code == 200
+            assert final_status.get_json()["state"] == "available", (
+                final_status.get_json()
+            )
+            assert final_status.get_json()["is_final"] is True
+            final_start = client.post(
+                final_start_endpoint, json={},
+                headers={"X-Quiz-CSRF": csrf_for_start}
+            )
+            assert final_start.status_code == 200, (
+                final_start.get_data(as_text=True)[:900]
+            )
+            assert final_start.get_json()["quiz_id"] == final_quiz
+            final_questions = client.get(
+                f"/api/mobile/quizzes/{final_quiz}"
+            )
+            assert final_questions.status_code == 200
+            assert len(final_questions.get_json()["questions"]) == 60
+            assert all(
+                "answer" not in item and "explanation" not in item
+                for item in final_questions.get_json()["questions"]
+            )
+            assert client.get(
+                f"/api/mobile/quizzes/{final_quiz}/review"
+            ).status_code == 403, "Answer key must be withheld until submission"
+            incomplete = client.post(
+                "/api/mobile/quiz/submit",
+                json={"quiz_id": final_quiz, "answers": [0] * 59,
+                      "request_id": "final60incomplete"}
+            )
+            assert incomplete.status_code == 400
+            final_payload = {
+                "quiz_id": final_quiz, "answers": [0] * 60,
+                "request_id": "final60mobileacceptance"
+            }
+            final_submitted = client.post(
+                "/api/mobile/quiz/submit", json=final_payload
+            )
+            assert final_submitted.status_code == 200, (
+                final_submitted.get_data(as_text=True)[:900]
+            )
+            final_grade = final_submitted.get_json()
+            assert final_grade["total_questions"] == 60
+            assert len(final_grade["correct_answers"]) == 60
+            assert len(final_grade["explanations"]) == 60
+            final_retry = client.post(
+                "/api/mobile/quiz/submit", json=final_payload
+            )
+            assert final_retry.status_code == 200
+            assert final_retry.get_json()["attempt_id"] == final_grade["attempt_id"]
+            assert final_retry.get_json()["attempt_count"] == 1
+            final_review = client.get(
+                f"/api/mobile/quizzes/{final_quiz}/review"
+            )
+            assert final_review.status_code == 200
+            assert len(final_review.get_json()["correct_answers"]) == 60
+            assert client.get(mobile_final).get_json()["state"] == "review"
+            conn = project.db()
+            assert conn.execute(
+                "SELECT COUNT(*) FROM quiz_attempts WHERE quiz_id=? AND user_id=?",
+                (final_quiz, student)
+            ).fetchone()[0] == 1
+            conn.close()
+            login(client, other)
+            assert client.get(
+                f"/api/mobile/quizzes/{final_quiz}/review"
+            ).status_code == 404
+            login(client, student)
+
             # Approval revoked => neither quiz nor answer keys leak, even with
             # the previous grant; historical quiz and answers are preserved.
             conn = project.db()
