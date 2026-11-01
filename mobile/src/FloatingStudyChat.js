@@ -40,6 +40,7 @@ export default function FloatingStudyChat({ subjects = [], lesson = null, openSi
     if (openSignal > 0) setOpened(true);
   }, [openSignal]);
   const [subjectId, setSubjectId] = useState(null);
+  const [showSubjectPicker, setShowSubjectPicker] = useState(false);
   const [history, setHistory] = useState([]);
   const [value, setValue] = useState('');
   const [loading, setLoading] = useState(false);
@@ -58,6 +59,11 @@ export default function FloatingStudyChat({ subjects = [], lesson = null, openSi
     if (lesson?.subjectId) setSubjectId(lesson.subjectId);
     else if (!subjectId && subjects.length) setSubjectId(subjects[0].id);
   }, [lesson?.subjectId, subjects, subjectId]);
+
+  // When entering a verified lesson, the lesson owns the chat subject.
+  useEffect(() => {
+    if (lesson?.subjectId) setShowSubjectPicker(false);
+  }, [lesson?.subjectId]);
 
   useEffect(() => {
     const sub = Dimensions.addEventListener('change', event => {
@@ -116,6 +122,7 @@ export default function FloatingStudyChat({ subjects = [], lesson = null, openSi
 
   const changeSubject = id => {
     if (sending || lesson) return;
+    setShowSubjectPicker(false);
     setSubjectId(id);
     setHistory([]);
     setError('');
@@ -164,7 +171,7 @@ export default function FloatingStudyChat({ subjects = [], lesson = null, openSi
         </TouchableOpacity>
       </Animated.View>
       <Modal visible={opened} transparent animationType="slide"
-        onRequestClose={() => setOpened(false)}>
+        onRequestClose={() => { setShowSubjectPicker(false); setOpened(false); }}>
         <KeyboardAvoidingView style={styles.overlay}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={[styles.panel,{maxHeight:Math.max(360,windowSize.height*0.88)}]}>
@@ -175,7 +182,7 @@ export default function FloatingStudyChat({ subjects = [], lesson = null, openSi
                   {lesson ? 'Học theo chương · học liệu được xác minh' : 'Chat theo môn · đồng bộ Web'}
                 </Text>
               </View>
-              <TouchableOpacity onPress={() => setOpened(false)}
+              <TouchableOpacity onPress={() => { setShowSubjectPicker(false); setOpened(false); }}
                 accessibilityRole="button" accessibilityLabel="Thu nhỏ bong bóng Chat"
                 style={styles.close}><Text style={styles.closeText}>−</Text></TouchableOpacity>
             </View>
@@ -184,18 +191,66 @@ export default function FloatingStudyChat({ subjects = [], lesson = null, openSi
                 📖 {currentSubject?.name || 'Buổi học'} · Chương {lesson.chapterNumber}
               </Text>
             ) : (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled" style={styles.subjectList}
-                contentContainerStyle={styles.subjectContent}>
-                {subjects.map(s => (
-                  <TouchableOpacity key={s.id} onPress={() => changeSubject(s.id)}
+              <View style={styles.subjectSelector}>
+                <Text style={styles.subjectSelectorLabel}>MÔN ĐANG HỎI</Text>
+                <View style={styles.selectedSubjectRow}>
+                  <View style={styles.selectedSubjectIcon}>
+                    <Text style={styles.selectedSubjectIconText}>📚</Text>
+                  </View>
+                  <View style={styles.selectedSubjectDetails}>
+                    <Text style={styles.selectedSubjectName} numberOfLines={3}
+                      ellipsizeMode="tail">
+                      {currentSubject?.name || 'Chưa chọn môn học'}
+                    </Text>
+                    {!!currentSubject?.code && (
+                      <Text style={styles.selectedSubjectCode} numberOfLines={1}>
+                        {currentSubject.code}
+                      </Text>
+                    )}
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => setShowSubjectPicker(value => !value)}
                     disabled={sending}
-                    style={[styles.subjectChip,Number(s.id)===Number(scopedId)&&styles.activeChip]}>
-                    <Text style={[styles.subjectText,Number(s.id)===Number(scopedId)&&styles.activeText]}
-                      numberOfLines={1}>{s.name}</Text>
+                    accessibilityRole="button"
+                    accessibilityLabel="Đổi môn học trong Chat AI"
+                    accessibilityState={{expanded:showSubjectPicker,disabled:sending}}
+                    style={styles.changeSubjectButton}>
+                    <Text style={styles.changeSubjectText}>
+                      {showSubjectPicker ? 'Đóng' : 'Đổi môn'}
+                    </Text>
+                    <Text style={styles.changeSubjectArrow}>
+                      {showSubjectPicker ? '⌃' : '⌄'}
+                    </Text>
                   </TouchableOpacity>
-                ))}
-              </ScrollView>
+                </View>
+                {showSubjectPicker && (
+                  <View style={styles.subjectOptionsContainer}>
+                    <ScrollView style={styles.subjectOptionsScroll}
+                      nestedScrollEnabled keyboardShouldPersistTaps="handled"
+                      showsVerticalScrollIndicator>
+                      {subjects.map(s => {
+                        const selected = Number(s.id) === Number(scopedId);
+                        return (
+                          <TouchableOpacity key={s.id} onPress={() => changeSubject(s.id)}
+                            disabled={sending} accessibilityRole="button"
+                            accessibilityState={{selected,disabled:sending}}
+                            style={[styles.subjectOption,selected&&styles.subjectOptionSelected]}>
+                            <View style={styles.subjectOptionContent}>
+                              <Text style={styles.subjectOptionName}>
+                                {s.name}
+                              </Text>
+                              {!!s.code && (
+                                <Text style={styles.subjectOptionCode}>{s.code}</Text>
+                              )}
+                            </View>
+                            {selected && <Text style={styles.subjectOptionTick}>✓</Text>}
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
             )}
             <ScrollView ref={scroll} style={styles.messages}
               keyboardShouldPersistTaps="handled"
@@ -249,13 +304,33 @@ const styles=StyleSheet.create({
   close:{paddingHorizontal:12,paddingVertical:5,backgroundColor:'#E0E7FF',borderRadius:10},
   closeText:{fontSize:24,color:'#3754A4'},
   context:{fontSize:12,fontWeight:'700',color:'#4158A0',paddingHorizontal:15,paddingTop:10},
-  subjectList:{maxHeight:54,flexGrow:0},
-  subjectContent:{padding:10,gap:7,alignItems:'center'},
-  subjectChip:{maxWidth:180,backgroundColor:'#FFFFFF',paddingVertical:8,paddingHorizontal:12,
-    borderWidth:1,borderColor:'#DCE3F6',borderRadius:20},
-  activeChip:{backgroundColor:'#5C70DC',borderColor:'#5C70DC'},
-  subjectText:{fontSize:12,color:'#465B93',fontWeight:'700'},
-  activeText:{color:'#FFFFFF'},
+  subjectSelector:{paddingHorizontal:14,paddingTop:10,paddingBottom:11,
+    borderBottomWidth:1,borderBottomColor:'#E5EAF7'},
+  subjectSelectorLabel:{fontSize:10,fontWeight:'800',letterSpacing:0.7,
+    color:'#6C7DA6',marginBottom:7},
+  selectedSubjectRow:{flexDirection:'row',alignItems:'center',backgroundColor:'#F0F3FF',
+    borderWidth:1,borderColor:'#DCE3FA',borderRadius:14,padding:10,gap:9},
+  selectedSubjectIcon:{width:34,height:34,borderRadius:11,backgroundColor:'#E2E8FF',
+    justifyContent:'center',alignItems:'center'},
+  selectedSubjectIconText:{fontSize:17},
+  selectedSubjectDetails:{flex:1,minWidth:0},
+  selectedSubjectName:{fontSize:12.5,fontWeight:'800',lineHeight:18,color:'#30488E'},
+  selectedSubjectCode:{fontSize:10.5,color:'#7382A7',marginTop:3},
+  changeSubjectButton:{flexDirection:'row',alignItems:'center',justifyContent:'center',
+    paddingHorizontal:10,minHeight:36,backgroundColor:'#FFFFFF',
+    borderWidth:1,borderColor:'#CED9F5',borderRadius:10,flexShrink:0,gap:4},
+  changeSubjectText:{fontSize:11.5,fontWeight:'800',color:'#4B5FC3'},
+  changeSubjectArrow:{fontSize:15,fontWeight:'800',color:'#4B5FC3'},
+  subjectOptionsContainer:{marginTop:8,backgroundColor:'#FFFFFF',
+    borderWidth:1,borderColor:'#DEE5F7',borderRadius:12,overflow:'hidden'},
+  subjectOptionsScroll:{maxHeight:210},
+  subjectOption:{paddingHorizontal:12,paddingVertical:11,flexDirection:'row',
+    alignItems:'center',borderBottomWidth:1,borderBottomColor:'#EDF1FA'},
+  subjectOptionSelected:{backgroundColor:'#EDF1FF'},
+  subjectOptionContent:{flex:1,minWidth:0,paddingRight:8},
+  subjectOptionName:{fontSize:12.5,lineHeight:19,fontWeight:'700',color:'#304160'},
+  subjectOptionCode:{fontSize:10.5,color:'#687C9F',marginTop:2},
+  subjectOptionTick:{fontSize:17,fontWeight:'900',color:'#5C70DC'},
   messages:{flexGrow:1,flexShrink:1,paddingHorizontal:13,paddingVertical:12},
   empty:{color:'#8A96B3',fontSize:13,lineHeight:20,textAlign:'center',paddingTop:25},
   message:{maxWidth:'93%',padding:12,borderRadius:15,marginBottom:10},
