@@ -60,6 +60,25 @@ async function request(path, options = {}) {
   return data;
 }
 
+// Free Chat and in-room Chat must use the exact same subject-owned
+// conversation and source-verified assistant path as Web. Never maintain a
+// second independent Gemini generation workflow for Mobile.
+async function sendVerifiedChat(subjectId, question, lesson = null) {
+  const history = await request(`/api/mobile/chat/${subjectId}`);
+  const conversationId = history.conversation_id;
+  if (!Number.isSafeInteger(conversationId) || conversationId <= 0) {
+    throw new Error('Không xác định được hội thoại của môn học.');
+  }
+  return request('/api/chat', {
+    method: 'POST',
+    body: JSON.stringify({
+      conversation_id: conversationId,
+      question,
+      ...(lesson ? { lesson } : {}),
+    }),
+  });
+}
+
 export const api = {
   login: (email, password) =>
     request('/api/mobile/login', {
@@ -142,11 +161,7 @@ export const api = {
       body: JSON.stringify({ document_id: docId }),
     }),
 
-  chat: (subjectId, message) =>
-    request('/api/mobile/chat', {
-      method: 'POST',
-      body: JSON.stringify({ subject_id: subjectId, message }),
-    }),
+  chat: (subjectId, message) => sendVerifiedChat(subjectId, message),
 
   chatHistory: (subjectId) =>
     request(`/api/mobile/chat/${subjectId}`),
@@ -244,21 +259,11 @@ export const api = {
 
   // Reuse Web's stricter source-verified tutor when inside a roadmap session.
   // The conversation id is read only from the student's own subject history.
-  studyChat: async (subjectId, message, taskId, chapterNumber) => {
-    const history = await request(`/api/mobile/chat/${subjectId}`);
-    const conversationId = history.conversation_id;
-    if (!Number.isSafeInteger(conversationId) || conversationId <= 0) {
-      throw new Error('Không xác định được hội thoại của môn học.');
-    }
-    return request('/api/chat', {
-      method: 'POST',
-      body: JSON.stringify({
-        conversation_id: conversationId,
-        question: message,
-        lesson: { chapter_number: chapterNumber, task_id: taskId },
-      }),
-    });
-  },
+  studyChat: (subjectId, message, taskId, chapterNumber) =>
+    sendVerifiedChat(subjectId, message, {
+      chapter_number: chapterNumber,
+      task_id: taskId,
+    }),
 
   studyPlan: () => request('/api/mobile/study-plan'),
 
