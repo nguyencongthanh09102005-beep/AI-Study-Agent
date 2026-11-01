@@ -485,9 +485,11 @@ def run():
                 final_status.get_json()
             )
             assert final_status.get_json()["is_final"] is True
+            # A re-login rotates session state. Use the fresh token read
+            # from the same Mobile status response as the app does.
             final_start = client.post(
                 final_start_endpoint, json={},
-                headers={"X-Quiz-CSRF": csrf_for_start}
+                headers={"X-Quiz-CSRF": final_status.get_json()["quiz_csrf"]}
             )
             assert final_start.status_code == 200, (
                 final_start.get_data(as_text=True)[:900]
