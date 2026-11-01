@@ -11,8 +11,8 @@ Nhánh: `feature/phase9-fixes`. Chưa merge main.
 | C5 | Bộ đánh giá so sánh với Gemini trực tiếp | Có script và rubric | Chưa chạy Gemini thật, chưa chấm độc lập |
 | C6 | Giao diện Web nhất quán | Đã nối từ buổi học đến bài tập/CLO | Chưa nghiệm thu bằng ảnh |
 | C7 | Kiểm thử tổng hợp bằng học liệu thật | Có CI tự động | Chưa nghiệm thu thủ công |
-| C8 | Mobile đồng bộ toàn bộ chức năng mới | Chưa cập nhật | Chưa đạt |
-| Đợt 15 | Báo cáo và slide có kết quả thật | Chưa cập nhật | Chưa đạt |
+| C8 | Mobile: 4 tab, Chat nổi, lộ trình/buổi học, Quiz theo buổi 15/60, tài liệu & lịch | Đã triển khai + CI PASS; chưa khẳng định ngang chức năng Web | Cần nghiệm thu Expo Go từng luồng; C1/C2/C4 chuyên sâu vẫn ưu tiên Web |
+| Đợt 15 | Báo cáo, slide và minh chứng bảo vệ | Bản 25/10 đã có; cần đồng bộ tính năng và commit mới | Chưa chốt đến khi cập nhật ảnh thực và duyệt thông tin bìa |
 
 ## Đường đi demo thực tế
 
@@ -29,7 +29,7 @@ Nhánh: `feature/phase9-fixes`. Chưa merge main.
 
 ## Quy tắc đạt
 
-Mỗi mục phải có PASS/FAIL/CHƯA TEST kèm ảnh/log. CI PASS không đồng nghĩa chất lượng câu hỏi Gemini đúng. Không kết luận đạt CLO chính thức, không nêu hiệu quả vượt Gemini nếu chưa có dữ liệu chấm thật. C8/Đợt 15 thực hiện sau khi Web được nghiệm thu.
+Mỗi mục phải có PASS/FAIL/CHƯA TEST kèm ảnh/log. CI PASS không đồng nghĩa chất lượng câu hỏi Gemini đúng. Không kết luận đạt CLO chính thức, không nêu hiệu quả vượt Gemini nếu chưa có dữ liệu chấm thật. C8 đã có triển khai nền tảng trên Mobile nhưng không đồng nghĩa tất cả chức năng Web đã có UI riêng trên Mobile. Báo cáo, slide và ảnh nghiệm thu cần cập nhật theo phiên bản mới. Xem `docs/FINAL_RELEASE_QA_2026-11-01.md` trước khi xác nhận hoàn tất.
 
 ## Cập nhật máy
 
