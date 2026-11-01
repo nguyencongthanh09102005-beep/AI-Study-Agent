@@ -138,3 +138,103 @@
  .floating-ai-window-button,.floating-ai-resize-handle{display:none!important}
  .floating-ai-message-body .chat-data-table{width:max(100%,560px);min-width:560px}
 }
+
+
+/* Inline schedule tools: no navigation out of the floating assistant. */
+.floating-ai-quick-actions{display:flex;align-items:center;padding:7px 12px;background:#f3f6ff;border-bottom:1px solid #e3e9fb}
+.floating-ai-schedule-button{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:5px 12px;border:1px solid #d5def6;background:#fff;border-radius:999px;color:#425ab2;font-weight:750;font-size:12px;cursor:pointer}
+.floating-ai-schedule-button:not(:disabled):hover{background:#e6ecff}
+.floating-ai-schedule-button:disabled{opacity:.55;cursor:wait}
+.floating-ai-schedule-card{box-sizing:border-box;flex:none;width:100%;max-width:100%;min-width:0;padding:13px;border-radius:14px;border:1px solid #cbd9fb;background:#fff;color:#2a416f;box-shadow:0 6px 20px rgba(43,71,136,.07);display:flex;flex-direction:column;gap:10px;font-size:12px}
+.floating-ai-schedule-head{display:flex;align-items:flex-start;gap:12px;justify-content:space-between}
+.floating-ai-schedule-head strong{font-size:13px;line-height:1.5;color:#2b4384}
+.floating-ai-schedule-close{border:0;background:#eef2fb;color:#5d6e96;border-radius:8px;padding:3px 10px;font-size:18px;line-height:1.2;cursor:pointer}
+.floating-ai-schedule-summary{margin:0;line-height:1.6;font-size:12px}
+.floating-ai-schedule-hint{margin:0;line-height:1.5;font-size:11.5px;color:#66799e;overflow-wrap:anywhere}
+.floating-ai-schedule-label{display:flex;flex-direction:column;gap:5px;font-size:11.5px;font-weight:750;color:#334c7f;min-width:0}
+.floating-ai-schedule-select,.floating-ai-schedule-time{box-sizing:border-box;min-width:0;width:100%;max-width:100%;min-height:40px;padding:7px 9px;border:1px solid #d1dbef;border-radius:10px;background:#f9fbff;color:#2d4272;font-size:12px;font-weight:500}
+.floating-ai-schedule-select:focus-visible,.floating-ai-schedule-time:focus-visible,.floating-ai-schedule-card button:focus-visible{outline:2px solid #6677e7;outline-offset:2px}
+.floating-ai-schedule-suggestion{align-self:stretch;min-height:33px;border-radius:9px;background:#eaf1ff;color:#3c5ac0;border:1px solid #d4dffd;font-size:11.5px;font-weight:750;cursor:pointer}
+.floating-ai-schedule-preview,.floating-ai-schedule-confirm{min-height:40px;border-radius:11px;padding:9px;border:0;color:#fff;font-weight:750;font-size:12px;background:linear-gradient(125deg,#6d9cff,#5d58eb);cursor:pointer}
+.floating-ai-schedule-confirm{background:#167b5e}
+.floating-ai-schedule-card button:disabled{opacity:.65;cursor:wait}
+.floating-ai-schedule-result{margin:0;font-size:11.5px;color:#37588b;line-height:1.65}
+.floating-ai-schedule-card [hidden]{display:none!important}
+
+
+/* Clear learning/support separation without shrinking the Chat's usable area. */
+.floating-ai-tabs{flex:none;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;padding:9px 11px;background:#f5f7ff;border-bottom:1px solid #e4eafa}
+.floating-ai-tabs button{min-height:39px;border:1px solid transparent;border-radius:11px;background:transparent;color:#7180a6;font-size:13px;font-weight:800;cursor:pointer}
+.floating-ai-tabs button.active{background:#fff;border-color:#dce4f8;box-shadow:0 3px 9px rgba(67,94,161,.08);color:#405ec1}
+.floating-ai-tabs button:focus-visible{outline:2px solid #6e83e8;outline-offset:1px}
+.floating-ai-tab-view{flex:1;min-height:0;min-width:0;display:flex;flex-direction:column}
+.floating-ai-tab-view[hidden]{display:none!important}
+.floating-ai-support-view{padding:0;background:#f8faff}
+.floating-ai-support-heading{flex:none;padding:17px 15px 10px}
+.floating-ai-support-heading strong{display:block;color:#284377;font-size:15px;font-weight:850}
+.floating-ai-support-heading p{font-size:12px;color:#7182a5;line-height:1.6;margin:6px 0 0}
+.floating-ai-support-view>.floating-ai-schedule-button{margin:0 15px 13px;min-height:42px;border:0;border-radius:12px;background:linear-gradient(135deg,#688dff,#655be8);color:white;font-size:13px;font-weight:850;justify-content:center}
+.floating-ai-support-view>.floating-ai-schedule-button:not(:disabled):hover{background:linear-gradient(135deg,#5e84f4,#514dd6)}
+.floating-ai-support-results{flex:1;min-height:0;padding:15px;overflow-y:auto;background:#fff;display:flex;flex-direction:column;gap:13px;overscroll-behavior:contain}
+.floating-ai-support-empty,.floating-ai-review-empty{color:#65799d;font-size:12.5px;line-height:1.6;margin:0}
+.floating-ai-review-summary{display:flex;flex-direction:column;gap:5px;border-radius:12px;padding:13px;background:#edf3ff;color:#2d5188;font-size:13px}
+.floating-ai-review-summary strong{font-weight:850}
+.floating-ai-review-summary span{font-size:11px;color:#627ba6}
+.floating-ai-review-success{margin:0;color:#168469;background:#edfaf4;border:1px solid #d2ede0;border-radius:10px;padding:9px;font-size:12px;line-height:1.5}
+.floating-ai-review-card{border:1px solid #dce5f7;border-radius:14px;display:flex;flex-direction:column;gap:13px;padding:14px;background:#fff}
+.floating-ai-review-subject{font-size:13px;font-weight:850;color:#233f78;overflow-wrap:anywhere;line-height:1.5}
+.floating-ai-review-warning{margin:0;color:#98572c;font-size:12px;line-height:1.5}
+.floating-ai-review-times{display:flex;align-items:center;gap:9px}
+.floating-ai-review-time{flex:1;min-width:0;padding:9px;border-radius:11px;background:#f3f6fc;display:flex;flex-direction:column;gap:5px}
+.floating-ai-review-time small{font-size:10px;color:#7180a4;font-weight:750}
+.floating-ai-review-time strong{font-size:12px;color:#2c467d;overflow-wrap:anywhere}
+.floating-ai-review-arrow{color:#647acc}
+.floating-ai-resize-guide{flex:none;background:#f8faff;padding:4px 30px;text-align:center;color:#8291ae;font-size:10px;line-height:1.3;border-top:1px solid #e5ebf7;user-select:none}
+/* More visible corner grip and two dedicated edge grips. */
+.floating-ai-resize-handle{width:29px;height:29px;left:0;bottom:0;border-radius:0 10px 0 17px;background:#e7edff;box-shadow:inset -1px 1px 0 #d2defb}
+.floating-ai-resize-handle::after{left:7px;bottom:7px;width:15px;height:15px;opacity:1;background:repeating-linear-gradient(135deg,transparent 0 3px,#5572cb 3px 5px,transparent 5px 7px)}
+.floating-ai-root[data-side="left"] .floating-ai-resize-handle{left:auto;right:0;border-radius:10px 0 17px 0}
+.floating-ai-root[data-side="left"] .floating-ai-resize-handle::after{right:7px;left:auto}
+.floating-ai-resize-edge{position:absolute;z-index:5;touch-action:none;user-select:none}
+.floating-ai-resize-edge-horizontal{top:38%;left:0;width:11px;height:100px;cursor:ew-resize;background:transparent;border-radius:0 9px 9px 0}
+.floating-ai-resize-edge-horizontal::after{content:"";position:absolute;width:4px;height:49px;border-radius:5px;background:#b6c3e5;top:25px;left:2px}
+.floating-ai-root[data-side="left"] .floating-ai-resize-edge-horizontal{left:auto;right:0;border-radius:9px 0 0 9px}
+.floating-ai-root[data-side="left"] .floating-ai-resize-edge-horizontal::after{left:auto;right:2px}
+.floating-ai-resize-edge-vertical{top:0;left:calc(50% - 54px);width:108px;height:10px;cursor:ns-resize;border-radius:0 0 9px 9px;background:transparent}
+.floating-ai-resize-edge-vertical::after{content:"";position:absolute;left:30px;top:2px;width:48px;height:4px;background:#b6c3e5;border-radius:5px}
+.floating-ai-resize-edge:hover{background:rgba(113,142,224,.16)}
+.floating-ai-resize-edge:focus-visible{outline:3px solid #6b80fd;outline-offset:1px}
+@media(max-width:600px){
+ .floating-ai-resize-guide,.floating-ai-resize-edge{display:none!important}
+ .floating-ai-support-heading{padding:15px}
+ .floating-ai-support-results{padding:12px}
+}
+
+/* Conversational Support, native controls and independent message history. */
+.floating-ai-support-suggestions{display:flex;flex-wrap:wrap;gap:7px;padding:9px 12px;background:#f5f8ff}
+.floating-ai-support-suggestions button{border:1px solid #d7e0f5;border-radius:9px;background:#fff;color:#405a9a;padding:8px 10px;font:700 11px/1.3 inherit;cursor:pointer}
+.floating-ai-support-suggestions button:hover{background:#e9efff}
+.floating-ai-support-view .floating-ai-support-results{background:#f7f9ff;padding:12px}
+.floating-ai-support-message{max-width:96%;align-self:flex-start;background:#fff;border:1px solid #dce5fb;border-radius:12px;padding:10px 12px;color:#2c4479;font-size:12px;line-height:1.6;overflow-wrap:anywhere}
+.floating-ai-support-message.user{align-self:flex-end;background:#e7edff}
+.floating-ai-support-message.error{background:#fff4e3;border-color:#edcf9e}
+.floating-ai-support-message>strong{display:block;font-size:11px;color:#6579aa;margin-bottom:4px}
+.floating-ai-support-message-body{white-space:pre-wrap}
+.floating-ai-support-card{display:flex;flex-direction:column;gap:10px;padding:12px;border:1px solid #cddcf8;border-radius:14px;background:#fff;min-width:0;font-size:12px;color:#304878}
+.floating-ai-support-card-heading{font-size:13px;color:#263f78}
+.floating-ai-support-field{display:flex;flex-direction:column;gap:6px;font-weight:700;color:#51678b}
+.floating-ai-support-field span{font-size:11px}
+.floating-ai-support-select,.floating-ai-support-upload{width:100%;box-sizing:border-box;min-width:0;padding:9px;border:1px solid #cbd7ec;border-radius:9px;background:#fcfdff;color:#284473;font:500 12px/1.5 inherit}
+.floating-ai-support-upload{font-size:11px}
+.floating-ai-support-hint{margin:0;font-size:11px;line-height:1.5;color:#65789f}
+.floating-ai-support-row{display:flex;justify-content:space-between;align-items:baseline;gap:9px;font-size:11.5px}
+.floating-ai-support-row span{color:#677c9f;flex-shrink:0}
+.floating-ai-support-row strong{text-align:right;overflow-wrap:anywhere}
+.floating-ai-support-primary{min-height:37px;border:0;background:#586de7;color:#fff;border-radius:10px;font:750 12px/1.4 inherit;padding:9px 12px;cursor:pointer}
+.floating-ai-support-primary:disabled{opacity:.65;cursor:default}
+.floating-ai-support-secondary{background:#edf1ff;color:#3f58a7;border:1px solid #d5defa}
+.floating-ai-support-confirm{display:flex;flex-direction:column;gap:9px;border:1px solid #b9d6c8;border-radius:10px;padding:10px;background:#f5fbf9}
+.floating-ai-support-feedback{margin:0;font-size:11px;line-height:1.5;color:#24674e}
+.floating-ai-support-view>.floating-ai-compose{padding:9px 11px}
+.floating-ai-support-view>.floating-ai-compose textarea{min-height:46px}
+@media(max-width:600px){.floating-ai-support-suggestions{flex-wrap:wrap}}

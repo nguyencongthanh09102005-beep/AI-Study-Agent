@@ -1,10 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
   const body = document.body;
-  const openAiPlanner = document.getElementById("openAiPlanner");
-  const aiPlannerModal = document.getElementById("aiPlannerModal");
-  const aiPlannerForm = document.getElementById("aiPlannerForm");
-  const generatePlanButton = document.getElementById("generatePlanButton");
-
   const toggleEditPlan = document.getElementById("toggleEditPlan");
   const addTaskButton = document.getElementById("addTaskButton");
   const taskModal = document.getElementById("taskModal");
@@ -74,10 +69,38 @@ document.addEventListener("DOMContentLoaded", () => {
     showConflictNotice();
     taskStudyAt.focus();
   });
-  taskForm?.addEventListener("submit", (event) => {
+  // Native confirm() blocked the page and exposed the localhost address.
+  // Preserve the form's normal submit, selected submitter and validation.
+  let conflictDecisionPending = false;
+  let conflictSubmitApproved = false;
+  taskForm?.addEventListener("submit", async (event) => {
+    if (conflictSubmitApproved) return;
     const {conflicts} = inspectTime();
-    if (conflicts.length && !window.confirm("Có " + conflicts.length +
-      " buổi bị trùng giờ. Bạn có chắc muốn giữ khung giờ này?")) event.preventDefault();
+    if (!conflicts.length) return;
+    event.preventDefault();
+    if (conflictDecisionPending) return;
+    const submitter = event.submitter;
+    const state = [taskForm.action, taskStudyAt?.value, taskDuration?.value].join("|");
+    conflictDecisionPending = true;
+    try {
+      const accepted = await window.AppDialogs.confirm({
+        title: "Lịch học bị trùng giờ",
+        message: "Có " + conflicts.length +
+          " buổi bị trùng giờ. Bạn có chắc muốn giữ khung giờ này?",
+        confirmLabel: "Giữ khung giờ",
+        kind: "warning"
+      });
+      // Do not save stale form values if inputs changed while modal was open.
+      if (!accepted ||
+          state !== [taskForm.action, taskStudyAt?.value, taskDuration?.value].join("|"))
+        return;
+      conflictSubmitApproved = true;
+      if (submitter && submitter.form === taskForm) taskForm.requestSubmit(submitter);
+      else taskForm.requestSubmit();
+    } finally {
+      conflictSubmitApproved = false;
+      conflictDecisionPending = false;
+    }
   });
 
 
@@ -90,7 +113,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Đưa modal ra trực tiếp dưới <body> như một "portal".
   // Nhờ vậy position: fixed luôn tính theo viewport thật của trình duyệt,
   // không bị lệch khi zoom 80% / 100% / 125% hoặc khi ancestor có transform.
-  [aiPlannerModal, taskModal, reminderModal].forEach((modal) => {
+  [taskModal, reminderModal].forEach((modal) => {
     if (modal && modal.parentElement !== body) {
       body.appendChild(modal);
     }
@@ -112,22 +135,13 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  openAiPlanner?.addEventListener("click", () => openModal(aiPlannerModal));
-  document.querySelectorAll("[data-close-modal]").forEach((el) => el.addEventListener("click", () => closeModal(aiPlannerModal)));
   document.querySelectorAll("[data-close-task-modal]").forEach((el) => el.addEventListener("click", () => closeModal(taskModal)));
   document.querySelectorAll("[data-close-reminder-modal]").forEach((el) => el.addEventListener("click", () => closeModal(reminderModal)));
 
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
-    closeModal(aiPlannerModal);
     closeModal(taskModal);
     closeModal(reminderModal);
-  });
-
-  aiPlannerForm?.addEventListener("submit", () => {
-    if (!generatePlanButton) return;
-    generatePlanButton.disabled = true;
-    generatePlanButton.textContent = "⏳ AI đang tạo kế hoạch...";
   });
 
   toggleEditPlan?.addEventListener("click", () => {
@@ -401,11 +415,16 @@ document.addEventListener("DOMContentLoaded", () => {
           // Only scheduled roadmap sessions have a Study Session (6.3.1).
           const card = makeDiv("study-hour-event-shell");
           card.appendChild(button);
-          if (item.dataset.taskSource === "roadmap" &&
-              /^\d+$/.test(item.dataset.taskId || "")) {
+          const validTaskId = /^\d+$/.test(item.dataset.taskId || "");
+          const official = item.dataset.taskSource === "roadmap";
+          const personal = item.dataset.taskSource === "manual" &&
+                           item.dataset.manualDoc === "1";
+          if (validTaskId && (official || personal)) {
             const launch = document.createElement("a");
             launch.className = "study-hour-launch";
-            launch.href = "/study-plan/tasks/" + item.dataset.taskId + "/learn";
+            launch.href = official
+              ? "/study-plan/tasks/" + item.dataset.taskId + "/learn"
+              : "/manual-study/" + item.dataset.taskId;
             launch.textContent = item.dataset.taskDone === "1"
               ? "Xem lại buổi học →" : "▶ Bắt đầu học";
             card.appendChild(launch);
@@ -481,8 +500,8 @@ document.addEventListener("DOMContentLoaded", () => {
     if (emptyState) {
       emptyState.hidden = visibleCount !== 0;
       emptyState.textContent = currentView === "list"
-        ? "Chưa có nhiệm vụ trong kế hoạch. Hãy chọn Tạo kế hoạch mới để bắt đầu."
-        : `Ngày ${formatShort(selectedDate)} chưa có buổi học. Bạn có thể chọn ngày khác hoặc tạo kế hoạch mới.`;
+        ? "Chưa có buổi học. Mở Môn học → Đề cương & lộ trình để xếp buổi học vào lịch, hoặc thêm buổi thủ công."
+        : `Ngày ${formatShort(selectedDate)} chưa có buổi học. Bạn có thể chọn ngày khác hoặc thêm buổi thủ công.`;
     }
   }
 

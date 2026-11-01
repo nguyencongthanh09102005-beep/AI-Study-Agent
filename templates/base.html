@@ -22,6 +22,7 @@
   {% if page == 'study_plan' %}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/study_plan_cleanup.css') }}">
   {% endif %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/phase9_accessibility.css') }}">
 </head>
 <body class="study-ui page-{{ page or 'default' }}">
 <div class="app-shell">
@@ -43,9 +44,9 @@
       {% else %}
       <a class="{{ 'active' if page=='dashboard' else '' }}{{ ' chat-nav-secondary' if page == 'chat' else '' }}" href="{{ url_for('dashboard') }}" title="Tổng quan"><span>⌂</span><b>Tổng quan</b></a>
       <a class="{{ 'active' if page=='subjects' else '' }}{{ ' chat-nav-secondary' if page == 'chat' else '' }}" href="{{ url_for('subjects') }}" title="Môn học"><span>▱</span><b>Môn học</b></a>
-      <a class="{{ 'active' if page=='documents' else '' }}{{ ' chat-nav-secondary' if page == 'chat' else '' }}" href="{{ url_for('documents') }}" title="Tài liệu"><span>▤</span><b>Tài liệu</b></a>
-      <a class="{{ 'active' if page=='quiz' else '' }}{{ ' chat-nav-secondary' if page == 'chat' else '' }}" href="{{ url_for('quiz') }}" title="Quiz"><span>?</span><b>Quiz</b></a>
       <a class="{{ 'active' if page=='study_plan' else '' }}{{ ' chat-nav-secondary' if page == 'chat' else '' }}" href="{{ url_for('study_plan') }}" title="Kế hoạch học"><span>▦</span><b>Kế hoạch học</b></a>
+      <a class="{{ 'active' if page=='quiz' else '' }}{{ ' chat-nav-secondary' if page == 'chat' else '' }}" href="{{ url_for('quiz') }}" title="Quiz"><span>?</span><b>Quiz</b></a>
+      <a class="{{ 'active' if page=='documents' else '' }}{{ ' chat-nav-secondary' if page == 'chat' else '' }}" href="{{ url_for('documents') }}" title="Tài liệu"><span>▤</span><b>Tài liệu</b></a>
       <a class="{{ 'active' if page=='chat' else '' }}{{ ' chat-nav-primary' if page == 'chat' else '' }}" href="{{ url_for('chat') }}"><span>◯</span><b>Chat AI</b></a>
       {% if page == 'chat' %}
       <button type="button" id="chatNavToggle" class="chat-nav-toggle" aria-controls="chatSidebarNav" aria-expanded="false">
@@ -126,6 +127,11 @@
         <button type="button" id="floatingAiClose" class="floating-ai-close" aria-label="Thu nhỏ Chat AI">−</button>
       </div>
     </header>
+    <div class="floating-ai-tabs" role="tablist" aria-label="Chế độ trợ lý">
+      <button type="button" id="floatingAiTabStudy" role="tab" aria-controls="floatingAiStudyView" aria-selected="true" class="active">📚 Học tập</button>
+      <button type="button" id="floatingAiTabSupport" role="tab" aria-controls="floatingAiSupportView" aria-selected="false">✦ Hỗ trợ</button>
+    </div>
+    <div id="floatingAiStudyView" class="floating-ai-tab-view" role="tabpanel" aria-labelledby="floatingAiTabStudy">
     <div id="floatingAiMode" class="floating-ai-mode" role="status" aria-live="polite">Đang tải trợ lý...</div>
     <label id="floatingAiCourseLabel" class="floating-ai-course-label" for="floatingAiCourse">
       Chọn môn học
@@ -143,9 +149,35 @@
       </div>
     </form>
     <a id="floatingAiFullChat" class="floating-ai-full-link" href="{{ url_for('chat') }}">Mở Chat AI đầy đủ ↗</a>
+    </div>
+    <div id="floatingAiSupportView" class="floating-ai-tab-view floating-ai-support-view" role="tabpanel" aria-labelledby="floatingAiTabSupport" hidden>
+      <div class="floating-ai-support-heading">
+        <strong>✦ AI Hỗ trợ thời khóa biểu</strong>
+        <p>Nhắn yêu cầu tự nhiên. Xem trước và xác nhận trước khi thêm hoặc đổi lịch.</p>
+      </div>
+      <div class="floating-ai-support-suggestions" aria-label="Câu gợi ý">
+        <button type="button" id="floatingAiScheduleButton" class="floating-ai-schedule-button">✦ Rà soát lịch trùng</button>
+        <button type="button" data-support-suggestion="Tui muốn đổi giờ một buổi học">Đổi giờ học</button>
+        <button type="button" data-support-suggestion="Cho tui tự học môn Figma">Thêm buổi tự học</button>
+      </div>
+      <div id="floatingAiSupportResults" class="floating-ai-support-results" role="log" aria-label="Hội thoại Hỗ trợ" aria-live="polite">
+        <p class="floating-ai-support-empty">Bạn có thể rà soát lịch, đổi giờ hoặc thêm buổi tự học.</p>
+      </div>
+      <form id="floatingAiSupportForm" class="floating-ai-compose">
+        <label class="sr-only" for="floatingAiSupportInput">Yêu cầu AI Hỗ trợ</label>
+        <textarea id="floatingAiSupportInput" maxlength="400" rows="2" placeholder="Ví dụ: Đổi lịch sử Đảng ngày 31/10 đến 9h tối..." required></textarea>
+        <div class="floating-ai-compose-footer">
+          <span id="floatingAiSupportStatus" role="status">Chưa kết nối</span>
+          <button id="floatingAiSupportSend" type="submit">Gửi ➤</button>
+        </div>
+      </form>
+    </div>
+    <div class="floating-ai-resize-guide" id="floatingAiResizeGuide">↗ Kéo góc hoặc cạnh để chỉnh kích thước</div>
+    <div id="floatingAiResizeHorizontal" class="floating-ai-resize-edge floating-ai-resize-edge-horizontal" role="separator" tabindex="0" aria-label="Kéo cạnh cửa sổ để chỉnh chiều rộng" title="Giữ và kéo cạnh trái/phải để chỉnh chiều rộng"></div>
+    <div id="floatingAiResizeVertical" class="floating-ai-resize-edge floating-ai-resize-edge-vertical" role="separator" tabindex="0" aria-label="Kéo cạnh trên để chỉnh chiều cao" title="Giữ và kéo cạnh trên để chỉnh chiều cao"></div>
     <div id="floatingAiResize" class="floating-ai-resize-handle" role="separator" tabindex="0"
          aria-orientation="vertical" aria-label="Đổi kích thước Chat AI. Kéo góc này, hoặc dùng phím mũi tên để chỉnh."
-         title="Kéo để chỉnh chiều rộng và chiều cao · Phím mũi tên để chỉnh"></div>
+         title="Kéo góc để chỉnh chiều rộng và chiều cao · Phím mũi tên để chỉnh"></div>
   </section>
 </div>
 {% endif %}
@@ -155,6 +187,8 @@
 <script src="{{ url_for('static', filename='js/mockup.js') }}"></script>
 {% if page not in ['chat', 'admin'] %}
 <script src="{{ url_for('static', filename='js/chat_format.js') }}"></script>
+<script src="{{ url_for('static', filename='js/ai_bubble_schedule.js') }}"></script>
+<script src="{{ url_for('static', filename='js/ai_support_chat.js') }}"></script>
 <script src="{{ url_for('static', filename='js/ai_bubble.js') }}"></script>
 {% endif %}
 {% block scripts %}{% endblock %}

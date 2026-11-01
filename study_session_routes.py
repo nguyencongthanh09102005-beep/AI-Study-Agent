@@ -104,30 +104,9 @@ def learning_session(task_id):
             return _unavailable(subject,
                 "Nội dung lộ trình khác buổi đã lưu. Hãy rà soát lại lộ trình; giờ và tiến độ cũ vẫn được giữ.")
 
-        # Saved roadmap hints are not authorization: resolve private documents
-        # from the current user's CURRENT subject on every page request.
+        # An academic lesson never imports a student's private uploads.
+        # Private PDFs belong exclusively to manual self-study rooms.
         private_docs = []
-        seen = set()
-        for item in lesson.get("materials") or []:
-            if not isinstance(item, dict) or item.get("kind") != "personal":
-                continue
-            try:
-                doc_id = int(item.get("id"))
-            except (ValueError, TypeError):
-                continue
-            if doc_id in seen:
-                continue
-            row = conn.execute("""
-                SELECT id,original_name,stored_name FROM documents
-                WHERE id=? AND user_id=? AND subject_id=? AND id!=COALESCE(?, -1)
-            """, (doc_id, uid, task["subject_id"],
-                  task["personal_syllabus_document_id"])).fetchone()
-            if row:
-                private_docs.append({
-                    "name": row["original_name"],
-                    "link": url_for("uploaded_file", filename=row["stored_name"]),
-                })
-                seen.add(doc_id)
 
         # Only currently Admin-approved shared documents mapped to the CURRENT
         # official syllabus chapter; ignore shared IDs embedded in saved JSON.

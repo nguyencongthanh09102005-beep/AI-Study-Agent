@@ -6,6 +6,7 @@ import json
 import os
 import secrets
 import sys
+import time
 
 from flask import Blueprint, current_app, render_template, request, redirect, url_for, session
 from werkzeug.utils import secure_filename
@@ -100,7 +101,7 @@ def review(subject_id):
             if action == "upload":
                 uploaded = request.files.get("file")
                 if not uploaded or not uploaded.filename or not project.allowed_file(uploaded.filename):
-                    return _back(subject_id, error="Chọn file PDF, TXT hoặc MD hợp lệ.")
+                    return _back(subject_id, error="Chọn file PDF, DOCX, TXT hoặc MD hợp lệ.")
                 original = os.path.basename(uploaded.filename.replace("\\", "/"))[:180]
                 safe = secure_filename(original)
                 if not safe:
@@ -112,7 +113,7 @@ def review(subject_id):
                     extracted = project.extract_text(path)
                     if not extracted.strip():
                         path.unlink(missing_ok=True)
-                        return _back(subject_id, error="Không trích xuất được chữ từ PDF. PDF scan cần OCR.")
+                        return _back(subject_id, error="Không trích xuất được nội dung từ file. PDF scan cần OCR; Word phải là DOCX hợp lệ.")
                     cursor = conn.execute("""
                         INSERT INTO documents(user_id,subject_id,original_name,stored_name,
                                               extracted_text,created_at)
@@ -132,10 +133,37 @@ def review(subject_id):
             if action == "analyze":
                 if not text:
                     return _back(subject_id, error="Hãy tải lên hoặc chọn đề cương trước.")
-                model_response = None
-                if os.getenv("GEMINI_API_KEY", "").strip():
-                    model_response, _ = project.gemini_generate(syllabus_llm_prompt(text))
-                units = extract_syllabus_units(text, model_response)
+                # Reuse ONLY a public course syllabus with the exact same hash.
+                # Personal syllabus analysis is never shared across students.
+                shared_id = None
+                if kind == "shared":
+                    link = conn.execute("""
+                        SELECT shared_subject_id FROM subjects
+                        WHERE id=? AND user_id=?
+                    """,(subject_id,uid)).fetchone()
+                    shared_id = link["shared_subject_id"] if link else None
+                from shared_analysis_cache import cached_units, save_units
+                from admin_syllabus_analysis import approved_shared_units
+                admin_approved = (approved_shared_units(conn, shared_id, text)
+                                  if shared_id else None)
+                cached = (admin_approved if admin_approved is not None else
+                          cached_units(conn, shared_id, text, project.now())
+                          if shared_id else None)
+                if cached is not None:
+                    units = cached
+                    source_notice = ("Đã tải danh sách chương từ đề cương được quản trị viên duyệt. Hãy kiểm tra và xác nhận." if admin_approved is not None else "Đã tìm thấy danh sách chương đã phân tích. Hãy kiểm tra và xác nhận.")
+                else:
+                    started = time.perf_counter()
+                    model_response = None
+                    attempted = bool(os.getenv("GEMINI_API_KEY", "").strip())
+                    if attempted:
+                        model_response, _ = project.gemini_generate(syllabus_llm_prompt(text))
+                    units = extract_syllabus_units(text, model_response)
+                    elapsed_ms = int((time.perf_counter()-started)*1000)
+                    source_notice = "Đã phân tích đề cương; hãy kiểm tra và xác nhận chương."
+                    if shared_id and units:
+                        save_units(conn, shared_id, text, units, attempted,
+                                   elapsed_ms, project.now())
                 if not units:
                     return _back(subject_id, error="Chưa tìm được tiêu đề chương/bài đáng tin cậy. Kiểm tra file đề cương hoặc yêu cầu GVHD hỗ trợ.")
                 conn.execute("""
@@ -149,7 +177,7 @@ def review(subject_id):
                         status='draft', updated_at=excluded.updated_at
                 """, (uid, subject_id, fingerprint, kind, json.dumps(units, ensure_ascii=False), project.now()))
                 conn.commit()
-                return _back(subject_id, notice="Đã phân tích; hãy kiểm tra từng chương rồi xác nhận.")
+                return _back(subject_id, notice=source_notice)
 
             if action == "confirm":
                 if not review_row or review_row["status"] != "draft":

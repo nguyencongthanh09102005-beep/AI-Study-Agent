@@ -42,9 +42,9 @@ def ensure_roadmap_schema(conn):
 def _course_documents(project, conn, user_id, subject_id, shared_subject,
                       syllabus_id, source_text):
     """Only unique private study documents; never offer the syllabus as a slide."""
-    return personal_course_documents(
-        conn, user_id, subject_id, syllabus_id, source_text
-    )
+    # The official roadmap uses only verified syllabus and approved shared
+    # chapter materials. Student PDFs remain in the separate self-study stream.
+    return []
 
 @course_path_bp.route("/subjects/<int:subject_id>/learning-path", methods=["GET", "POST"])
 def learning_path(subject_id):
@@ -99,7 +99,7 @@ def learning_path(subject_id):
             if not secrets.compare_digest(request.form.get("csrf_token", ""), token):
                 return "Phiên biểu mẫu không hợp lệ.", 403
             action = request.form.get("action")
-            if action == "schedule":
+            if action in ("schedule", "reflow"):
                 # Import is explicit: creating a roadmap alone never creates
                 # or deletes Study Plan tasks, and old/stale plans are rejected.
                 if not fresh:
@@ -109,7 +109,8 @@ def learning_path(subject_id):
                     ), code=303)
                 try:
                     summary = import_roadmap_lessons(
-                        conn, uid, subject_id, saved_sessions, project.now()
+                        conn, uid, subject_id, saved_sessions, project.now(),
+                        reschedule_existing=(action == "reflow"),
                     )
                 except ValueError as exc:
                     return redirect(url_for(
@@ -127,6 +128,16 @@ def learning_path(subject_id):
                     message += (
                         f" Có {summary['changed']} buổi đã thay đổi nội dung; "
                         "lịch cũ được giữ để bạn rà soát, không tự ghi đè."
+                    )
+                if summary["moved"]:
+                    message += (
+                        f" Đã tự chuyển {summary['moved']} buổi chưa học sang "
+                        "khung giờ trống, không đụng lịch bạn tự chỉnh."
+                    )
+                if summary["created"]:
+                    message += (
+                        " Giờ học được chọn theo lịch trống của tất cả các môn "
+                        "và giờ học ưu tiên; xem giờ chính thức trong thẻ buổi học."
                     )
                 # Detect collisions across all subjects after import, but do
                 # not automatically reschedule any existing lesson.
@@ -207,19 +218,13 @@ def learning_path(subject_id):
                                     notice="Đã xây dựng lộ trình từ đề cương đã xác nhận."), code=303)
 
         sessions = saved_sessions if fresh else []
-        # Filter older saved plans dynamically, without deleting the user's PDFs.
-        if sessions:
-            valid_private = {
-                d["id"] for d in personal_course_documents(
-                    conn, uid, subject_id,
-                    subject["personal_syllabus_document_id"], text
-                )
-            }
-            for lesson in sessions:
-                lesson["materials"] = [
-                    doc for doc in lesson.get("materials", [])
-                    if doc.get("kind") != "personal" or doc.get("id") in valid_private
-                ]
+        # Never attach a private upload to an academic roadmap. Existing
+        # saved test data are filtered at read time, not deleted from storage.
+        for lesson in sessions:
+            lesson["materials"] = [
+                doc for doc in lesson.get("materials", [])
+                if doc.get("kind") != "personal"
+            ]
         # Show confirmed shared materials live, even when Admin approves/revokes
         # a document after the student's roadmap was generated.
         if sessions and source_kind == "shared":
@@ -230,7 +235,8 @@ def learning_path(subject_id):
                     ensure_chapter_material_schema(conn)
                     linked_by_chapter = {}
                     for index, unit in enumerate(units):
-                        key = chapter_key(unit["evidence"])
+                        key = (chapter_key(unit["evidence"])
+                               or chapter_key(unit["title"]) or str(index + 1))
                         if key:
                             linked_by_chapter[index + 1] = [
                                 {"id": row["id"], "name": row["original_name"],
@@ -241,10 +247,8 @@ def learning_path(subject_id):
                     for lesson in sessions:
                         existing = lesson.get("materials") or []
                         confirmed = linked_by_chapter.get(lesson["unit_id"], [])
-                        # Only personal suggestions plus explicitly reviewed shared files.
-                        lesson["materials"] = [
-                            doc for doc in existing if doc.get("kind") == "personal"
-                        ] + confirmed
+                        # Official schedule consumes Admin-approved resources only.
+                        lesson["materials"] = confirmed
         linked = scheduled_lessons(conn, uid, subject_id) if sessions else {}
         schedule_status = {
             int(lesson["session_id"]): (
@@ -257,7 +261,7 @@ def learning_path(subject_id):
         return render_template(
             "course_learning_path.html", page="subjects", subject=subject,
             syllabus_name=syllabus_name, units=units, sessions=sessions,
-            schedule_status=schedule_status,
+            schedule_status=schedule_status, actual_schedule=linked,
             stale=bool(plan_row and not fresh),
             notice=request.args.get("notice", "")[:400], csrf_token=token,
             prepare_quizzes=request.args.get("prepare_quizzes") == "1",

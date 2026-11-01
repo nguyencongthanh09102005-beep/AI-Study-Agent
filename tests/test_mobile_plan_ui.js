@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const {
   localDateKey, addDays, getWeekDates, getPlanOverview,
-  getVisiblePlanTasks, splitReminders,
+  getVisiblePlanTasks, splitReminders, findTaskConflicts,
 } = require('../mobile/src/plan-utils');
 
 assert.equal(localDateKey(new Date(2026, 9, 25, 23, 55)), '2026-10-25');
@@ -45,6 +45,23 @@ assert.deepEqual(sorted.pending.map(r => r.id), [3,2]);
 assert.deepEqual(sorted.completed.map(r => r.id), [1,4]);
 assert.equal(reminders[0].id, 1, 'Sorting must not alter API source array');
 
+// Clash detection must match Web overlap semantics; do not move sessions
+// or mutate the old schedule without an explicit user decision.
+const planned = [
+  {id:10,title:'Buổi A',study_at:'2026-10-31T20:00',duration:45},
+  {id:11,title:'Buổi B',study_at:'2026-11-01T09:00',duration:30},
+];
+assert.deepEqual(findTaskConflicts(planned,{
+  study_at:'2026-10-31T20:15',duration:45
+}).map(x=>x.id),[10]);
+assert.deepEqual(findTaskConflicts(planned,{
+  study_at:'2026-10-31T20:45',duration:45
+}),[]);
+assert.deepEqual(findTaskConflicts(planned,{
+  study_at:'2026-10-31T20:15',duration:45
+},10),[]);
+assert.equal(planned[0].duration,45);
+
 // Static presentation contract: Mobile is for students; Admin remains Web-only.
 // The Expo iOS export in CI validates all JSX syntax and React Native bundling.
 const app = fs.readFileSync(path.join(__dirname, '../mobile/App.js'), 'utf8');
@@ -53,7 +70,11 @@ assert.ok(app.includes("planView === 'list'"), 'List view must remain available'
 assert.ok(app.includes('getPlanOverview(tasks, selectedDate)'), 'Progress based on selected week');
 assert.ok(app.includes('splitReminders(reminders)'), 'Completed deadlines must be grouped');
 assert.ok(app.includes('accessibilityState={{ expanded: showCompletedReminders }}'));
-assert.ok(app.includes("Quản trị viên chỉ đăng nhập trên Web."));
+const connection = fs.readFileSync(
+  path.join(__dirname, '../mobile/src/ConnectionSettings.js'), 'utf8'
+);
+assert.ok(connection.includes("Quản trị viên chỉ đăng nhập trên Web."),
+  'Admin-only disclosure belongs to connection settings, not the login form');
 assert.ok(app.includes('secureTextEntry={!showPassword}'));
 assert.ok(app.includes('secureTextEntry={!showConfirm}'));
 assert.ok(!app.includes('onAdminRegister'), 'No self-service mobile Admin registration');

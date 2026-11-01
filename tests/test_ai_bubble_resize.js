@@ -35,6 +35,7 @@ function fixture(width=1600, height=900) {
     };
     const node = {
       id: name, listeners, attributes, style, dataset: {}, hidden: true,
+      classList: {toggle() {}},
       offsetWidth: 62, offsetHeight: 62, disabled: false,
       addEventListener(event, callback) { (listeners[event] ||= []).push(callback); },
       setAttribute(name, value) { attributes[name] = value; },
@@ -51,6 +52,10 @@ function fixture(width=1600, height=900) {
   for (const id of [
     "floatingAiRoot", "floatingAiBubble", "floatingAiPanel", "floatingAiClose",
     "floatingAiExpand", "floatingAiResetSize", "floatingAiResize",
+    "floatingAiResizeHorizontal", "floatingAiResizeVertical",
+    "floatingAiTabStudy", "floatingAiTabSupport",
+    "floatingAiStudyView", "floatingAiSupportView", "floatingAiSupportResults",
+    "floatingAiScheduleButton",
     "floatingAiScope", "floatingAiMode", "floatingAiCourseLabel",
     "floatingAiCourse", "floatingAiMessages", "floatingAiForm",
     "floatingAiInput", "floatingAiSend", "floatingAiStatus",
@@ -73,7 +78,8 @@ function fixture(width=1600, height=900) {
     document, window: win, innerWidth: width, innerHeight: height,
     innerHeight: height, innerWidth: width,
     localStorage: storage(), sessionStorage: {
-      getItem() { return null; }, setItem() {}
+      getItem(key) { return state.get("session:"+key) ?? null; },
+      setItem(key, value) { state.set("session:"+key, String(value)); }
     },
     location: {pathname: "/", search: ""},
     URLSearchParams,
@@ -156,5 +162,48 @@ test.emit("floatingAiResize", "pointermove",
   {pointerId:3,clientX:530,clientY:750});
 test.emit("floatingAiResize", "pointerup", {pointerId:3});
 assert.equal(left.style.width, "550px");
+
+
+
+// Separate Học tập/Hỗ trợ views must keep the same user-sized window.
+state.clear();
+test = fixture();
+const twoTabsPanel = test.elements.get("floatingAiPanel");
+const learn = test.elements.get("floatingAiStudyView");
+const help = test.elements.get("floatingAiSupportView");
+assert.equal(learn.hidden,false);
+assert.equal(help.hidden,true);
+test.emit("floatingAiTabSupport","click");
+assert.equal(learn.hidden,true);
+assert.equal(help.hidden,false);
+assert.equal(test.elements.get("floatingAiTabSupport").attributes["aria-selected"],"true");
+test.emit("floatingAiResizeHorizontal","pointerdown",
+  {button:0,pointerId:7,clientX:400,clientY:420});
+test.emit("floatingAiResizeHorizontal","pointermove",
+  {pointerId:7,clientX:280,clientY:390});
+test.emit("floatingAiResizeHorizontal","pointerup",{pointerId:7});
+assert.equal(twoTabsPanel.style.width,"540px");
+assert.equal(twoTabsPanel.style.height,"640px",
+  "Dragging a side must not change the other axis");
+test.emit("floatingAiResizeVertical","pointerdown",
+  {button:0,pointerId:8,clientX:520,clientY:100});
+test.emit("floatingAiResizeVertical","pointermove",
+  {pointerId:8,clientX:520,clientY:40});
+test.emit("floatingAiResizeVertical","pointerup",{pointerId:8});
+assert.equal(twoTabsPanel.style.width,"540px");
+assert.equal(twoTabsPanel.style.height,"700px");
+test.emit("floatingAiTabStudy","click");
+assert.equal(learn.hidden,false);
+assert.equal(help.hidden,true);
+assert.equal(twoTabsPanel.style.width,"540px");
+assert.equal(twoTabsPanel.style.height,"700px");
+test.emit("floatingAiTabSupport","click");
+test = fixture();
+assert.equal(test.elements.get("floatingAiSupportView").hidden,false,
+  "Support tab choice is stored in the session");
+assert.equal(test.elements.get("floatingAiPanel").style.width,"540px",
+  "Custom width survives navigation");
+assert.equal(test.elements.get("floatingAiPanel").style.height,"700px",
+  "Custom height survives navigation");
 
 console.log("Floating chat: resize mouse, keyboard, expand/reset, save, viewport/mobile bounds and left/right docking PASS");

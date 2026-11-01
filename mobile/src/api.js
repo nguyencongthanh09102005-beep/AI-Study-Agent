@@ -9,8 +9,35 @@ export const API_BASE_URL = (
   configuredBaseUrl || 'http://10.0.2.2:5000'
 ).replace(/\/$/, '');
 
+// Runtime override is intentionally temporary: configure mobile/.env for a
+// permanent development URL. Never store credentials in the address.
+let activeBaseUrl = API_BASE_URL;
+export const getApiBaseUrl = () => activeBaseUrl;
+export function setApiBaseUrl(value) {
+  const normalized = String(value || '').trim().replace(/\/+$/, '');
+  if (!/^https?:\/\/[a-z0-9.-]+(?::\d{1,5})?$/i.test(normalized)) {
+    throw new Error('Địa chỉ hợp lệ có dạng http://192.168.1.10:5000');
+  }
+  activeBaseUrl = normalized;
+  return activeBaseUrl;
+}
+export async function testApiConnection(candidate) {
+  const value = String(candidate || getApiBaseUrl()).trim().replace(/\/+$/, '');
+  if (!/^https?:\/\/[a-z0-9.-]+(?::\d{1,5})?$/i.test(value)) {
+    throw new Error('Địa chỉ máy chủ chưa đúng định dạng.');
+  }
+  // HTTP 401 is a VALID connection test: user may not be logged in.
+  const response = await fetch(value + '/api/mobile/session', {
+    method:'GET', credentials:'include'
+  });
+  if (response.status !== 200 && response.status !== 401) {
+    throw new Error('Flask phản hồi HTTP ' + response.status + '. Kiểm tra đường dẫn.');
+  }
+  return true;
+}
+
 async function request(path, options = {}) {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetch(`${activeBaseUrl}${path}`, {
     credentials: 'include',
     ...options,
     headers: options.body instanceof FormData
@@ -31,6 +58,25 @@ async function request(path, options = {}) {
   }
 
   return data;
+}
+
+// Free Chat and in-room Chat must use the exact same subject-owned
+// conversation and source-verified assistant path as Web. Never maintain a
+// second independent Gemini generation workflow for Mobile.
+async function sendVerifiedChat(subjectId, question, lesson = null) {
+  const history = await request(`/api/mobile/chat/${subjectId}`);
+  const conversationId = history.conversation_id;
+  if (!Number.isSafeInteger(conversationId) || conversationId <= 0) {
+    throw new Error('Không xác định được hội thoại của môn học.');
+  }
+  return request('/api/chat', {
+    method: 'POST',
+    body: JSON.stringify({
+      conversation_id: conversationId,
+      question,
+      ...(lesson ? { lesson } : {}),
+    }),
+  });
 }
 
 export const api = {
@@ -115,11 +161,7 @@ export const api = {
       body: JSON.stringify({ document_id: docId }),
     }),
 
-  chat: (subjectId, message) =>
-    request('/api/mobile/chat', {
-      method: 'POST',
-      body: JSON.stringify({ subject_id: subjectId, message }),
-    }),
+  chat: (subjectId, message) => sendVerifiedChat(subjectId, message),
 
   chatHistory: (subjectId) =>
     request(`/api/mobile/chat/${subjectId}`),
@@ -135,12 +177,13 @@ export const api = {
       }),
     }),
 
-  quizSubmit: (quizId, answers) =>
+  quizSubmit: (quizId, answers, requestId) =>
     request('/api/mobile/quiz/submit', {
       method: 'POST',
       body: JSON.stringify({
         quiz_id: quizId,
         answers,
+        request_id: requestId,
       }),
     }),
 
@@ -176,6 +219,51 @@ export const api = {
 
   updateProfile: (payload) =>
     request('/api/mobile/profile', { method: 'PUT', body: JSON.stringify(payload) }),
+
+  // Official roadmap / learning session: source signatures are checked by Flask.
+  roadmap: (subjectId) =>
+    request(`/api/mobile/subjects/${subjectId}/roadmap`),
+
+  studyRoom: (taskId) =>
+    request(`/api/mobile/study-room/${taskId}`),
+  sessionQuizStatus: taskId =>
+    request(`/api/mobile/study-room/${taskId}/quiz-status`),
+
+  sessionQuizStart: (taskId, csrf) =>
+    request(`/api/mobile/study-room/${taskId}/quiz-start`, {
+      method:'POST',
+      headers:{'X-Quiz-CSRF':csrf},
+      body:JSON.stringify({}),
+    }),
+
+  quizPreparation: subjectId =>
+    request(`/api/mobile/subjects/${subjectId}/quiz-preparation`),
+
+  quizPreparationAction: (subjectId, action, csrf) =>
+    request(`/api/mobile/subjects/${subjectId}/quiz-preparation`, {
+      method:'POST',
+      headers:{'X-Quiz-CSRF':csrf},
+      body:JSON.stringify({action}),
+    }),
+
+  quizReview: quizId =>
+    request(`/api/mobile/quizzes/${quizId}/review`),
+
+
+  studyTimer: (taskId, action, csrf) =>
+    request(`/api/mobile/study-room/${taskId}/timer`, {
+      method: 'POST',
+      headers: { 'X-Study-CSRF': csrf },
+      body: JSON.stringify({ action }),
+    }),
+
+  // Reuse Web's stricter source-verified tutor when inside a roadmap session.
+  // The conversation id is read only from the student's own subject history.
+  studyChat: (subjectId, message, taskId, chapterNumber) =>
+    sendVerifiedChat(subjectId, message, {
+      chapter_number: chapterNumber,
+      task_id: taskId,
+    }),
 
   studyPlan: () => request('/api/mobile/study-plan'),
 

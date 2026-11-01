@@ -83,6 +83,8 @@ def next_review_slot(conn, user_id, duration, preferred_time,
     duration = max(15, min(int(duration), 120))
     for day_offset in range(30):
         day = (current + timedelta(days=day_offset)).date()
+        if day.weekday() == 6:  # Sunday is a rest day for automatic study
+            continue
         first = datetime.combine(day, datetime.min.time()).replace(
             hour=hh, minute=mm)
         last = datetime.combine(day, datetime.min.time()).replace(hour=22)

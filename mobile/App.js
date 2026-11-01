@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -11,11 +11,14 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { api, API_BASE_URL } from './src/api';
+import { api } from './src/api';
 import * as DocumentPicker from 'expo-document-picker';
+import FloatingStudyChat from './src/FloatingStudyChat';
+import StudyRoom from './src/StudyRoom';
+import ConnectionSettings from './src/ConnectionSettings';
 const {
   localDateKey, addDays, getWeekDates, getPlanOverview,
-  getVisiblePlanTasks, splitReminders,
+  getVisiblePlanTasks, splitReminders, findTaskConflicts,
 } = require('./src/plan-utils');
 
 function localInputDate(days = 0, hour = 19, minute = 0) {
@@ -61,7 +64,7 @@ function ErrorCard({ message }) {
   );
 }
 
-function HomeScreen({ dashboard, setTab, loading, onLogout }) {
+function HomeScreen({ dashboard, setTab, loading, onOpenStudy, onAskAI, onOpenQuiz }) {
   const user = dashboard?.user || {};
   const subjects = dashboard?.subjects || [];
   const tasks = dashboard?.tasks || [];
@@ -69,20 +72,10 @@ function HomeScreen({ dashboard, setTab, loading, onLogout }) {
   return (
     <ScrollView contentContainerStyle={styles.page}>
       <Header
-        title={`Chào ${user.name || 'bạn'} 👋`}
-        subtitle="Study Agent đang dùng dữ liệu học tập thật từ Flask"
+        title={`Xin chào, ${(user.name || 'bạn').split(' ').slice(-1)[0]} 👋`}
+        subtitle="Hôm nay bạn muốn học gì?"
         userName={user.name}
       />
-
-      <View style={styles.mobileStatusRow}>
-        <Text style={styles.mobileStatusText}>Đồng bộ Web và iPhone</Text>
-        <TouchableOpacity onPress={() => setTab('profile')} style={styles.logoutButton}>
-          <Text style={styles.logoutButtonText}>⚙ Hồ sơ</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={onLogout} style={styles.logoutButton}>
-          <Text style={styles.logoutButtonText}>Đăng xuất</Text>
-        </TouchableOpacity>
-      </View>
 
       <View style={styles.homeMetricsRow}>
         <View style={styles.homeMetric}><Text style={styles.homeMetricValue}>{dashboard?.stats?.subject_count || 0}</Text><Text style={styles.homeMetricLabel}>Môn học</Text></View>
@@ -92,11 +85,12 @@ function HomeScreen({ dashboard, setTab, loading, onLogout }) {
 
       {dashboard?.next_best_action && (
         <TouchableOpacity style={styles.recommendCard}
-          onPress={() => setTab(
-            dashboard.next_best_action.kind === 'weakness' ? 'quiz' :
-            ['task', 'deadline', 'plan'].includes(dashboard.next_best_action.kind)
-              ? 'plan' : 'agent'
-          )}>
+          onPress={() => {
+            if (dashboard.next_best_action.kind === 'weakness')
+              onOpenQuiz(dashboard.next_best_action.subject_id || null);
+            else if (['task','deadline','plan'].includes(dashboard.next_best_action.kind)) setTab('plan');
+            else onAskAI();
+          }}>
           <Text style={styles.eyebrow}>✦ STUDY AGENT ĐỀ XUẤT</Text>
           <Text style={styles.cardTitle}>{dashboard.next_best_action.title}</Text>
           <Text style={styles.muted}>{dashboard.next_best_action.reason}</Text>
@@ -104,21 +98,15 @@ function HomeScreen({ dashboard, setTab, loading, onLogout }) {
         </TouchableOpacity>
       )}
 
-      <TouchableOpacity style={styles.heroCard} onPress={() => setTab('agent')}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.heroEyebrow}>TRỢ LÝ CÁ NHÂN</Text>
-          <Text style={styles.heroTitle}>Bạn đang cần hiểu lại phần nào?</Text>
-          <Text style={styles.heroText}>Agent kết hợp tài liệu, kiến thức chung, điểm yếu và tiến độ riêng của bạn.</Text>
-          <View style={styles.heroButton}><Text style={styles.heroButtonText}>Hỏi Study Agent →</Text></View>
-        </View>
-        <View style={styles.robot}><Text style={{ fontSize: 38 }}>🤖</Text></View>
-      </TouchableOpacity>
+      <Text style={styles.muted}>Bấm nút 🤖 ở góc màn hình để hỏi AI bất kỳ lúc nào.</Text>
 
       {loading && <ActivityIndicator />}
 
-      <Text style={styles.sectionTitle}>Việc cần làm</Text>
+      <Text style={styles.sectionTitle}>Lịch học hôm nay & sắp tới</Text>
       {tasks.length ? tasks.slice(0, 5).map((task) => (
-        <View key={task.id} style={styles.card}>
+        <TouchableOpacity key={task.id} style={styles.card}
+          disabled={task.source !== 'roadmap' || !task.roadmap_session_id}
+          onPress={() => onOpenStudy(task.id)}>
           <View style={styles.rowBetween}>
             <Text style={[styles.cardTitle, { flex: 1 }]}>{task.title}</Text>
             <Text style={styles.time}>{String(task.study_at || '').slice(11, 16)}</Text>
@@ -127,11 +115,13 @@ function HomeScreen({ dashboard, setTab, loading, onLogout }) {
             {task.subject_name || 'Tự học'} · {task.duration} phút
             {task.source === 'adaptive' ? ' · Adaptive' : ''}
           </Text>
-        </View>
+          {task.source === 'roadmap' && !!task.roadmap_session_id &&
+            <Text style={styles.smallActionText}>Vào không gian học tập →</Text>}
+        </TouchableOpacity>
       )) : <View style={styles.card}><Text style={styles.muted}>Chưa có nhiệm vụ học nào.</Text></View>}
 
       <Text style={styles.sectionTitle}>Tiến độ môn học</Text>
-      {subjects.map((item) => (
+      {subjects.slice(0, 3).map((item) => (
         <TouchableOpacity key={item.id} style={styles.card} onPress={() => setTab('subjects')}>
           <View style={styles.rowBetween}>
             <View style={{ flex: 1, paddingRight: 14 }}>
@@ -185,25 +175,36 @@ function SubjectForm({ initial, onSave, onCancel, busy }) {
   );
 }
 
-function SubjectsScreen({ subjects, userName, refreshData }) {
+function SubjectsScreen({ subjects, userName, refreshData, onOpenStudy, onOpenQuiz }) {
   const [mode, setMode] = useState('list');
   const [selectedId, setSelectedId] = useState(null);
   const [editing, setEditing] = useState(null);
   const [detail, setDetail] = useState(null);
+  const [roadmap, setRoadmap] = useState(null);
   const [documents, setDocuments] = useState([]);
   const [docPreview, setDocPreview] = useState(null);
   const [sharedDocPreview, setSharedDocPreview] = useState(null);
   const [docSummary, setDocSummary] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+  const [courseFilter, setCourseFilter] = useState('all');
+  const [expanded, setExpanded] = useState({
+    roadmap:false, personal:false, shared:false, weaknesses:false
+  });
+  const toggleSection = key => setExpanded(old => ({...old,[key]:!old[key]}));
 
   const loadDetail = async (id) => {
     setBusy(true);
     setError('');
     try {
-      const [subjectData, documentData] = await Promise.all([
+      const [subjectData, documentData, roadmapData] = await Promise.all([
         api.subjectDetail(id), api.documents(),
+        api.roadmap(id).catch(err => ({ready:false,notice:err.message,
+          chapters:[],sessions:[]})),
       ]);
+      setRoadmap(roadmapData);
+      setExpanded({roadmap:false,personal:false,shared:false,weaknesses:false});
       setSelectedId(id);
       setDetail(subjectData);
       setDocuments(documentData.documents || []);
@@ -433,11 +434,59 @@ function SubjectsScreen({ subjects, userName, refreshData }) {
           }</Text>
           {!!syllabus.syllabus_source_name && <Text style={styles.muted}>{syllabus.syllabus_source_name}</Text>}
         </View>
+        <TouchableOpacity style={styles.settingsEntry} onPress={() => toggleSection('roadmap')}
+          accessibilityRole="button" accessibilityState={{expanded:expanded.roadmap}}>
+          <Text style={styles.settingsEntryText}>📖 Đề cương & lộ trình</Text>
+          <Text style={styles.settingsChevron}>{expanded.roadmap ? '⌃' : '›'}</Text>
+        </TouchableOpacity>
+        {expanded.roadmap && <View style={styles.card}>
+          <Text style={styles.cardTitle}>Đề cương, CLO & lộ trình chính thức</Text>
+          <Text style={styles.muted}>{roadmap?.ready
+            ? 'Lộ trình đã được xác nhận từ đề cương.'
+            : roadmap?.notice || 'Chưa có lộ trình được xác nhận. Hãy tạo từ Web.'}</Text>
+          {(roadmap?.chapters || []).map((chapter, index) => (
+            <View key={'chapter-'+index} style={{marginTop:9}}>
+              <Text style={styles.cardTitle}>{chapter.title}</Text>
+              {!!chapter.topics?.length && <Text style={styles.muted}>
+                {chapter.topics.map(t=>typeof t==='string'?t:t?.title||'').filter(Boolean).join(' · ').slice(0,240)}
+              </Text>}
+            </View>
+          ))}
+          {!!roadmap?.sessions?.length && <Text style={[styles.cardTitle,{marginTop:13}]}>
+            Lộ trình theo buổi ({roadmap.sessions.length})
+          </Text>}
+          {(roadmap?.sessions || []).map((lesson,index)=>(
+            <TouchableOpacity key={'lesson-'+index}
+              style={{paddingVertical:11,borderTopWidth:1,borderTopColor:'#E6EAF5'}}
+              disabled={!lesson.scheduled_task_id}
+              onPress={()=>onOpenStudy(lesson.scheduled_task_id)}>
+              <Text style={styles.cardTitle}>{lesson.title}</Text>
+              <Text style={styles.muted}>
+                Chương {lesson.unit_id} · {lesson.study_at
+                  ? lesson.study_at.replace('T',' ').slice(0,16)
+                  : 'Chưa đưa vào thời khóa biểu'}
+              </Text>
+              <Text style={styles.smallActionText}>
+                {lesson.scheduled_task_id ? 'Vào học →' : 'Tạo lịch cho buổi này trên Web'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>}
+        <TouchableOpacity style={styles.primaryButton} onPress={() => onOpenQuiz(sub.id)}
+          accessibilityRole="button">
+          <Text style={styles.primaryButtonText}>✓ Làm Quiz & Ôn điểm yếu</Text>
+        </TouchableOpacity>
         <View style={styles.actionRow}>
           <TouchableOpacity style={styles.smallAction} onPress={() => { setEditing(sub); setMode('form'); }}><Text style={styles.smallActionText}>✎ Sửa môn</Text></TouchableOpacity>
           <TouchableOpacity style={[styles.smallAction, styles.deleteAction]} onPress={confirmDeleteSubject}><Text style={styles.deleteActionText}>Xóa môn</Text></TouchableOpacity>
         </View>
-        <Text style={styles.sectionTitle}>Tài liệu cá nhân ({docs.length})</Text>
+        <TouchableOpacity style={styles.settingsEntry} onPress={() => toggleSection('personal')}
+          accessibilityRole="button" accessibilityState={{expanded:expanded.personal}}>
+          <Text style={styles.settingsEntryText}>📄 Tài liệu cá nhân ({docs.length})</Text>
+          <Text style={styles.settingsChevron}>{expanded.personal ? '⌃' : '›'}</Text>
+        </TouchableOpacity>
+        {expanded.personal && <>
+        <Text style={styles.sectionTitle}>Tài liệu cá nhân</Text>
         <TouchableOpacity style={styles.primaryButton} disabled={busy} onPress={pickFile}>
           <Text style={styles.primaryButtonText}>＋ Tải lên PDF / TXT / MD</Text>
         </TouchableOpacity>
@@ -471,7 +520,14 @@ function SubjectsScreen({ subjects, userName, refreshData }) {
             <Text style={styles.secondaryActionText}>Bỏ chọn đề cương cá nhân</Text>
           </TouchableOpacity>
         ) : null}
-        <Text style={styles.sectionTitle}>Tài liệu dùng chung ({(detail.shared_documents || []).length})</Text>
+        </>}
+        <TouchableOpacity style={styles.settingsEntry} onPress={() => toggleSection('shared')}
+          accessibilityRole="button" accessibilityState={{expanded:expanded.shared}}>
+          <Text style={styles.settingsEntryText}>📚 Tài liệu chung ({(detail.shared_documents || []).length})</Text>
+          <Text style={styles.settingsChevron}>{expanded.shared ? '⌃' : '›'}</Text>
+        </TouchableOpacity>
+        {expanded.shared && <>
+        <Text style={styles.sectionTitle}>Tài liệu dùng chung</Text>
         <Text style={styles.muted}>Được quản trị viên tải và xử lý sẵn theo mã môn; bạn có quyền xem nhưng không thể sửa.</Text>
         {(detail.shared_documents || []).length ? detail.shared_documents.map((doc) => (
           <View key={'shared-' + doc.id} style={styles.card}>
@@ -482,23 +538,46 @@ function SubjectsScreen({ subjects, userName, refreshData }) {
             </TouchableOpacity>
           </View>
         )) : <Text style={styles.muted}>Chưa có tài liệu chung cho mã môn này.</Text>}
+        </>}
+        <TouchableOpacity style={styles.settingsEntry} onPress={() => toggleSection('weaknesses')}
+          accessibilityRole="button" accessibilityState={{expanded:expanded.weaknesses}}>
+          <Text style={styles.settingsEntryText}>🎯 Điểm yếu cần ôn</Text>
+          <Text style={styles.settingsChevron}>{expanded.weaknesses ? '⌃' : '›'}</Text>
+        </TouchableOpacity>
+        {expanded.weaknesses && <>
         <Text style={styles.sectionTitle}>Điểm yếu đang cần ôn</Text>
         {(detail.weaknesses || []).length ? detail.weaknesses.map((w, i) => (
           <View key={i} style={styles.card}><Text style={styles.cardTitle}>{w.topic}</Text><Text style={styles.muted}>{w.chapter || 'Chưa phân chương'}</Text></View>
         )) : <Text style={styles.muted}>Chưa có điểm yếu cần ôn.</Text>}
+        </>}
       </ScrollView>
     );
   }
 
   return (
     <ScrollView contentContainerStyle={styles.page}>
-      <Header title="Môn học" subtitle="Quản lý môn, tài liệu và đề cương cá nhân" userName={userName} />
+      <Header title="Môn học" subtitle="Lộ trình và tài liệu học tập" userName={userName} />
+      <TextInput value={search} onChangeText={setSearch} style={styles.loginInput}
+        placeholder="⌕ Tìm môn học..." placeholderTextColor="#7B8DAC" />
+      <View style={styles.actionRow}>
+        {[['all','Tất cả'],['ongoing','Đang học'],['completed','Đã hoàn thành']].map(([key,label])=>(
+          <TouchableOpacity key={key} onPress={()=>setCourseFilter(key)}
+            style={[styles.smallAction,courseFilter===key&&{backgroundColor:'#6567E8'}]}>
+            <Text style={[styles.smallActionText,courseFilter===key&&{color:'#FFFFFF'}]}>{label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
       <ErrorCard message={error} />
       <TouchableOpacity style={styles.primaryButton} onPress={() => { setEditing(null); setError(''); setMode('form'); }}>
         <Text style={styles.primaryButtonText}>＋ Tạo môn học</Text>
       </TouchableOpacity>
       {busy && <ActivityIndicator />}
-      {subjects.map((item) => (
+      {subjects.filter(item => {
+        const matchesName = String(item.name||'').toLowerCase().includes(search.trim().toLowerCase());
+        const progress = Number(item.progress || 0);
+        return matchesName && (courseFilter==='all' ||
+          (courseFilter==='completed'?progress>=100:progress<100));
+      }).map((item) => (
         <TouchableOpacity key={item.id} style={styles.subjectCard} onPress={() => loadDetail(item.id)}>
           <View style={styles.subjectIcon}><Text style={{ fontSize: 24 }}>📘</Text></View>
           <View style={{ flex: 1 }}>
@@ -546,7 +625,7 @@ function SubjectSelector({ subjects, selectedId, onSelect }) {
 }
 
 // Hiển thị Markdown cơ bản trong phản hồi AI mà không cần thư viện ngoài.
-// React Native Text không tự định dạng dấu **in đậm** từ Gemini.
+// React Native Text không tự định dạng dấu **in đậm** từ câu trả lời AI.
 function ChatFormattedText({ value, style }) {
   const rows = String(value ?? '').split(/\r?\n/);
   return (
@@ -691,8 +770,8 @@ function AgentScreen({ subjects, userName }) {
   );
 }
 
-function QuizScreen({ subjects, userName, refreshData }) {
-  const [subjectId, setSubjectId] = useState(subjects[0]?.id || null);
+function QuizScreen({ subjects, userName, refreshData, initialSubjectId, initialQuizId, onBack }) {
+  const [subjectId, setSubjectId] = useState(initialSubjectId || subjects[0]?.id || null);
   const [quiz, setQuiz] = useState(null);
   const [answers, setAnswers] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -704,10 +783,30 @@ function QuizScreen({ subjects, userName, refreshData }) {
   const [count, setCount] = useState(10);
   const [selectedDoc, setSelectedDoc] = useState(null);
   const [tab, setTab] = useState('create');
+  const [currentQuestion,setCurrentQuestion] = useState(0);
+  const submitKey=useRef('');
 
   useEffect(() => {
-    if (!subjectId && subjects[0]?.id) setSubjectId(subjects[0].id);
-  }, [subjects, subjectId]);
+    if (initialSubjectId) setSubjectId(initialSubjectId);
+    else if (!subjectId && subjects[0]?.id) setSubjectId(subjects[0].id);
+  }, [subjects, initialSubjectId, subjectId]);
+
+  useEffect(()=>{
+    if(!Number.isSafeInteger(initialQuizId)||initialQuizId<=0) return;
+    let active=true;
+    setLoading(true);setError('');
+    api.quizDetail(initialQuizId).then(body=>{
+      if(!active)return;
+      setQuiz(body);
+      setAnswers(Array(body.questions?.length||0).fill(null));
+      setCurrentQuestion(0);
+      submitKey.current='';
+      setResult(null);
+      setTab('take');
+    }).catch(err=>{if(active)setError(err.message||'Quiz đang khóa.');})
+      .finally(()=>{if(active)setLoading(false);});
+    return()=>{active=false;};
+  },[initialQuizId]);
 
   const refreshQuizList = async () => {
     const [data, docsData] = await Promise.all([
@@ -741,6 +840,8 @@ function QuizScreen({ subjects, userName, refreshData }) {
       const data = await api.quizGenerate(subjectId, count, mode, selectedDoc);
       setQuiz(data);
       setAnswers(Array(data.questions?.length || 0).fill(null));
+      setCurrentQuestion(0);
+      submitKey.current='';
       setTab('take');
       await refreshQuizList();
     } catch (err) {
@@ -758,6 +859,8 @@ function QuizScreen({ subjects, userName, refreshData }) {
       const data = await api.quizDetail(id);
       setQuiz(data);
       setAnswers(Array(data.questions?.length || 0).fill(null));
+      setCurrentQuestion(0);
+      submitKey.current='';
       setTab('take');
     } catch (err) {
       setError(err.message || 'Không đọc được Quiz.');
@@ -766,31 +869,59 @@ function QuizScreen({ subjects, userName, refreshData }) {
     }
   };
 
-  const submit = async () => {
-    if (!quiz?.quiz_id || loading) return;
-    const unanswered = answers.filter(value => value === null || value === undefined).length;
-    if (unanswered) {
-      setError(`Còn ${unanswered} câu chưa trả lời. Hoàn thành tất cả câu hỏi trước khi nộp.`);
+  const submit=()=>{
+    if(!quiz?.quiz_id || loading)return;
+    const firstUnanswered=answers.findIndex(value=>value===null||value===undefined);
+    if(firstUnanswered>=0){
+      setCurrentQuestion(firstUnanswered);
+      setError('Vui lòng trả lời đủ '+answers.length+' câu trước khi nộp.');
       return;
     }
-    setLoading(true);
-    setError('');
-    try {
-      const data = await api.quizSubmit(quiz.quiz_id, answers);
-      setResult(data);
+    Alert.alert('Xác nhận nộp Quiz',
+      'Bạn đã trả lời đủ '+answers.length+' câu. Nộp bài để chấm và cập nhật điểm yếu?',
+      [{text:'Kiểm tra lại',style:'cancel'},
+       {text:'Nộp bài',onPress:async()=>{
+         if(loading)return;
+         setLoading(true);setError('');
+         if(!submitKey.current) submitKey.current='mobile_'
+           +Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,14);
+         try{
+           const data=await api.quizSubmit(quiz.quiz_id,answers,submitKey.current);
+           setResult(data);
+           setCurrentQuestion(0);
+           setTab('result');
+           submitKey.current='';
+           try{
+             await Promise.all([refreshQuizList(),refreshData()]);
+           }catch(_refreshError){
+             setError('Bài đã nộp thành công. Chưa làm mới được danh sách Quiz; bạn có thể mở lại sau.');
+           }
+         }catch(err){setError(err.message||'Không nộp được Quiz. Có thể thử lại.');}
+         finally{setLoading(false);}
+       }}]);
+  };
+  const viewReview=async (id)=>{
+    setLoading(true);setError('');
+    try{
+      const [q,review]=await Promise.all([api.quizDetail(id),api.quizReview(id)]);
+      setQuiz(q);
+      setResult({...review.attempt,
+        correct_answers:review.correct_answers,
+        explanations:review.explanations});
+      const previous=JSON.parse(review.attempt.answers_json||'[]');
+      setAnswers(Array.isArray(previous)?previous:[]);
+      setCurrentQuestion(0);
       setTab('result');
-      await Promise.all([refreshQuizList(), refreshData()]);
-    } catch (err) {
-      setError(err.message || 'Không nộp được Quiz.');
-    } finally {
-      setLoading(false);
-    }
+    }catch(err){setError(err.message||'Chưa xem được bài đã nộp.');}
+    finally{setLoading(false);}
   };
 
   const changeSubject = (id) => {
     setSubjectId(id);
     setQuiz(null);
     setAnswers([]);
+    setCurrentQuestion(0);
+    submitKey.current='';
     setResult(null);
     setSelectedDoc(null);
     setError('');
@@ -805,10 +936,25 @@ function QuizScreen({ subjects, userName, refreshData }) {
 
   return (
     <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
-      <Header title="Quiz & điểm yếu" subtitle="Luyện tập theo đề cương, tài liệu và năng lực" userName={userName} />
+      <TouchableOpacity onPress={onBack} accessibilityRole="button">
+        <Text style={styles.backLink}>← Quay về môn học</Text>
+      </TouchableOpacity>
+      <Header title="Quiz & điểm yếu" subtitle="Luyện tập theo đề cương và năng lực" userName={userName} />
       <SubjectSelector subjects={subjects} selectedId={subjectId} onSelect={changeSubject} />
       <ErrorCard message={error} />
       {loading && <ActivityIndicator />}
+      {!!subjects.find(s=>s.id===subjectId)?.weaknesses?.length && (
+        <View style={[styles.card,{backgroundColor:'#F1F4FF'}]}>
+          <Text style={styles.cardTitle}>🎯 Điểm yếu cần củng cố</Text>
+          {subjects.find(s=>s.id===subjectId).weaknesses.slice(0,4).map((weak,i)=>(
+            <Text key={i} style={styles.muted}>• {weak.topic}{weak.chapter?' · '+weak.chapter:''}</Text>
+          ))}
+          <TouchableOpacity style={styles.secondaryAction}
+            onPress={()=>{setMode('weakness');setCount(10);setTab('create');}}>
+            <Text style={styles.secondaryActionText}>✦ Tạo Quiz ôn điểm yếu →</Text>
+          </TouchableOpacity>
+        </View>
+      )}
       <View style={styles.actionRow}>
         <Choice label="Tạo Quiz" active={tab === 'create'} onPress={() => { setTab('create'); setQuiz(null); setResult(null); }} />
         <Choice label={`Quiz đã lưu (${saved.length})`} active={tab === 'saved'} onPress={() => setTab('saved')} />
@@ -845,11 +991,19 @@ function QuizScreen({ subjects, userName, refreshData }) {
           <Text style={styles.sectionTitle}>Lịch sử Quiz</Text>
           {!saved.length && <Text style={styles.muted}>Chưa có Quiz. Tạo Quiz để bắt đầu luyện tập.</Text>}
           {saved.filter(q => !subjectId || q.subject_id === subjectId).map(item => (
-            <TouchableOpacity key={item.id} style={styles.card} onPress={() => openQuiz(item.id)}>
+            <View key={item.id} style={styles.card}>
               <Text style={styles.cardTitle}>{item.title}</Text>
               <Text style={styles.muted}>Đã làm {item.attempt_count || 0} lần · Điểm cao nhất {item.best_score ?? '—'}%</Text>
-              <Text style={styles.smallActionText}>Làm Quiz →</Text>
-            </TouchableOpacity>
+              <View style={styles.actionRow}>
+                <TouchableOpacity style={styles.smallAction} onPress={() => openQuiz(item.id)}>
+                  <Text style={styles.smallActionText}>Làm Quiz →</Text>
+                </TouchableOpacity>
+                {item.attempt_count>0 &&
+                  <TouchableOpacity style={styles.smallAction} onPress={()=>viewReview(item.id)}>
+                    <Text style={styles.smallActionText}>Xem bài đã nộp</Text>
+                  </TouchableOpacity>}
+              </View>
+            </View>
           ))}
         </>
       )}
@@ -859,7 +1013,14 @@ function QuizScreen({ subjects, userName, refreshData }) {
             <Text style={styles.backLink}>← Danh sách Quiz</Text>
           </TouchableOpacity>
           <Text style={styles.sectionTitle}>{quiz.title}</Text>
-          {quiz.questions?.map((question, qIndex) => {
+          {!!quiz.questions?.length && <Text style={styles.muted}>
+            Câu {currentQuestion+1}/{quiz.questions.length}
+            {'  '}·{'  '}Đã trả lời {answers.filter(a=>a!==null&&a!==undefined).length}/{answers.length}
+          </Text>}
+          <Progress value={quiz.questions?.length?(
+            answers.filter(a=>a!==null&&a!==undefined).length*100/quiz.questions.length):0}/>
+          {quiz.questions?.slice(currentQuestion,currentQuestion+1).map((question) => {
+            const qIndex=currentQuestion;
             const chosen = answers[qIndex];
             const correct = tab === 'result' && result?.correct_answers
               ? Number(result.correct_answers[qIndex])
@@ -873,7 +1034,11 @@ function QuizScreen({ subjects, userName, refreshData }) {
                   <TouchableOpacity key={index} disabled={tab === 'result'}
                     style={[styles.option, chosen === index && styles.optionSelected,
                       tab === 'result' && index === correct && { borderColor: '#31A879', backgroundColor: '#EAFAF2' }]}
-                    onPress={() => setAnswers(old => old.map((v, n) => n === qIndex ? index : v))}>
+                    onPress={() => {
+                      submitKey.current='';
+                      setAnswers(old => old.map((v, n) => n === qIndex ? index : v));
+                      setError('');
+                    }}>
                     <Text style={[styles.optionLetter, chosen === index && styles.optionLetterSelected]}>
                       {String.fromCharCode(65 + index)}
                     </Text>
@@ -889,6 +1054,18 @@ function QuizScreen({ subjects, userName, refreshData }) {
               </View>
             );
           })}
+          <View style={[styles.actionRow,{justifyContent:'space-between'}]}>
+            <TouchableOpacity disabled={currentQuestion===0}
+              style={[styles.smallAction,currentQuestion===0&&{opacity:0.35}]}
+              onPress={()=>setCurrentQuestion(i=>Math.max(0,i-1))}>
+              <Text style={styles.smallActionText}>← Câu trước</Text>
+            </TouchableOpacity>
+            <TouchableOpacity disabled={currentQuestion+1>=(quiz.questions?.length||0)}
+              style={[styles.smallAction,currentQuestion+1>=(quiz.questions?.length||0)&&{opacity:0.35}]}
+              onPress={()=>setCurrentQuestion(i=>Math.min(quiz.questions.length-1,i+1))}>
+              <Text style={styles.smallActionText}>Câu tiếp →</Text>
+            </TouchableOpacity>
+          </View>
           {tab === 'take' && (
             <TouchableOpacity style={styles.primaryButton} disabled={loading} onPress={submit}>
               <Text style={styles.primaryButtonText}>Nộp bài ({answers.filter(a => a !== null).length}/{answers.length})</Text>
@@ -897,9 +1074,20 @@ function QuizScreen({ subjects, userName, refreshData }) {
           {tab === 'result' && result && (
             <View style={styles.insightCard}>
               <Text style={styles.insightTitle}>Kết quả: {result.correct_count}/{result.total_questions} · {result.score}%</Text>
-              <Text style={styles.muted}>Điểm yếu cần ôn: {result.weakness_count || 0}. Lộ trình Adaptive đã cập nhật.</Text>
+              <Text style={styles.muted}>Điểm yếu cần ôn: {result.weakness_count ?? '—'}.
+                {result.learning_updated ? ' Tiến độ đã đồng bộ với Web.' : ''}</Text>
+              {!!result.resolved_topics?.length &&
+                <Text style={[styles.muted,{color:'#18805C'}]}>
+                  Tiến bộ: {result.resolved_topics.slice(0,4).join(' · ')}
+                </Text>}
+              {!!result.new_weakness_topics?.length &&
+                <Text style={styles.muted}>
+                  Cần ôn thêm: {result.new_weakness_topics.slice(0,4).join(' · ')}
+                </Text>}
               <TouchableOpacity style={styles.secondaryAction} onPress={() => {
                 setAnswers(Array(quiz.questions?.length || 0).fill(null));
+                setCurrentQuestion(0);
+                submitKey.current='';
                 setResult(null);
                 setTab('take');
               }}>
@@ -913,7 +1101,7 @@ function QuizScreen({ subjects, userName, refreshData }) {
   );
 }
 
-function PlanScreen({ plan, subjects, userName, refreshData }) {
+function PlanScreen({ plan, subjects, userName, refreshData, onOpenStudy }) {
   const [local, setLocal] = useState(plan || {});
   const [mode, setMode] = useState('list');
   const [planView, setPlanView] = useState('week');
@@ -1051,15 +1239,29 @@ function PlanScreen({ plan, subjects, userName, refreshData }) {
           {entryField('Ngày giờ (YYYY-MM-DDTHH:MM)', taskAt, setTaskAt, '2026-10-15T19:00')}
           {entryField('Thời lượng (phút)', taskDuration, setTaskDuration, '45')}
           {entryField('Ghi chú', taskNote, setTaskNote, 'Nội dung cần ôn tập', true)}
-          <TouchableOpacity style={styles.primaryButton} disabled={busy} onPress={() => run(() => (
-            taskEdit ? api.updateTask(taskEdit.id, {
-              subject_id: selectedSubject, title: taskTitle, study_at: taskAt,
-              duration: Number(taskDuration), note: taskNote,
-            }) : api.createTask({
-              subject_id: selectedSubject, title: taskTitle, study_at: taskAt,
-              duration: Number(taskDuration), note: taskNote,
-            })
-          ))}>
+          {findTaskConflicts(local?.tasks || [],{
+            study_at:taskAt,duration:Number(taskDuration)
+          },taskEdit?.id).length>0 && (
+            <View style={[styles.card,{backgroundColor:'#FFF9E9',borderColor:'#EFCB85'}]}>
+              <Text style={[styles.cardTitle,{color:'#95611E'}]}>⚠ Phát hiện trùng giờ học</Text>
+              <Text style={styles.muted}>
+                {findTaskConflicts(local?.tasks || [],{
+                  study_at:taskAt,duration:Number(taskDuration)
+                },taskEdit?.id).slice(0,3).map(c=>c.title).join(', ')}
+              </Text>
+            </View>
+          )}
+          <TouchableOpacity style={styles.primaryButton} disabled={busy} onPress={() => {
+            const payload={subject_id:selectedSubject,title:taskTitle,
+              study_at:taskAt,duration:Number(taskDuration),note:taskNote};
+            const save=()=>run(()=>taskEdit
+              ?api.updateTask(taskEdit.id,payload):api.createTask(payload));
+            const conflicts=findTaskConflicts(local?.tasks||[],payload,taskEdit?.id);
+            if(!conflicts.length)return save();
+            Alert.alert('Lịch học trùng giờ',
+              'Có '+conflicts.length+' buổi trùng khung giờ đã chọn. Bạn vẫn muốn lưu?',
+              [{text:'Hủy',style:'cancel'},{text:'Giữ khung giờ',onPress:save}]);
+          }}>
             <Text style={styles.primaryButtonText}>{taskEdit ? 'Lưu buổi học' : 'Thêm buổi học'}</Text>
           </TouchableOpacity>
         </>
@@ -1251,6 +1453,12 @@ function PlanScreen({ plan, subjects, userName, refreshData }) {
                 {String(task.study_at || '').replace('T', ' ').slice(0, 16)} · {task.subject_name || 'Tự học'} · {task.duration} phút
               </Text>
               {!!task.note && <Text style={styles.planTaskNote} numberOfLines={3}>{task.note}</Text>}
+              {task.source === 'roadmap' && !!task.roadmap_session_id &&
+                <TouchableOpacity onPress={() => onOpenStudy(task.id)}
+                  accessibilityRole="button" accessibilityLabel={'Bắt đầu học: '+task.title}
+                  style={{paddingVertical:7}}>
+                  <Text style={styles.smallActionText}>▶ Bắt đầu học →</Text>
+                </TouchableOpacity>}
               {task.source === 'adaptive' && <Text style={styles.planAdaptiveTag}>✦ Ôn tập điểm yếu</Text>}
             </View>
             <View style={styles.planTaskActions}>
@@ -1319,7 +1527,7 @@ function PlanScreen({ plan, subjects, userName, refreshData }) {
   );
 }
 
-function ProfileScreen({ userName, refreshData, onBack }) {
+function ProfileScreen({ userName, email, refreshData, onOpenQuiz, onOpenConnection, onLogout }) {
   const [profile, setProfile] = useState({});
   const [style, setStyle] = useState('balanced');
   const [time, setTime] = useState('19:00');
@@ -1328,6 +1536,7 @@ function ProfileScreen({ userName, refreshData, onBack }) {
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [showLearningSettings, setShowLearningSettings] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -1364,8 +1573,32 @@ function ProfileScreen({ userName, refreshData, onBack }) {
 
   return (
     <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
-      <TouchableOpacity onPress={onBack}><Text style={styles.backLink}>← Trang chủ</Text></TouchableOpacity>
-      <Header title="Hồ sơ học tập" subtitle={userName} userName={userName} />
+      <Header title="Cá nhân" subtitle="Hồ sơ & cài đặt" userName={userName} />
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>👤 {userName || 'Sinh viên'}</Text>
+        {!!email && <Text style={styles.muted}>{email}</Text>}
+        <Text style={styles.muted}>Tài khoản sinh viên · Đồng bộ với Web</Text>
+      </View>
+      <Text style={styles.sectionTitle}>Học tập</Text>
+      <TouchableOpacity style={styles.settingsEntry} onPress={onOpenQuiz}>
+        <Text style={styles.settingsEntryText}>✓ Kết quả Quiz & điểm yếu</Text>
+        <Text style={styles.settingsChevron}>›</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.settingsEntry}
+        onPress={() => setShowLearningSettings(v => !v)}>
+        <Text style={styles.settingsEntryText}>⚙ Tùy chỉnh học tập</Text>
+        <Text style={styles.settingsChevron}>{showLearningSettings ? '⌃' : '›'}</Text>
+      </TouchableOpacity>
+      <Text style={styles.sectionTitle}>Ứng dụng</Text>
+      <TouchableOpacity style={styles.settingsEntry} onPress={onOpenConnection}>
+        <Text style={styles.settingsEntryText}>⌁ Cài đặt kết nối</Text>
+        <Text style={styles.settingsChevron}>›</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.settingsEntry} onPress={onLogout}>
+        <Text style={[styles.settingsEntryText,{color:'#B83F51'}]}>↪ Đăng xuất</Text>
+        <Text style={styles.settingsChevron}>›</Text>
+      </TouchableOpacity>
+      {showLearningSettings && <View style={styles.card}>
       <ErrorCard message={error} />
       <Text style={styles.fieldLabel}>Phong cách học</Text>
       <View style={styles.actionRow}>
@@ -1389,11 +1622,12 @@ function ProfileScreen({ userName, refreshData, onBack }) {
       <TouchableOpacity disabled={busy} style={styles.primaryButton} onPress={save}>
         <Text style={styles.primaryButtonText}>{busy ? 'Đang lưu...' : 'Lưu hồ sơ học tập'}</Text>
       </TouchableOpacity>
+      </View>}
     </ScrollView>
   );
 }
 
-function LoginScreen({ onLogin, onRegister }) {
+function LoginScreen({ onLogin, onRegister, onOpenConnection }) {
   const [signup, setSignup] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -1425,18 +1659,7 @@ function LoginScreen({ onLogin, onRegister }) {
         <View style={styles.logo}><Text style={{ fontSize: 34 }}>🎓</Text></View>
         <Text style={styles.loginTitle}>AI Study Agent</Text>
         <Text style={styles.loginSubtitle}>Học theo đề cương · AI cá nhân hóa</Text>
-        <View style={styles.authSegment}>
-          <TouchableOpacity style={[styles.authSegmentButton, !signup && styles.authSegmentSelected]}
-            accessibilityRole="button" accessibilityState={{ selected: !signup }}
-            onPress={() => { setSignup(false); setError(''); }}>
-            <Text style={[styles.authSegmentText, !signup && styles.authSegmentTextSelected]}>Đăng nhập</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.authSegmentButton, signup && styles.authSegmentSelected]}
-            accessibilityRole="button" accessibilityState={{ selected: signup }}
-            onPress={() => { setSignup(true); setError(''); }}>
-            <Text style={[styles.authSegmentText, signup && styles.authSegmentTextSelected]}>Đăng ký sinh viên</Text>
-          </TouchableOpacity>
-        </View>
+        <Text style={styles.loginModeTitle}>{signup ? 'Đăng ký sinh viên' : 'Đăng nhập'}</Text>
         {signup && <TextInput value={name} onChangeText={setName} style={styles.loginInput} placeholder="Họ và tên" />}
         <TextInput value={email} onChangeText={setEmail} autoCapitalize="none"
           keyboardType="email-address" autoComplete="email" style={styles.loginInput}
@@ -1466,9 +1689,17 @@ function LoginScreen({ onLogin, onRegister }) {
         <TouchableOpacity style={styles.primaryButton} onPress={submit} disabled={loading}>
           <Text style={styles.primaryButtonText}>{loading ? 'Đang xử lý...' : signup ? 'Tạo tài khoản' : 'Đăng nhập'}</Text>
         </TouchableOpacity>
-        <Text style={styles.loginHint}>Sinh viên dùng cùng tài khoản trên Web và iPhone.</Text>
-        <Text style={styles.loginAdminNote}>♜ Quản trị viên chỉ đăng nhập trên Web. Không có đăng ký Admin.</Text>
-        <Text style={styles.loginBackendHint}>Máy chủ: {API_BASE_URL}</Text>
+        <TouchableOpacity
+          onPress={() => { setSignup(v => !v); setError(''); }}
+          accessibilityRole="button" style={styles.loginLinkButton}>
+          <Text style={styles.loginLink}>
+            {signup ? 'Đã có tài khoản? Đăng nhập' : 'Chưa có tài khoản? Đăng ký sinh viên'}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={onOpenConnection}
+          accessibilityRole="button" style={styles.loginLinkButton}>
+          <Text style={styles.loginConnectionLink}>⚙ Cài đặt kết nối máy chủ</Text>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );
@@ -1482,6 +1713,29 @@ export default function App() {
   const [subjects, setSubjects] = useState([]);
   const [plan, setPlan] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [activeStudyTask, setActiveStudyTask] = useState(null);
+  const [activeLesson, setActiveLesson] = useState(null);
+  const [quizSubjectId, setQuizSubjectId] = useState(null);
+  const [quizToOpenId,setQuizToOpenId]=useState(null);
+  const [showConnectionSettings, setShowConnectionSettings] = useState(false);
+  const [chatOpenSignal, setChatOpenSignal] = useState(0);
+  const openQuiz = (subjectId, quizId=null) => {
+    setQuizSubjectId(subjectId || null);
+    setQuizToOpenId(quizId || null);
+    setActiveStudyTask(null);
+    setActiveLesson(null);
+    setTab('quiz');
+  };
+
+  const openStudyRoom = taskId => {
+    setActiveLesson(null);
+    setActiveStudyTask(taskId);
+  };
+  const closeStudyRoom = () => {
+    setActiveLesson(null);
+    setActiveStudyTask(null);
+    refreshData().catch(() => {});
+  };
 
   const refreshData = async () => {
     setLoading(true);
@@ -1529,6 +1783,10 @@ export default function App() {
     } finally {
       setLoggedIn(false);
       setTab('home');
+      setQuizSubjectId(null);
+      setQuizToOpenId(null);
+      setActiveStudyTask(null);
+      setActiveLesson(null);
       setDashboard(null);
       setSubjects([]);
       setPlan(null);
@@ -1544,20 +1802,41 @@ export default function App() {
   const userName = dashboard?.user?.name || '';
 
   const screen = useMemo(() => {
-    if (tab === 'profile') return <ProfileScreen userName={userName} refreshData={refreshData} onBack={() => setTab('home')} />;
-    if (tab === 'subjects') return <SubjectsScreen subjects={subjects} userName={userName} refreshData={refreshData} />;
+    if (activeStudyTask) return (
+      <StudyRoom key={activeStudyTask} taskId={activeStudyTask}
+        onBack={closeStudyRoom} onContext={setActiveLesson}
+        onOpenQuiz={info => openQuiz(
+          info?.subjectId || activeLesson?.subjectId,
+          info?.quizId || null
+        )} />
+    );
+    if (tab === 'profile') return (
+      <ProfileScreen userName={userName} email={dashboard?.user?.email}
+        refreshData={refreshData} onOpenQuiz={() => openQuiz(null)}
+        onOpenConnection={() => setShowConnectionSettings(true)}
+        onLogout={handleLogout}/>
+    );
+    if (tab === 'subjects') return <SubjectsScreen subjects={subjects}
+      userName={userName} refreshData={refreshData}
+      onOpenStudy={openStudyRoom} onOpenQuiz={openQuiz} />;
     if (tab === 'agent') return <AgentScreen subjects={subjects} userName={userName} />;
-    if (tab === 'quiz') return <QuizScreen subjects={subjects} userName={userName} refreshData={refreshData} />;
-    if (tab === 'plan') return <PlanScreen plan={plan} subjects={subjects} userName={userName} refreshData={refreshData} />;
+    if (tab === 'quiz') return <QuizScreen subjects={subjects}
+      initialSubjectId={quizSubjectId} initialQuizId={quizToOpenId}
+      onBack={() => {setQuizToOpenId(null);setTab('subjects');}}
+      userName={userName} refreshData={refreshData} />;
+    if (tab === 'plan') return <PlanScreen plan={plan} subjects={subjects} userName={userName} refreshData={refreshData} onOpenStudy={openStudyRoom} />;
     return (
       <HomeScreen
         dashboard={dashboard}
         setTab={setTab}
         loading={loading}
-        onLogout={handleLogout}
+        onOpenStudy={openStudyRoom}
+        onAskAI={() => setChatOpenSignal(value => value+1)}
+        onOpenQuiz={openQuiz}
       />
     );
-  }, [tab, subjects, dashboard, plan, loading, userName, loggedIn]);
+  }, [tab, subjects, dashboard, plan, loading, userName, loggedIn,
+      activeStudyTask, activeLesson?.subjectId, quizSubjectId, quizToOpenId]);
 
   if (checkingSession) {
     return (
@@ -1567,14 +1846,29 @@ export default function App() {
       </SafeAreaView>
     );
   }
-  if (!loggedIn) return <LoginScreen onLogin={handleLogin} onRegister={handleRegister} />;
+  if (showConnectionSettings) return (
+    <ConnectionSettings onBack={() => setShowConnectionSettings(false)}
+      onSaved={() => {
+        // New host requires a new login; never preserve old identity.
+        setLoggedIn(false);
+        setDashboard(null);
+        setSubjects([]);
+        setPlan(null);
+        setActiveStudyTask(null);
+        setActiveLesson(null);
+        setTab('home');
+        setShowConnectionSettings(false);
+      }}/>
+  );
+  if (!loggedIn) return <LoginScreen onLogin={handleLogin}
+    onRegister={handleRegister}
+    onOpenConnection={() => setShowConnectionSettings(true)} />;
 
   const tabs = [
-    ['home', '⌂', 'Trang chủ'],
-    ['subjects', '📚', 'Môn học'],
-    ['agent', '✦', 'Agent'],
-    ['quiz', '✓', 'Quiz'],
-    ['plan', '◷', 'Kế hoạch'],
+    ['home', '⌂', 'Tổng quan'],
+    ['subjects', '▤', 'Môn học'],
+    ['plan', '▦', 'Lịch học'],
+    ['profile', '♙', 'Cá nhân'],
   ];
 
   return (
@@ -1587,15 +1881,19 @@ export default function App() {
             key={key}
             style={styles.navItem}
             onPress={() => {
+              setActiveStudyTask(null);
+              setActiveLesson(null);
               setTab(key);
               refreshData().catch(() => {});
             }}
           >
-            <Text style={[styles.navIcon, tab === key && styles.navActive]}>{icon}</Text>
-            <Text style={[styles.navLabel, tab === key && styles.navActive]}>{label}</Text>
+            <Text style={[styles.navIcon, (tab === key || (tab === 'quiz' && key === 'subjects')) && styles.navActive]}>{icon}</Text>
+            <Text style={[styles.navLabel, (tab === key || (tab === 'quiz' && key === 'subjects')) && styles.navActive]}>{label}</Text>
           </TouchableOpacity>
         ))}
       </View>
+      <FloatingStudyChat subjects={subjects} lesson={activeLesson}
+        openSignal={chatOpenSignal}/>
     </SafeAreaView>
   );
 }
@@ -1687,16 +1985,25 @@ const styles = StyleSheet.create({
   navLabel: { fontSize: 10, color: '#637493', marginTop: 4, fontWeight: '700' },
   navActive: { color: '#5E66D8' },
   loginSafe: { flex: 1, backgroundColor: '#F6F8FC', justifyContent: 'center' },
-  loginWrap: { paddingHorizontal: 26, paddingTop: 80, paddingBottom: 80, alignItems: 'stretch' },
-  logo: { alignSelf: 'center', width: 72, height: 72, borderRadius: 24, backgroundColor: '#EBEDFF', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  loginWrap: { flexGrow: 1, paddingHorizontal: 26, paddingTop: 32, paddingBottom: 32, justifyContent: 'center', alignItems: 'stretch' },
+  logo: { alignSelf: 'center', width: 64, height: 64, borderRadius: 22, backgroundColor: '#EBEDFF', alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
   loginTitle: { textAlign: 'center', color: '#202943', fontSize: 28, fontWeight: '900' },
-  loginSubtitle: { textAlign: 'center', color: '#53678B', fontSize: 14, marginTop: 7, marginBottom: 23 },
+  loginSubtitle: { textAlign: 'center', color: '#53678B', fontSize: 14, marginTop: 7, marginBottom: 18 },
   loginInput: { height: 52, borderRadius: 15, backgroundColor: 'white', borderWidth: 1, borderColor: '#E4E7F0', paddingHorizontal: 15, marginBottom: 11, color: '#202943' },
   primaryButton: { height: 52, borderRadius: 15, backgroundColor: '#6567E8', alignItems: 'center', justifyContent: 'center', marginTop: 4 },
   primaryButtonText: { color: 'white', fontSize: 15, fontWeight: '900' },
   loginHint: { color: '#516585', textAlign: 'center', fontSize: 12, marginTop: 18 },
   loginAdminNote: { color: '#4D6290', textAlign: 'center', fontSize: 11.5, lineHeight: 18, marginTop: 11 },
   loginBackendHint: { color: '#677899', textAlign: 'center', fontSize: 10, marginTop: 10 },
+  loginModeTitle:{fontSize:17,fontWeight:'800',color:'#27304B',marginBottom:14},
+  loginLinkButton:{alignItems:'center',paddingVertical:11},
+  loginLink:{fontSize:13,fontWeight:'800',color:'#5C60D5'},
+  loginConnectionLink:{fontSize:12,color:'#687B9B',fontWeight:'700'},
+  settingsEntry:{minHeight:54,paddingHorizontal:16,paddingVertical:14,
+    borderRadius:14,backgroundColor:'#FFFFFF',borderWidth:1,borderColor:'#E8ECF6',
+    flexDirection:'row',alignItems:'center',marginBottom:9},
+  settingsEntryText:{color:'#2F436C',fontSize:14,fontWeight:'700',flex:1},
+  settingsChevron:{fontSize:22,color:'#8493AF',paddingHorizontal:4},
   authSegment: { flexDirection: 'row', padding: 5, borderRadius: 15, backgroundColor: '#E9EEFA', marginBottom: 20, gap: 5 },
   authSegmentButton: { flex: 1, paddingVertical: 13, borderRadius: 11, alignItems: 'center' },
   authSegmentSelected: { backgroundColor: '#6567E8' },

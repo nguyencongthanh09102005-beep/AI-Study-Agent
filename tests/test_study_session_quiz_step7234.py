@@ -138,6 +138,15 @@ def run():
             try:
                 import re
                 def mixed_ai(prompt):
+                    if "người kiểm định độc lập" in prompt:
+                        candidates = json.loads(
+                            prompt.split("CÂU HỎI CẦN KIỂM ĐỊNH (KHÔNG CÓ ĐÁP ÁN TỪ NGƯỜI RA ĐỀ):\n")[-1]
+                        )
+                        return json.dumps({"checks": [
+                            {"id": item["id"], "answer": 0,
+                             "quote": "Node có dữ liệu và con trỏ next để duyệt danh sách đơn."}
+                            for item in candidates
+                        ]}, ensure_ascii=False), None
                     n = int(re.search(r"Tạo đúng (\d+) câu", prompt).group(1))
                     batch = int(re.search(r"cho NHÓM (\d+)", prompt).group(1))
                     questions = []
@@ -171,18 +180,49 @@ def run():
             final_status = f"/api/study-plan/tasks/{task_rows[-1]['id']}/quiz-status"
             assert client.get(endpoint).status_code == 401
             assert client.get(first_status).status_code == 401
+            mobile_first = f"/api/mobile/study-room/{task_rows[0]['id']}/quiz-status"
+            mobile_final = f"/api/mobile/study-room/{task_rows[-1]['id']}/quiz-status"
+            mobile_start = f"/api/mobile/study-room/{task_rows[0]['id']}/quiz-start"
+            mobile_prepare = f"/api/mobile/subjects/{subject}/quiz-preparation"
+            assert client.get(mobile_first).status_code == 401
+            assert client.post(mobile_start,json={}).status_code == 401
+            assert client.get(mobile_prepare).status_code == 401
             login(client, other)
             assert client.get(endpoint).status_code == 404
             assert client.get(first_status).status_code == 404
+            assert client.get(mobile_first).status_code == 404
+            assert client.get(mobile_prepare).status_code == 404
             login(client, admin)
             assert client.get(endpoint).status_code == 403
             assert client.get(first_status).status_code == 403
+            assert client.get(mobile_first).status_code == 403
+            assert client.get(mobile_prepare).status_code == 403
             login(client, student)
             route = f"/subjects/{subject}/learning-path"
             assert client.get(route).status_code == 200
             unprepared = client.get(first_status)
             assert unprepared.status_code == 200, unprepared.get_data(as_text=True)
             assert unprepared.get_json()["state"] == "unprepared"
+            mobile_unprepared = client.get(mobile_first)
+            assert mobile_unprepared.status_code == 200
+            assert mobile_unprepared.get_json()["state"] == "unprepared"
+            assert "questions" not in mobile_unprepared.get_json()
+            mobile_prepare_state = client.get(mobile_prepare)
+            assert mobile_prepare_state.status_code == 200
+            mobile_csrf = mobile_prepare_state.get_json()["quiz_csrf"]
+            assert mobile_csrf
+            assert client.post(mobile_prepare,json={"action":"start"}).status_code == 403
+            assert client.post(mobile_prepare,json={"action":"invalid"},
+                headers={"X-Quiz-CSRF":mobile_csrf}).status_code == 400
+            import unittest.mock as mocking
+            with mocking.patch("quiz_preparation_jobs.enqueue",return_value="queued") as queued,\
+                 mocking.patch("quiz_preparation_jobs.start_local_worker") as started:
+                queued_resp = client.post(mobile_prepare,json={"action":"start"},
+                    headers={"X-Quiz-CSRF":mobile_csrf})
+                assert queued_resp.status_code == 200
+                assert queued_resp.get_json()["state"] == "queued"
+                queued.assert_called_once()
+                started.assert_called_once()
             room = client.get(f"/study-plan/tasks/{task_rows[0]['id']}/learn")
             assert room.status_code == 200
             assert "Quiz của buổi học này" in room.get_data(as_text=True)
@@ -208,7 +248,13 @@ def run():
             assert ready_first.status_code == 200
             assert ready_first.get_json()["count"] == 15
             assert ready_first.get_json()["state"] == "locked"
-            assert "questions" not in ready_first.get_json()
+            ready_mobile = client.get(mobile_first)
+            assert ready_mobile.status_code == 200
+            assert ready_mobile.get_json()["count"] == 15
+            assert ready_mobile.get_json()["state"] == "locked"
+            assert "questions" not in ready_mobile.get_json()
+            assert client.get(mobile_final).get_json()["count"] == 60
+            assert "questions" not in ready_mobile.get_json()
             assert "payload" not in ready_first.get_json()
             ready_final = client.get(final_status)
             assert ready_final.status_code == 200
@@ -236,6 +282,11 @@ def run():
             assert f'data-quiz-id="{first_quiz}"' not in locked_html
             assert f'data-quiz-id="{final_quiz}"' not in locked_html
             assert client.get(f"/api/mobile/quizzes/{first_quiz}").status_code == 409
+            assert client.get(f"/api/mobile/quizzes/{first_quiz}/review").status_code == 409
+            assert client.post(mobile_start,json={}).status_code == 403
+            locked_mobile = client.post(mobile_start,json={},
+                headers={"X-Quiz-CSRF":mobile_csrf})
+            assert locked_mobile.status_code == 409
             blocked = client.post("/api/quiz/submit", json={
                 "quiz_id": first_quiz, "answers": [0]*15
             })
@@ -302,18 +353,41 @@ def run():
             assert room_before["state"] == "available", room_before
             with client.session_transaction() as sess:
                 csrf_for_start = sess["session_quiz_csrf"]
+            opened_mobile = client.post(mobile_start,json={},
+                headers={"X-Quiz-CSRF":csrf_for_start})
+            assert opened_mobile.status_code == 200, opened_mobile.get_data(as_text=True)
+            assert opened_mobile.get_json()["quiz_id"] == first_quiz
+            # The timed grant unlocks questions, not the answer key.
+            assert client.get(f"/api/mobile/quizzes/{first_quiz}/review").status_code == 403
             opened = client.post(
                 f"/quiz/{first_quiz}/start-session",
                 data={"csrf_token": csrf_for_start},
             )
             assert opened.status_code == 303, opened.get_data(as_text=True)
             assert f'data-quiz-id="{first_quiz}"' in client.get("/quiz").get_data(as_text=True)
-            submitted = client.post("/api/quiz/submit", json={
+            # Mobile submission shares Web scoring, adaptive updates and
+            # the persistent request receipt. Duplicate retries cannot grade twice.
+            mobile_submission = {
                 "quiz_id": first_quiz, "answers": [0] * 15,
                 "request_id": "first7234revision"
-            })
+            }
+            submitted = client.post("/api/mobile/quiz/submit",
+                                    json=mobile_submission)
             assert submitted.status_code == 200, submitted.get_data(as_text=True)[:900]
             assert submitted.get_json()["attempt_count"] == 1
+            retried = client.post("/api/mobile/quiz/submit",
+                                  json=mobile_submission)
+            assert retried.status_code == 200
+            assert retried.get_json()["attempt_id"] == submitted.get_json()["attempt_id"]
+            assert retried.get_json()["attempt_count"] == 1
+            reviewed_mobile = client.get(f"/api/mobile/quizzes/{first_quiz}/review")
+            assert reviewed_mobile.status_code == 200
+            assert reviewed_mobile.get_json()["attempt"]["id"] == submitted.get_json()["attempt_id"]
+            assert len(reviewed_mobile.get_json()["correct_answers"]) == 15
+            assert len(reviewed_mobile.get_json()["explanations"]) == 15
+            login(client,other)
+            assert client.get(f"/api/mobile/quizzes/{first_quiz}/review").status_code == 404
+            login(client,student)
             assert len(calls) == len(task_rows) - 1 + len(task_rows) - 1
             conn = project.db()
             assert conn.execute(
@@ -384,6 +458,97 @@ def run():
             assert client.post("/api/quiz/submit", json={
                 "quiz_id": first_quiz, "answers": [0] * 15
             }).status_code == 404
+            login(client, student)
+
+            # Mobile FINAL 60-question acceptance: actual locked -> open ->
+            # complete submit -> idempotent retry -> owner-scoped review.
+            # No network or paid AI generation: use the prepared final
+            # question set from this same validated academic course.
+            final_task_id = task_rows[-1]["id"]
+            final_start_endpoint = (
+                f"/api/mobile/study-room/{final_task_id}/quiz-start"
+            )
+            assert client.get(mobile_final).get_json()["count"] == 60
+            assert client.get(
+                f"/api/mobile/quizzes/{final_quiz}"
+            ).status_code == 409
+            conn = project.db()
+            conn.execute(
+                "UPDATE study_tasks SET study_at=? WHERE id=?",
+                (current_slot.isoformat(timespec="minutes"), final_task_id)
+            )
+            conn.commit()
+            conn.close()
+            final_status = client.get(mobile_final)
+            assert final_status.status_code == 200
+            assert final_status.get_json()["state"] == "available", (
+                final_status.get_json()
+            )
+            assert final_status.get_json()["is_final"] is True
+            # A re-login rotates session state. Use the fresh token read
+            # from the same Mobile status response as the app does.
+            final_start = client.post(
+                final_start_endpoint, json={},
+                headers={"X-Quiz-CSRF": final_status.get_json()["quiz_csrf"]}
+            )
+            assert final_start.status_code == 200, (
+                final_start.get_data(as_text=True)[:900]
+            )
+            assert final_start.get_json()["quiz_id"] == final_quiz
+            final_questions = client.get(
+                f"/api/mobile/quizzes/{final_quiz}"
+            )
+            assert final_questions.status_code == 200
+            assert len(final_questions.get_json()["questions"]) == 60
+            assert all(
+                "answer" not in item and "explanation" not in item
+                for item in final_questions.get_json()["questions"]
+            )
+            assert client.get(
+                f"/api/mobile/quizzes/{final_quiz}/review"
+            ).status_code == 403, "Answer key must be withheld until submission"
+            incomplete = client.post(
+                "/api/mobile/quiz/submit",
+                json={"quiz_id": final_quiz, "answers": [0] * 59,
+                      "request_id": "final60incomplete"}
+            )
+            assert incomplete.status_code == 400
+            final_payload = {
+                "quiz_id": final_quiz, "answers": [0] * 60,
+                "request_id": "final60mobileacceptance"
+            }
+            final_submitted = client.post(
+                "/api/mobile/quiz/submit", json=final_payload
+            )
+            assert final_submitted.status_code == 200, (
+                final_submitted.get_data(as_text=True)[:900]
+            )
+            final_grade = final_submitted.get_json()
+            assert final_grade["total_questions"] == 60
+            assert len(final_grade["correct_answers"]) == 60
+            assert len(final_grade["explanations"]) == 60
+            final_retry = client.post(
+                "/api/mobile/quiz/submit", json=final_payload
+            )
+            assert final_retry.status_code == 200
+            assert final_retry.get_json()["attempt_id"] == final_grade["attempt_id"]
+            assert final_retry.get_json()["attempt_count"] == 1
+            final_review = client.get(
+                f"/api/mobile/quizzes/{final_quiz}/review"
+            )
+            assert final_review.status_code == 200
+            assert len(final_review.get_json()["correct_answers"]) == 60
+            assert client.get(mobile_final).get_json()["state"] == "review"
+            conn = project.db()
+            assert conn.execute(
+                "SELECT COUNT(*) FROM quiz_attempts WHERE quiz_id=? AND user_id=?",
+                (final_quiz, student)
+            ).fetchone()[0] == 1
+            conn.close()
+            login(client, other)
+            assert client.get(
+                f"/api/mobile/quizzes/{final_quiz}/review"
+            ).status_code == 404
             login(client, student)
 
             # Approval revoked => neither quiz nor answer keys leak, even with

@@ -14,6 +14,20 @@ UNIT_HEADING = re.compile(
     r"(?:\d+(?:\.\d+)*|[IVXLCDM]+)\s*[:.\-–—)]?\s+(.{3,160})$",
     re.IGNORECASE,
 )
+SPLIT_UNIT_HEADING = re.compile(
+    r"^(?:chương|chapter|bài|lesson|unit|module)\s+"
+    r"(?:\d+(?:\.\d+)*|[IVXLCDM]+)\s*[:.\-–—)]?\s*$",
+    re.IGNORECASE,
+)
+BULLET_PREFIX = re.compile(r"^[•●▪◦*+\-–—]\s+")
+WEEK_PREFIX = re.compile(
+    r"^\d{1,2}\s*[-–]\s*\d{1,2}\s+(?=(?:chương|chapter|bài|lesson|unit|module)\s+\d)",
+    re.IGNORECASE,
+)
+HEADING_NUMBER = re.compile(
+    r"^(?:chương|chapter|bài|lesson|unit|module)\s+(\d+)\b",
+    re.IGNORECASE,
+)
 NON_TEACHING = (
     "mục tiêu học phần", "chuẩn đầu ra", "tài liệu tham khảo",
     "tài liệu học tập", "thang điểm", "phương pháp đánh giá",
@@ -34,22 +48,79 @@ def _lines(text):
     return [_clean(line) for line in (text or "").replace("\r", "\n").split("\n") if _clean(line)]
 
 
+def normalize_heading_prefix(line):
+    """Remove decorative PDF prefixes ONLY for chapter-heading recognition.
+
+    The original evidence remains untouched for citations, hashing and review.
+    Do not strip numbers in actual chapter titles or week ranges elsewhere.
+    """
+    value = _clean(line)
+    value = WEEK_PREFIX.sub("", value, count=1)
+    # List numbering may prefix an actual chapter title, e.g. "[1] Chương 1".
+    value = re.sub(
+        r"^(?:\[\d{1,2}\]|\(\d{1,2}\)|\d{1,2}[.)])\s+"
+        r"(?=(?:[^\w\s]*\s*)?(?:chương|chapter|bài|lesson|unit|module)\b)",
+        "", value, flags=re.I,
+    )
+    # '►', '.', '·', arrows, unicode bullets or combinations. Never remove
+    # letters/numbers: a normal heading must remain distinguishable.
+    value = re.sub(r"^[^\w\s]{1,16}\s*", "", value)
+    return value
+
+
 def _is_teaching_heading(line):
     return bool(UNIT_HEADING.match(line) and not any(
         x in line.casefold() for x in NON_TEACHING
     ))
 
 
+def _heading_candidate(line, following=""):
+    """Accept bullet and weekly timetable headings, preserving verbatim evidence."""
+    weekly = bool(WEEK_PREFIX.match(line))
+    without_week = WEEK_PREFIX.sub("", line, count=1) if weekly else line
+    clean = normalize_heading_prefix(line)
+    listed = clean != without_week
+    priority = 2 if weekly else (0 if listed else 1)
+    if _is_teaching_heading(clean):
+        title = clean
+        # PDFs may wrap a week-table heading midway through its title.
+        if (weekly and following and len(following) <= 70
+                and clean.rstrip().split()[-1].casefold() in
+                    {"&", "và", "xác", "kỹ", "tạo", "đổi", "triển"}
+                and not re.match(r"^(?:\d|[•●▪◦*+\-–—])", following)
+                and not any(x in following.casefold() for x in NON_TEACHING)):
+            title += " " + following
+        return title[:180], priority
+    if SPLIT_UNIT_HEADING.fullmatch(clean) and 3 <= len(following) <= 160:
+        if (not SPLIT_UNIT_HEADING.fullmatch(following)
+                and not _is_teaching_heading(following)
+                and not any(x in following.casefold() for x in NON_TEACHING)):
+            return (clean.rstrip(" :.-–—)") + ". " + following)[:180], priority
+    return None
+
+
 def _grounded_units(text):
-    units, seen = [], set()
-    for line in _lines(text):
-        if not _is_teaching_heading(line) or line.casefold() in seen:
+    lines = _lines(text)
+    selected = {}
+    for position, line in enumerate(lines):
+        candidate = _heading_candidate(
+            line, lines[position + 1] if position + 1 < len(lines) else ""
+        )
+        if candidate is None:
             continue
-        seen.add(line.casefold())
-        units.append({"title": line[:180], "evidence": line[:180]})
-        if len(units) >= MAX_UNITS:
-            break
-    return units
+        title, priority = candidate
+        clean = normalize_heading_prefix(line)
+        number = HEADING_NUMBER.match(clean)
+        identity = number.group(0).casefold() if number else clean.casefold()
+        earlier = selected.get(identity)
+        # The detailed 15-week timetable is a better source than a contents
+        # bullet. Never turn the same chapter into two study chapters.
+        if earlier is None or priority > earlier[0]:
+            selected[identity] = (priority, position, {
+                "title": title, "evidence": line[:180]
+            })
+    return [item[2] for item in
+            sorted(selected.values(), key=lambda x: x[1])[:MAX_UNITS]]
 
 
 def _llm_candidates(response):

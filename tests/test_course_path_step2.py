@@ -257,10 +257,9 @@ Quiz Chương 2: 10 câu lý thuyết.
             assert chapter_two["topics"][0] == "2.1. Danh sách liên kết đơn"
             last_chapter_two = [x for x in sessions if x["unit_id"] == 2][-1]
             assert last_chapter_two["quiz"]["available"] is False
-            # Personal notes must never be mislabeled as Admin-approved.
-            assert any(x["name"] == "Slide Danh sách liên kết"
-                       and x["kind"] == "personal"
-                       for x in chapter_two["materials"]), chapter_two["materials"]
+            # Private notes must never enter the official syllabus roadmap.
+            assert not any(x["kind"] == "personal"
+                           for lesson in sessions for x in lesson["materials"])
             assert not any(x["kind"] == "shared" for x in chapter_two["materials"])
             assert not any("DeCuongChiTiet_CTDL_TEST_GiaLap.pdf" == x["name"]
                            for item in sessions for x in item["materials"])

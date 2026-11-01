@@ -7,11 +7,17 @@ import hashlib
 import json
 import re
 from datetime import date, timedelta
+from syllabus_learning import normalize_heading_prefix
 
-PLAN_VERSION = 5
+PLAN_VERSION = 6
 
 TOPIC_RE = re.compile(r"^(\d+(?:\.\d+){1,3})[.)]?\s+(.{3,200})$")
-CHAPTER_RE = re.compile(r"^(?:chương|chapter|bài|lesson|unit|module)\s+(\d+)\b", re.I)
+CHAPTER_RE = re.compile(
+    r"^(?:\d{1,2}\s*[-–]\s*\d{1,2}\s+)?"
+    r"(?:[•●▪◦*+\-–—]\s+)?"
+    r"(?:chương|chapter|bài|lesson|unit|module)\s+(\d+)\b",
+    re.I,
+)
 CLO_RE = re.compile(r"\bCLO\s*[-:]?\s*\d+\b", re.I)
 BULLET_RE = re.compile(r"^[•●▪◦*+\-–—]\s*")
 COURSE_END_RE = re.compile(
@@ -94,7 +100,7 @@ def parse_chapter_details(text, units):
     for index, section in enumerate(sections):
         end = sections[index+1]["start"] if index+1 < len(sections) else len(lines)
         body = lines[section["start"]+1:end]
-        chapter_match = CHAPTER_RE.match(section["evidence"])
+        chapter_match = CHAPTER_RE.match(normalize_heading_prefix(section["evidence"]))
         chapter_num = chapter_match.group(1) if chapter_match else ""
         values = {name: [] for name, _ in SECTION_PATTERNS}
         clos = []
@@ -107,7 +113,7 @@ def parse_chapter_details(text, units):
             if COURSE_END_RE.match(line):
                 break
             # A different chapter heading is a hard boundary, even if not approved.
-            if CHAPTER_RE.match(line):
+            if CHAPTER_RE.match(normalize_heading_prefix(line)):
                 break
 
             if line.casefold().startswith("thời lượng:"):
@@ -213,11 +219,19 @@ def personal_course_documents(conn, user_id, subject_id, exclude_document_id,
 def match_course_materials(section, documents):
     """Only return genuinely subject-scoped files with topical text evidence."""
     search_terms = _terms(section["chapter"] + " " + " ".join(section["topics"][:8]))
+    from chapter_fulltext_retrieval import _phrases
     ranked = []
     for document in documents:
-        content = (document.get("text") or "")[:18000]
+        # Require topical overlap inside one local passage; combining a term
+        # on page 1 with an unrelated term on page 180 is not evidence.
+        content = document.get("text") or ""
         name = document.get("name") or ""
-        matches = search_terms & _terms(content)
+        best_matches = set()
+        for _, passage in _phrases(content, size=1800, overlap=180):
+            matches = search_terms & _terms(passage)
+            if len(matches) > len(best_matches):
+                best_matches = matches
+        matches = best_matches
         if len(matches) < 2:
             continue
         title_matches = search_terms & _terms(name)
@@ -307,6 +321,23 @@ def build_course_roadmap(chapters, documents, profile, weaknesses=None, start_da
             max(1, (len(chapter["topics"]) + chunk_size - 1) // chunk_size)
             for chapter in chapters
         ]
+    def suggested_day(index):
+        """Academic lessons fall on Mon–Sat, never Sunday by default."""
+        candidate = base_date
+        remaining = index
+        while candidate.weekday() == 6:
+            candidate += timedelta(days=1)
+        while remaining:
+            candidate += timedelta(days=1)
+            if candidate.weekday() != 6:
+                remaining -= 1
+        return candidate
+
+    # Official classes are daytime; user-chosen times in the calendar override
+    # these suggestions and must never be silently overwritten by re-import.
+    if has_credits:
+        preferred_time = "08:00"
+
     for chapter, slots in zip(chapters, allocations):
         topic_items = chapter["topics"]
         topic_chunks = _learning_chunks(topic_items, slots) if has_credits else (
@@ -351,8 +382,8 @@ def build_course_roadmap(chapters, documents, profile, weaknesses=None, start_da
                 "unit_id": chapter["unit_id"],
                 "chapter": chapter["chapter"],
                 "source_evidence": chapter["evidence"],
-                "date": (base_date + timedelta(days=len(sessions))).isoformat(),
-                "time": preferred_time,
+                "date": (suggested_day(len(sessions)) if has_credits else base_date + timedelta(days=len(sessions))).isoformat(),
+                "time": ("08:00" if len(sessions) % 2 == 0 else "13:30") if has_credits else preferred_time,
                 "duration": daily_minutes,
                 "title": (f'{chapter["chapter"]} — Buổi {index+1}/{len(topic_chunks)}')[:180],
                 "topics": chunk,
@@ -385,8 +416,8 @@ def build_course_roadmap(chapters, documents, profile, weaknesses=None, start_da
             "unit_id": last["unit_id"],
             "chapter": last["chapter"],
             "source_evidence": last["evidence"],
-            "date": (base_date + timedelta(days=len(sessions))).isoformat(),
-            "time": preferred_time,
+            "date": (suggested_day(len(sessions)) if has_credits else base_date + timedelta(days=len(sessions))).isoformat(),
+            "time": ("08:00" if len(sessions) % 2 == 0 else "13:30") if has_credits else preferred_time,
             "duration": max(daily_minutes, 90),
             "title": "Ôn tập tổng hợp và kiểm tra cuối môn",
             "topics": [],

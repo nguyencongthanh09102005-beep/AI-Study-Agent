@@ -10,6 +10,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const expandButton = document.getElementById("floatingAiExpand");
   const resetSizeButton = document.getElementById("floatingAiResetSize");
   const resizeHandle = document.getElementById("floatingAiResize");
+  const resizeHorizontal = document.getElementById("floatingAiResizeHorizontal");
+  const resizeVertical = document.getElementById("floatingAiResizeVertical");
+  const tabStudy = document.getElementById("floatingAiTabStudy");
+  const tabSupport = document.getElementById("floatingAiTabSupport");
+  const studyView = document.getElementById("floatingAiStudyView");
+  const supportView = document.getElementById("floatingAiSupportView");
+  const supportResults = document.getElementById("floatingAiSupportResults");
   const scope = document.getElementById("floatingAiScope");
   const mode = document.getElementById("floatingAiMode");
   const courseLabel = document.getElementById("floatingAiCourseLabel");
@@ -37,6 +44,11 @@ document.addEventListener("DOMContentLoaded", () => {
   let loaded = false, busy = false, disabled = true, requestToken = 0;
   let conversationId = null, subjectId = null;
   let courses = [], approvedSourceNames = [];
+  // Keep exactly the existing bubble UI. The full Web Chat's chapter choice
+  // is reused automatically; both surfaces call the same /api/chat backend.
+  let syncedChapter = null;
+  const ACTIVE_SUBJECT_KEY = "ai-study-active-subject-v1";
+  const CHAPTER_KEY_PREFIX = "ai-study-chat-chapter-v1:";
 
   const number = n => Number.isSafeInteger(n) && n > 0;
   function setStatus(value) { status.textContent = value; }
@@ -104,6 +116,33 @@ document.addEventListener("DOMContentLoaded", () => {
     messages.appendChild(box);
     messages.scrollTop = messages.scrollHeight;
   }
+  // Support has its own conversational, confirmation-gated workspace.
+  // The learning conversation stays unchanged and source-grounded.
+  const supportFeature = window.FloatingAiSupport?.attach({
+    results: supportResults, setStatus
+  });
+
+  // Learning stays the unchanged, source-grounded Chat. Support is a separate
+  // workspace for optional schedule checks: no AI prompt can write to the DB.
+  let activeTab = "study";
+  function chooseTab(tab) {
+    activeTab = tab === "support" ? "support" : "study";
+    if (!tabStudy || !tabSupport || !studyView || !supportView) return;
+    const learning = activeTab === "study";
+    studyView.hidden = !learning;
+    supportView.hidden = learning;
+    tabStudy.classList.toggle("active", learning);
+    tabSupport.classList.toggle("active", !learning);
+    tabStudy.setAttribute("aria-selected", String(learning));
+    tabSupport.setAttribute("aria-selected", String(!learning));
+    try { sessionStorage.setItem("ai-study-floating-tab-v1", activeTab); }
+    catch (_error) {}
+  }
+  tabStudy?.addEventListener("click", () => chooseTab("study"));
+  tabSupport?.addEventListener("click", () => chooseTab("support"));
+  try { chooseTab(sessionStorage.getItem("ai-study-floating-tab-v1")); }
+  catch (_error) { chooseTab("study"); }
+
   function renderHistory(rows) {
     clear();
     if (!Array.isArray(rows) || !rows.length) {
@@ -167,6 +206,50 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  function readSessionNumber(key) {
+    try {
+      const value = Number(sessionStorage.getItem(key));
+      return number(value) ? value : null;
+    } catch (_error) { return null; }
+  }
+  function rememberSubject(id) {
+    try { sessionStorage.setItem(ACTIVE_SUBJECT_KEY, String(id)); }
+    catch (_error) {}
+  }
+  async function restoreWebChatChapter(expectedSubject, token) {
+    const savedChapter = readSessionNumber(CHAPTER_KEY_PREFIX + expectedSubject);
+    if (!savedChapter) return;
+    // Never silently downgrade a chapter-scoped question to free Chat.
+    enable(false);
+    setMode("Đang xác minh chương đã chọn từ Chat Web...");
+    setStatus("Đang kiểm tra học liệu...");
+    try {
+      const params = new URLSearchParams({
+        subject_id: String(expectedSubject),
+        chapter_number: String(savedChapter)
+      });
+      const verified = await api("/api/chat/lesson-context?" + params.toString());
+      if (token !== requestToken || subjectId !== expectedSubject) return;
+      if (Number(verified.subject_id) !== expectedSubject ||
+          Number(verified.chapter_number) !== savedChapter) {
+        throw new Error("Ngữ cảnh chương không khớp môn học.");
+      }
+      syncedChapter = verified;
+      fullChatFor(expectedSubject, savedChapter);
+      setMode("✓ Học theo chương " + savedChapter +
+        " · Dùng chung học liệu đã duyệt với Chat Web");
+      setStatus("Sẵn sàng");
+      enable(true);
+    } catch (error) {
+      if (token !== requestToken || subjectId !== expectedSubject) return;
+      syncedChapter = null;
+      fullChatFor(expectedSubject, savedChapter);
+      enable(false);
+      setMode("Chương đang học cần xác minh lại: " + error.message, true);
+      setStatus("Mở Chat Web để kiểm tra chương");
+    }
+  }
+
   function pageSubjectHint() {
     const match = location.pathname.match(/\/subjects\/(\d+)(?:\/|$)/);
     const query = new URLSearchParams(location.search).get("subject_id");
@@ -177,6 +260,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const chosen = courses.find(c => Number(c.subject_id) === Number(id));
     const token = ++requestToken;
     conversationId = null;
+    syncedChapter = null;
     enable(false);
     clear();
     if (!chosen) {
@@ -187,6 +271,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
     subjectId = chosen.subject_id;
+    rememberSubject(subjectId);
     scope.textContent = chosen.title;
     courseSelect.value = String(subjectId);
     fullChatFor(subjectId, null);
@@ -199,6 +284,9 @@ document.addEventListener("DOMContentLoaded", () => {
       renderHistory(history);
       setStatus("Sẵn sàng");
       enable(true);
+      // The full Chat already chose the mode. Mirror it without new controls.
+      // The server validates chapter ownership and approved sources again.
+      await restoreWebChatChapter(subjectId, token);
     } catch (error) {
       if (token !== requestToken) return;
       empty(error.message);
@@ -225,7 +313,9 @@ document.addEventListener("DOMContentLoaded", () => {
         option.textContent = course.title;
         courseSelect.appendChild(option);
       }
-      const match = courses.find(c => c.subject_id === pageSubjectHint());
+      const preferredSubject = pageSubjectHint() ||
+        readSessionNumber(ACTIVE_SUBJECT_KEY);
+      const match = courses.find(c => c.subject_id === preferredSubject);
       await selectCourse(match?.subject_id || courses[0].subject_id);
     } catch (error) {
       empty(error.message);
@@ -336,61 +426,77 @@ document.addEventListener("DOMContentLoaded", () => {
     applyPanelSize();
     savePanelSize();
   });
-  resizeHandle?.addEventListener("pointerdown", event => {
-    if (event.button !== 0 || mobilePanel()) return;
-    const bounds = panel.getBoundingClientRect();
-    resizePointer = {
-      id: event.pointerId, x: event.clientX, y: event.clientY,
-      width: bounds.width, height: bounds.height,
-      leftSide: root.dataset.side === "left", moved: false
-    };
-    resizeHandle.setPointerCapture?.(event.pointerId);
-    event.preventDefault();
-  });
-  resizeHandle?.addEventListener("pointermove", event => {
-    if (!resizePointer || resizePointer.id !== event.pointerId) return;
-    const dx = event.clientX - resizePointer.x;
-    const dy = event.clientY - resizePointer.y;
-    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) resizePointer.moved = true;
-    if (!resizePointer.moved) return;
-    event.preventDefault();
-    usePanelSize(
-      resizePointer.width + (resizePointer.leftSide ? dx : -dx),
-      resizePointer.height - dy
-    );
-  });
-  function finishResize(event) {
-    if (!resizePointer || resizePointer.id !== event.pointerId) return;
-    if (resizePointer.moved) savePanelSize();
-    if (resizeHandle?.hasPointerCapture?.(event.pointerId)) {
-      resizeHandle.releasePointerCapture(event.pointerId);
-    }
-    resizePointer = null;
-  }
-  resizeHandle?.addEventListener("pointerup", finishResize);
-  resizeHandle?.addEventListener("pointercancel", finishResize);
-  resizeHandle?.addEventListener("keydown", event => {
-    if (mobilePanel()) return;
-    const step = event.shiftKey ? 64 : 24;
-    const keys = {
-      ArrowRight: [step, 0], ArrowLeft: [-step, 0],
-      ArrowUp: [0, step], ArrowDown: [0, -step]
-    };
-    if (event.key === "Home") {
+  // Make resize discoverable: grab the corner for both axes, or an edge for
+  // just width/height. A popup docked to the right grows toward the left.
+  // A popup docked left grows toward the right. Mobile stays fullscreen.
+  const resizeTargets = [
+    [resizeHandle, true, true],
+    [resizeHorizontal, true, false],
+    [resizeVertical, false, true]
+  ];
+  for (const [handle, horizontal, vertical] of resizeTargets) {
+    handle?.addEventListener("pointerdown", event => {
+      if (event.button !== 0 || mobilePanel()) return;
+      const bounds = panel.getBoundingClientRect();
+      resizePointer = {
+        handle, id: event.pointerId, x:event.clientX, y:event.clientY,
+        width:bounds.width, height:bounds.height,
+        horizontal, vertical, leftSide: root.dataset.side === "left",
+        moved:false
+      };
+      handle.setPointerCapture?.(event.pointerId);
       event.preventDefault();
-      panelSize = {width: 420, height: 640};
-      expanded = false;
-      applyPanelSize();
-      savePanelSize();
-      return;
+    });
+    handle?.addEventListener("pointermove", event => {
+      if (!resizePointer || resizePointer.handle !== handle ||
+          resizePointer.id !== event.pointerId) return;
+      const dx=event.clientX-resizePointer.x;
+      const dy=event.clientY-resizePointer.y;
+      if (Math.abs(dx)>2 || Math.abs(dy)>2) resizePointer.moved=true;
+      if (!resizePointer.moved) return;
+      event.preventDefault();
+      usePanelSize(
+        resizePointer.width + (resizePointer.horizontal
+          ? (resizePointer.leftSide ? dx : -dx) : 0),
+        resizePointer.height + (resizePointer.vertical ? -dy : 0)
+      );
+    });
+    function endResize(event) {
+      if (!resizePointer || resizePointer.handle !== handle ||
+          resizePointer.id !== event.pointerId) return;
+      if (resizePointer.moved) savePanelSize();
+      if (handle?.hasPointerCapture?.(event.pointerId)) {
+        handle.releasePointerCapture(event.pointerId);
+      }
+      resizePointer=null;
     }
-    if (!keys[event.key]) return;
-    event.preventDefault();
-    const current = panel.getBoundingClientRect();
-    usePanelSize(current.width + keys[event.key][0],
-                 current.height + keys[event.key][1]);
-    savePanelSize();
-  });
+    handle?.addEventListener("pointerup", endResize);
+    handle?.addEventListener("pointercancel", endResize);
+    handle?.addEventListener("keydown", event => {
+      if (mobilePanel()) return;
+      const step=event.shiftKey ? 64 : 24;
+      const keys={
+        ArrowRight:[step,0], ArrowLeft:[-step,0],
+        ArrowUp:[0,step], ArrowDown:[0,-step]
+      };
+      if (event.key==="Home") {
+        event.preventDefault();
+        panelSize={width:420,height:640};
+        expanded=false;
+        applyPanelSize();
+        savePanelSize();
+        return;
+      }
+      if (!keys[event.key]) return;
+      event.preventDefault();
+      const rect=panel.getBoundingClientRect();
+      usePanelSize(
+        rect.width + (horizontal ? keys[event.key][0] : 0),
+        rect.height + (vertical ? keys[event.key][1] : 0)
+      );
+      savePanelSize();
+    });
+  }
 
   function place(x, y) {
     const edge = 10;
@@ -470,9 +576,11 @@ document.addEventListener("DOMContentLoaded", () => {
     input.value="";
     setStatus("AI đang trả lời...");
     try {
+      const selectedChapter = syncedChapter?.chapter_number || null;
       const payload = {
         conversation_id:conversation, question,
-        ...(isLesson ? {lesson:{chapter_number:lesson.chapter,task_id:lesson.taskId}} : {})
+        ...(isLesson ? {lesson:{chapter_number:lesson.chapter,task_id:lesson.taskId}} :
+          (number(selectedChapter) ? {lesson:{chapter_number:selectedChapter}} : {}))
       };
       const data = await api("/api/chat", {
         method:"POST",
@@ -483,6 +591,11 @@ document.addEventListener("DOMContentLoaded", () => {
           data.lesson?.session_task_id !== lesson.taskId ||
           data.lesson?.chapter_number !== lesson.chapter)) {
         throw new Error("Phản hồi không được xác thực cho đúng buổi học.");
+      }
+      if (!isLesson && number(selectedChapter) &&
+          (data.source_mode !== "chapter" ||
+           Number(data.lesson?.chapter_number) !== selectedChapter)) {
+        throw new Error("Phản hồi không được xác thực cho đúng chương.");
       }
       if (sentFor !== subjectId || conversation !== conversationId) return;
       appendMessage("assistant", data.answer || "Chưa có câu trả lời.");

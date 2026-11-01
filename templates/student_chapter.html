@@ -89,7 +89,12 @@
   {% if chapter.passing_criteria %}
     <p><strong>Tiêu chí từ đề cương:</strong> {{ chapter.passing_criteria|join('; ') }}</p>
   {% endif %}
-  <p style="color:#647896;font-size:13px">Quiz thực hành theo chương và cơ chế điều chỉnh tiến độ là bước tiếp theo, chưa kích hoạt ở màn hình này.</p>
+  <div style="background:#f3f6ff;border:1px solid #dce5f7;border-radius:12px;padding:16px;margin:14px 0">
+    <strong style="color:#314d87">✍️ Thực hành bài tập theo chương</strong>
+    <p style="font-size:13px;color:#617493;line-height:1.65">Nộp lời giải, xem các lần sửa và nhận gợi ý AI có dẫn chứng từ học liệu đã duyệt. Không sử dụng nhận xét AI làm điểm chính thức.</p>
+    <a class="soft-primary" href="{{ url_for('chapter_exercise.exercises',subject_id=subject.id,chapter_number=chapter_number) }}">Làm bài tập & xem lịch sử →</a>
+  </div>
+  <p style="color:#647896;font-size:13px">Quiz theo buổi và lịch ôn thích ứng được quản lý tại Lộ trình theo chương và Kế hoạch học; bài tập tự luận được theo dõi riêng tại đây.</p>
   <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:24px">
     <a class="soft-primary" href="{{ url_for('course_path.learning_path', subject_id=subject.id) }}">← Về lộ trình</a>
     {% if chapter_number < total_chapters %}<a class="soft-primary" href="{{ url_for('chapter_material.student_chapter', subject_id=subject.id, chapter_number=chapter_number+1) }}">Chương tiếp theo →</a>{% endif %}

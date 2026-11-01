@@ -39,12 +39,30 @@ from syllabus_routes import syllabus_bp
 app.register_blueprint(syllabus_bp)
 from course_path_routes import course_path_bp
 app.register_blueprint(course_path_bp)
+from admin_syllabus_analysis import admin_syllabus_bp
+app.register_blueprint(admin_syllabus_bp)
 from chapter_material_routes import chapter_material_bp
 app.register_blueprint(chapter_material_bp)
+from bulk_chapter_mapping import bulk_chapter_bp
+app.register_blueprint(bulk_chapter_bp)
+from chapter_exercise_routes import chapter_exercise_bp
+app.register_blueprint(chapter_exercise_bp)
+from clo_review_routes import clo_review_bp
+app.register_blueprint(clo_review_bp)
+from shared_analysis_cache import shared_analysis_bp
+app.register_blueprint(shared_analysis_bp)
 from study_session_routes import study_session_bp
 app.register_blueprint(study_session_bp)
 from study_session_quiz_routes import session_quiz_bp
 app.register_blueprint(session_quiz_bp)
+from manual_lesson_routes import manual_lesson_bp
+app.register_blueprint(manual_lesson_bp)
+from chat_schedule_actions import chat_schedule_bp
+app.register_blueprint(chat_schedule_bp)
+from support_schedule_chat import support_chat_bp
+app.register_blueprint(support_chat_bp)
+from mobile_learning_routes import mobile_learning_bp
+app.register_blueprint(mobile_learning_bp)
 # Khi thiếu SECRET_KEY, dùng khóa ngẫu nhiên chỉ cho phiên chạy hiện tại.
 # Khi triển khai cần đặt SECRET_KEY bí mật, ổn định trong biến môi trường.
 app.secret_key = os.getenv("SECRET_KEY") or secrets.token_hex(32)
@@ -61,7 +79,7 @@ app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 # Bật chỉ khi chạy HTTPS thật; khi demo LAN HTTP giữ =0.
 app.config["SESSION_COOKIE_SECURE"] = os.getenv("SESSION_COOKIE_SECURE", "0") == "1"
 
-ALLOWED_EXTENSIONS = {"pdf", "txt", "md"}
+ALLOWED_EXTENSIONS = {"pdf", "txt", "md", "docx"}
 
 
 @app.errorhandler(RequestEntityTooLarge)
@@ -1106,7 +1124,17 @@ def get_shared_subject_context(user_id, subject_id, query="", max_chars=5500):
     source_labels = []
     total = 0
 
-    shared_syllabus = (shared["syllabus_text"] or "").strip()
+    # The shared_subjects field is only a short preview. Prefer the complete
+    # extracted official file for retrieval when the admin uploaded one.
+    official = conn.execute("""
+        SELECT extracted_text FROM shared_documents
+        WHERE shared_subject_id=? AND is_syllabus=1
+        ORDER BY id DESC LIMIT 1
+    """, (shared["id"],)).fetchone()
+    shared_syllabus = (
+        (official["extracted_text"] if official else "")
+        or shared["syllabus_text"] or ""
+    ).strip()
     personal_syllabus = ""
     personal_syllabus_name = ""
 
@@ -1131,7 +1159,11 @@ def get_shared_subject_context(user_id, subject_id, query="", max_chars=5500):
 
     syllabus_text = shared_syllabus or personal_syllabus
     if syllabus_text:
-        clipped = syllabus_text[:max_chars]
+        from chat_retrieval import retrieve
+        source_budget = min(2200, max(350, max_chars // 2))
+        found = retrieve([{"name":"syllabus","text":syllabus_text}], query,
+                         max_chars=source_budget, max_passages=1)
+        clipped = found[0][1] if found else ""
         if shared_syllabus:
             parts.append(f"ĐỀ CƯƠNG CHUẨN CỦA MÔN:\n{clipped}")
             source_labels.append("Đề cương chuẩn của môn")
@@ -1151,7 +1183,7 @@ def get_shared_subject_context(user_id, subject_id, query="", max_chars=5500):
         FROM shared_knowledge
         WHERE shared_subject_id=?
         ORDER BY id DESC
-        LIMIT 12
+
         """,
         (shared["id"],)
     ).fetchall()
@@ -1178,7 +1210,12 @@ def get_shared_subject_context(user_id, subject_id, query="", max_chars=5500):
         remaining = max_chars - total
         if remaining <= 0:
             break
-        clipped = content[:remaining]
+        from chat_retrieval import retrieve
+        found = retrieve([{"name": title, "text": content}], query,
+                         max_chars=max(200, remaining - 80), max_passages=1)
+        clipped = found[0][1] if found else ""
+        if not clipped:
+            continue
         parts.append(
             f"KIẾN THỨC CHUNG - {title} ({source_type or 'note'}):\n{clipped}"
         )
@@ -1682,11 +1719,18 @@ def record_quiz_learning_signal(
     topic,
     chapter,
     is_correct,
-    question_text=""
+    question_text="", stream="academic"
 ):
     """Ghi nhận tín hiệu học theo chủ đề/chương thay vì lưu nguyên câu hỏi."""
     if not subject_id:
         return
+    # SQL identifiers are chosen only from trusted, fixed literals.
+    if stream == "self_study":
+        from learning_streams import ensure_private_weakness_schema
+        ensure_private_weakness_schema(conn)
+        table = "self_study_weaknesses"
+    else:
+        table = "learning_weaknesses"
 
     topic = re.sub(
         r"\s+",
@@ -1709,9 +1753,9 @@ def record_quiz_learning_signal(
         return
 
     row = conn.execute(
-        """
+        f"""
         SELECT id,miss_count,correct_count
-        FROM learning_weaknesses
+        FROM {table}
         WHERE user_id=? AND subject_id=? AND topic_key=?
         """,
         (user_id, subject_id, topic_key)
@@ -1719,8 +1763,8 @@ def record_quiz_learning_signal(
 
     if row:
         conn.execute(
-            """
-            UPDATE learning_weaknesses
+            f"""
+            UPDATE {table}
             SET miss_count=?,
                 correct_count=?,
                 topic=?,
@@ -1741,8 +1785,8 @@ def record_quiz_learning_signal(
         # Chỉ tạo weakness mới khi sinh viên thực sự trả lời sai.
         # Câu đúng ngay lần đầu không nên xuất hiện trong "Phần cần ôn thêm".
         conn.execute(
-            """
-            INSERT INTO learning_weaknesses(
+            f"""
+            INSERT INTO {table}(
                 user_id,subject_id,topic_key,topic,chapter,
                 miss_count,correct_count,last_seen_at
             ) VALUES(?,?,?,?,?,?,?,?)
@@ -1772,7 +1816,7 @@ def rebuild_subject_learning_signals(conn, user_id, subject_id):
 
     attempts = conn.execute(
         """
-        SELECT q.payload, qa.answers_json
+        SELECT q.id AS quiz_id, q.payload, qa.answers_json
         FROM quiz_attempts qa
         JOIN quizzes q ON q.id=qa.quiz_id AND q.user_id=qa.user_id
         WHERE qa.user_id=? AND q.subject_id=?
@@ -1781,12 +1825,17 @@ def rebuild_subject_learning_signals(conn, user_id, subject_id):
         (user_id, subject_id)
     ).fetchall()
 
-    conn.execute(
-        "DELETE FROM learning_weaknesses WHERE user_id=? AND subject_id=?",
-        (user_id, subject_id)
-    )
+    from learning_streams import academic_quiz, ensure_private_weakness_schema
+    ensure_private_weakness_schema(conn)
+    for table in ("learning_weaknesses", "self_study_weaknesses"):
+        conn.execute(
+            f"DELETE FROM {table} WHERE user_id=? AND subject_id=?",
+            (user_id, subject_id)
+        )
 
     for attempt in attempts:
+        stream = ("academic" if academic_quiz(conn, user_id, attempt["quiz_id"])
+                  else "self_study")
         try:
             questions = json.loads(attempt["payload"] or "[]")
             answers = json.loads(attempt["answers_json"] or "[]")
@@ -1809,22 +1858,29 @@ def rebuild_subject_learning_signals(conn, user_id, subject_id):
                 str(question.get("topic") or ""),
                 str(question.get("chapter") or ""),
                 chosen == expected,
-                str(question.get("question") or "")
+                str(question.get("question") or ""), stream=stream
             )
 
     sync_adaptive_review_task(conn, user_id, subject_id)
     recalculate_subject_progress(user_id, subject_id, conn)
 
 
-def get_active_weakness_rows(conn, user_id, subject_id, limit=12):
+def get_active_weakness_rows(conn, user_id, subject_id, limit=12, stream="academic"):
     """Các chủ đề vẫn còn yếu: số lần sai đang lớn hơn số lần làm đúng."""
     if not subject_id:
         return []
 
+    if stream == "self_study":
+        from learning_streams import ensure_private_weakness_schema
+        ensure_private_weakness_schema(conn)
+        table = "self_study_weaknesses"
+    else:
+        table = "learning_weaknesses"
+
     return conn.execute(
-        """
+        f"""
         SELECT id,topic_key,topic,chapter,miss_count,correct_count,last_seen_at
-        FROM learning_weaknesses
+        FROM {table}
         WHERE user_id=? AND subject_id=?
           AND miss_count > correct_count
         ORDER BY (miss_count - correct_count * 0.5) DESC,
@@ -2038,126 +2094,50 @@ def allowed_file(filename):
 def extract_text(path: Path):
     ext = path.suffix.lower()
     if ext in {".txt", ".md"}:
-        return path.read_text(encoding="utf-8", errors="ignore")[:100000]
+        return path.read_text(encoding="utf-8", errors="ignore")
+    if ext == ".docx":
+        try:
+            from syllabus_file_preview import extract_docx_text
+            return extract_docx_text(path, max_chars=None)
+        except Exception:
+            return ""
     if ext == ".pdf" and PdfReader:
         try:
             reader = PdfReader(str(path))
             chunks = []
-            for page in reader.pages[:80]:
+            for page in reader.pages:
                 chunks.append(page.extract_text() or "")
-            return "\n".join(chunks)[:100000]
+            return "\n".join(chunks)
         except Exception:
             return ""
     return ""
 
 def get_subject_context(user_id, subject_id, query, max_chars=10000):
-    """
-    Lấy ngữ cảnh CHỈ từ tài liệu của môn đang chat.
-    Trả về (context, source_names).
-    """
+    """Find relevant passages anywhere in all stored personal course files."""
     if not subject_id:
         return "", []
-
+    from chat_retrieval import retrieve
     conn = db()
-    rows = conn.execute(
-        """
-        SELECT original_name, extracted_text
-        FROM documents
-        WHERE user_id=? AND subject_id=?
-        ORDER BY id DESC
-        LIMIT 8
-        """,
-        (user_id, subject_id)
-    ).fetchall()
-    conn.close()
-
-    rows = [row for row in rows if (row["extracted_text"] or "").strip()]
-    if not rows:
-        return "", []
-
-    stop_words = {
-        "là", "gì", "có", "và", "của", "cho", "với", "trong", "một",
-        "những", "các", "này", "đó", "được", "về", "theo", "tại", "khi",
-        "ai", "em", "tui", "mình", "hãy", "giúp", "cho", "biết"
-    }
-
-    terms = {
-        token.lower()
-        for token in re.findall(r"[\wÀ-ỹ]+", query, flags=re.UNICODE)
-        if len(token) >= 2 and token.lower() not in stop_words
-    }
-
-    query_lower = (query or "").lower()
-    document_intent = any(
-        phrase in query_lower
-        for phrase in (
-            "tóm tắt", "tài liệu", "file", "nội dung", "bài giảng",
-            "chương", "đã tải", "đã up", "trong bài"
-        )
-    )
-
-    scored_docs = []
-
-    for row in rows:
-        text_value = row["extracted_text"] or ""
-        lowered = text_value.lower()
-        score = sum(lowered.count(term) for term in terms)
-
-        if document_intent:
-            score += 1
-
-        paragraphs = [
-            p.strip()
-            for p in re.split(r"\n{2,}|(?<=[.!?])\s+", text_value)
-            if len(p.strip()) >= 30
-        ]
-
-        paragraph_scores = []
-        for paragraph in paragraphs:
-            p_lower = paragraph.lower()
-            p_score = sum(p_lower.count(term) for term in terms)
-            if p_score > 0:
-                paragraph_scores.append((p_score, paragraph))
-
-        paragraph_scores.sort(key=lambda item: item[0], reverse=True)
-
-        if paragraph_scores:
-            snippet_parts = []
-            snippet_length = 0
-            for _, paragraph in paragraph_scores[:5]:
-                if snippet_length + len(paragraph) > 2600:
-                    break
-                snippet_parts.append(paragraph)
-                snippet_length += len(paragraph)
-            snippet = "\n".join(snippet_parts)
-        else:
-            snippet = text_value[:1800]
-
-        scored_docs.append((score, row["original_name"], snippet))
-
-    scored_docs.sort(key=lambda item: item[0], reverse=True)
-
-    # Nếu có tài liệu, vẫn đưa một lượng ngữ cảnh nhỏ cho Gemini.
-    # Gemini sẽ tự quyết định ngữ cảnh có đủ để trả lời hay phải dùng kiến thức chung.
-    selected = scored_docs[:4]
-    context_parts = []
-    source_names = []
-    total = 0
-
-    for _, name, snippet in selected:
-        if not snippet:
+    try:
+        rows = conn.execute("""
+            SELECT original_name,extracted_text FROM documents
+            WHERE user_id=? AND subject_id=? ORDER BY id DESC
+        """, (user_id,subject_id)).fetchall()
+    finally:
+        conn.close()
+    documents = [{"name":r["original_name"],"text":r["extracted_text"]}
+                 for r in rows if (r["extracted_text"] or "").strip()]
+    selected = retrieve(documents,query,max_chars=max(500,max_chars-800),
+                        max_passages=5)
+    parts, source_names, used = [], [], 0
+    for name, excerpt in selected:
+        value = f"FILE: {name}\n{excerpt}"
+        if used + len(value) > max_chars:
             continue
-
-        remaining = max_chars - total
-        if remaining <= 0:
-            break
-
-        clipped = snippet[:remaining]
-        context_parts.append(f"FILE: {name}\n{clipped}")
+        parts.append(value)
         source_names.append(name)
-        total += len(clipped)
-
-    return "\n\n".join(context_parts), source_names
+        used += len(value)
+    return "\n\n".join(parts), list(dict.fromkeys(source_names))
 
 def local_ai_answer(question, context, source_names=None):
     source_names = source_names or []
@@ -2187,12 +2167,12 @@ def local_ai_answer(question, context, source_names=None):
                 source_line
                 + "\n\n"
                 + best[:1500]
-                + "\n\nĐây là phản hồi dự phòng cục bộ vì Gemini chưa khả dụng."
+                + "\n\nĐây là trích đoạn dự phòng vì AI tạm thời chưa phản hồi."
             )
 
     return (
-        "Gemini hiện chưa khả dụng nên hệ thống chưa thể trả lời bằng kiến thức chung. "
-        "Hãy kiểm tra GEMINI_API_KEY hoặc kết nối mạng rồi thử lại."
+        "AI tạm thời chưa khả dụng nên hệ thống chưa thể trả lời bằng kiến thức chung. "
+        "Vui lòng kiểm tra kết nối mạng và thử lại sau."
     )
 
 def gemini_generate(prompt):
@@ -2208,7 +2188,7 @@ def gemini_generate(prompt):
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
 
     if not api_key:
-        return None, "Chưa cấu hình GEMINI_API_KEY trong file .env."
+        return None, "Dịch vụ AI chưa được cấu hình. Vui lòng liên hệ quản trị viên."
 
     if requests is None:
         return None, "Thiếu thư viện requests."
@@ -2242,6 +2222,14 @@ def gemini_generate(prompt):
     except ValueError:
         request_timeout = 25
     request_timeout = max(10, min(request_timeout, 60))
+    # F3: cap the total latency across primary retries, backups and backoff.
+    # This is especially important for synchronous Chat and live demonstrations.
+    try:
+        total_budget = int(os.getenv("GEMINI_TOTAL_TIMEOUT", "35"))
+    except ValueError:
+        total_budget = 35
+    total_budget = max(15, min(total_budget, 90))
+    deadline = time.monotonic() + total_budget
 
     last_error = ""
 
@@ -2250,6 +2238,9 @@ def gemini_generate(prompt):
         max_attempts = 1 + primary_retries if model_index == 0 else 1
 
         for attempt in range(max_attempts):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0.5:
+                return None, "AI phản hồi quá thời gian chờ. Vui lòng thử lại."
             url = (
                 "https://generativelanguage.googleapis.com/v1beta/"
                 f"models/{model}:generateContent"
@@ -2270,7 +2261,7 @@ def gemini_generate(prompt):
                             }
                         ]
                     },
-                    timeout=request_timeout,
+                    timeout=min(float(request_timeout), max(1.0, remaining)),
                 )
 
                 if res.ok:
@@ -2320,8 +2311,10 @@ def gemini_generate(prompt):
                 )
 
                 if status not in transient_statuses:
-                    # 400/401/403... không retry vì thường là cấu hình/key.
-                    return None, last_error
+                    # 400/401/403: log provider details privately, never display
+                    # model names, API metadata or provider credentials in UI.
+                    print("AI provider request failed:", last_error)
+                    return None, "Dịch vụ AI hiện chưa khả dụng. Vui lòng thử lại sau."
 
                 # Retry model chính với exponential backoff + jitter.
                 if model_index == 0 and attempt < max_attempts - 1:
@@ -2330,6 +2323,8 @@ def gemini_generate(prompt):
                         f"Gemini {model} tạm lỗi HTTP {status}; "
                         f"retry sau {delay:.1f}s"
                     )
+                    if delay >= deadline - time.monotonic():
+                        break
                     time.sleep(delay)
                     continue
 
@@ -2347,6 +2342,8 @@ def gemini_generate(prompt):
 
                 if model_index == 0 and attempt < max_attempts - 1:
                     delay = min(4.0, (2 ** attempt)) + random.uniform(0.1, 0.5)
+                    if delay >= deadline - time.monotonic():
+                        break
                     time.sleep(delay)
                     continue
 
@@ -2356,10 +2353,11 @@ def gemini_generate(prompt):
                 last_error = f"{model}: không đọc được phản hồi Gemini - {exc}"
                 break
 
+    if last_error:
+        print("AI provider exhausted retries:", last_error)
     return None, (
         "AI đang bận hoặc kết nối chưa ổn định. "
-        "Hệ thống đã thử model chính và model dự phòng."
-        + (f" Chi tiết: {last_error}" if last_error else "")
+        "Vui lòng thử lại sau."
     )
 
 def gemini_subject_answer(
@@ -2380,6 +2378,13 @@ def gemini_subject_answer(
     """
     source_names = source_names or []
     shared_source_names = shared_source_names or []
+    from chat_grounding import brief_greeting, citation_hints
+    if brief_greeting(question):
+        # A short conversational greeting doesn't call for a PDF quotation.
+        return (
+            f"Tui đây! Bạn muốn hỏi gì về môn {subject_name}?",
+            [], "general"
+        )
     sources_text = ", ".join(source_names) if source_names else "Không có"
     shared_sources_text = (
         ", ".join(shared_source_names)
@@ -2413,6 +2418,8 @@ QUY TẮC NGUỒN RẤT QUAN TRỌNG:
 4. Khi mode = "general", sources phải là mảng rỗng.
 5. Không được giả vờ thông tin nằm trong tài liệu/đề cương nếu nguồn không hỗ trợ.
 6. Không sao chép nguyên văn dài từ nguồn.
+7. Nếu mode = "document" hoặc "shared", thêm citations chứa nguồn và một trích dẫn nguyên văn 20-400 ký tự có trong NGỮ CẢNH ĐƯỢC CUNG CẤP. Nếu không tìm được bằng chứng, chọn mode="general" và không gắn nguồn; không giả vờ đã đọc tài liệu.
+8. Chỉ trả lời theo tài liệu khi đoạn trích thực sự hỗ trợ nội dung. Trích dẫn có thật không đồng nghĩa suy luận đúng; tránh khẳng định vượt quá bằng chứng.
 
 CÁC FILE CÁ NHÂN ĐƯỢC CUNG CẤP:
 {sources_text}
@@ -2441,69 +2448,58 @@ nhưng phải nằm bên trong chuỗi JSON escape đúng quy tắc. Cấu trúc
 {{
   "mode": "document", "shared" hoặc "general",
   "sources": ["ten_file_1.pdf"],
+  "citations": [{{"source": "ten_file_1.pdf", "quote": "một câu nguyên văn có thật trong đoạn nguồn"}}],
   "answer": "Nội dung trả lời"
 }}
 """.strip()
 
-    raw, error = gemini_generate(prompt)
+    # Suggest verified verbatim quotes, not fabricated explanations. Every
+    # model citation must still pass source-scoped validation below.
+    quote_examples = citation_hints(
+        question, context, source_names, shared_context, shared_source_names
+    )
+    if quote_examples:
+        prompt += "\n\n" + quote_examples
 
-    if raw:
-        try:
-            match = re.search(r"\{[\s\S]*\}", raw)
-            if not match:
-                raise ValueError("Không tìm thấy JSON object")
+    from chat_ai_recovery import generate_verified
+    from chat_response_validation import (
+        parse_free_chat_response, verify_source_citations
+    )
+    from chat_retrieval import evidence_from_context
 
-            data = json.loads(match.group(0))
-            answer = str(data.get("answer") or "").strip()
-            mode = str(data.get("mode") or "general").strip().lower()
-            requested_sources = data.get("sources") or []
+    def validate_chat_response(raw):
+        answer, used_sources, mode = parse_free_chat_response(
+            raw, source_names, shared_source_names
+        )
+        if mode in ("document", "shared"):
+            # Check only passages that the model actually received in its prompt.
+            selected_context = (
+                context[:9000] if mode == "document" else shared_context[:5500]
+            )
+            evidence = evidence_from_context(selected_context, used_sources, mode)
+            verified = verify_source_citations(raw, mode, used_sources, evidence)
+            used_sources = list(dict.fromkeys(x["source"] for x in verified))
+            quotes = "\n".join(
+                f'- {x["source"]}: “{x["quote"]}”' for x in verified[:3]
+            )
+            answer += "\n\nDẫn chứng nguyên văn từ học liệu:\n" + quotes
+        return answer, used_sources, mode
 
-            personal_allowed = {name: name for name in source_names}
-            shared_allowed = {name: name for name in shared_source_names}
-            used_sources = []
-
-            if isinstance(requested_sources, list):
-                allowed = (
-                    personal_allowed
-                    if mode == "document"
-                    else shared_allowed
-                    if mode == "shared"
-                    else {}
-                )
-                for item in requested_sources:
-                    name = str(item or "").strip()
-                    if name in allowed and name not in used_sources:
-                        used_sources.append(name)
-
-            if not answer:
-                raise ValueError("Gemini trả về answer rỗng")
-
-            if mode == "document" and used_sources:
-                if len(used_sources) == 1:
-                    source_line = f'Dựa trên tài liệu "{used_sources[0]}":'
-                else:
-                    joined = ", ".join(f'"{name}"' for name in used_sources)
-                    source_line = f"Dựa trên các tài liệu {joined}:"
-
-                return source_line + "\n\n" + answer, used_sources, "document"
-
-            if mode == "shared" and used_sources:
-                if len(used_sources) == 1:
-                    source_line = f'Dựa trên kiến thức chung "{used_sources[0]}":'
-                else:
-                    joined = ", ".join(f'"{name}"' for name in used_sources)
-                    source_line = f"Dựa trên các nguồn kiến thức chung {joined}:"
-
-                return source_line + "\n\n" + answer, used_sources, "shared"
-
-            # Không có nguồn hợp lệ -> coi là kiến thức chung để tránh gắn nguồn sai.
-            return answer, [], "general"
-
-        except (ValueError, TypeError, json.JSONDecodeError) as exc:
-            print("Không đọc được JSON Chat từ Gemini:", exc)
-            # Không gắn tên file khi không xác định chắc chắn mode nguồn.
-            cleaned = raw.strip()
-            return cleaned, [], "general"
+    checked, error = generate_verified(
+        prompt, gemini_generate, validate_chat_response,
+        label="Gemini Chat"
+    )
+    if checked:
+        answer, used_sources, mode = checked
+        if mode == "document":
+            joined = ", ".join(f'"{name}"' for name in used_sources)
+            return f"Dựa trên tài liệu cá nhân {joined}:\\n\\n".replace(
+                "\\n", "\n") + answer, used_sources, "document"
+        if mode == "shared":
+            joined = ", ".join(f'"{name}"' for name in used_sources)
+            return f"Dựa trên kiến thức chung {joined}:\\n\\n".replace(
+                "\\n", "\n") + answer, used_sources, "shared"
+        return answer, [], "general"
 
     # Nếu Gemini/model dự phòng đều lỗi, vẫn cố gắng trả lời từ
     # tài liệu cá nhân hoặc kiến thức chung đã có trong hệ thống.
@@ -2534,11 +2530,16 @@ nhưng phải nằm bên trong chuỗi JSON escape đúng quy tắc. Cấu trúc
     if error:
         print("Gemini Chat fallback:", error)
 
-    return (
-        fallback,
-        fallback_sources if fallback_context else [],
-        fallback_mode
-    )
+    # A failed verification must not dump raw course PDFs as a Chat answer.
+    # Do not falsely attribute an unverified response to any source.
+    if fallback_context:
+        return (
+            "⚠ AI chưa tạo được câu trả lời có dẫn chứng kiểm chứng được. "
+            "Tài liệu của môn vẫn được lưu an toàn; hãy thử hỏi lại "
+            "hoặc xem nội dung trong mục Tài liệu của môn.",
+            [], "general"
+        )
+    return fallback, [], "general"
 
 
 def build_quiz(text, question_count=10, focus_topics=None, session_mode=False, avoid_questions=None):
@@ -2815,7 +2816,13 @@ Cấu trúc:
                 if len(result) >= batch_size:
                     break
 
-            return result
+            # A second model pass sees the question/options but NOT the
+            # generator's answer key. Require identical independent answer
+            # and an actual quotation in the exact supplied study source.
+            # Unverified items are discarded before any score/weakness data
+            # is created; never silently fall back to the unverified key.
+            from quiz_answer_verification import verify_quiz_batch
+            return verify_quiz_batch(result, document_content, gemini_generate)
 
         except (
             ValueError,
@@ -4263,11 +4270,91 @@ def subject_detail(subject_id):
         (uid, subject_id)
     ).fetchall()
 
+    # Course overview: use the approved syllabus and real admin chapter links.
+    # Never generate chapter titles or material counts from unapproved AI output.
+    shared_syllabus_doc = conn.execute("""
+        SELECT id,original_name,stored_name FROM shared_documents
+        WHERE shared_subject_id=? AND is_syllabus=1
+        ORDER BY id DESC LIMIT 1
+    """, (shared["id"],)).fetchone()
+    syllabus_file = None
+    if shared_syllabus_doc:
+        syllabus_file = {
+            "id": shared_syllabus_doc["id"],
+            "name": shared_syllabus_doc["original_name"],
+            "type": Path(shared_syllabus_doc["stored_name"]).suffix.lower(),
+            "scope": "shared",
+        }
+    elif not (shared["syllabus_text"] or "").strip() and subject["personal_syllabus_document_id"]:
+        selected = conn.execute("""
+            SELECT id,original_name,stored_name FROM documents
+            WHERE id=? AND user_id=? AND subject_id=?
+        """, (subject["personal_syllabus_document_id"], uid, subject_id)).fetchone()
+        if selected:
+            syllabus_file = {
+                "id": selected["id"], "name": selected["original_name"],
+                "type": Path(selected["stored_name"]).suffix.lower(),
+                "scope": "personal",
+            }
+    from syllabus_routes import _source, ensure_syllabus_schema
+    from syllabus_learning import syllabus_hash
+    from chapter_material_routes import (
+        approved_document_rows, chapter_key, official_syllabus,
+    )
+    ensure_syllabus_schema(conn)
+    source_kind, source_text, _ = _source(sys.modules[__name__], conn, uid, subject_id)
+    source_signature = syllabus_hash(source_text) if source_text else ""
+    confirmed = conn.execute("""
+        SELECT units_json FROM syllabus_reviews
+        WHERE user_id=? AND subject_id=? AND status='confirmed' AND source_hash=?
+    """, (uid, subject_id, source_signature)).fetchone()
+    chapter_items = []
+    if confirmed:
+        try:
+            units = json.loads(confirmed["units_json"])
+            if not isinstance(units, list):
+                units = []
+        except (TypeError, ValueError):
+            units = []
+        mapping_ok = False
+        if source_kind == "shared" and source_text:
+            official_text, official_hash, _ = official_syllabus(conn, shared["id"])
+            mapping_ok = bool(official_text and official_hash == source_signature)
+        for index, unit in enumerate(units[:40], 1):
+            if not isinstance(unit, dict):
+                continue
+            key = chapter_key(unit.get("evidence", ""))
+            approved = approved_document_rows(
+                conn, shared["id"], key, source_signature
+            ) if mapping_ok and key else []
+            chapter_items.append({
+                "number": index, "title": str(unit.get("title") or
+                                              unit.get("evidence") or
+                                              f"Chương {index}")[:200],
+                "material_count": len(approved),
+                "preview_files": [row["original_name"] for row in approved[:2]],
+            })
+    from course_schedule_sync import ensure_session_schedule_schema
+    ensure_session_schedule_schema(conn)
+    next_study_task = conn.execute("""
+        SELECT id,title FROM study_tasks
+        WHERE user_id=? AND subject_id=? AND source='roadmap'
+          AND done=0 AND roadmap_session_id IS NOT NULL
+        ORDER BY study_at,id LIMIT 1
+    """, (uid, subject_id)).fetchone()
+
     next_best_action = get_next_best_action(
         conn,
         uid,
         subject_id=subject_id
     )
+    # Phase 8.1/8.2: evidence-backed and read-only; no Gemini on page load.
+    from adaptive_decision_phase8 import decide_next_learning_step
+    adaptive_decision = decide_next_learning_step(conn, uid, subject_id)
+    from adaptive_plan_phase8 import proposal_for_subject
+    adaptive_plan_proposal = proposal_for_subject(conn, uid, subject_id)
+    if "adaptive_plan_csrf" not in session:
+        session["adaptive_plan_csrf"] = secrets.token_urlsafe(32)
 
     conn.close()
 
@@ -4284,8 +4371,41 @@ def subject_detail(subject_id):
         syllabus_documents=syllabus_documents,
         quiz_stats=quiz_stats,
         upcoming_tasks=upcoming_tasks,
-        next_best_action=next_best_action
+        next_best_action=next_best_action,
+        adaptive_decision=adaptive_decision,
+        adaptive_plan_proposal=adaptive_plan_proposal,
+        adaptive_plan_csrf=session["adaptive_plan_csrf"],
+        syllabus_file=syllabus_file,
+        chapter_items=chapter_items,
+        next_study_task=next_study_task,
+        syllabus_confirmed=bool(confirmed)
     )
+
+
+@app.route("/subjects/<int:subject_id>/adaptive-plan", methods=["POST"])
+@login_required
+def choose_adaptive_plan(subject_id):
+    """Phase 8.3: explicit, CSRF-protected consent; owner-scoped and atomic."""
+    from adaptive_plan_phase8 import apply_student_choice
+    submitted_csrf = request.form.get("csrf_token", "")
+    expected_csrf = session.get("adaptive_plan_csrf", "")
+    if not expected_csrf or not secrets.compare_digest(submitted_csrf, expected_csrf):
+        return "Phiên xác nhận không hợp lệ. Tải lại trang và thử lại.", 403
+    uid = session["user_id"]
+    conn = db()
+    try:
+        proposal = apply_student_choice(
+            conn, uid, subject_id, request.form.get("proposal_key"),
+            request.form.get("choice")
+        )
+    except (ValueError, sqlite3.IntegrityError):
+        conn.close()
+        return redirect(url_for("subject_detail", subject_id=subject_id,
+                                adaptive_notice="stale"), code=303)
+    conn.close()
+    notice = "accepted" if request.form.get("choice") == "accept" else "dismissed"
+    return redirect(url_for("subject_detail", subject_id=subject_id,
+                            adaptive_notice=notice), code=303)
 
 
 @app.route("/subjects/<int:subject_id>/delete", methods=["POST"])
@@ -4551,7 +4671,7 @@ def admin_add_document():
     upload = request.files.get("file")
     if not subject_id or not upload or not upload.filename or not allowed_file(upload.filename):
         return redirect(url_for(
-            "admin_shared_documents", error="Chọn môn và tệp PDF, TXT hoặc MD hợp lệ."
+            "admin_shared_documents", error="Chọn môn và tệp PDF, DOCX, TXT hoặc MD hợp lệ."
         ))
     original = os.path.basename(upload.filename.replace("\\", "/")).strip()[:180]
     safe = secure_filename(original)
@@ -4597,7 +4717,23 @@ def admin_add_document():
                 r"chuẩn đầu ra(?: học phần)?|course syllabus|course outline)\b",
                 extracted
             ))
-            if len(distinct_chapters) < 2 and not is_course_outline:
+            # A genuine syllabus can use "Phần", "Chủ đề", unusual Unicode
+            # or a semester table rather than literal "Chương". Give Admin
+            # a route to AI review instead of rejecting an unfamiliar layout,
+            # but still reject obvious single-chapter teaching slides.
+            metadata_clues = [
+                r"(?i)\b(?:học phần|course|module)\b",
+                r"(?i)\b(?:tín chỉ|credits?)\b",
+                r"(?i)\b(?:CLO\s*\d+|chuẩn đầu ra)\b",
+                r"(?i)\b(?:kế hoạch giảng dạy|tuần học|teaching plan)\b",
+                r"(?i)\b(?:phương pháp đánh giá|đánh giá học phần)\b",
+                r"(?i)\b(?:nội dung học phần|nội dung giảng dạy)\b",
+            ]
+            resembles_syllabus = (
+                len(extracted) >= 300 and
+                sum(bool(re.search(pattern, extracted)) for pattern in metadata_clues) >= 2
+            )
+            if len(distinct_chapters) < 2 and not is_course_outline and not resembles_syllabus:
                 target.unlink(missing_ok=True)
                 return redirect(url_for(
                     "admin_shared_documents",
@@ -4716,9 +4852,53 @@ def shared_document_file(doc_id):
     conn.close()
     if not authorized:
         return "Không có quyền xem tài liệu của môn học này.", 403
+    stored_path = UPLOAD_DIR / document["stored_name"]
+    if request.args.get("preview") == "1" and stored_path.suffix.lower() == ".docx":
+        return _render_word_preview(stored_path, document["original_name"])
     return send_from_directory(
         UPLOAD_DIR, document["stored_name"],
-        as_attachment=False, download_name=document["original_name"]
+        as_attachment=request.args.get("download") == "1",
+        download_name=document["original_name"]
+    )
+
+
+def _render_word_preview(path, name):
+    """Authenticated-only HTML preview with restrictive content security policy."""
+    from flask import Response
+    from syllabus_file_preview import render_docx_preview
+    try:
+        page = render_docx_preview(path, name)
+    except Exception:
+        return "Không đọc được bản xem trước Word. Hãy tải file gốc để xem.", 422
+    response = Response(page, mimetype="text/html; charset=utf-8")
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'none'; style-src 'unsafe-inline'; "
+        "img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'self'"
+    )
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Cache-Control"] = "private, no-store"
+    return response
+
+
+@app.route("/documents/<int:doc_id>/file")
+@login_required
+def personal_document_file(doc_id):
+    """Source file/preview is accessible only to the owner of that document."""
+    conn = db()
+    row = conn.execute("""
+        SELECT original_name,stored_name FROM documents
+        WHERE id=? AND user_id=?
+    """, (doc_id, session["user_id"])).fetchone()
+    conn.close()
+    if not row:
+        return "Không tìm thấy tài liệu cá nhân.", 404
+    path = UPLOAD_DIR / row["stored_name"]
+    if request.args.get("preview") == "1" and path.suffix.lower() == ".docx":
+        return _render_word_preview(path, row["original_name"])
+    return send_from_directory(
+        UPLOAD_DIR, row["stored_name"],
+        as_attachment=request.args.get("download") == "1",
+        download_name=row["original_name"]
     )
 
 
@@ -4776,10 +4956,12 @@ def documents():
     # Resolve current code -> shared subject linkage for older student accounts too.
     # This makes an admin upload visible on the very next student page request.
     shared_subject_names = {}
+    shared_subject_codes = {}
     for student_subject in subs:
         common = ensure_shared_subject_for_user_subject(conn, uid, student_subject["id"])
         if common:
             shared_subject_names[common["id"]] = student_subject["name"]
+            shared_subject_codes[common["id"]] = student_subject["code"] or ""
 
     shared_docs = []
     if shared_subject_names:
@@ -4807,6 +4989,36 @@ def documents():
         except OSError:
             pass
 
+    # Folder view is purely presentational: preserve the original per-user
+    # and per-shared-course permission filters in the SQL queries above.
+    personal_buckets = {row["id"]: [] for row in subs}
+    personal_buckets[None] = []
+    for row in docs:
+        key = row["subject_id"] if row["subject_id"] in personal_buckets else None
+        personal_buckets[key].append(row)
+    personal_groups = [
+        {"key": f"personal-{row['id']}", "name": row["name"],
+         "code": row["code"] or "", "files": personal_buckets[row["id"]]}
+        for row in subs
+    ]
+    if personal_buckets[None]:
+        personal_groups.append({
+            "key": "personal-unassigned", "name": "Chưa phân loại",
+            "code": "", "files": personal_buckets[None]
+        })
+
+    shared_buckets = {subject_id: [] for subject_id in shared_subject_names}
+    for row in shared_docs:
+        shared_buckets[row["shared_subject_id"]].append(row)
+    shared_groups = []
+    for shared_id, display_name in shared_subject_names.items():
+        shared_groups.append({
+            "key": f"shared-{shared_id}", "name": display_name,
+            "code": shared_subject_codes.get(shared_id, ""),
+            "files": sorted(shared_buckets[shared_id],
+                            key=lambda row: (not bool(row["is_syllabus"]), -row["id"]))
+        })
+
     extraction_percent = (
         round((extracted_count / len(docs)) * 100)
         if docs else 0
@@ -4823,6 +5035,8 @@ def documents():
         extraction_percent=extraction_percent,
         storage_mb=storage_mb,
         shared_documents=shared_docs,
+        personal_groups=personal_groups,
+        shared_groups=shared_groups,
         upload_max_mb=MAX_UPLOAD_MB,
         upload_error=request.args.get("upload_error") == "too_large"
     )
@@ -5171,6 +5385,14 @@ def api_subject_learning_insights(subject_id):
         return jsonify({"error": "Không tìm thấy môn học."}), 404
 
     profile = ensure_learning_profile(conn, uid)
+    from learning_streams import ensure_private_weakness_schema
+    ensure_private_weakness_schema(conn)
+    private_weaknesses = conn.execute("""
+        SELECT topic,chapter,miss_count,correct_count,last_seen_at
+        FROM self_study_weaknesses
+        WHERE user_id=? AND subject_id=? AND miss_count>correct_count
+        ORDER BY (miss_count-correct_count) DESC,last_seen_at DESC LIMIT 12
+    """, (uid, subject_id)).fetchall()
     weaknesses = conn.execute(
         """
         SELECT id,topic,chapter,miss_count,correct_count,last_seen_at
@@ -5235,6 +5457,7 @@ def api_subject_learning_insights(subject_id):
             "best_score": float(quiz_stats["best_score"] or 0)
         },
         "weaknesses": [dict(row) for row in weaknesses],
+        "self_study_weaknesses": [dict(row) for row in private_weaknesses],
         "adaptive_task": dict(adaptive_task) if adaptive_task else None,
         "mastery": {
             "active_count": int(mastery_stats["active_count"] or 0),
@@ -5502,9 +5725,14 @@ def api_chat():
     history_rows = history_for_mode(
         conn, uid, conversation_id, lesson_context
     )
+    from chat_grounding import is_unverified_fallback
+    # Failed responses remain visible, but must never be fed to Gemini as
+    # trusted AI explanations for subsequent questions.
     conversation_history = "\n".join(
         f"{'Bạn' if row['role']=='user' else 'AI'}: {row['content']}"
         for row in history_rows
+        if not (row["role"] == "assistant" and
+                is_unverified_fallback(row["content"]))
     )
     conn.close()
 
@@ -5534,8 +5762,12 @@ def api_chat():
             question, lesson_context["sources"], conversation_history,
             profile=personal_context, session_scope=session_scope
         )
-        raw, ai_error = gemini_generate(prompt)
-        tutored = parse_tutor_answer(raw, lesson_context["sources"]) if raw else None
+        from chat_ai_recovery import generate_verified
+        tutored, ai_error = generate_verified(
+            prompt, gemini_generate,
+            lambda raw: parse_tutor_answer(raw, lesson_context["sources"]),
+            label="Chapter tutor"
+        )
         if not tutored:
             return jsonify({
                 "error": ("AI chưa trả được câu trả lời có dẫn chứng kiểm chứng "
@@ -5817,7 +6049,7 @@ def quiz():
         if not questions:
             return redirect(url_for(
                 "quiz",
-                generation_error="Không tạo đủ câu hỏi hợp lệ. Kiểm tra tài liệu và kết nối Gemini rồi thử lại."
+                generation_error="Chưa tạo đủ câu hỏi hợp lệ. Vui lòng kiểm tra tài liệu và thử lại."
             ))
         return redirect(url_for("quiz"))
 
@@ -5948,7 +6180,13 @@ def quiz():
         session_quiz_status["quiz_id"] if session_quiz_status
         and session_quiz_status.get("allowed") else None
     )
-    active_quiz_id = (active_session_quiz_id or
+    selected_quiz_id = request.args.get("quiz_id", type=int)
+    # A deep link may select only a Quiz that passed owner and access filters.
+    linked_quiz_id = next(
+        (item["id"] for item in parsed if item["id"] == selected_quiz_id),
+        None
+    )
+    active_quiz_id = (active_session_quiz_id or linked_quiz_id or
                       (parsed[0]["id"] if parsed else None))
 
     selected_document_id = request.args.get("document_id", type=int)
@@ -6156,8 +6394,10 @@ def submit_quiz():
     normalized_answers = []
     subject_id = quiz_row["subject_id"]
 
+    from learning_streams import academic_quiz
+    stream = "academic" if academic_quiz(conn, uid, quiz_id) else "self_study"
     active_before = (
-        get_active_weakness_rows(conn, uid, subject_id, limit=100)
+        get_active_weakness_rows(conn, uid, subject_id, limit=100, stream=stream)
         if subject_id
         else []
     )
@@ -6209,7 +6449,7 @@ def submit_quiz():
             str(question.get("topic") or ""),
             str(question.get("chapter") or ""),
             is_correct,
-            str(question.get("question") or "")
+            str(question.get("question") or ""), stream=stream
         )
 
     score = round(
@@ -6261,7 +6501,7 @@ def submit_quiz():
             conn,
             uid,
             subject_id,
-            limit=100
+            limit=100, stream=stream
         )
         active_after_map = {
             row["topic_key"]: {
@@ -6289,31 +6529,27 @@ def submit_quiz():
             for key in new_keys[:8]
         ]
 
-        adaptive_task = sync_adaptive_review_task(
-            conn,
-            uid,
-            subject_id
-        )
+        adaptive_task = (sync_adaptive_review_task(
+            conn, uid, subject_id
+        ) if stream == "academic" else None)
 
         # Task thích nghi cũng là một phần của lộ trình, nên tính lại tiến độ
         # sau khi đồng bộ task để Dashboard/Kế hoạch phản ánh đúng trạng thái mới.
-        recalculate_subject_progress(
-            uid,
-            subject_id,
-            conn
-        )
+        if stream == "academic":
+            recalculate_subject_progress(uid, subject_id, conn)
 
         weakness_rows = get_active_weakness_rows(
             conn,
             uid,
             subject_id,
-            limit=8
+            limit=8, stream=stream
         )
         weaknesses = [dict(row) for row in weakness_rows]
         # The UI shows only eight examples, but the total MUST count all
         # currently active weak topics (not just the preview rows).
-        weakness_count = conn.execute("""
-            SELECT COUNT(*) FROM learning_weaknesses
+        table = "learning_weaknesses" if stream == "academic" else "self_study_weaknesses"
+        weakness_count = conn.execute(f"""
+            SELECT COUNT(*) FROM {table}
             WHERE user_id=? AND subject_id=? AND miss_count>correct_count
         """, (uid, subject_id)).fetchone()[0]
 
@@ -6353,7 +6589,8 @@ def submit_quiz():
         "resolved_topics": resolved_topics,
         "adaptive_task": adaptive_task,
         "learning_updated": bool(subject_id),
-        "adaptive_learning": bool(subject_id),
+        "adaptive_learning": bool(subject_id and stream == "academic"),
+        "learning_stream": stream,
         "analysis": analysis,
         "review_comparison": review_comparison,
     }
@@ -6430,6 +6667,23 @@ def study_plan():
     ).fetchall()
 
     profile = ensure_learning_profile(conn, uid)
+
+    from manual_lesson_routes import ensure_schema as ensure_manual_lesson_schema
+    ensure_manual_lesson_schema(conn)
+    personal_study_documents = conn.execute("""
+        SELECT d.id,d.subject_id,d.original_name
+        FROM documents d JOIN subjects s
+          ON s.id=d.subject_id AND s.user_id=d.user_id
+        WHERE d.user_id=? AND length(trim(COALESCE(d.extracted_text,''))) >= 80
+        ORDER BY s.name,d.original_name,d.id
+    """, (uid,)).fetchall()
+    manual_lesson_docs = {
+        row["task_id"]: row["document_id"] for row in conn.execute("""
+            SELECT m.task_id,m.document_id
+            FROM manual_lesson_documents m JOIN study_tasks t ON t.id=m.task_id
+            WHERE m.user_id=? AND t.user_id=? AND t.source='manual'
+        """, (uid,uid)).fetchall()
+    }
 
     task_rows = conn.execute(
         """
@@ -6625,7 +6879,8 @@ def study_plan():
         )
     else:
         agent_tip = (
-            "Chưa có lịch học. Hãy chọn môn, mục tiêu và deadline để AI tạo kế hoạch đầu tiên."
+            "Chưa có lịch học. Mở Môn học → Đề cương & lộ trình để xếp các buổi "
+            "theo chương vào thời khóa biểu, hoặc thêm buổi thủ công nếu cần."
         )
 
     # Keep pending deadlines immediately visible. Completed deadlines are
@@ -6657,6 +6912,8 @@ def study_plan():
         urgent_count=urgent_count,
         today_input=today.isoformat(),
         profile=profile,
+        personal_study_documents=personal_study_documents,
+        manual_lesson_docs=manual_lesson_docs,
     )
 
 
@@ -6795,30 +7052,51 @@ def generate_study_plan_route():
 @login_required
 def create_study_task():
     uid = session["user_id"]
-    title = request.form.get("title", "").strip() or "Buổi học"
+    title = request.form.get("title", "").strip()[:160] or "Buổi học"
     study_at = request.form.get("study_at", "").strip()
     duration = _safe_int(request.form.get("duration"), 45, 15, 240)
-    note = request.form.get("note", "").strip()
+    note = request.form.get("note", "").strip()[:1000]
+    document_id = request.form.get("document_id", type=int)
+    prepare_quiz = request.form.get("prepare_quiz") == "1"
 
     if not study_at:
         return redirect(url_for("study_plan"))
+    try:
+        datetime.fromisoformat(study_at)
+    except (TypeError, ValueError):
+        return "Ngày giờ học không hợp lệ.", 400
 
     conn = db()
-    subject_id = owned_subject_id(
-        conn,
-        uid,
-        request.form.get("subject_id")
-    )
-    conn.execute(
-        """
-        INSERT INTO study_tasks(
-            user_id,subject_id,title,study_at,duration,note,done,source,created_at
-        ) VALUES(?,?,?,?,?,?,?,?,?)
-        """,
-        (uid, subject_id, title, study_at, duration, note, 0, "manual", now())
-    )
-    conn.commit()
-    conn.close()
+    try:
+        subject_id = owned_subject_id(conn, uid, request.form.get("subject_id"))
+        from manual_lesson_routes import owned_document, attach_document
+        if document_id and not owned_document(conn, uid, subject_id, document_id):
+            return "Tài liệu cá nhân không thuộc môn đã chọn.", 400
+        if prepare_quiz and not document_id:
+            return "Hãy chọn tài liệu cá nhân trước khi yêu cầu chuẩn bị Quiz.", 400
+
+        cursor = conn.execute("""
+            INSERT INTO study_tasks(
+                user_id,subject_id,title,study_at,duration,note,done,source,created_at
+            ) VALUES(?,?,?,?,?,?,?,?,?)
+        """, (uid, subject_id, title, study_at, duration, note, 0, "manual", now()))
+        if document_id:
+            attach_document(conn, uid, cursor.lastrowid, subject_id,
+                            document_id, now(), quiz_requested=prepare_quiz)
+        task_id = cursor.lastrowid
+        conn.commit()
+    finally:
+        conn.close()
+
+    if document_id and prepare_quiz:
+        # AI cost only after explicit opt-in. Failure leaves the calendar
+        # session intact and lets the student retry in the private study room.
+        from manual_lesson_routes import generate_for_lesson
+        done, message = generate_for_lesson(sys.modules[__name__], uid, task_id)
+        if not done:
+            session["manual_lesson_answer"] = {"task_id": task_id, "error": message}
+    if document_id:
+        return redirect(url_for("manual_lesson.room", task_id=task_id),code=303)
     return redirect(url_for("study_plan"))
 
 
@@ -6834,7 +7112,7 @@ def update_study_task(task_id):
     if study_at:
         conn = db()
         old_task = conn.execute(
-            "SELECT subject_id,source FROM study_tasks WHERE id=? AND user_id=?",
+            "SELECT subject_id,source,study_at FROM study_tasks WHERE id=? AND user_id=?",
             (task_id, uid)
         ).fetchone()
         subject_id = owned_subject_id(
@@ -6842,6 +7120,19 @@ def update_study_task(task_id):
             uid,
             request.form.get("subject_id")
         )
+        from manual_lesson_routes import (ensure_schema as ensure_manual_schema,
+                                          owned_document)
+        ensure_manual_schema(conn)
+        binding = conn.execute("""
+            SELECT document_id FROM manual_lesson_documents
+            WHERE task_id=? AND user_id=?
+        """, (task_id, uid)).fetchone()
+        # Editing an existing manual lesson cannot silently attach an unrelated
+        # course document or leave a private document bound to the wrong course.
+        if binding and not owned_document(conn, uid, subject_id,
+                                          binding["document_id"]):
+            conn.close()
+            return "Không thể chuyển buổi học sang môn khác khi vẫn gắn tài liệu cũ.", 400
         conn.execute(
             """
             UPDATE study_tasks
@@ -6853,6 +7144,10 @@ def update_study_task(task_id):
         if old_task and old_task["source"] == "adaptive":
             from adaptive_review_schedule import lock_adaptive_time
             lock_adaptive_time(conn, task_id, uid)
+        if (old_task and old_task["source"] == "roadmap"
+                and old_task["study_at"] != study_at):
+            from adaptive_plan_phase8 import lock_manual_roadmap_time
+            lock_manual_roadmap_time(conn, uid, task_id)
         if old_task and old_task["subject_id"]:
             recalculate_subject_progress(uid, old_task["subject_id"], conn)
         if subject_id:
@@ -7074,6 +7369,9 @@ def api_mobile_dashboard():
         return error
 
     conn = db()
+    # Older SQLite installations may predate roadmap columns.
+    from course_schedule_sync import ensure_session_schedule_schema
+    ensure_session_schedule_schema(conn)
     recalculate_all_subject_progress(uid, conn)
 
     user = conn.execute(
@@ -7112,7 +7410,7 @@ def api_mobile_dashboard():
     task_rows = conn.execute(
         """
         SELECT t.id,t.title,t.study_at,t.duration,t.done,t.source,
-               s.id AS subject_id,s.name AS subject_name
+               t.roadmap_session_id, s.id AS subject_id,s.name AS subject_name
         FROM study_tasks t
         LEFT JOIN subjects s
           ON s.id=t.subject_id AND s.user_id=t.user_id
@@ -7830,6 +8128,7 @@ def api_mobile_chat_history(subject_id):
     conn.close()
 
     return jsonify({
+        "conversation_id": conversation["id"],
         "subject_id": subject_id,
         "subject_name": conversation["subject_name"],
         "messages": [dict(row) for row in rows]
@@ -7954,7 +8253,7 @@ def api_mobile_quiz_generate():
     if not questions:
         conn.close()
         return jsonify({
-            "error": "Chưa đủ tài liệu, dữ liệu điểm yếu hoặc Gemini chưa tạo đủ câu hỏi hợp lệ. Hãy kiểm tra nguồn học và thử lại."
+            "error": "Chưa đủ tài liệu, dữ liệu điểm yếu hoặc AI chưa tạo đủ câu hỏi hợp lệ. Hãy kiểm tra nguồn học và thử lại."
         }), 400
 
     cursor = conn.execute(
@@ -8003,13 +8302,16 @@ def api_mobile_study_plan():
         return error
 
     conn = db()
+    # Older SQLite installations may predate roadmap columns.
+    from course_schedule_sync import ensure_session_schedule_schema
+    ensure_session_schedule_schema(conn)
 
     if request.method == "GET":
         profile = ensure_learning_profile(conn, uid)
         rows = conn.execute(
             """
             SELECT t.id,t.subject_id,t.title,t.study_at,t.duration,t.note,t.done,t.source,
-                   s.name AS subject_name
+                   t.roadmap_session_id, s.name AS subject_name
             FROM study_tasks t
             LEFT JOIN subjects s
               ON s.id=t.subject_id AND s.user_id=t.user_id

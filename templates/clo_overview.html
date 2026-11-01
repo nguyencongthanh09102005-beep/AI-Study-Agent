@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}CLO và minh chứng · {{ details.subject.name }}{% endblock %}
+{% block page_title %}Chuẩn đầu ra & tiến bộ học tập{% endblock %}
+{% block page_desc %}Xác nhận liên kết CLO với chương · Đọc minh chứng cá nhân{% endblock %}
+{% block content %}
+<div style="max-width:1100px;margin:0 auto;display:grid;gap:18px">
+  <section class="soft-card" style="padding:24px">
+    <a class="back-link" href="{{ url_for('subject_detail',subject_id=details.subject.id) }}">← Môn học</a>
+    <h2 style="margin:14px 0 7px;color:#293e7a">{{ details.subject.name }} · Chuẩn đầu ra (CLO)</h2>
+    <p style="font-size:13px;line-height:1.7;color:#637699">Nguồn: {{ details.source_name }}. Các mã CLO lấy trực tiếp từ đề cương đã xác nhận; sinh viên xác nhận chương liên kết. Kết quả chỉ phản ánh <strong>minh chứng luyện tập</strong>, không phải điểm hoặc chuẩn đầu ra được trường chứng nhận.</p>
+  </section>
+  <section class="soft-card" style="padding:23px">
+    <h3 style="color:#304676">1. Xác nhận CLO theo chương</h3>
+    {% if details.allowed %}
+      <p style="font-size:13px;color:#687c9d">{{ '✓ Đã lưu liên kết CLO cá nhân' if details.mapping_confirmed else 'Chưa xác nhận liên kết. Đây là các mã gợi ý từ đề cương; hãy kiểm tra trước khi lưu.' }}</p>
+      <form method="post" action="{{ url_for('clo_review.overview',subject_id=details.subject.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        {% for ch in details.sections %}
+        {% set i=loop.index %}
+        <fieldset style="border:1px solid #e1e7f4;border-radius:12px;padding:16px;margin:14px 0">
+          <legend style="color:#314a82;font-weight:750;padding:0 7px">Chương {{ i }} · {{ ch.chapter }}</legend>
+          <div style="display:flex;gap:15px;flex-wrap:wrap">
+          {% for code in details.allowed %}
+          <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:#425578;cursor:pointer">
+            <input type="checkbox" name="clo_{{ i }}" value="{{ code }}" {% if code in details.mapping.get(i|string,[]) %}checked{% endif %}>
+            {{ code }}
+          </label>
+          {% endfor %}
+          </div>
+          {% if ch.objectives %}<p style="margin-top:9px;font-size:12px;color:#6b7e9f"><strong>Mục tiêu chương:</strong> {{ ch.objectives[:2]|join(' · ') }}</p>{% endif %}
+        </fieldset>
+        {% endfor %}
+        <button class="soft-primary" type="submit">✓ Xác nhận liên kết CLO theo đề cương</button>
+      </form>
+    {% else %}
+      <p style="padding:12px;background:#fff6e8;border-radius:10px;color:#875c25">Đề cương chưa có mã CLO rõ ràng để đối chiếu. Không tự sinh CLO. Hãy bổ sung đề cương có chuẩn đầu ra hoặc nhờ giảng viên xác nhận.</p>
+    {% endif %}
+  </section>
+  <section class="soft-card" style="padding:23px">
+    <h3 style="color:#304676">2. Minh chứng từ Quiz và bài tập</h3>
+    <p style="color:#687c9d;font-size:12px;line-height:1.65">Chỉ lấy lượt làm gần nhất của từng Quiz, gom câu hỏi có gắn nhãn chương phù hợp. Bài tập ghi nhận số lần nộp và số nhận xét AI có dẫn chứng; không tự quy đổi nhận xét AI thành điểm. Đây là tín hiệu học tập để tự đánh giá, không phải kết quả chấm CLO chính thức.</p>
+    {% if evidence %}
+    <div style="display:grid;gap:12px">
+    {% for row in evidence %}
+    <article style="border:1px solid #dce5f3;border-radius:13px;padding:16px;background:#fbfcff">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <strong style="color:#273e7a">{{ row.code }}</strong>
+        <span style="font-size:11px;border-radius:13px;padding:6px 10px;background:#eaf0ff;color:#435eb4">{{ row.state }}</span>
+      </div>
+      <p style="font-size:13px;color:#677a9a;line-height:1.65">{{ row.reason }}</p>
+      <p style="font-size:13px;font-weight:750;color:#304c7e">Quiz đúng {{ row.quiz_correct }}/{{ row.quiz_total }} câu · Bài tập đã nộp {{ row.submitted }} lượt · Nhận xét AI có dẫn chứng {{ row.reviewed }} lượt</p>
+      {% if row.chapters %}
+      <details style="margin-top:8px">
+        <summary style="font-size:12px;color:#5167bf;cursor:pointer;font-weight:750">Xem chương và minh chứng</summary>
+        <ul style="line-height:1.75;font-size:12px;color:#607391">
+        {% for ch in row.chapters %}
+          <li>Chương {{ ch.number }}: {{ ch.chapter }} · Quiz {{ ch.correct }}/{{ ch.total }} câu · {{ ch.submissions }} bài nộp</li>
+        {% endfor %}
+        </ul>
+      </details>
+      {% endif %}
+    </article>
+    {% endfor %}
+    </div>
+    {% else %}
+    <p style="color:#7587a1;font-size:13px">Chưa có CLO hợp lệ trong đề cương, nên chưa thể tổng hợp minh chứng.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

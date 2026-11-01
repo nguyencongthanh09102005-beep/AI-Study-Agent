@@ -42,16 +42,27 @@ jobs:
         run: npx expo export --platform ios --output-dir dist-ci
 
       - name: Compile Flask backend
-        run: python -m py_compile app.py
+        run: python -m py_compile app.py mobile_learning_routes.py
+
+      - name: Mobile roadmap and session security
+        run: python tests/test_mobile_study_room.py
 
       - name: Initialize SQLite schema
         run: python -c "import app; app.init_db(); print('DB init OK')"
+
+      - name: Verify support creation, file upload and private learning isolation
+        run: |
+          python -m py_compile learning_streams.py support_schedule_chat.py
+          python tests/test_support_study_streams.py
 
       - name: Check JavaScript syntax
         run: |
           node --check static/js/quiz.js
           node --check static/js/mockup.js
           node --check static/js/study_plan.js
+          node --check static/js/confirm-modal.js
+          node --check static/js/study_session_timer.js
+          node tests/test_shared_dialogs.js
           node --check static/js/study_timetable_periods.js
           node tests/test_study_timetable_periods.js
           node tests/test_weekly_planner_navigation.js
@@ -61,6 +72,12 @@ jobs:
           node tests/test_study_session_chat.js
           node tests/test_ai_bubble.js
           node tests/test_ai_bubble_resize.js
+          node tests/test_floating_chat_mode_parity.js
+          node --check static/js/admin_ai_hub.js
+          node tests/test_admin_ai_hub.js
+          node --check static/js/ai_bubble_schedule.js
+          node --check static/js/ai_support_chat.js
+          node tests/test_ai_bubble_schedule.js
           node --check static/js/quiz_preparation.js
           node --check static/js/quiz_learning_analytics.js
           node --check static/js/study_session_quiz_status.js
@@ -75,6 +92,10 @@ jobs:
         run: |
           node --check mobile/src/plan-utils.js
           node tests/test_mobile_plan_ui.js
+          node tests/test_mobile_learning_ui.js
+          node tests/test_mobile_minimal_ui.js
+          node tests/test_mobile_session_quiz_ui.js
+          node tests/test_mobile_chat_parity.js
 
       - name: Password eye toggle tests
         run: node tests/test_auth_password.js
@@ -86,12 +107,25 @@ jobs:
         run: |
           python -m py_compile app.py syllabus_learning.py syllabus_routes.py
           python tests/test_syllabus_step1.py
+          python tests/test_admin_syllabus_analysis.py
       - name: Verified course learning paths
         run: |
           python -m py_compile course_path_learning.py course_path_routes.py
           python tests/test_course_path_step2.py
+          python -m py_compile chapter_exercise_routes.py
+          python tests/test_chapter_exercises_c1.py
+          python tests/test_bulk_chapter_mapping.py
+          python tests/test_fulltext_chapter_retrieval.py
+          python -m py_compile clo_review_routes.py
+          python tests/test_clo_evidence_c2.py
+          python tests/test_agent_personalization_c3.py
+          python -m py_compile shared_analysis_cache.py
+          python tests/test_shared_cache_c4.py
+          python -m py_compile evaluation/benchmark_agent_vs_gemini.py
+          python tests/test_evaluation_harness_c5.py
           python tests/test_credits_roadmap.py
           python tests/test_course_schedule_sync.py
+          python tests/test_smart_roadmap_schedule.py
 
       - name: Admin recovery and student data preservation
         run: python tests/test_admin_recovery.py
@@ -99,27 +133,65 @@ jobs:
       - name: Admin + Shared Knowledge cross-account tests
         run: python tests/test_admin_shared.py
 
+      - name: Unified Admin AI hub layout and permissions
+        run: python tests/test_admin_ai_hub.py
+
+      - name: Chat bubble safe schedule proposals and updates
+        run: python tests/test_chat_schedule_actions.py
+
       - name: Global Web readability coverage
         run: python tests/test_web_readability.py
+
+      - name: Student-facing copy and release-label regression
+        run: python tests/test_student_copy_release_labels.py
+
+      - name: Provider-neutral AI Study Agent interface and API errors
+        run: python tests/test_ai_provider_branding.py
 
       - name: Study Plan layout and task action regressions
         run: |
           python tests/test_study_plan_ui.py
+          python tests/test_study_plan_roadmap_first.py
+          python tests/test_manual_lesson_flow.py
           python tests/test_schedule_conflicts.py
           python tests/test_study_session_step631.py
           python tests/test_study_session_tracking.py
           python tests/test_study_session_quiz_step71.py
           python tests/test_study_session_quiz_step7234.py
+          python tests/test_quiz_answer_verification.py
           python tests/test_quiz_learning_analysis_step751_752.py
           python tests/test_adaptive_review_step753.py
           python tests/test_quiz_review_progress_step754.py
           python tests/test_quiz_background_jobs_step76.py
+          python tests/test_adaptive_phase8.py
+          python tests/test_phase9_schedule_safety.py
+          python tests/test_phase9_chat_safety.py
+          python tests/test_chat_retrieval_verified.py
+          python tests/test_chat_ai_recovery.py
+          python tests/test_chat_grounding.py
+          python tests/test_chat_extraction_completeness.py
+          python tests/test_phase9_integration.py
+          python tests/test_course_overview_refresh.py
+          python tests/test_document_library_folders.py
+          node --check static/js/document_library.js
+          node tests/test_document_library_ui.js
+          node --check static/js/document_dropzone.js
+          node tests/test_document_dropzone_ui.js
+          python tests/test_quiz_layout_refresh.py
+          node --check static/js/quiz.js
+          node tests/test_quiz_layout_ui.js
+          python -m py_compile syllabus_file_preview.py
+          python -m py_compile chat_response_validation.py
+          python -m py_compile adaptive_decision_phase8.py adaptive_plan_phase8.py
           python tests/test_delete_subject_session_quiz.py
           python -m py_compile study_session_quiz.py study_session_quiz_runtime.py study_session_quiz_routes.py subject_course_cleanup.py
           python -m py_compile study_session_tracking.py study_session_routes.py study_session_chat_context.py
 
       - name: Final roles and manual deadline data-integrity audit
         run: python tests/test_final_integrity_audit.py
+
+      - name: Final cross-platform release acceptance
+        run: python tests/test_final_release_contract.py
 
       - name: Final QA regression tests
         run: python tests/test_final_qa.py
@@ -392,6 +464,15 @@ jobs:
                   project.now()
               )
           ).lastrowid
+          # This scenario tests academic adaptive signals: mark the sample
+          # quiz as syllabus-review evidence, not a self-study upload.
+          from quiz_review_progress import ensure_review_baseline_schema
+          ensure_review_baseline_schema(conn)
+          conn.execute("""
+              INSERT INTO quiz_review_baselines(
+                  quiz_id,user_id,subject_id,snapshot_json,created_at)
+              VALUES(?,?,?,'[]',?)
+          """,(quiz_a_id,user_a_id,subject_a_id,project.now()))
           conn.commit()
           conn.close()
 

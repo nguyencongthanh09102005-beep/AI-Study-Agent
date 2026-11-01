@@ -13,7 +13,7 @@ from ai_chapter_suggestions import chapter_ai_prompt, validate_ai_suggestions
 from course_path_learning import (
     match_course_materials, parse_chapter_details, personal_course_documents, _terms,
 )
-from syllabus_learning import extract_syllabus_units, syllabus_hash
+from syllabus_learning import extract_syllabus_units, syllabus_hash, normalize_heading_prefix
 from syllabus_routes import _source, ensure_syllabus_schema
 
 chapter_material_bp = Blueprint("chapter_material", __name__)
@@ -22,7 +22,8 @@ CHAPTER_KEY_RE = re.compile(r"^(?:chương|chapter|bài|lesson|unit|module)\s+(\
 
 
 def chapter_key(evidence):
-    found = CHAPTER_KEY_RE.match((evidence or "").strip())
+    raw = normalize_heading_prefix(evidence)
+    found = CHAPTER_KEY_RE.match(raw)
     return found.group(1) if found else ""
 
 
@@ -138,10 +139,14 @@ def admin_chapter_mapping(document_id):
         source_text, source_hash, source_name = official_syllabus(
             conn, document["shared_subject_id"],
         )
-        units = extract_syllabus_units(source_text)
+        from admin_syllabus_analysis import approved_shared_units
+        units = (approved_shared_units(
+            conn, document["shared_subject_id"], source_text
+        ) or extract_syllabus_units(source_text))
         valid = {}
-        for unit in units:
-            key = chapter_key(unit["evidence"])
+        for index, unit in enumerate(units, 1):
+            key = (chapter_key(unit["evidence"])
+                   or chapter_key(unit["title"]) or str(index))
             if key and key not in valid:
                 valid[key] = unit
 
@@ -265,6 +270,8 @@ def admin_chapter_mapping(document_id):
             "admin_chapter_mapping.html", page="admin", document=document,
             source_name=source_name, chapters=chapters,
             source_present=bool(source_hash and valid),
+            syllabus_uploaded=bool(source_text.strip()),
+            syllabus_preview="\n".join(source_text.splitlines()[:18])[:1200],
             ai_by_key=ai_by_key, ai_analyzed=ai_valid,
             stale=bool(saved and not selected and any(row["syllabus_hash"] != source_hash
                                                       for row in saved)),
@@ -316,7 +323,8 @@ def student_chapter(subject_id, chapter_number):
             official_text, official_hash, _ = official_syllabus(conn, shared["id"])
             mapping_allowed = bool(official_text and official_hash == fingerprint)
         if mapping_allowed:
-            key = chapter_key(section["evidence"])
+            key = (chapter_key(section["evidence"])
+                   or chapter_key(section["chapter"]) or str(chapter_number))
             for row in approved_document_rows(conn, shared["id"], key, fingerprint):
                 materials.append({
                     "id": row["id"], "name": row["original_name"],

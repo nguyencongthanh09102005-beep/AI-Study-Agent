@@ -321,7 +321,7 @@ def prepare_step(project, conn, uid, subject_id):
             if age < 900:
                 conn.rollback()
                 raise LessonContextError(
-                    "Gemini đang chuẩn bị buổi này ở một phiên khác.", 409)
+                    "AI đang chuẩn bị bài kiểm tra cho buổi này ở một phiên khác.", 409)
         conn.execute("""
             INSERT INTO quiz_preparation_claims(task_id,user_id,step_key,claimed_at)
             VALUES(?,?,?,?)
@@ -364,7 +364,7 @@ def prepare_step(project, conn, uid, subject_id):
                         question["chapter"] = verified_chapter[:120]
             if not _question_count_valid(questions, count):
                 raise LessonContextError(
-                    "Gemini chưa tạo đủ câu hỏi kiến thức hợp lệ. "
+                    "AI chưa tạo đủ câu hỏi kiến thức hợp lệ. "
                     "Nguồn không bị thay đổi; bạn có thể thử chuẩn bị lại.", 409)
             # Revalidate source state after external request, not only before.
             new_ctx, new_prior, _ = context_for_task(project, conn, uid, task_id)
