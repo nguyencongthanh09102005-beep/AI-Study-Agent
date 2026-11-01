@@ -59,8 +59,8 @@ python tests/test_final_release_contract.py
 python tests/test_study_session_quiz_step7234.py
 python tests/test_final_integrity_audit.py
 python tests/test_final_qa.py
+node tests/test_mobile_session_quiz_ui.js
 cd mobile
-node ../tests/test_mobile_session_quiz_ui.js
 npx expo export --platform ios --output-dir dist-ci
 ```
 
