@@ -6,6 +6,7 @@ const fs = require("node:fs");
 const vm = require("node:vm");
 const code = fs.readFileSync("mobile/src/api.js","utf8")
   .replace(/export const /g, "const ")
+  .replace(/export async function /g, "async function ")
   .replace(/export function /g, "function ");
 let calls=[];
 let conversationId=73;
