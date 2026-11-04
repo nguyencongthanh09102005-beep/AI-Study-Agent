@@ -116,6 +116,7 @@ jobs:
           python tests/test_chapter_exercises_c1.py
           python tests/test_bulk_chapter_mapping.py
           python tests/test_fulltext_chapter_retrieval.py
+          python tests/test_chapter_materials_step3.py
           python -m py_compile clo_review_routes.py
           python tests/test_clo_evidence_c2.py
           python tests/test_agent_personalization_c3.py
@@ -169,6 +170,7 @@ jobs:
           python tests/test_chat_retrieval_verified.py
           python tests/test_chat_ai_recovery.py
           python tests/test_chat_grounding.py
+          python tests/test_chat_output_style.py
           python tests/test_chat_extraction_completeness.py
           python tests/test_phase9_integration.py
           python tests/test_course_overview_refresh.py
@@ -192,6 +194,9 @@ jobs:
 
       - name: Final cross-platform release acceptance
         run: python tests/test_final_release_contract.py
+
+      - name: Offline Load Test regression (no server, no AI calls)
+        run: python tests/test_loadtest_smoke.py
 
       - name: Final QA regression tests
         run: python tests/test_final_qa.py
