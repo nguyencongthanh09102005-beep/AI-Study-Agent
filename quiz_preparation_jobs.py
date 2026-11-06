@@ -155,7 +155,7 @@ def tick(project):
             if attempts>=3:
                 new_state='paused'
                 retry_after=''
-                message=('Gemini tiếp tục giới hạn API (HTTP 429) sau 3 lần chờ. '
+                message=('Dịch vụ AI tiếp tục giới hạn API (HTTP 429) sau 3 lần chờ. '
                          'Đã tạm dừng để tránh gọi tốn quota; thử lại sau hoặc '
                          'kiểm tra hạn mức API.')
             else:
@@ -163,7 +163,7 @@ def tick(project):
                 retry_after=(datetime.now(ZoneInfo('Asia/Ho_Chi_Minh'))+
                              timedelta(seconds=delay)).isoformat(timespec='seconds')
                 new_state='cooldown'
-                message=(f'Gemini giới hạn API (HTTP 429). Tự thử lại sau '
+                message=(f'Dịch vụ AI giới hạn API (HTTP 429). Tự thử lại sau '
                          f'{delay} giây; đã giữ nguyên Quiz và câu hỏi nháp.')
         except (LessonContextError,ValueError,RuntimeError) as error:
             retry_after=''
