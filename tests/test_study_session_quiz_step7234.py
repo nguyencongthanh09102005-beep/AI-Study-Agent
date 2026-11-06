@@ -121,17 +121,24 @@ def run():
             conn.close()
 
             calls = []
-            def mock_build(text, count, focus_topics=None, session_mode=False, avoid_questions=None):
+            partial_once = {"active": True}
+            def mock_build(text, count, focus_topics=None, session_mode=False,
+                           avoid_questions=None, allow_partial=False):
                 assert session_mode
                 assert "Giảng viên môn" not in text
                 calls.append(count)
-                return [
+                results = [
                     {"question": f"Node và con trỏ trong lần {len(calls)}, câu {i} hoạt động thế nào?",
                      "topic": "Cấu trúc node", "chapter": "Chương 1",
                      "options": ["Theo head", "Theo tail", "Theo root", "Theo leaf"],
                      "answer": i % 4}
                     for i in range(count)
                 ]
+                if partial_once["active"]:
+                    partial_once["active"] = False
+                    assert allow_partial, "Only preparation can request partial results"
+                    return results[:7]
+                return results
             # Verify the real Gemini parser rejects administrative trivia
             # even when AI includes it among otherwise valid academic items.
             original_gemini = project.gemini_generate
@@ -233,6 +240,24 @@ def run():
             assert client.post(endpoint + "/next", json={},
                                headers={"X-Quiz-CSRF": "wrong"}).status_code == 403
             headers = {"X-Quiz-CSRF": csrf}
+            # A partially verified response is never published as a Quiz.
+            first_step = client.post(endpoint + "/next", json={}, headers=headers)
+            assert first_step.status_code == 200, first_step.get_data(as_text=True)
+            assert first_step.get_json()["status"] == "partial"
+            assert first_step.get_json()["question_count"] == 7
+            partial_status = client.get(endpoint).get_json()
+            assert partial_status["ready"] == 0
+            assert partial_status["items"][0]["prepared_questions"] == 7
+            conn = project.db()
+            draft = conn.execute("""
+                SELECT questions_json FROM quiz_preparation_drafts
+                WHERE user_id=? AND task_id=?
+            """, (student, task_rows[0]["id"])).fetchone()
+            assert draft and len(json.loads(draft["questions_json"])) == 7
+            assert conn.execute("""
+                SELECT COUNT(*) FROM quizzes WHERE user_id=? AND subject_id=?
+            """, (student, subject)).fetchone()[0] == 0
+            conn.close()
             max_steps = len(task_rows) * 3 + 20
             for _ in range(max_steps):
                 step = client.post(endpoint + "/next", json={}, headers=headers)
@@ -276,7 +301,7 @@ def run():
             final_context, _, _ = context_for_task(project, conn, student, task_rows[-1]["id"])
             final_quiz = saved_quiz(conn, student, task_rows[-1]["id"],
                                     final_context["source_signature"])["id"]
-            assert len(calls) == len(task_rows)-1 + len(task_rows)-1, calls
+            assert len(calls) == len(task_rows)-1 + len(task_rows)-1 + 1, calls
             assert client.get("/quiz").status_code == 200
             locked_html = client.get("/quiz").get_data(as_text=True)
             assert f'data-quiz-id="{first_quiz}"' not in locked_html
@@ -388,7 +413,7 @@ def run():
             login(client,other)
             assert client.get(f"/api/mobile/quizzes/{first_quiz}/review").status_code == 404
             login(client,student)
-            assert len(calls) == len(task_rows) - 1 + len(task_rows) - 1
+            assert len(calls) == len(task_rows) - 1 + len(task_rows) - 1 + 1
             conn = project.db()
             assert conn.execute(
                 "SELECT COUNT(*) FROM quizzes WHERE id=? AND user_id=?",
@@ -439,7 +464,7 @@ def run():
                 })
                 assert second_submit.status_code == 200
                 assert second_submit.get_json()["attempt_count"] == 2
-                assert len(calls) == len(task_rows) - 1 + len(task_rows) - 1
+                assert len(calls) == len(task_rows) - 1 + len(task_rows) - 1 + 1
             conn = project.db()
             assert conn.execute(
                 "SELECT COUNT(*) FROM quizzes WHERE id=? AND user_id=?",

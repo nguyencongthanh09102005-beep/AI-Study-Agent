@@ -2542,7 +2542,7 @@ nhưng phải nằm bên trong chuỗi JSON escape đúng quy tắc. Cấu trúc
     return fallback, [], "general"
 
 
-def build_quiz(text, question_count=10, focus_topics=None, session_mode=False, avoid_questions=None):
+def build_quiz(text, question_count=10, focus_topics=None, session_mode=False, avoid_questions=None, allow_partial=False):
     """
     Tạo quiz 10 / 20 / 30 câu bằng Gemini.
 
@@ -2894,8 +2894,10 @@ Cấu trúc:
             batch_number += 1
 
 
-    # Không ghi Quiz bị thiếu câu. Nguồn AI lỗi -> UI hướng dẫn thử lại.
-    if len(questions) != question_count:
+    # Only the durable Quiz-preparation pipeline may explicitly opt in to
+    # retaining a *verified subset* as draft. All other callers still require
+    # the exact requested count and never persist incomplete Quiz.
+    if len(questions) != question_count and not (session_mode and allow_partial):
         return []
 
     # Với Quiz ôn điểm yếu, chuẩn hóa topic/chapter về đúng nhãn weakness cũ.

@@ -85,4 +85,37 @@ with patch.object(project,"gemini_generate",
                         "answer":0,"topic":"Node","chapter":"Chương 1"} for i in range(10)]
                   ) if "Tạo đúng" in prompt else "{}",None)):
     assert project.build_quiz(SOURCE,10,session_mode=True)==[]
+# Strict callers still fail closed, while the scheduler may preserve ONLY
+# corroborated questions in its unexposed, source-scoped draft store.
+partial_calls = {"generate": 0, "review": 0}
+def partial_model(prompt):
+    if "người kiểm định độc lập" in prompt:
+        partial_calls["review"] += 1
+        pending = json.loads(prompt.split(
+            "CÂU HỎI CẦN KIỂM ĐỊNH (KHÔNG CÓ ĐÁP ÁN TỪ NGƯỜI RA ĐỀ):\n")[-1])
+        checks = [
+            {"id": item["id"], "answer": 0 if i == 0 else None,
+             "quote": QUOTE if i == 0 else ""}
+            for i, item in enumerate(pending)
+        ]
+        return json.dumps({"checks": checks}, ensure_ascii=False), None
+    partial_calls["generate"] += 1
+    count = int(__import__("re").search(r"Tạo đúng (\d+) câu", prompt).group(1))
+    questions = [
+        {"question": f"Node nối tiếp thế nào? Nhóm {partial_calls['generate']}, câu {i}",
+         "topic": "Node", "chapter": "Chương 1",
+         "options": ["Dữ liệu và con trỏ next", "Chỉ âm thanh", "Chỉ hình ảnh",
+                     "Không có dữ liệu"], "answer": 0}
+        for i in range(count)
+    ]
+    return json.dumps(questions, ensure_ascii=False), None
+
+with patch.object(project, "gemini_generate", partial_model):
+    incomplete = project.build_quiz(SOURCE, 10, session_mode=True)
+    accepted_draft = project.build_quiz(
+        SOURCE, 10, session_mode=True, allow_partial=True)
+assert incomplete == [], "Normal Quiz output must still reject incomplete items"
+assert 0 < len(accepted_draft) < 10
+assert all(q["options"][q["answer"]] == "Dữ liệu và con trỏ next" for q in accepted_draft)
+
 print("Quiz answer verification PASS: second-pass evidence, wrong keys excluded, retries and fail closed")
