@@ -6,6 +6,7 @@ silently applied to tasks the student has already rescheduled/completed.
 """
 import hashlib
 import json
+import re
 from datetime import datetime, time, timedelta
 
 from study_schedule_conflicts import _interval
@@ -24,6 +25,16 @@ def ensure_session_schedule_schema(conn):
         CREATE UNIQUE INDEX IF NOT EXISTS idx_study_tasks_roadmap_session
         ON study_tasks(user_id, subject_id, roadmap_session_id)
         WHERE roadmap_session_id IS NOT NULL
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS roadmap_schedule_preferences (
+            user_id INTEGER NOT NULL,
+            subject_id INTEGER NOT NULL,
+            preferred_start_time TEXT NOT NULL DEFAULT '',
+            PRIMARY KEY (user_id, subject_id),
+            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY(subject_id) REFERENCES subjects(id) ON DELETE CASCADE
+        )
     """)
     # Do not commit: the caller owns the transaction.
 
@@ -151,11 +162,22 @@ def _ceil_quarter(value):
     return base if base >= value else base + timedelta(minutes=15)
 
 
-def _free_study_slot(preferred, duration_minutes, occupied, earliest):
-    """First valid daytime slot Mon–Sat, no Sunday, with a 15-minute break.
+def _validated_study_clock(value):
+    """An optional user-selected clock time; never parse arbitrary date text."""
+    if value in (None, ""):
+        return None
+    if not isinstance(value, str) or not re.fullmatch(r"(?:[01][0-9]|2[0-3]):[0-5][0-9]", value):
+        raise ValueError("Giờ học mong muốn không hợp lệ. Hãy chọn theo định dạng HH:MM.")
+    return time.fromisoformat(value)
 
-    Respect preferred date and morning/afternoon whenever possible; do not
-    schedule official study at night. Manually changed tasks are never moved.
+
+def _free_study_slot(preferred, duration_minutes, occupied, earliest,
+                     exact_time=None):
+    """Find a free Mon–Sat slot, preserving a 15-minute break.
+
+    Automatic mode uses daytime windows. When a student explicitly supplies
+    a clock time, keep that precise time and move to the next free day rather
+    than silently shifting the clock hour.
     """
     duration = timedelta(minutes=duration_minutes)
     pause = timedelta(minutes=BREAK_MINUTES)
@@ -165,24 +187,36 @@ def _free_study_slot(preferred, duration_minutes, occupied, earliest):
         if day.weekday() == 6:
             continue
         choices = []
-        for window_start, window_end in OFFICIAL_WINDOWS:
-            cursor = _ceil_quarter(max(datetime.combine(day, window_start),
-                                       earliest))
-            latest = datetime.combine(day, window_end) - duration
-            while cursor <= latest:
-                choices.append(cursor)
-                cursor += timedelta(minutes=15)
-        target = datetime.combine(day, preferred.time())
-        choices.sort(key=lambda candidate: (
-            abs((candidate - target).total_seconds()),
-            candidate,
-        ))
+        if exact_time is not None:
+            selected = datetime.combine(day, exact_time)
+            if (selected >= earliest and
+                    selected + duration <= datetime.combine(
+                        day + timedelta(days=1), time.min)):
+                choices = [selected]
+        else:
+            for window_start, window_end in OFFICIAL_WINDOWS:
+                cursor = _ceil_quarter(max(datetime.combine(day, window_start),
+                                           earliest))
+                latest = datetime.combine(day, window_end) - duration
+                while cursor <= latest:
+                    choices.append(cursor)
+                    cursor += timedelta(minutes=15)
+            target = datetime.combine(day, preferred.time())
+            choices.sort(key=lambda candidate: (
+                abs((candidate - target).total_seconds()),
+                candidate,
+            ))
         for candidate in choices:
             end = candidate + duration
             if all(end + pause <= busy_start or
                    candidate >= busy_end + pause
                    for busy_start, busy_end in occupied):
                 return candidate
+    if exact_time is not None:
+        raise ValueError(
+            "Không tìm được ngày trống vào đúng giờ đã chọn trong 180 ngày "
+            "(thứ Hai–thứ Bảy). Hãy chọn giờ khác hoặc kiểm tra Kế hoạch học."
+        )
     raise ValueError(
         "Không còn giờ trống chính khóa từ thứ Hai đến thứ Bảy "
         "trong 180 ngày tới. Hãy kiểm tra thời khóa biểu hoặc tự chọn giờ."
@@ -190,7 +224,8 @@ def _free_study_slot(preferred, duration_minutes, occupied, earliest):
 
 
 def import_roadmap_lessons(conn, user_id, subject_id, sessions, created_at,
-                           reschedule_existing=False, reference_time=None):
+                           reschedule_existing=False, reference_time=None,
+                           preferred_start_time=None):
     """Import missing lessons into free time without moving any existing task.
 
     An explicitly requested reflow may move only future, unfinished roadmap
@@ -199,6 +234,7 @@ def import_roadmap_lessons(conn, user_id, subject_id, sessions, created_at,
     """
     if not isinstance(sessions, list) or not 1 <= len(sessions) <= 80:
         raise ValueError("Lộ trình cần có từ 1 đến 80 buổi hợp lệ.")
+    selected_clock = _validated_study_clock(preferred_start_time)
 
     prepared = []
     seen = set()
@@ -237,6 +273,15 @@ def import_roadmap_lessons(conn, user_id, subject_id, sessions, created_at,
             note, session_signature(lesson),
         ))
 
+    # Reject impossible same-day clock times before changing any task.
+    if selected_clock is not None:
+        for _sid, _title, _at, duration, _note, _signature in prepared:
+            start = datetime.combine(datetime(2026, 1, 1).date(), selected_clock)
+            if (start + timedelta(minutes=duration)).date() != start.date():
+                raise ValueError(
+                    "Giờ bắt đầu đã chọn khiến buổi học kết thúc sang ngày hôm sau. "
+                    "Hãy chọn giờ sớm hơn."
+                )
     # All validation above finishes before we consider changing any tasks.
     prepared.sort(key=lambda row: row[0])
     linked = scheduled_lessons(conn, user_id, subject_id)
@@ -286,12 +331,15 @@ def import_roadmap_lessons(conn, user_id, subject_id, sessions, created_at,
             continue
 
         preferred = datetime.fromisoformat(study_at)
-        earliest = max(datetime.combine(preferred.date(), OFFICIAL_WINDOWS[0][0]),
+        start_of_day = selected_clock or OFFICIAL_WINDOWS[0][0]
+        earliest = max(datetime.combine(preferred.date(), start_of_day),
                        future_floor)
         if previous_start is not None:
             earliest = max(earliest, datetime.combine(
-                previous_start.date() + timedelta(days=1), OFFICIAL_WINDOWS[0][0]))
-        assigned = _free_study_slot(preferred, duration, occupied, earliest)
+                previous_start.date() + timedelta(days=1), start_of_day))
+        assigned = _free_study_slot(
+            preferred, duration, occupied, earliest, exact_time=selected_clock
+        )
         assigned_at = assigned.isoformat(timespec="minutes")
         if old:
             if assigned_at != old["study_at"]:
