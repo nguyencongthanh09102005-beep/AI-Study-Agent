@@ -312,6 +312,14 @@ def run():
             assert len(calls) == len(task_rows)-1 + len(task_rows)-1 + 1, calls
             assert client.get("/quiz").status_code == 200
             locked_html = client.get("/quiz").get_data(as_text=True)
+            # Large archives are grouped by course and folded by default,
+            # without rendering the actual questions or answer key in HTML.
+            assert 'id="quizLockedArchive"' in locked_html
+            assert 'class="quiz-locked-course"' in locked_html
+            assert 'class="quiz-locked-row-title"' in locked_html
+            assert 'class="quiz-locked-row-reason"' in locked_html
+            assert 'class="quiz-locked-course-count"' in locked_html
+            assert "Quiz theo buổi đã lưu" in locked_html
             assert f'data-quiz-id="{first_quiz}"' not in locked_html
             assert f'data-quiz-id="{final_quiz}"' not in locked_html
             assert client.get(f"/api/mobile/quizzes/{first_quiz}").status_code == 409

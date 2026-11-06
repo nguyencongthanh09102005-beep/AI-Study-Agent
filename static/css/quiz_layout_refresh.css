@@ -339,3 +339,45 @@ body.study-ui.page-quiz :is(.quiz-create-collapse-toggle, .quiz-history-details 
     padding: 13px !important;
   }
 }
+
+
+/* Locked Quiz archive: compact and collapsed by default.
+   Only metadata is rendered; answer and question gating remains server-side. */
+body.study-ui.page-quiz .quiz-locked-archive{padding:0;margin:16px 0;border:1px solid #d9e3f7;border-radius:15px;overflow:visible}
+body.study-ui.page-quiz .quiz-locked-archive-head{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:17px 20px;color:#29437e}
+body.study-ui.page-quiz .quiz-locked-archive-head::-webkit-details-marker,
+body.study-ui.page-quiz .quiz-locked-course-head::-webkit-details-marker{display:none}
+body.study-ui.page-quiz .quiz-locked-head-copy{display:grid;min-width:0;gap:4px}
+body.study-ui.page-quiz .quiz-locked-head-copy strong{font-size:16px;line-height:1.4;color:#2e477d}
+body.study-ui.page-quiz .quiz-locked-head-copy small{font-size:12px;color:#7486aa}
+body.study-ui.page-quiz .quiz-locked-total{font-weight:800}
+body.study-ui.page-quiz .quiz-locked-head-action{display:inline-flex;align-items:center;gap:8px;white-space:nowrap;font-weight:750;font-size:12px;color:#576ed0;background:#eaf0ff;border-radius:10px;padding:9px 12px}
+body.study-ui.page-quiz .quiz-locked-head-action span{display:inline-block;transition:transform .18s}
+body.study-ui.page-quiz .quiz-locked-archive[open] .quiz-locked-head-action span{transform:rotate(180deg)}
+body.study-ui.page-quiz .quiz-locked-archive-head:focus-visible,
+body.study-ui.page-quiz .quiz-locked-course-head:focus-visible{outline:2px solid #6273e7;outline-offset:2px;border-radius:10px}
+body.study-ui.page-quiz .quiz-locked-archive-content{padding:0 17px 18px;border-top:1px solid #e3e9f5}
+body.study-ui.page-quiz .quiz-locked-note{color:#6d7e9c;font-size:12px;line-height:1.5;margin:12px 2px}
+body.study-ui.page-quiz .quiz-locked-course{border:1px solid #e1e8f5;border-radius:12px;margin:9px 0;background:#f7f9fd}
+body.study-ui.page-quiz .quiz-locked-course-head{list-style:none;display:flex;align-items:center;gap:10px;cursor:pointer;padding:12px 14px;min-height:44px;box-sizing:border-box}
+body.study-ui.page-quiz .quiz-locked-course-head:hover{background:#eff4ff;border-radius:12px}
+body.study-ui.page-quiz .quiz-locked-course-head strong{flex:1;min-width:0;color:#334c80;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+body.study-ui.page-quiz .quiz-locked-course-chevron{color:#687bc8;transition:transform .18s}
+body.study-ui.page-quiz .quiz-locked-course[open] .quiz-locked-course-chevron{transform:rotate(90deg)}
+body.study-ui.page-quiz .quiz-locked-course-count{white-space:nowrap;font-size:11px;font-weight:800;background:#e6edfe;border-radius:999px;color:#5970bc;padding:6px 10px}
+body.study-ui.page-quiz .quiz-locked-rows{background:#fff;border-top:1px solid #e7edfa;border-radius:0 0 12px 12px;padding:1px 11px}
+body.study-ui.page-quiz .quiz-locked-row{display:flex;align-items:center;gap:9px;min-height:49px;padding:7px 4px;border-bottom:1px solid #ebeff7;box-sizing:border-box}
+body.study-ui.page-quiz .quiz-locked-row:last-child{border-bottom:0}
+body.study-ui.page-quiz .quiz-locked-row-title{flex:1 1 44%;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#354e7b;font-size:12px;font-weight:730}
+body.study-ui.page-quiz .quiz-locked-row-reason{flex:1 1 35%;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px;color:#7384a3}
+body.study-ui.page-quiz .quiz-locked-row-attempts{flex:0 0 auto;white-space:nowrap;font-size:10px;color:#387d70;background:#e7f5ef;border-radius:9px;padding:5px 7px}
+@media(max-width:720px){
+ body.study-ui.page-quiz .quiz-locked-archive-head{padding:13px;align-items:flex-start}
+ body.study-ui.page-quiz .quiz-locked-head-copy strong{font-size:14px}
+ body.study-ui.page-quiz .quiz-locked-head-action{font-size:11px;padding:7px}
+ body.study-ui.page-quiz .quiz-locked-archive-content{padding:0 10px 12px}
+ body.study-ui.page-quiz .quiz-locked-row{display:grid;grid-template-columns:minmax(0,1fr) auto;min-height:50px;column-gap:8px;row-gap:2px}
+ body.study-ui.page-quiz .quiz-locked-row-title{grid-column:1/3;font-size:12px}
+ body.study-ui.page-quiz .quiz-locked-row-reason{grid-column:1;grid-row:2}
+ body.study-ui.page-quiz .quiz-locked-row-attempts{grid-column:2;grid-row:2}
+}
