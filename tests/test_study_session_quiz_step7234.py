@@ -137,7 +137,12 @@ def run():
                 if partial_once["active"]:
                     partial_once["active"] = False
                     assert allow_partial, "Only preparation can request partial results"
-                    return results[:7]
+                    return results[:14]
+                if count == 3 and avoid_questions and len(avoid_questions) == 14:
+                    # Last-question recovery requests several VERIFIED
+                    # candidates. Ignore the first duplicate and keep only
+                    # one new question, never saving a 17-question Quiz.
+                    results[0]["question"] = avoid_questions[0]
                 return results
             # Verify the real Gemini parser rejects administrative trivia
             # even when AI includes it among otherwise valid academic items.
@@ -244,16 +249,16 @@ def run():
             first_step = client.post(endpoint + "/next", json={}, headers=headers)
             assert first_step.status_code == 200, first_step.get_data(as_text=True)
             assert first_step.get_json()["status"] == "partial"
-            assert first_step.get_json()["question_count"] == 7
+            assert first_step.get_json()["question_count"] == 14
             partial_status = client.get(endpoint).get_json()
             assert partial_status["ready"] == 0
-            assert partial_status["items"][0]["prepared_questions"] == 7
+            assert partial_status["items"][0]["prepared_questions"] == 14
             conn = project.db()
             draft = conn.execute("""
                 SELECT questions_json FROM quiz_preparation_drafts
                 WHERE user_id=? AND task_id=?
             """, (student, task_rows[0]["id"])).fetchone()
-            assert draft and len(json.loads(draft["questions_json"])) == 7
+            assert draft and len(json.loads(draft["questions_json"])) == 14
             assert conn.execute("""
                 SELECT COUNT(*) FROM quizzes WHERE user_id=? AND subject_id=?
             """, (student, subject)).fetchone()[0] == 0
@@ -266,6 +271,9 @@ def run():
                     break
             else:
                 raise AssertionError("Quiz preparation did not finish")
+            # First call generates 15 candidates (14 accepted); the next
+            # deliberately oversamples 3 candidates for only 1 missing item.
+            assert calls[:2] == [15, 3], calls
             status = client.get(endpoint).get_json()
             assert status["done"] is True
             assert status["ready"] == len(task_rows)
