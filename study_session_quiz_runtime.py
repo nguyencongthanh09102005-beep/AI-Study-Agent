@@ -509,8 +509,14 @@ def prepare_step(project, conn, uid, subject_id):
             # The generator still independently verifies every answer against
             # the actual approved source. Only verified questions may be saved
             # as drafts, never shown or scored before the full Quiz is ready.
+            # One remaining question is disproportionately fragile: the
+            # verifier may reject a single model candidate (bad answer key,
+            # imprecise quotation, repeated fact). Ask for a few independent
+            # candidates, but only keep the exact number missing. Every
+            # candidate still passes the normal source-evidence verification.
+            candidate_count = max(missing, 3)
             generated = project.build_quiz(
-                source, missing, session_mode=True,
+                source, candidate_count, session_mode=True,
                 avoid_questions=used_before, allow_partial=True
             )
             if not isinstance(generated, list):
@@ -524,6 +530,8 @@ def prepare_step(project, conn, uid, subject_id):
                 if key and key not in previous_keys:
                     previous_keys.add(key)
                     new_questions.append(q)
+                    if len(new_questions) == missing:
+                        break
             verified_chapter = str(source_ctx.get("chapter") or "").strip()
             if verified_chapter:
                 for question in new_questions:
