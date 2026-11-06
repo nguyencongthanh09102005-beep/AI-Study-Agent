@@ -116,6 +116,6 @@ with patch.object(project, "gemini_generate", partial_model):
         SOURCE, 10, session_mode=True, allow_partial=True)
 assert incomplete == [], "Normal Quiz output must still reject incomplete items"
 assert 0 < len(accepted_draft) < 10
-assert all(q["answer"] == 0 for q in accepted_draft)
+assert all(q["options"][q["answer"]] == "Dữ liệu và con trỏ next" for q in accepted_draft)
 
 print("Quiz answer verification PASS: second-pass evidence, wrong keys excluded, retries and fail closed")
