@@ -276,7 +276,7 @@ def import_roadmap_lessons(conn, user_id, subject_id, sessions, created_at,
     # Reject impossible same-day clock times before changing any task.
     if selected_clock is not None:
         for _sid, _title, _at, duration, _note, _signature in prepared:
-            start = datetime.combine(datetime(2026, 1, 1).date(), selected_clock)
+            start = datetime.combine(datetime.fromisoformat(_at).date(), selected_clock)
             if (start + timedelta(minutes=duration)).date() != start.date():
                 raise ValueError(
                     "Giờ bắt đầu đã chọn khiến buổi học kết thúc sang ngày hôm sau. "
