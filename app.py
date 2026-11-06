@@ -6177,12 +6177,15 @@ def quiz():
             qsl.session_title AS linked_session_title,
             qsl.chapter_number AS linked_chapter_number,
             qsl.quiz_id AS linked_quiz_id,
+            COALESCE(s.name, 'Môn học đã xóa hoặc chưa phân loại') AS subject_name,
             COUNT(qa.id) AS attempt_count,
             MAX(qa.created_at) AS last_attempt_at,
             MAX(qa.score) AS best_score
         FROM quizzes q
         LEFT JOIN quiz_session_links qsl
           ON qsl.quiz_id=q.id AND qsl.user_id=q.user_id
+        LEFT JOIN subjects s
+          ON s.id=q.subject_id AND s.user_id=q.user_id
         LEFT JOIN quiz_attempts qa
           ON qa.quiz_id=q.id
          AND qa.user_id=q.user_id
@@ -6203,8 +6206,14 @@ def quiz():
                 # Preserve visibility of historical metadata WITHOUT sending
                 # locked questions or answers to HTML/JavaScript.
                 locked_session_quizzes.append({
-                    "title": q["title"],
-                    "session_title": q["linked_session_title"],
+                    "subject_name": q["subject_name"],
+                    # A saved session label already contains the lesson name.
+                    # Show it once, not "Quiz title · identical session title".
+                    # Final exams retain their explicit exam label.
+                    "display_title": (
+                        q["title"] if str(q["title"] or "").startswith("Tổng hợp cuối môn")
+                        else (q["linked_session_title"] or q["title"])
+                    ),
                     "attempt_count": int(q["attempt_count"] or 0),
                     "best_score": q["best_score"],
                     "reason": access.get("reason") or (
