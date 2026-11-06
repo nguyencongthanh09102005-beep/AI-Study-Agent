@@ -2242,7 +2242,7 @@ def gemini_generate(prompt):
             remaining = deadline - time.monotonic()
             if remaining <= 0.5:
                 if rate_limited:
-                    return None, "Gemini đã chạm giới hạn API (HTTP 429). Vui lòng thử lại sau."
+                    return None, "Dịch vụ AI đã chạm giới hạn API (HTTP 429). Vui lòng thử lại sau."
                 return None, "AI phản hồi quá thời gian chờ. Vui lòng thử lại."
             url = (
                 "https://generativelanguage.googleapis.com/v1beta/"
@@ -2361,7 +2361,7 @@ def gemini_generate(prompt):
     if last_error:
         print("AI provider exhausted retries:", last_error)
     if rate_limited:
-        return None, "Gemini đã chạm giới hạn API (HTTP 429). Vui lòng thử lại sau."
+        return None, "Dịch vụ AI đã chạm giới hạn API (HTTP 429). Vui lòng thử lại sau."
     return None, (
         "AI đang bận hoặc kết nối chưa ổn định. "
         "Vui lòng thử lại sau."
