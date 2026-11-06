@@ -30,10 +30,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const pending = data.items.filter(item => item.status !== "ready");
     const next = pending[0];
     const state = data.job?.state || "not_started";
-    const active = state === "running" || state === "queued";
+    const resumeAvailable = data.job?.resume_available === true;
+    const active = (state === "running" || state === "queued") && !resumeAvailable;
     let message = "Đã chuẩn bị " + data.ready + "/" + data.total +
       " bộ Quiz";
     if (data.done) message += " · tất cả đã sẵn sàng.";
+    else if (resumeAvailable) message +=
+      " · tiến trình nền chưa chạy trên máy chủ này. Bấm Tiếp tục để khởi động lại.";
     else if (active) message +=
       " · AI đang tạo trên máy chủ. Bạn có thể chuyển trang, không làm dừng tiến trình.";
     else if (state === "paused") message +=
