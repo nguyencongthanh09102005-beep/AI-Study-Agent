@@ -118,4 +118,41 @@ assert incomplete == [], "Normal Quiz output must still reject incomplete items"
 assert 0 < len(accepted_draft) < 10
 assert all(q["options"][q["answer"]] == "Dữ liệu và con trỏ next" for q in accepted_draft)
 
+# Quota failures must be distinguished from invalid answers in Quiz drafts.
+from quiz_provider_limits import QuizRateLimitError
+with patch.object(project, "gemini_generate",
+                  return_value=(None, "Gemini đã chạm giới hạn API (HTTP 429).")):
+    try:
+        project.build_quiz(SOURCE, 15, session_mode=True, allow_partial=True)
+        raise AssertionError("Quota error must be visible to the background queue")
+    except QuizRateLimitError:
+        pass
+    assert project.build_quiz(SOURCE, 15, session_mode=True) == []
+
+# A verified subset from the first batch survives a rate limit later in the
+# same call; future steps can persist that subset before entering cooldown.
+mixed_calls={"generation":0}
+def mid_batch_rate_limit(prompt):
+    if "người kiểm định độc lập" in prompt:
+        candidate=json.loads(prompt.split(
+            "CÂU HỎI CẦN KIỂM ĐỊNH (KHÔNG CÓ ĐÁP ÁN TỪ NGƯỜI RA ĐỀ):\\n")[-1])
+        return json.dumps({"checks":[
+            {"id": x["id"], "answer": 0, "quote": QUOTE}
+            for x in candidate
+        ]}, ensure_ascii=False), None
+    mixed_calls["generation"]+=1
+    if mixed_calls["generation"] > 1:
+        return None, "Gemini đã chạm giới hạn API (HTTP 429)."
+    items=[{"question":f"Node trong lần gọi đầu: {i}",
+            "topic":"Node", "chapter":"Chương 1",
+            "options":["Dữ liệu và con trỏ next","Chỉ âm thanh",
+                       "Chỉ hình ảnh","Không có dữ liệu"], "answer":0}
+           for i in range(10)]
+    return json.dumps(items, ensure_ascii=False), None
+
+with patch.object(project, "gemini_generate", mid_batch_rate_limit):
+    partial_429=project.build_quiz(
+        SOURCE, 15, session_mode=True, allow_partial=True)
+assert len(partial_429)==10, len(partial_429)
+
 print("Quiz answer verification PASS: second-pass evidence, wrong keys excluded, retries and fail closed")
