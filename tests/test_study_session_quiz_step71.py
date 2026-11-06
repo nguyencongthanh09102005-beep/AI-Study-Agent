@@ -235,7 +235,30 @@ def verify():
             assert "Quiz theo buổi thử liên kết" in linked_page
             assert "Quiz theo buổi đã lưu" in linked_page
             assert f'data-quiz-id="{candidate}"' not in linked_page
+            assert f'/quiz?quiz_id={candidate}#selectedLockedQuiz' in linked_page
+            assert "Đi tới Quiz" in linked_page
             assert "Quiz cũ" in linked_page
+
+            # Clicking "Đi tới Quiz" opens a focused, safe explanation
+            # and a scoped link back to the exact lesson, not answer payload.
+            focused = client.get(f"/quiz?quiz_id={candidate}")
+            assert focused.status_code == 200
+            focused_html = focused.get_data(as_text=True)
+            assert 'id="selectedLockedQuiz"' in focused_html
+            assert "CHI TIẾT QUIZ THEO BUỔI" in focused_html
+            assert f"/study-plan/tasks/{task}/learn#studyRoomQuiz" in focused_html
+            assert f'data-quiz-id="{candidate}"' not in focused_html
+            assert "quiz-locked-row-selected" in focused_html
+
+            # A different student may not select or view another user's
+            # archived Quiz details, even by guessing the Quiz ID.
+            other_client = project.app.test_client()
+            login(other_client, other)
+            outsider = other_client.get(f"/quiz?quiz_id={candidate}")
+            assert outsider.status_code == 200
+            outsider_html = outsider.get_data(as_text=True)
+            assert 'id="selectedLockedQuiz"' not in outsider_html
+            assert f'/quiz?quiz_id={candidate}#selectedLockedQuiz' not in outsider_html
 
             # Revoked approval disables prospective session Quiz, never removes
             # the historic quiz or recorded scores.
