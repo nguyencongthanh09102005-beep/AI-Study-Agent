@@ -135,7 +135,7 @@ mixed_calls={"generation":0}
 def mid_batch_rate_limit(prompt):
     if "người kiểm định độc lập" in prompt:
         candidate=json.loads(prompt.split(
-            "CÂU HỎI CẦN KIỂM ĐỊNH (KHÔNG CÓ ĐÁP ÁN TỪ NGƯỜI RA ĐỀ):\\n")[-1])
+            "CÂU HỎI CẦN KIỂM ĐỊNH (KHÔNG CÓ ĐÁP ÁN TỪ NGƯỜI RA ĐỀ):\n")[-1])
         return json.dumps({"checks":[
             {"id": x["id"], "answer": 0, "quote": QUOTE}
             for x in candidate
