@@ -180,23 +180,41 @@
 </section>
 
 {% if locked_session_quizzes %}
-<section class="soft-card" aria-label="Quiz theo buổi đã lưu nhưng đang khóa"
-         style="padding:18px;margin:16px 0;border:1px solid #d9e3f7;border-radius:14px">
-  <h3 style="margin:0 0 8px;color:#29437e">🔒 Quiz theo buổi đã lưu ({{ locked_session_quizzes|length }})</h3>
-  <p style="color:#5b6e90;margin:0 0 12px">Các bộ Quiz này vẫn được lưu trong tài khoản nhưng chưa đủ điều kiện mở. Không hiển thị câu hỏi hoặc đáp án khi đang khóa.</p>
-  <ul style="padding-left:22px;line-height:1.75;color:#344a74">
-  {% for item in locked_session_quizzes %}
-    <li style="margin:8px 0">
-      <strong>{{ item.title }}</strong>
-      {% if item.session_title %}<span> · {{ item.session_title }}</span>{% endif %}
-      <div style="font-size:13px;color:#637698">
-        {% if item.attempt_count %}Đã làm {{ item.attempt_count }} lượt{% if item.best_score is not none %} · Điểm cao nhất {{ item.best_score|round(1) }}%{% endif %} · {% endif %}
-        {{ item.reason }}
+<details class="soft-card quiz-locked-archive" id="quizLockedArchive"
+         aria-label="Quiz theo buổi đã lưu nhưng đang khóa">
+  <summary class="quiz-locked-archive-head">
+    <span class="quiz-locked-head-copy">
+      <strong>🔒 Quiz theo buổi đã lưu <span class="quiz-locked-total">({{ locked_session_quizzes|length }})</span></strong>
+      <small>Được giữ trong tài khoản · chưa đủ điều kiện mở</small>
+    </span>
+    <span class="quiz-locked-head-action">Xem danh sách <span aria-hidden="true">⌄</span></span>
+  </summary>
+  <div class="quiz-locked-archive-content">
+    <p class="quiz-locked-note">Các bộ Quiz vẫn được lưu. Khi đang khóa, hệ thống chỉ hiển thị thông tin buổi học và lý do, không gửi câu hỏi hoặc đáp án.</p>
+    {% for subject_name, group in locked_session_quizzes|groupby('subject_name') %}
+    <details class="quiz-locked-course">
+      <summary class="quiz-locked-course-head">
+        <span class="quiz-locked-course-chevron" aria-hidden="true">▸</span>
+        <strong title="{{ subject_name }}">{{ subject_name }}</strong>
+        <span class="quiz-locked-course-count">{{ group|length }} bộ Quiz</span>
+      </summary>
+      <div class="quiz-locked-rows" role="list">
+        {% for item in group %}
+        <div class="quiz-locked-row" role="listitem">
+          <span class="quiz-locked-row-title" title="{{ item.display_title }}">{{ item.display_title }}</span>
+          <span class="quiz-locked-row-reason" title="{{ item.reason }}">{{ item.reason }}</span>
+          {% if item.attempt_count %}
+            <span class="quiz-locked-row-attempts" title="Đã làm {{ item.attempt_count }} lượt{% if item.best_score is not none %} · Điểm cao nhất {{ item.best_score|round(1) }}%{% endif %}">
+              Đã làm {{ item.attempt_count }} lượt{% if item.best_score is not none %} · {{ item.best_score|round(1) }}%{% endif %}
+            </span>
+          {% endif %}
+        </div>
+        {% endfor %}
       </div>
-    </li>
-  {% endfor %}
-  </ul>
-</section>
+    </details>
+    {% endfor %}
+  </div>
+</details>
 {% endif %}
 
 <section class="quiz-work-layout quiz-new-layout">
