@@ -179,6 +179,26 @@
   <div class="quiz-compact-stat"><span class="quiz-stat-icon" aria-hidden="true">🎯</span><span><small>Chủ đề cần ôn</small><strong>{{ quiz_summary.weaknesses }}</strong></span></div>
 </section>
 
+{% if locked_session_quizzes %}
+<section class="soft-card" aria-label="Quiz theo buổi đã lưu nhưng đang khóa"
+         style="padding:18px;margin:16px 0;border:1px solid #d9e3f7;border-radius:14px">
+  <h3 style="margin:0 0 8px;color:#29437e">🔒 Quiz theo buổi đã lưu ({{ locked_session_quizzes|length }})</h3>
+  <p style="color:#5b6e90;margin:0 0 12px">Các bộ Quiz này vẫn được lưu trong tài khoản nhưng chưa đủ điều kiện mở. Không hiển thị câu hỏi hoặc đáp án khi đang khóa.</p>
+  <ul style="padding-left:22px;line-height:1.75;color:#344a74">
+  {% for item in locked_session_quizzes %}
+    <li style="margin:8px 0">
+      <strong>{{ item.title }}</strong>
+      {% if item.session_title %}<span> · {{ item.session_title }}</span>{% endif %}
+      <div style="font-size:13px;color:#637698">
+        {% if item.attempt_count %}Đã làm {{ item.attempt_count }} lượt{% if item.best_score is not none %} · Điểm cao nhất {{ item.best_score|round(1) }}%{% endif %} · {% endif %}
+        {{ item.reason }}
+      </div>
+    </li>
+  {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
 <section class="quiz-work-layout quiz-new-layout">
   <aside class="soft-card quiz-library">
     <div class="card-title-row"><h3>▣ &nbsp; Danh sách quiz của bạn</h3><span>{{ quizzes|length }} bài</span></div>

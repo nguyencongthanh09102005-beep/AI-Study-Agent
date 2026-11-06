@@ -7,6 +7,7 @@ deployments run a separate persistent worker instead; request-lifetime
 threads are NOT guaranteed to survive there.
 """
 import logging
+import os
 import threading
 import time
 from datetime import datetime
@@ -78,14 +79,29 @@ def pause(conn,uid,subject_id):
         row["state"] if row else "not_started")
 
 
+def local_worker_alive():
+    """Whether this Flask process hosts an active local preparation worker."""
+    return bool(_thread and _thread.is_alive())
+
+
 def status(conn,uid,subject_id):
     ensure_job_schema(conn)
     row=conn.execute("""
         SELECT state,message,updated_at FROM quiz_preparation_jobs
         WHERE user_id=? AND subject_id=?
     """,(uid,subject_id)).fetchone()
-    return dict(row) if row else {"state":"not_started","message":"",
-                                   "updated_at":""}
+    result = dict(row) if row else {"state":"not_started","message":"",
+                                    "updated_at":""}
+    # SQLite jobs survive a process restart. A local Flask host that did not
+    # restart its worker must let the student resume instead of showing an
+    # indefinitely disabled "AI is working" button. A dedicated worker is
+    # tracked outside this Flask process; set QUIZ_WORKER_MODE=external there.
+    external = os.getenv("QUIZ_WORKER_MODE", "local").lower() == "external"
+    result["resume_available"] = (
+        not external and result["state"] in ("queued", "running")
+        and not local_worker_alive()
+    )
+    return result
 
 
 def tick(project):

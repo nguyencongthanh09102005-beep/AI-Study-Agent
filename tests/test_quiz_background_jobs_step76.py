@@ -67,7 +67,14 @@ def run():
                 assert queued.get_json()["state"]=="queued"
                 starter.assert_called_once()
                 conn=project.db()
-                assert status(conn,uid,sid)["state"]=="queued"
+                queued_info=status(conn,uid,sid)
+                assert queued_info["state"]=="queued"
+                # A queued job left behind after a local worker stops must
+                # be restartable instead of disabling the button forever.
+                with patch("quiz_preparation_jobs._thread", None):
+                    assert status(conn,uid,sid)["resume_available"] is True
+                    with patch.dict("os.environ", {"QUIZ_WORKER_MODE":"external"}):
+                        assert status(conn,uid,sid)["resume_available"] is False
                 conn.close()
                 stopped=client.post(
                     f"/api/subjects/{sid}/quiz-preparation/background/pause",

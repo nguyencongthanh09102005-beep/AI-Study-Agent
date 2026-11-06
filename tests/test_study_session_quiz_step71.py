@@ -230,8 +230,11 @@ def verify():
                                 (old_quiz,)).fetchone()[0] == 0
             conn.close()
             linked_page = client.get("/quiz").get_data(as_text=True)
-            # 7.3: prepared session Quiz remains hidden until server unlock.
-            assert "Quiz theo buổi thử liên kết" not in linked_page
+            # Locked lesson Quiz shows owner-only metadata, never the quiz
+            # workspace, questions or answers until access is authorized.
+            assert "Quiz theo buổi thử liên kết" in linked_page
+            assert "Quiz theo buổi đã lưu" in linked_page
+            assert f'data-quiz-id="{candidate}"' not in linked_page
             assert "Quiz cũ" in linked_page
 
             # Revoked approval disables prospective session Quiz, never removes
