@@ -179,9 +179,41 @@
   <div class="quiz-compact-stat"><span class="quiz-stat-icon" aria-hidden="true">🎯</span><span><small>Chủ đề cần ôn</small><strong>{{ quiz_summary.weaknesses }}</strong></span></div>
 </section>
 
+{% if selected_locked_quiz %}
+<section class="soft-card quiz-locked-focus" id="selectedLockedQuiz"
+         aria-labelledby="selectedLockedQuizTitle">
+  <div class="quiz-locked-focus-head">
+    <span class="quiz-locked-focus-icon" aria-hidden="true">🔒</span>
+    <div>
+      <span class="quiz-locked-focus-eyebrow">CHI TIẾT QUIZ THEO BUỔI</span>
+      <h3 id="selectedLockedQuizTitle">{{ selected_locked_quiz.display_title }}</h3>
+      <small>{{ selected_locked_quiz.subject_name }}</small>
+    </div>
+  </div>
+  <p class="quiz-locked-focus-reason" role="status">{{ selected_locked_quiz.reason }}</p>
+  <p class="quiz-locked-focus-note">Bài Quiz đã lưu nhưng đang khóa. Bạn có thể đến đúng buổi học để xem điều kiện mở; câu hỏi và đáp án vẫn được bảo vệ.</p>
+  <div class="quiz-locked-focus-actions">
+    {% if selected_locked_quiz.task_id %}
+      {% if selected_locked_quiz.can_start %}
+      <a class="quiz-locked-focus-primary" href="{{ url_for('quiz', task_id=selected_locked_quiz.task_id, _anchor='sessionQuizContext') }}">▶ Đến phần bắt đầu Quiz</a>
+      {% else %}
+      <a class="quiz-locked-focus-primary" href="{{ url_for('study_session.learning_session', task_id=selected_locked_quiz.task_id, _anchor='studyRoomQuiz') }}">→ Đến Quiz trong buổi học</a>
+      {% endif %}
+    {% endif %}
+    {% if selected_locked_quiz.subject_id %}
+      <a class="quiz-locked-focus-secondary" href="{{ url_for('course_path.learning_path', subject_id=selected_locked_quiz.subject_id, _anchor='quizPreparation') }}">Xem lộ trình / lịch Quiz</a>
+    {% endif %}
+    <a class="quiz-locked-focus-secondary" href="#quizLockedArchive">↓ Danh sách Quiz đã lưu</a>
+  </div>
+  {% if not selected_locked_quiz.task_id %}
+    <p class="quiz-locked-focus-note">Buổi học gốc không còn được liên kết; chỉ có thể xem trạng thái và lịch sử đã lưu.</p>
+  {% endif %}
+</section>
+{% endif %}
+
 {% if locked_session_quizzes %}
 <details class="soft-card quiz-locked-archive" id="quizLockedArchive"
-         aria-label="Quiz theo buổi đã lưu nhưng đang khóa">
+         aria-label="Quiz theo buổi đã lưu nhưng đang khóa" {% if selected_locked_quiz %}open{% endif %}>
   <summary class="quiz-locked-archive-head">
     <span class="quiz-locked-head-copy">
       <strong>🔒 Quiz theo buổi đã lưu <span class="quiz-locked-total">({{ locked_session_quizzes|length }})</span></strong>
@@ -192,7 +224,7 @@
   <div class="quiz-locked-archive-content">
     <p class="quiz-locked-note">Các bộ Quiz vẫn được lưu. Khi đang khóa, hệ thống chỉ hiển thị thông tin buổi học và lý do, không gửi câu hỏi hoặc đáp án.</p>
     {% for subject_name, group in locked_session_quizzes|groupby('subject_name') %}
-    <details class="quiz-locked-course">
+    <details class="quiz-locked-course" {% if selected_locked_quiz and selected_locked_quiz.subject_name == subject_name %}open{% endif %}>
       <summary class="quiz-locked-course-head">
         <span class="quiz-locked-course-chevron" aria-hidden="true">▸</span>
         <strong title="{{ subject_name }}">{{ subject_name }}</strong>
@@ -200,7 +232,7 @@
       </summary>
       <div class="quiz-locked-rows" role="list">
         {% for item in group %}
-        <div class="quiz-locked-row" role="listitem">
+        <div class="quiz-locked-row {% if item.selected %}quiz-locked-row-selected{% endif %}" role="listitem" id="quiz-locked-{{ item.quiz_id }}">
           <span class="quiz-locked-row-title" title="{{ item.display_title }}">{{ item.display_title }}</span>
           <span class="quiz-locked-row-reason" title="{{ item.reason }}">{{ item.reason }}</span>
           {% if item.attempt_count %}
@@ -208,6 +240,8 @@
               Đã làm {{ item.attempt_count }} lượt{% if item.best_score is not none %} · {{ item.best_score|round(1) }}%{% endif %}
             </span>
           {% endif %}
+          <a class="quiz-locked-row-go" href="{{ url_for('quiz', quiz_id=item.quiz_id, _anchor='selectedLockedQuiz') }}"
+             aria-label="Đi tới Quiz {{ item.display_title }}">Đi tới Quiz <span aria-hidden="true">→</span></a>
         </div>
         {% endfor %}
       </div>
