@@ -102,6 +102,11 @@ Chương 2. Danh sách liên kết
             assert client.post(url, data={
                 "action": "schedule", "csrf_token": token + "bad"
             }).status_code == 403
+            invalid_time = client.post(url, data={
+                "action": "schedule", "csrf_token": token,
+                "preferred_start_time": "24:00",
+            }, follow_redirects=True)
+            assert "không hợp lệ" in invalid_time.get_data(as_text=True)
             conn = project.db()
             assert conn.execute(
                 "SELECT COUNT(*) FROM study_tasks WHERE source='roadmap'"
@@ -125,6 +130,29 @@ Chương 2. Danh sách liên kết
             assert all(r["done"] == 0 for r in rows)
             assert len(scheduled_lessons(conn, student, subject)) == len(sessions)
             first_id, first_title = rows[0]["id"], rows[0]["title"]
+            conn.close()
+
+            # The student may choose their own hour and apply it to unlocked,
+            # future roadmap sessions without replacing existing task IDs.
+            preferred = client.post(url, data={
+                "action": "reflow", "csrf_token": token,
+                "preferred_start_time": "19:30",
+            }, follow_redirects=True)
+            assert preferred.status_code == 200
+            assert "19:30" in preferred.get_data(as_text=True)
+            assert 'value="19:30"' in client.get(url).get_data(as_text=True)
+            conn = project.db()
+            chosen = conn.execute("""
+                SELECT preferred_start_time FROM roadmap_schedule_preferences
+                WHERE user_id=? AND subject_id=?
+            """, (student, subject)).fetchone()
+            assert chosen["preferred_start_time"] == "19:30"
+            rows_at_hour = conn.execute("""
+                SELECT study_at FROM study_tasks
+                WHERE user_id=? AND subject_id=? AND source='roadmap'
+            """, (student, subject)).fetchall()
+            assert len(rows_at_hour) == len(sessions)
+            assert all(row["study_at"].endswith("T19:30") for row in rows_at_hour)
             conn.close()
 
             # Editing or completing on the existing Study Plan must survive
