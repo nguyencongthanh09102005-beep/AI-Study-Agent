@@ -178,6 +178,71 @@ def test():
             )
             assert next_day == datetime(2026, 11, 4, 16, 15)
             assert next_day.weekday() != 6  # official lessons never use Sunday
+
+            # Student explicitly chooses 19:00. The scheduler keeps the exact
+            # clock time, moves to another day when busy, and skips Sunday.
+            personal_subject = conn.execute("""
+                INSERT INTO subjects(user_id,name,code,created_at)
+                VALUES(?,?,?,?)
+            """, (student, "Môn giờ riêng", "PERSONAL-HOUR", "now")).lastrowid
+            personal_lessons = lessons("2026-11-03", 3)
+            personal = import_roadmap_lessons(
+                conn, student, personal_subject, personal_lessons, "now",
+                reference_time=NOW, preferred_start_time="19:00",
+            )
+            assert personal["created"] == 3
+            personal_rows = conn.execute("""
+                SELECT id,study_at FROM study_tasks WHERE user_id=?
+                  AND subject_id=? AND source='roadmap'
+                ORDER BY roadmap_session_id
+            """, (student, personal_subject)).fetchall()
+            assert all(row["study_at"].endswith("T19:00") for row in personal_rows)
+            assert len({row["study_at"][:10] for row in personal_rows}) == 3
+            assert all(datetime.fromisoformat(row["study_at"]).weekday() != 6
+                       for row in personal_rows)
+            assert not find_study_conflicts(conn.execute("""
+                SELECT id,title,study_at,duration FROM study_tasks WHERE user_id=?
+            """, (student,)).fetchall())
+
+            # A user-edited lesson remains in place when applying a new hour
+            # to the not-yet-completed lessons.
+            kept_id = personal_rows[0]["id"]
+            kept_at = personal_rows[0]["study_at"]
+            lock_manual_roadmap_time(conn, student, kept_id)
+            reflow = import_roadmap_lessons(
+                conn, student, personal_subject, personal_lessons, "now",
+                reschedule_existing=True, reference_time=NOW,
+                preferred_start_time="20:00",
+            )
+            assert reflow["moved"] == 2, reflow
+            assert conn.execute(
+                "SELECT study_at FROM study_tasks WHERE id=?", (kept_id,)
+            ).fetchone()[0] == kept_at
+            others = conn.execute("""
+                SELECT study_at FROM study_tasks WHERE user_id=?
+                  AND subject_id=? AND id != ?
+            """, (student, personal_subject, kept_id)).fetchall()
+            assert all(row["study_at"].endswith("T20:00") for row in others)
+
+            # Invalid or cross-midnight times fail without modifying records.
+            snapshot = [row[0] for row in conn.execute("""
+                SELECT study_at FROM study_tasks WHERE user_id=?
+                  AND subject_id=? ORDER BY id
+            """, (student, personal_subject))]
+            for bad_clock in ("25:00", "19:5", "23:30"):
+                try:
+                    import_roadmap_lessons(
+                        conn, student, personal_subject, personal_lessons,
+                        "now", reschedule_existing=True, reference_time=NOW,
+                        preferred_start_time=bad_clock,
+                    )
+                    raise AssertionError(f"Invalid time accepted: {bad_clock}")
+                except ValueError:
+                    pass
+            assert [row[0] for row in conn.execute("""
+                SELECT study_at FROM study_tasks WHERE user_id=?
+                  AND subject_id=? ORDER BY id
+            """, (student, personal_subject))] == snapshot
             conn.close()
     finally:
         project.DB_PATH = previous
