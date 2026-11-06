@@ -47,8 +47,8 @@ def enqueue(conn, project, uid, subject_id):
         raise LessonContextError(
             "Hãy đưa lộ trình vào Kế hoạch học trước khi chuẩn bị Quiz.", 409)
     items=preparation_status(conn,project,uid,subject_id)
-    ready=sum(item["status"]=="ready" for item in items)
-    if ready==len(items):
+    handled=sum(item["status"] in ("ready","archived") for item in items)
+    if handled==len(items):
         state="completed"
     else:
         state="queued"

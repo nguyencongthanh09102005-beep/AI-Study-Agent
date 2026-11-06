@@ -19,6 +19,10 @@ def study_now():
 from chapter_chat_context import LessonContextError
 from chapter_tutor import prepared_sources
 from study_session_chat_context import verified_study_session
+from course_path_learning import PLAN_VERSION, unit_fingerprint
+from course_schedule_sync import session_signature
+from syllabus_learning import syllabus_hash
+from syllabus_routes import _source
 from study_session_quiz import (
     ensure_session_quiz_schema, get_session_quiz_context, link_generated_quiz,
 )
@@ -65,6 +69,70 @@ def ordered_tasks(conn, uid, subject_id):
     """, (uid, subject_id)).fetchall()
 
 
+def _archived_completed_lesson(project, conn, uid, task_id):
+    """Recognize an already-submitted, completed lesson with changed roadmap.
+
+    This is NOT permission to unlock its old Quiz or reuse old source content.
+    Require current confirmed syllabus and roadmap plus an actual submitted
+    historical Quiz linked to the saved task signature. Read-only.
+    """
+    task = conn.execute("""
+        SELECT t.* FROM study_tasks t
+        JOIN subjects s ON s.id=t.subject_id AND s.user_id=t.user_id
+        WHERE t.id=? AND t.user_id=? AND t.source='roadmap'
+          AND t.roadmap_session_id IS NOT NULL AND t.done=1
+    """, (task_id, uid)).fetchone()
+    if not task or not task["roadmap_session_signature"]:
+        return None
+    _, source, _ = _source(project, conn, uid, task["subject_id"])
+    fingerprint = syllabus_hash(source) if source else ""
+    review = conn.execute("""
+        SELECT status,source_hash,units_json FROM syllabus_reviews
+        WHERE user_id=? AND subject_id=?
+    """, (uid, task["subject_id"])).fetchone()
+    roadmap = conn.execute("""
+        SELECT source_hash,units_hash,sessions_json FROM course_roadmaps
+        WHERE user_id=? AND subject_id=?
+    """, (uid, task["subject_id"])).fetchone()
+    if (not fingerprint or not review or review["status"] != "confirmed"
+            or review["source_hash"] != fingerprint or not roadmap
+            or roadmap["source_hash"] != fingerprint):
+        return None
+    try:
+        units = json.loads(review["units_json"])
+        sessions = json.loads(roadmap["sessions_json"])
+        if (not isinstance(units, list) or not isinstance(sessions, list)
+                or not sessions or not all(isinstance(x, dict) for x in sessions)
+                or sessions[0].get("planner_version") != PLAN_VERSION
+                or roadmap["units_hash"] != unit_fingerprint(units)):
+            return None
+        lesson = next(
+            (x for x in sessions
+             if x.get("session_id") == task["roadmap_session_id"]), None)
+        if not lesson or session_signature(lesson) == task["roadmap_session_signature"]:
+            return None
+    except (ValueError, TypeError, KeyError, AttributeError):
+        return None
+
+    historical_quiz = conn.execute("""
+        SELECT l.quiz_id FROM quiz_session_links l
+        JOIN quizzes q ON q.id=l.quiz_id
+        JOIN quiz_attempts a ON a.quiz_id=q.id AND a.user_id=l.user_id
+        WHERE l.user_id=? AND l.subject_id=? AND l.task_id=?
+          AND l.session_signature=?
+          AND q.user_id=l.user_id AND q.subject_id=l.subject_id
+        LIMIT 1
+    """, (uid, task["subject_id"], task_id,
+          task["roadmap_session_signature"])).fetchone()
+    if not historical_quiz:
+        return None
+    return {
+        "task_id": task_id,
+        "saved_signature": task["roadmap_session_signature"],
+        "quiz_id": historical_quiz["quiz_id"],
+    }
+
+
 def context_for_task(project, conn, uid, task_id):
     identity = verified_study_session(project, conn, uid, task_id)
     tasks = ordered_tasks(conn, uid, identity["subject_id"])
@@ -80,8 +148,19 @@ def context_for_task(project, conn, uid, task_id):
             "Lộ trình có hơn 60 buổi trước bài tổng kết, không thể kiểm tra đủ "
             "mỗi buổi với 60 câu. Cần điều chỉnh lộ trình.", 409
         )
-    contexts = [get_session_quiz_context(project, conn, uid, tid)
-                for tid in ids[:-1]]
+    contexts = []
+    archived = []
+    for prior_task in tasks[:-1]:
+        historical = _archived_completed_lesson(
+            project, conn, uid, prior_task["id"])
+        if historical:
+            archived.append((historical["task_id"], historical["saved_signature"]))
+            continue
+        contexts.append(get_session_quiz_context(
+            project, conn, uid, prior_task["id"]))
+    if not contexts:
+        raise LessonContextError(
+            "Không còn buổi học có nguồn hiện tại hợp lệ để tạo Quiz tổng hợp.", 409)
     missing = [i + 1 for i, item in enumerate(contexts) if not item["ready"]]
     if missing:
         raise LessonContextError(
@@ -90,10 +169,16 @@ def context_for_task(project, conn, uid, task_id):
         )
     # The final slot may have no materials itself; only the preceding 17
     # sessions' current source signatures authorize the comprehensive Quiz.
-    signature = hashlib.sha256(json.dumps({
+    signature_parts = {
         "final_task": task_id, "final_session": identity["task_signature"],
         "prior": [(c["task_id"], c["source_signature"]) for c in contexts],
-    }, sort_keys=True).encode("utf-8")).hexdigest()
+    }
+    if archived:
+        # Changing the historical baseline invalidates a derived final exam.
+        # It must NEVER silently include questions from the old Quiz.
+        signature_parts["excluded_completed_history"] = archived
+    signature = hashlib.sha256(json.dumps(
+        signature_parts, sort_keys=True).encode("utf-8")).hexdigest()
     chapter = identity["chapter_number"]
     context = {
         "ready": True, "task_id": task_id, "subject_id": identity["subject_id"],
@@ -178,6 +263,13 @@ def _progress(conn, project, uid, subject_id):
     tasks = ordered_tasks(conn, uid, subject_id)
     status = []
     for task in tasks:
+        if _archived_completed_lesson(project, conn, uid, task["id"]):
+            status.append({
+                "task_id": task["id"], "status": "archived", "count": 15,
+                "reason": ("Buổi đã hoàn thành với Quiz lịch sử. "
+                           "Nội dung mới chưa được xác minh cho buổi này."),
+            })
+            continue
         try:
             ctx, prior, count = context_for_task(project, conn, uid, task["id"])
             existing = saved_quiz(conn, uid, task["id"], ctx["source_signature"])
@@ -270,6 +362,10 @@ def prepare_step(project, conn, uid, subject_id):
             "Hãy đưa lộ trình vào Kế hoạch học trước khi chuẩn bị Quiz.", 409)
     for task in tasks:
         task_id = task["id"]
+        if _archived_completed_lesson(project, conn, uid, task_id):
+            # Keep the completed task and its submitted Quiz immutable.
+            # Continue generating only from currently verified lessons.
+            continue
         ctx, prior, count = context_for_task(project, conn, uid, task_id)
         if not ctx["ready"]:
             raise LessonContextError(ctx.get("reason") or "Nguồn chưa sẵn sàng.", 409)

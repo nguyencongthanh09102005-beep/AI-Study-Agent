@@ -84,7 +84,7 @@ def run():
             sessions = build_course_roadmap(
                 parse_chapter_details(syllabus, units), [],
                 {"goal": "Thuần thục node", "preferred_time": "19:00",
-                 "daily_minutes": 45}, start_date=date(2026, 11, 2))
+                 "daily_minutes": 45, "credits": 1}, start_date=date(2026, 11, 2))
             assert len(sessions) >= 2, "Need a final comprehensive lesson"
             conn.execute("""
                 INSERT INTO course_roadmaps(user_id,subject_id,source_hash,
@@ -575,6 +575,87 @@ def run():
             conn = project.db()
             assert conn.execute("SELECT COUNT(*) FROM quizzes WHERE user_id=?",
                                 (student,)).fetchone()[0] == len(task_rows)
+            conn.close()
+
+            # Regression: user completed lesson 1 with submitted Quiz history,
+            # then regenerated only its content. The history is immutable;
+            # Quiz preparation must continue with verified current lessons.
+            from course_schedule_sync import session_signature
+            conn = project.db()
+            old_signature = conn.execute("""
+                SELECT roadmap_session_signature FROM study_tasks WHERE id=?
+            """, (task_rows[0]["id"],)).fetchone()[0]
+            old_final_source_signature = final_context["source_signature"]
+            old_attempts = conn.execute("""
+                SELECT COUNT(*) FROM quiz_attempts WHERE quiz_id=? AND user_id=?
+            """, (first_quiz, student)).fetchone()[0]
+            conn.execute("""
+                INSERT INTO shared_document_chapters(
+                    document_id,shared_subject_id,chapter_key,syllabus_hash,
+                    confirmed_by,confirmed_at) VALUES(?,?,?,?,?,?)
+            """, (approved_id, shared["id"], "1", fp, admin, project.now()))
+            conn.execute("UPDATE study_tasks SET done=1 WHERE id=?",
+                         (task_rows[0]["id"],))
+            regenerated = json.loads(json.dumps(sessions))
+            regenerated[0]["topics"] = ["Mục học đã cập nhật"]
+            assert session_signature(regenerated[0]) != old_signature
+            conn.execute("""
+                UPDATE course_roadmaps SET sessions_json=?,updated_at=?
+                WHERE user_id=? AND subject_id=?
+            """, (json.dumps(regenerated, ensure_ascii=False),
+                  project.now(), student, subject))
+            conn.commit()
+            conn.close()
+            status = client.get(endpoint).get_json()
+            assert status["archived"] == 1, status
+            assert status["items"][0]["status"] == "archived"
+            assert status["done"] is False
+            assert status["ready"] == len(task_rows) - 2, status
+            historical_status = client.get(first_status)
+            assert historical_status.status_code == 409
+            assert "questions" not in historical_status.get_json()
+
+            conn = project.db()
+            final_context, prior_contexts, count = context_for_task(
+                project, conn, student, task_rows[-1]["id"])
+            assert count == 60 and len(prior_contexts) == len(task_rows)-2
+            assert task_rows[0]["id"] not in [c["task_id"] for c in prior_contexts]
+            assert final_context["source_signature"] != old_final_source_signature
+            conn.close()
+            # Re-login above cleared the old CSRF token; get the live one.
+            assert client.get(f"/subjects/{subject}/learning-path").status_code == 200
+            with client.session_transaction() as sess:
+                current_csrf = sess["session_quiz_csrf"]
+            for _ in range(len(task_rows) * 4 + 10):
+                response = client.post(
+                    endpoint + "/next", json={},
+                    headers={"X-Quiz-CSRF": current_csrf})
+                assert response.status_code == 200, response.get_data(as_text=True)
+                if response.get_json()["done"]:
+                    break
+            else:
+                raise AssertionError("Preparation halted at completed legacy lesson")
+            status = client.get(endpoint).get_json()
+            assert status["done"] is True, status
+            assert status["ready"] == len(task_rows)-1, status
+            assert status["archived"] == 1
+            conn = project.db()
+            assert conn.execute("""
+                SELECT roadmap_session_signature,done FROM study_tasks WHERE id=?
+            """, (task_rows[0]["id"],)).fetchone()[:] == (old_signature, 1)
+            assert conn.execute("""
+                SELECT COUNT(*) FROM quiz_attempts WHERE quiz_id=? AND user_id=?
+            """, (first_quiz, student)).fetchone()[0] == old_attempts
+            assert conn.execute("""
+                SELECT COUNT(*) FROM quizzes WHERE id=? AND user_id=?
+            """, (first_quiz, student)).fetchone()[0] == 1
+            new_final = saved_quiz(
+                conn, student, task_rows[-1]["id"], final_context["source_signature"])
+            assert new_final and new_final["id"] != final_quiz
+            assert len(json.loads(new_final["payload"])) == 60
+            assert not quiz_access(conn, project, student, first_quiz)["allowed"]
+            from quiz_preparation_jobs import enqueue
+            assert enqueue(conn, project, student, subject) == "completed"
             conn.close()
         finally:
             project.DB_PATH, project.UPLOAD_DIR = prev_db, prev_upload
