@@ -27,14 +27,19 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   function report(data) {
     if (!data || !Array.isArray(data.items)) return;
-    const pending = data.items.filter(item => item.status !== "ready");
+    const archived = data.items.filter(item => item.status === "archived").length;
+    const applicable = data.total - archived;
+    const pending = data.items.filter(item =>
+      item.status !== "ready" && item.status !== "archived");
     const next = pending[0];
     const state = data.job?.state || "not_started";
     const resumeAvailable = data.job?.resume_available === true;
     const active = (state === "running" || state === "queued") && !resumeAvailable;
-    let message = "Đã chuẩn bị " + data.ready + "/" + data.total +
-      " bộ Quiz";
-    if (data.done) message += " · tất cả đã sẵn sàng.";
+    let message = "Đã chuẩn bị " + data.ready + "/" + applicable +
+      " bộ Quiz theo lộ trình hiện tại";
+    if (archived) message += " · " + archived +
+      " buổi đã hoàn thành được giữ Quiz lịch sử (không tự tạo lại).";
+    if (data.done) message += " · các buổi có thể chuẩn bị đã hoàn tất.";
     else if (resumeAvailable) message +=
       " · tiến trình nền chưa chạy trên máy chủ này. Bấm Tiếp tục để khởi động lại.";
     else if (active) message +=
