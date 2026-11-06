@@ -47,7 +47,7 @@ def scheduled_lessons(conn, user_id, subject_id):
     return {
         int(row["roadmap_session_id"]): dict(row)
         for row in conn.execute("""
-            SELECT id,roadmap_session_id,roadmap_session_signature,
+            SELECT id,title,roadmap_session_id,roadmap_session_signature,
                    study_at,duration,done,roadmap_auto_study_at
             FROM study_tasks
             WHERE user_id=? AND subject_id=? AND source='roadmap'
@@ -55,6 +55,84 @@ def scheduled_lessons(conn, user_id, subject_id):
         """, (user_id, subject_id))
     }
 
+
+
+def reconcile_blocker(conn, uid, subject_id, task):
+    """Protect finished lessons, tracked study time and submitted Quiz history.
+
+    No Quiz answers, history or source provenance are rewritten. This check is
+    also repeated on POST; the display-time check is informational only.
+    """
+    if task["done"]:
+        return "Buổi đã hoàn thành; không thể đổi nội dung học đã ghi nhận."
+    tables = {r[0] for r in conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table'")}
+    if "study_session_tracking" in tables:
+        tracked = conn.execute("""
+            SELECT status, elapsed_seconds FROM study_session_tracking
+            WHERE task_id=? AND user_id=?
+        """, (task["id"], uid)).fetchone()
+        if tracked and (tracked["status"] != "idle" or
+                        int(tracked["elapsed_seconds"] or 0) > 0):
+            return "Buổi đã ghi nhận thời gian học; cần đối chiếu thủ công."
+    if "quiz_session_links" in tables and "quiz_attempts" in tables:
+        attempted = conn.execute("""
+            SELECT 1 FROM quiz_attempts a
+            JOIN quiz_session_links l ON l.quiz_id=a.quiz_id
+            WHERE l.task_id=? AND l.user_id=? AND a.user_id=?
+            LIMIT 1
+        """, (task["id"], uid, uid)).fetchone()
+        if attempted:
+            return "Buổi đã có kết quả Quiz; không thể tự thay đổi nội dung cũ."
+    if "quiz_preparation_jobs" in tables:
+        busy = conn.execute("""
+            SELECT 1 FROM quiz_preparation_jobs
+            WHERE user_id=? AND subject_id=? AND state IN ('queued','running')
+        """, (uid, subject_id)).fetchone()
+        if busy:
+            return "Đang chuẩn bị Quiz cho môn; hãy tạm dừng tác vụ trước."
+    return None
+
+
+def confirm_changed_roadmap_lesson(conn, uid, subject_id, task_id, lesson,
+                                   expected_old, expected_new):
+    """Explicitly accept ONE regenerated lesson; never replace its schedule.
+
+    Historic Quiz rows keep their original provenance and remain archived if
+    the content no longer matches. Re-preparation uses the new verified lesson.
+    The owning Flask route must first verify the confirmed syllabus/roadmap.
+    """
+    if not isinstance(lesson, dict) or not isinstance(lesson.get("session_id"), int):
+        raise ValueError("Buổi học trong lộ trình không hợp lệ.")
+    signature = session_signature(lesson)
+    if not expected_old or not expected_new or signature != expected_new:
+        raise ValueError("Lộ trình đã thay đổi khi đang rà soát; hãy tải lại trang.")
+    task = conn.execute("""
+        SELECT * FROM study_tasks
+        WHERE id=? AND user_id=? AND subject_id=? AND source='roadmap'
+          AND roadmap_session_id IS NOT NULL
+    """, (task_id, uid, subject_id)).fetchone()
+    if not task or int(task["roadmap_session_id"]) != lesson["session_id"]:
+        raise ValueError("Buổi học không thuộc lộ trình đã xác nhận của tài khoản.")
+    if task["roadmap_session_signature"] != expected_old:
+        raise ValueError("Buổi đã được thay đổi ở nơi khác; hãy tải lại trang.")
+    reason = reconcile_blocker(conn, uid, subject_id, task)
+    if reason:
+        raise ValueError(reason)
+    if expected_old == signature:
+        return False
+    new_title = str(lesson.get("title") or "").strip()[:160]
+    if not new_title:
+        raise ValueError("Buổi học mới thiếu tên.")
+    updated = conn.execute("""
+        UPDATE study_tasks SET roadmap_session_signature=?,title=?
+        WHERE id=? AND user_id=? AND subject_id=? AND source='roadmap'
+          AND roadmap_session_signature=? AND done=0
+    """, (signature, new_title, task_id, uid, subject_id,
+          expected_old))
+    if updated.rowcount != 1:
+        raise ValueError("Buổi học vừa thay đổi; hãy tải lại trang.")
+    return True
 
 
 # A preferred time is a preference, never an unconditional appointment.
