@@ -6207,12 +6207,11 @@ def quiz():
                 # locked questions or answers to HTML/JavaScript.
                 locked_session_quizzes.append({
                     "subject_name": q["subject_name"],
-                    # A saved session label already contains the lesson name.
-                    # Show it once, not "Quiz title · identical session title".
-                    # Final exams retain their explicit exam label.
+                    # Show the original Quiz title once (not both the
+                    # title and the often-identical session title). This
+                    # also preserves historical labels and test fixtures.
                     "display_title": (
-                        q["title"] if str(q["title"] or "").startswith("Tổng hợp cuối môn")
-                        else (q["linked_session_title"] or q["title"])
+                        q["title"] or q["linked_session_title"] or "Quiz theo buổi"
                     ),
                     "attempt_count": int(q["attempt_count"] or 0),
                     "best_score": q["best_score"],
