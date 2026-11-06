@@ -6177,6 +6177,7 @@ def quiz():
             qsl.session_title AS linked_session_title,
             qsl.chapter_number AS linked_chapter_number,
             qsl.quiz_id AS linked_quiz_id,
+            qsl.task_id AS linked_task_id,
             COALESCE(s.name, 'Môn học đã xóa hoặc chưa phân loại') AS subject_name,
             COUNT(qa.id) AS attempt_count,
             MAX(qa.created_at) AS last_attempt_at,
@@ -6196,6 +6197,8 @@ def quiz():
         (uid,)
     ).fetchall()
 
+    selected_quiz_id = request.args.get("quiz_id", type=int)
+    selected_locked_quiz = None
     parsed = []
     locked_session_quizzes = []
     for q in quizzes:
@@ -6205,11 +6208,11 @@ def quiz():
             if not access["allowed"]:
                 # Preserve visibility of historical metadata WITHOUT sending
                 # locked questions or answers to HTML/JavaScript.
-                locked_session_quizzes.append({
+                item_meta = {
+                    "quiz_id": int(q["id"]),
                     "subject_name": q["subject_name"],
-                    # Show the original Quiz title once (not both the
-                    # title and the often-identical session title). This
-                    # also preserves historical labels and test fixtures.
+                    # Preserve the original label once, not the duplicate
+                    # "quiz title · session title" previously shown.
                     "display_title": (
                         q["title"] or q["linked_session_title"] or "Quiz theo buổi"
                     ),
@@ -6218,7 +6221,31 @@ def quiz():
                     "reason": access.get("reason") or (
                         "Chưa đến giờ mở Quiz hoặc chưa bắt đầu phiên học."
                     ),
-                })
+                    "selected": int(q["id"]) == selected_quiz_id,
+                }
+                locked_session_quizzes.append(item_meta)
+                if item_meta["selected"]:
+                    # The details page shows metadata only. Scope optional
+                    # navigation to the owned course and the owned task.
+                    course = conn.execute("""
+                        SELECT id FROM subjects
+                        WHERE id=? AND user_id=?
+                    """, (q["subject_id"], uid)).fetchone()
+                    task = conn.execute("""
+                        SELECT t.id FROM study_tasks t
+                        WHERE t.id=? AND t.user_id=? AND t.subject_id=?
+                          AND t.source='roadmap'
+                    """, (q["linked_task_id"], uid, q["subject_id"])).fetchone()
+                    selected_locked_quiz = dict(item_meta)
+                    selected_locked_quiz["subject_id"] = (
+                        course["id"] if course else None
+                    )
+                    selected_locked_quiz["task_id"] = (
+                        task["id"] if task else None
+                    )
+                    selected_locked_quiz["can_start"] = bool(
+                        access.get("can_start")
+                    )
                 continue
         item = dict(q)
         try:
@@ -6232,7 +6259,6 @@ def quiz():
         session_quiz_status["quiz_id"] if session_quiz_status
         and session_quiz_status.get("allowed") else None
     )
-    selected_quiz_id = request.args.get("quiz_id", type=int)
     # A deep link may select only a Quiz that passed owner and access filters.
     linked_quiz_id = next(
         (item["id"] for item in parsed if item["id"] == selected_quiz_id),
@@ -6272,6 +6298,7 @@ def quiz():
         session_quiz_status=session_quiz_status,
         session_quiz_csrf=session.get('session_quiz_csrf', ''),
         active_quiz_id=active_quiz_id,
+        selected_locked_quiz=selected_locked_quiz,
         generation_error=request.args.get("generation_error", "").strip()[:240]
     )
 
