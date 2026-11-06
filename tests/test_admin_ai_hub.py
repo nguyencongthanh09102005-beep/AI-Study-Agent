@@ -85,6 +85,53 @@ def run():
             assert 'data-document-count="0"' in html
             assert 'name="is_syllabus"' in html
             assert 'action="/admin/documents"' in html
+            # Grouped document library retains all Admin routes, source
+            # protection, course membership and the existing upload form.
+            assert 'id="adminDocumentLibrary"' in html
+            assert 'id="adminDocSearch"' in html
+            assert 'id="adminDocFilter"' in html
+            assert "admin_document_library.js" in html
+            assert html.count('data-admin-document-group') == 1
+            assert html.count('data-admin-doc-row') == 1
+            assert 'data-kind="material"' in html
+            assert '/chapters' in html
+            assert 'name="csrf_token"' in html
+
+            conn = project.db()
+            doc_two = conn.execute("""
+                INSERT INTO shared_documents
+                (shared_subject_id,original_name,stored_name,extracted_text,
+                 is_syllabus,created_by_user_id,created_at)
+                VALUES(?,?,?,'',0,?,?)
+            """,(without_syllabus,"Chuong 1 <script>alert(1)</script>.pdf",
+                 "test2.pdf",admin,now)).lastrowid
+            doc_three = conn.execute("""
+                INSERT INTO shared_documents
+                (shared_subject_id,original_name,stored_name,extracted_text,
+                 is_syllabus,created_by_user_id,created_at)
+                VALUES(?,?,?,?,1,?,?)
+            """,(with_syllabus,"De cuong.pdf","test3.pdf",
+                 "De cuong mon hoc",admin,now)).lastrowid
+            conn.commit()
+            conn.close()
+            with patch.object(project,"gemini_generate",
+                              side_effect=AssertionError("GET must not call AI")):
+                multi_page = client.get("/admin/documents")
+            assert multi_page.status_code == 200
+            multi = multi_page.get_data(as_text=True)
+            assert multi.count('data-admin-document-group') == 2
+            assert multi.count('data-admin-doc-row') == 3
+            assert 'data-kind="unextracted"' in multi
+            assert 'data-kind="syllabus"' in multi
+            assert "Chưa trích xuất" in multi
+            assert "Đề cương" in multi
+            assert "Tư Duy Thiết Kế" in multi and "Lịch sử Đảng" in multi
+            assert "&lt;script&gt;alert(1)&lt;/script&gt;" in multi
+            assert "<script>alert(1)</script>" not in multi
+            assert f'/admin/documents/{doc_two}/delete' in multi
+            assert f'/admin/documents/{doc_three}/delete' in multi
+            assert f'/admin/documents/{doc_two}/chapters' in multi
+            assert f'/admin/documents/{doc_three}/chapters' not in multi
             # No admin workflows or files shown to non-admin users.
             assert student_client.get("/admin/documents").status_code==403
             subjects=client.get("/admin").get_data(as_text=True)

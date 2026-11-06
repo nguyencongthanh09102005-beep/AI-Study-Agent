@@ -160,29 +160,86 @@
       <p id="adminFileError" class="admin-file-error" role="alert" hidden></p>
       <p class="admin-form-hint">PDF scan ảnh chưa hỗ trợ OCR. Tài liệu được lưu dùng chung theo mã môn học.</p>
     </form>
-    <div class="soft-card admin-table-card">
-      <div class="admin-card-title"><strong>Tài liệu trong kho</strong><small>{{ documents|length }} file gần đây · dùng chung theo mã môn</small></div>
-      <div class="admin-table-scroll"><table class="admin-table">
-        <thead><tr><th>Tài liệu</th><th>Môn học</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
-        <tbody>
-        {% for item in documents %}
-          <tr>
-            <td><strong class="admin-filename">{{ item.original_name }}</strong><small>{{ item.created_at[:10] }}</small></td>
-            <td><span class="admin-code">{{ item.subject_code }}</span></td>
-            <td>{% if item.is_syllabus %}<span class="admin-success">✓ Đề cương</span>{% else %}<span class="admin-success">✓ Đã trích xuất</span>{% endif %}</td>
-            <td><div class="admin-actions">
-              <a href="{{ url_for('shared_document_file', doc_id=item.id) }}" target="_blank" rel="noopener">Xem</a>
-              {% if not item.is_syllabus %}<a href="{{ url_for('chapter_material.admin_chapter_mapping', document_id=item.id) }}">Gắn chương</a>{% endif %}
-              <form method="post" action="{{ url_for('admin_delete_document', doc_id=item.id) }}" data-confirm-title="Xóa tài liệu chung?"
-                    data-confirm-message="Xóa tài liệu chung này khỏi tất cả sinh viên?"
-                    data-confirm-label="Xóa tài liệu" data-confirm-kind="danger"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit">Xóa</button></form>
-            </div></td>
-          </tr>
+    <div class="soft-card admin-table-card admin-doc-library" id="adminDocumentLibrary">
+      <div class="admin-card-title">
+        <strong>Tài liệu trong kho</strong>
+        <small>{{ documents|length }} file gần đây · nhóm theo môn học</small>
+      </div>
+      <div class="admin-doc-toolbar">
+        <label class="admin-doc-search" for="adminDocSearch">
+          <span aria-hidden="true">⌕</span>
+          <input id="adminDocSearch" type="search" placeholder="Tìm tên tài liệu, môn hoặc mã môn..." autocomplete="off"
+                 aria-controls="adminDocGroups">
+        </label>
+        <label class="admin-doc-filter-label" for="adminDocFilter">Lọc
+          <select id="adminDocFilter" aria-controls="adminDocGroups">
+            <option value="all">Tất cả tài liệu</option>
+            <option value="syllabus">Đề cương</option>
+            <option value="material">Tài liệu học</option>
+            <option value="unextracted">Chưa trích xuất</option>
+          </select>
+        </label>
+      </div>
+      <div class="admin-doc-groups" id="adminDocGroups">
+        {% for subject_id, group in documents|groupby('shared_subject_id')|reverse %}
+        <details class="admin-document-group" data-admin-document-group data-subject-id="{{ subject_id }}"
+                 {% if loop.first %}open{% endif %}>
+          <summary class="admin-document-group-head">
+            <span class="admin-doc-chevron" aria-hidden="true">▸</span>
+            <span class="admin-doc-course">
+              <strong>{{ group[0].subject_name or group[0].subject_code or 'Môn học dùng chung' }}</strong>
+              <small>{{ group[0].subject_code or 'Chưa có mã môn' }}</small>
+            </span>
+            <span class="admin-doc-count" data-admin-doc-count>{{ group|length }} file</span>
+          </summary>
+          <div class="admin-doc-items" role="list">
+            {% for item in group %}
+            <div class="admin-doc-row" role="listitem" data-admin-doc-row
+                 data-search="{{ item.original_name }} {{ item.subject_name or '' }} {{ item.subject_code or '' }}"
+                 data-kind="{{ 'syllabus' if item.is_syllabus else ('unextracted' if not item.extracted_text else 'material') }}">
+              <span class="admin-doc-icon" aria-hidden="true">▤</span>
+              <span class="admin-doc-file-wrap">
+                <a class="admin-doc-file" href="{{ url_for('shared_document_file', doc_id=item.id) }}"
+                   target="_blank" rel="noopener" title="{{ item.original_name }}">{{ item.original_name }}</a>
+                <small>{{ item.created_at[:10] }}</small>
+              </span>
+              <span class="admin-doc-state">
+                {% if item.is_syllabus %}
+                  <span class="admin-doc-syllabus">Đề cương</span>
+                {% elif not item.extracted_text %}
+                  <span class="admin-doc-warning" title="Tài liệu chưa có văn bản trích xuất">! Chưa trích xuất</span>
+                {% else %}
+                  <span class="admin-doc-ok" title="Đã trích xuất" aria-label="Đã trích xuất">✓</span>
+                {% endif %}
+              </span>
+              <details class="admin-doc-menu" data-admin-doc-menu>
+                <summary aria-label="Thao tác với {{ item.original_name }}" title="Thao tác với tài liệu">···</summary>
+                <div class="admin-doc-menu-content">
+                  <a href="{{ url_for('shared_document_file', doc_id=item.id) }}" target="_blank" rel="noopener">Xem tài liệu</a>
+                  {% if not item.is_syllabus %}
+                  <a href="{{ url_for('chapter_material.admin_chapter_mapping', document_id=item.id) }}">Gắn chương</a>
+                  {% endif %}
+                  <form method="post" action="{{ url_for('admin_delete_document', doc_id=item.id) }}"
+                        data-confirm-title="Xóa tài liệu chung?"
+                        data-confirm-message="Xóa tài liệu chung này khỏi tất cả sinh viên?"
+                        data-confirm-label="Xóa tài liệu" data-confirm-kind="danger">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <button class="admin-doc-menu-delete" type="submit">Xóa tài liệu</button>
+                  </form>
+                </div>
+              </details>
+            </div>
+            {% endfor %}
+          </div>
+        </details>
         {% else %}
-          <tr><td colspan="4" class="admin-empty">Chưa tải tài liệu nào lên kho chung.</td></tr>
+        <p class="admin-empty">Chưa tải tài liệu nào lên kho chung.</p>
         {% endfor %}
-        </tbody>
-      </table></div>
+      </div>
+      {% if documents %}
+      <p class="admin-doc-empty" id="adminDocEmpty" hidden>Không tìm thấy tài liệu phù hợp. Thử đổi từ khóa hoặc bộ lọc.</p>
+      <p class="admin-doc-summary" id="adminDocStatus" role="status" aria-live="polite">Đang hiển thị {{ documents|length }} tài liệu gần đây.</p>
+      {% endif %}
     </div>
   </div>
 </section>
@@ -190,6 +247,7 @@
 {% endblock %}
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/admin_ai_hub.js') }}"></script>
+<script src="{{ url_for('static', filename='js/admin_document_library.js') }}"></script>
 <script>
 (function(){
   var subjectForm = document.getElementById('adminSubjectForm');
