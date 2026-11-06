@@ -611,7 +611,9 @@ def run():
             assert status["items"][0]["status"] == "archived"
             assert status["done"] is False
             assert status["ready"] == len(task_rows) - 2, status
-            assert client.get(first_status).get_json()["state"] == "blocked"
+            historical_status = client.get(first_status)
+            assert historical_status.status_code == 409
+            assert "questions" not in historical_status.get_json()
 
             conn = project.db()
             final_context, prior_contexts, count = context_for_task(
