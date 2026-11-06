@@ -181,7 +181,7 @@
         </label>
       </div>
       <div class="admin-doc-groups" id="adminDocGroups">
-        {% for subject_id, group in documents|groupby('shared_subject_id') %}
+        {% for subject_id, group in documents|groupby('shared_subject_id')|reverse %}
         <details class="admin-document-group" data-admin-document-group data-subject-id="{{ subject_id }}"
                  {% if loop.first %}open{% endif %}>
           <summary class="admin-document-group-head">
