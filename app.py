@@ -6162,11 +6162,23 @@ def quiz():
     ).fetchall()
 
     parsed = []
+    locked_session_quizzes = []
     for q in quizzes:
         # Never send questions for a locked session Quiz to Jinja/HTML.
         if q["linked_quiz_id"]:
             access = quiz_access(conn, sys.modules[__name__], uid, q["id"])
             if not access["allowed"]:
+                # Preserve visibility of historical metadata WITHOUT sending
+                # locked questions or answers to HTML/JavaScript.
+                locked_session_quizzes.append({
+                    "title": q["title"],
+                    "session_title": q["linked_session_title"],
+                    "attempt_count": int(q["attempt_count"] or 0),
+                    "best_score": q["best_score"],
+                    "reason": access.get("reason") or (
+                        "Chưa đến giờ mở Quiz hoặc chưa bắt đầu phiên học."
+                    ),
+                })
                 continue
         item = dict(q)
         try:
@@ -6212,6 +6224,7 @@ def quiz():
         documents=docs,
         subjects=subjects,
         quizzes=parsed,
+        locked_session_quizzes=locked_session_quizzes,
         selected_document_id=selected_document_id,
         selected_subject_id=selected_subject_id,
         selected_quiz_mode=selected_quiz_mode,
