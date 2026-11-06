@@ -47,8 +47,10 @@ def status(subject_id):
         items = preparation_status(conn, project, uid, subject_id)
         from quiz_preparation_jobs import status as job_status
         ready = sum(1 for item in items if item["status"] == "ready")
-        return jsonify({"total": len(items), "ready": ready, "items": items,
-                        "done": bool(items) and ready == len(items),
+        archived = sum(1 for item in items if item["status"] == "archived")
+        return jsonify({"total": len(items), "ready": ready,
+                        "archived": archived, "items": items,
+                        "done": bool(items) and ready + archived == len(items),
                         "job": job_status(conn,uid,subject_id)})
     except LessonContextError as err:
         return jsonify({"error": err.message}), err.status
