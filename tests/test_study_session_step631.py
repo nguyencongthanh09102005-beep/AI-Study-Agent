@@ -327,6 +327,66 @@ def verify():
             assert stale_room.status_code == 409
             assert "cần được rà soát" in stale_room.get_data(as_text=True)
             assert "Nội dung mới sau khi tạo lại" not in stale_room.get_data(as_text=True)
+            assert "#lesson-" in stale_room.get_data(as_text=True)
+
+            # A student explicitly confirms ONE changed, unfinished lesson.
+            # This never changes time, duration, existing notes or completion.
+            from course_schedule_sync import session_signature
+            route = f"/subjects/{subject}/learning-path"
+            review_page = client.get(route)
+            assert review_page.status_code == 200
+            assert "Xác nhận cập nhật nội dung buổi" in review_page.get_data(as_text=True)
+            with client.session_transaction() as sess:
+                form_csrf = sess["syllabus_csrf_token"]
+            db = project.db()
+            snapshot = dict(db.execute(
+                "SELECT * FROM study_tasks WHERE id=?", (task_id,)
+            ).fetchone())
+            db.close()
+            form = {
+                "action": "confirm_lesson",
+                "csrf_token": form_csrf,
+                "task_id": str(task_id),
+                "session_id": str(changed[0]["session_id"]),
+                "expected_old": snapshot["roadmap_session_signature"],
+                "expected_new": session_signature(changed[0]),
+            }
+            assert client.post(route, data={**form, "csrf_token": "wrong"}).status_code == 403
+            login(client, outsider)
+            assert client.post(route, data=form).status_code == 404
+            login(client, student)
+
+            # Completed sessions must NOT be reclassified as new learning.
+            db = project.db()
+            db.execute("UPDATE study_tasks SET done=1 WHERE id=?", (task_id,))
+            db.commit()
+            db.close()
+            blocked = client.post(route, data=form)
+            assert blocked.status_code == 303
+            assert client.get(url).status_code == 409
+            db = project.db()
+            assert db.execute(
+                "SELECT roadmap_session_signature FROM study_tasks WHERE id=?",
+                (task_id,)
+            ).fetchone()[0] == snapshot["roadmap_session_signature"]
+            db.execute("UPDATE study_tasks SET done=0 WHERE id=?", (task_id,))
+            db.commit()
+            db.close()
+
+            applied = client.post(route, data=form)
+            assert applied.status_code == 303
+            assert f"/study-plan/tasks/{task_id}/learn" in applied.headers["Location"]
+            db = project.db()
+            updated = dict(db.execute(
+                "SELECT * FROM study_tasks WHERE id=?", (task_id,)
+            ).fetchone())
+            db.close()
+            for field in ("id", "user_id", "subject_id", "study_at", "duration",
+                          "note", "done", "created_at"):
+                assert updated[field] == snapshot[field], field
+            assert updated["roadmap_session_signature"] == session_signature(changed[0])
+            assert client.get(url).status_code == 200
+            assert "Nội dung mới sau khi tạo lại" in client.get(url).get_data(as_text=True)
 
             # Restoring roadmaps then replacing syllabus invalidates the room.
             db = project.db()
