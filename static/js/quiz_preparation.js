@@ -48,7 +48,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const labelTime = when instanceof Date && !Number.isNaN(when.getTime())
         ? when.toLocaleTimeString("vi-VN", {hour:"2-digit", minute:"2-digit", second:"2-digit"})
         : "";
-      message += " · " + (data.job?.message || "Gemini giới hạn API (HTTP 429).");
+      message += " · " + (data.job?.message || "Dịch vụ AI giới hạn API (HTTP 429).");
       if (labelTime) message += " Dự kiến thử lại lúc " + labelTime + ".";
       message += " Có thể tạm dừng; không cần bấm tạo liên tục.";
     }
@@ -63,7 +63,7 @@ document.addEventListener("DOMContentLoaded", () => {
     else message += " · tiếp theo: buổi " + (data.items.indexOf(next) + 1);
     label.textContent = message;
     start.textContent = data.done ? "✓ Đã chuẩn bị xong" :
-      cooling && !resumeAvailable ? "◷ Đang chờ hạn mức Gemini..." :
+      cooling && !resumeAvailable ? "◷ Đang chờ hạn mức AI..." :
       active ? "◷ AI đang tạo Quiz..." : "✦ Chuẩn bị / Tiếp tục tạo Quiz";
     start.disabled = working || active || data.done || data.total === 0;
     stop.hidden = !active;
