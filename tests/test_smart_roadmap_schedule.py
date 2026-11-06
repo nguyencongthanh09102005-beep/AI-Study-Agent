@@ -186,6 +186,14 @@ def test():
                 VALUES(?,?,?,?)
             """, (student, "Môn giờ riêng", "PERSONAL-HOUR", "now")).lastrowid
             personal_lessons = lessons("2026-11-03", 3)
+            # Reflow requires the same verified roadmap source that a real
+            # student has when using the course page.
+            conn.execute("""
+                INSERT INTO course_roadmaps(
+                    user_id,subject_id,source_hash,units_hash,sessions_json,updated_at
+                ) VALUES(?,?,?,?,?,?)
+            """, (student, personal_subject, "verified", "verified",
+                  json.dumps(personal_lessons), "now"))
             personal = import_roadmap_lessons(
                 conn, student, personal_subject, personal_lessons, "now",
                 reference_time=NOW, preferred_start_time="19:00",
