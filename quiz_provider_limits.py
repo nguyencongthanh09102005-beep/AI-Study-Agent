@@ -10,7 +10,7 @@ class QuizRateLimitError(RuntimeError):
 
     def __init__(self):
         super().__init__(
-            "Gemini đang giới hạn yêu cầu (HTTP 429). "
+            "Dịch vụ AI đang giới hạn yêu cầu (HTTP 429). "
             "Quiz đã chuẩn bị được giữ nguyên; hệ thống sẽ tạm nghỉ "
             "trước khi tiếp tục."
         )
