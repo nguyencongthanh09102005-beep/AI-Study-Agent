@@ -92,7 +92,7 @@ def partial_model(prompt):
     if "người kiểm định độc lập" in prompt:
         partial_calls["review"] += 1
         pending = json.loads(prompt.split(
-            "CÂU HỎI CẦN KIỂM ĐỊNH (KHÔNG CÓ ĐÁP ÁN TỪ NGƯỜI RA ĐỀ):\\n")[-1])
+            "CÂU HỎI CẦN KIỂM ĐỊNH (KHÔNG CÓ ĐÁP ÁN TỪ NGƯỜI RA ĐỀ):\n")[-1])
         checks = [
             {"id": item["id"], "answer": 0 if i == 0 else None,
              "quote": QUOTE if i == 0 else ""}
@@ -100,7 +100,7 @@ def partial_model(prompt):
         ]
         return json.dumps({"checks": checks}, ensure_ascii=False), None
     partial_calls["generate"] += 1
-    count = int(__import__("re").search(r"Tạo đúng (\\d+) câu", prompt).group(1))
+    count = int(__import__("re").search(r"Tạo đúng (\d+) câu", prompt).group(1))
     questions = [
         {"question": f"Node nối tiếp thế nào? Nhóm {partial_calls['generate']}, câu {i}",
          "topic": "Node", "chapter": "Chương 1",
