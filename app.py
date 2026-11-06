@@ -2232,6 +2232,7 @@ def gemini_generate(prompt):
     deadline = time.monotonic() + total_budget
 
     last_error = ""
+    rate_limited = False
 
     for model_index, model in enumerate(models):
         # Model chính được retry thêm; model dự phòng thử 1 lần/model
@@ -2240,6 +2241,8 @@ def gemini_generate(prompt):
         for attempt in range(max_attempts):
             remaining = deadline - time.monotonic()
             if remaining <= 0.5:
+                if rate_limited:
+                    return None, "Gemini đã chạm giới hạn API (HTTP 429). Vui lòng thử lại sau."
                 return None, "AI phản hồi quá thời gian chờ. Vui lòng thử lại."
             url = (
                 "https://generativelanguage.googleapis.com/v1beta/"
@@ -2305,6 +2308,8 @@ def gemini_generate(prompt):
                     detail = res.text[:240]
 
                 status = int(res.status_code)
+                if status == 429:
+                    rate_limited = True
                 last_error = (
                     f"{model}: HTTP {status}"
                     + (f" - {detail}" if detail else "")
@@ -2355,6 +2360,8 @@ def gemini_generate(prompt):
 
     if last_error:
         print("AI provider exhausted retries:", last_error)
+    if rate_limited:
+        return None, "Gemini đã chạm giới hạn API (HTTP 429). Vui lòng thử lại sau."
     return None, (
         "AI đang bận hoặc kết nối chưa ổn định. "
         "Vui lòng thử lại sau."
@@ -2670,6 +2677,7 @@ def build_quiz(text, question_count=10, focus_topics=None, session_mode=False, a
     # GỌI GEMINI CHO 1 NHÓM NHỎ
     # =====================================================
     def generate_batch(batch_size, existing_questions, batch_number):
+        from quiz_provider_limits import QuizRateLimitError
         # Giới hạn context để request ổn định.
         document_content = clean_text[:16000]
 
@@ -2787,6 +2795,8 @@ Cấu trúc:
                 f"Gemini tạo Quiz nhóm {batch_number} thất bại:",
                 error
             )
+            if session_mode and allow_partial and "HTTP 429" in str(error):
+                raise QuizRateLimitError()
             return []
 
         try:
@@ -2822,7 +2832,15 @@ Cấu trúc:
             # Unverified items are discarded before any score/weakness data
             # is created; never silently fall back to the unverified key.
             from quiz_answer_verification import verify_quiz_batch
-            return verify_quiz_batch(result, document_content, gemini_generate)
+
+            def checked_provider(prompt):
+                response, provider_error = gemini_generate(prompt)
+                if (not response and session_mode and allow_partial
+                        and "HTTP 429" in str(provider_error)):
+                    raise QuizRateLimitError()
+                return response, provider_error
+
+            return verify_quiz_batch(result, document_content, checked_provider)
 
         except (
             ValueError,
@@ -2853,11 +2871,23 @@ Cấu trúc:
     while remaining > 0 and attempts < 6:
         batch_size = min(10, remaining)
 
-        batch = generate_batch(
-            batch_size,
-            questions,
-            batch_number
-        )
+        try:
+            batch = generate_batch(
+                batch_size,
+                questions,
+                batch_number
+            )
+        except Exception as exc:
+            from quiz_provider_limits import QuizRateLimitError
+            if not isinstance(exc, QuizRateLimitError):
+                raise
+            if session_mode and allow_partial and questions:
+                # Preserve verified items already collected in this run.
+                # The following worker step will back off if quota is still hit.
+                break
+            if session_mode and allow_partial:
+                raise
+            break
 
         added = 0
 
