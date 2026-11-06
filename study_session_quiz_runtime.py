@@ -42,6 +42,15 @@ def ensure_quiz_runtime_schema(conn):
         )
     """)
     conn.execute("""
+        CREATE TABLE IF NOT EXISTS quiz_preparation_drafts (
+          task_id INTEGER PRIMARY KEY,
+          user_id INTEGER NOT NULL,
+          source_signature TEXT NOT NULL,
+          questions_json TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        )
+    """)
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS quiz_preparation_claims (
           task_id INTEGER PRIMARY KEY,
           user_id INTEGER NOT NULL,
@@ -237,6 +246,23 @@ def _question_count_valid(questions, count):
                 0 <= q["answer"] <= 3 for q in questions))
 
 
+def _read_verified_draft(row, limit):
+    """Read only an exact-source draft with distinct, structurally valid items.
+
+    Historic or malformed drafts are not reused or exposed as runnable Quiz.
+    """
+    if not row:
+        return []
+    try:
+        items = json.loads(row["questions_json"])
+    except (ValueError, TypeError):
+        return []
+    if (not isinstance(items, list) or len(items) > limit or
+            not _question_count_valid(items, len(items))):
+        return []
+    return items
+
+
 def _persist_quiz(project, conn, uid, context, questions, count):
     if not _question_count_valid(questions, count):
         raise LessonContextError("AI chưa tạo đủ câu hỏi chất lượng và không trùng nhau.", 409)
@@ -285,7 +311,13 @@ def _progress(conn, project, uid, subject_id):
                                "prepared_parts": parts, "total_parts": len(prior),
                                "count": count})
             else:
+                draft = conn.execute("""
+                    SELECT questions_json FROM quiz_preparation_drafts
+                    WHERE task_id=? AND user_id=? AND source_signature=?
+                """, (task["id"], uid, ctx["source_signature"])).fetchone()
+                verified_count = len(_read_verified_draft(draft, count))
                 status.append({"task_id": task["id"], "status": "pending",
+                               "prepared_questions": verified_count,
                                "count": count})
         except LessonContextError as err:
             status.append({"task_id": task["id"], "status": "blocked",
@@ -427,42 +459,83 @@ def prepare_step(project, conn, uid, subject_id):
         """, (task_id, uid, key, claimed.isoformat(timespec="seconds")))
         conn.commit()
         try:
-            source = source_content(conn, source_ctx)
-            used_before = []
+            if prior:
+                draft_row = conn.execute("""
+                    SELECT questions_json FROM quiz_preparation_parts
+                    WHERE task_id=? AND source_task_id=? AND user_id=?
+                      AND source_signature=?
+                """, (task_id, source_ctx["task_id"], uid,
+                      source_ctx["source_signature"])).fetchone()
+            else:
+                draft_row = conn.execute("""
+                    SELECT questions_json FROM quiz_preparation_drafts
+                    WHERE task_id=? AND user_id=? AND source_signature=?
+                """, (task_id, uid, ctx["source_signature"])).fetchone()
+            draft = _read_verified_draft(draft_row, count)
+            used_before = [str(q["question"]) for q in draft]
             if prior:
                 for existing in conn.execute("""
-                    SELECT questions_json FROM quiz_preparation_parts
-                    WHERE task_id=? AND user_id=?
-                """, (task_id, uid)):
+                    SELECT source_task_id,questions_json FROM quiz_preparation_parts
+                    WHERE task_id=? AND user_id=? AND source_task_id!=?
+                """, (task_id, uid, source_ctx["task_id"])):
                     try:
-                        used_before.extend(
-                            q.get("question", "") for q in
-                            json.loads(existing["questions_json"]) if isinstance(q, dict)
-                        )
+                        other = json.loads(existing["questions_json"])
+                        if isinstance(other, list):
+                            used_before.extend(
+                                str(q.get("question") or "") for q in other
+                                if isinstance(q, dict))
                     except (ValueError, TypeError):
                         pass
-            questions = project.build_quiz(
-                source, count, session_mode=True,
-                avoid_questions=used_before
+            missing = count - len(draft)
+            if missing <= 0:
+                # A complete normal-session draft may survive a crash between
+                # its commit and final persistence. No model call is needed.
+                if prior:
+                    raise LessonContextError(
+                        "Bản nháp tổng hợp đã đủ câu; hãy tiếp tục tác vụ.", 409)
+                new_ctx, _, _ = context_for_task(project, conn, uid, task_id)
+                if new_ctx["source_signature"] != ctx["source_signature"]:
+                    raise LessonContextError("Nguồn hoặc lộ trình vừa đổi.", 409)
+                _persist_quiz(project, conn, uid, new_ctx, draft, 15)
+                conn.execute("""
+                    DELETE FROM quiz_preparation_drafts WHERE task_id=? AND user_id=?
+                """, (task_id, uid))
+                conn.execute("""
+                    DELETE FROM quiz_preparation_claims WHERE task_id=? AND user_id=?
+                """, (task_id, uid))
+                conn.commit()
+                return {"done": False, "task_id": task_id, "status": "ready"}
+            source = source_content(conn, source_ctx)
+            # The generator still independently verifies every answer against
+            # the actual approved source. Only verified questions may be saved
+            # as drafts, never shown or scored before the full Quiz is ready.
+            generated = project.build_quiz(
+                source, missing, session_mode=True,
+                avoid_questions=used_before, allow_partial=True
             )
-            previous_keys = {" ".join(q.casefold().split()) for q in used_before}
-            if any(_question_key(q) in previous_keys for q in questions):
-                raise LessonContextError(
-                    "Câu hỏi bị trùng với buổi trước trong đề tổng hợp; "
-                    "hãy thử tạo lại phần này.", 409)
-            # The approved chapter for the verified lesson takes precedence
-            # over a model's free-form chapter label. This matters especially
-            # for the 60-question final exam spanning many prior lessons.
+            if not isinstance(generated, list):
+                generated = []
+            previous_keys = {_question_key({"question": q}) for q in used_before}
+            new_questions = []
+            for q in generated:
+                if not isinstance(q, dict):
+                    continue
+                key = _question_key(q)
+                if key and key not in previous_keys:
+                    previous_keys.add(key)
+                    new_questions.append(q)
             verified_chapter = str(source_ctx.get("chapter") or "").strip()
             if verified_chapter:
-                for question in questions:
-                    if isinstance(question, dict):
-                        question["chapter"] = verified_chapter[:120]
-            if not _question_count_valid(questions, count):
+                for question in new_questions:
+                    question["chapter"] = verified_chapter[:120]
+            combined = draft + new_questions
+            if not new_questions or len(combined) > count or not _question_count_valid(
+                    combined, len(combined)):
                 raise LessonContextError(
-                    "AI chưa tạo đủ câu hỏi kiến thức hợp lệ. "
-                    "Nguồn không bị thay đổi; bạn có thể thử chuẩn bị lại.", 409)
-            # Revalidate source state after external request, not only before.
+                    "AI chưa tạo thêm được câu hỏi có đáp án và trích dẫn hợp lệ. "
+                    "Các câu đã kiểm chứng trước đó vẫn được giữ; thử lại hoặc "
+                    "kiểm tra học liệu Admin đã duyệt.", 409)
+            # Revalidate current syllabus/roadmap/source after the model call.
             new_ctx, new_prior, _ = context_for_task(project, conn, uid, task_id)
             if new_ctx["source_signature"] != ctx["source_signature"]:
                 raise LessonContextError(
@@ -482,14 +555,31 @@ def prepare_step(project, conn, uid, subject_id):
                         created_at=excluded.created_at
                 """, (task_id, source_ctx["task_id"], uid,
                       source_ctx["source_signature"],
-                      json.dumps(questions, ensure_ascii=False), project.now()))
+                      json.dumps(combined, ensure_ascii=False), project.now()))
+            elif len(combined) == 15:
+                _persist_quiz(project, conn, uid, new_ctx, combined, 15)
+                conn.execute("""
+                    DELETE FROM quiz_preparation_drafts
+                    WHERE task_id=? AND user_id=?
+                """, (task_id, uid))
             else:
-                _persist_quiz(project, conn, uid, new_ctx, questions, 15)
+                conn.execute("""
+                    INSERT INTO quiz_preparation_drafts(
+                        task_id,user_id,source_signature,questions_json,updated_at)
+                    VALUES(?,?,?,?,?)
+                    ON CONFLICT(task_id) DO UPDATE SET
+                        user_id=excluded.user_id,
+                        source_signature=excluded.source_signature,
+                        questions_json=excluded.questions_json,
+                        updated_at=excluded.updated_at
+                """, (task_id, uid, ctx["source_signature"],
+                      json.dumps(combined, ensure_ascii=False), project.now()))
             conn.execute("DELETE FROM quiz_preparation_claims WHERE task_id=? AND user_id=?",
                          (task_id, uid))
             conn.commit()
             return {"done": False, "task_id": task_id,
-                    "status": "prepared", "question_count": count}
+                    "status": "prepared" if len(combined) == count else "partial",
+                    "question_count": len(combined), "expected_count": count}
         except Exception:
             conn.rollback()
             conn.execute("DELETE FROM quiz_preparation_claims WHERE task_id=? AND user_id=?",
