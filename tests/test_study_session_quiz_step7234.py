@@ -622,8 +622,14 @@ def run():
             assert task_rows[0]["id"] not in [c["task_id"] for c in prior_contexts]
             assert final_context["source_signature"] != old_final_source_signature
             conn.close()
+            # Re-login above cleared the old CSRF token; get the live one.
+            assert client.get(f"/subjects/{subject}/learning-path").status_code == 200
+            with client.session_transaction() as sess:
+                current_csrf = sess["session_quiz_csrf"]
             for _ in range(len(task_rows) * 4 + 10):
-                response = client.post(endpoint + "/next", json={}, headers=headers)
+                response = client.post(
+                    endpoint + "/next", json={},
+                    headers={"X-Quiz-CSRF": current_csrf})
                 assert response.status_code == 200, response.get_data(as_text=True)
                 if response.get_json()["done"]:
                     break
