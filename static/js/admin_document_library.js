@@ -18,9 +18,8 @@
     let wasFiltering = false;
 
     function normalize(value) {
-      return String(value || "").normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d")
-        .toLocaleLowerCase("vi");
+      return String(value || "").normalize("NFD").toLocaleLowerCase("vi")
+        .replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d");
     }
 
     function render() {
