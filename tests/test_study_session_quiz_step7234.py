@@ -562,6 +562,13 @@ def run():
             revoked_status = client.get(first_status)
             assert revoked_status.status_code == 200
             assert revoked_status.get_json()["state"] == "blocked"
+            # Archived Quiz metadata remains visible to its owner, but the
+            # question/answer payload stays completely out of the HTML.
+            archived_html = client.get("/quiz").get_data(as_text=True)
+            assert "Quiz theo buổi đã lưu" in archived_html
+            assert "Đã làm" in archived_html
+            assert f'data-quiz-id="{first_quiz}"' not in archived_html
+            assert f'data-quiz-id="{final_quiz}"' not in archived_html
             assert client.post("/api/quiz/submit", json={
                 "quiz_id": first_quiz, "answers": [0]*15
             }).status_code == 409
