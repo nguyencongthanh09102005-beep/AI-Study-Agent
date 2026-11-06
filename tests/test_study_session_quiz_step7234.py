@@ -585,8 +585,7 @@ def run():
             old_signature = conn.execute("""
                 SELECT roadmap_session_signature FROM study_tasks WHERE id=?
             """, (task_rows[0]["id"],)).fetchone()[0]
-            old_final_source_signature = context_for_task(
-                project, conn, student, task_rows[-1]["id"])[0]["source_signature"]
+            old_final_source_signature = final_context["source_signature"]
             old_attempts = conn.execute("""
                 SELECT COUNT(*) FROM quiz_attempts WHERE quiz_id=? AND user_id=?
             """, (first_quiz, student)).fetchone()[0]
