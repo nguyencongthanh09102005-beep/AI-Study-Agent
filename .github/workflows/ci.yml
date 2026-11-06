@@ -75,6 +75,8 @@ jobs:
           node tests/test_floating_chat_mode_parity.js
           node --check static/js/admin_ai_hub.js
           node tests/test_admin_ai_hub.js
+          node --check static/js/admin_document_library.js
+          node tests/test_admin_document_library.js
           node --check static/js/ai_bubble_schedule.js
           node --check static/js/ai_support_chat.js
           node tests/test_ai_bubble_schedule.js
