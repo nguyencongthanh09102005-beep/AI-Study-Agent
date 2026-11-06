@@ -84,7 +84,7 @@ def run():
             sessions = build_course_roadmap(
                 parse_chapter_details(syllabus, units), [],
                 {"goal": "Thuần thục node", "preferred_time": "19:00",
-                 "daily_minutes": 45}, start_date=date(2026, 11, 2))
+                 "daily_minutes": 45, "credits": 1}, start_date=date(2026, 11, 2))
             assert len(sessions) >= 2, "Need a final comprehensive lesson"
             conn.execute("""
                 INSERT INTO course_roadmaps(user_id,subject_id,source_hash,
