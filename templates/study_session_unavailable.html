@@ -5,7 +5,8 @@
 <section class="study-room-unavailable">
   <h2>Buổi học cần được rà soát</h2>
   <p role="alert">{{ message }}</p>
-  <a href="{{ url_for('course_path.learning_path', subject_id=subject.id) }}">Rà soát Lộ trình theo chương →</a>
+  {% set roadmap_url = url_for('course_path.learning_path', subject_id=subject.id) %}
+  <a href="{{ roadmap_url }}{% if review_session_id %}#lesson-{{ review_session_id }}{% endif %}">Rà soát Lộ trình theo chương →</a>
   <a href="{{ url_for('study_plan', subject_id=subject.id) }}">← Quay lại Kế hoạch học</a>
 </section>
 {% endblock %}
