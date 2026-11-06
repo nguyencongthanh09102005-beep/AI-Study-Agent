@@ -200,9 +200,15 @@ def test():
             assert len({row["study_at"][:10] for row in personal_rows}) == 3
             assert all(datetime.fromisoformat(row["study_at"]).weekday() != 6
                        for row in personal_rows)
-            assert not find_study_conflicts(conn.execute("""
+            # Earlier in this test we deliberately created a pre-existing
+            # conflict involving an old, completed lesson. Only ensure that
+            # our newly added custom-hour lessons introduce no collisions.
+            conflicts_after_custom = find_study_conflicts(conn.execute("""
                 SELECT id,title,study_at,duration FROM study_tasks WHERE user_id=?
             """, (student,)).fetchall())
+            assert not set(row["id"] for row in personal_rows) & set(
+                conflicts_after_custom
+            )
 
             # A user-edited lesson remains in place when applying a new hour
             # to the not-yet-completed lessons.
