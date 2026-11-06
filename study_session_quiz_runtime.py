@@ -514,7 +514,7 @@ def prepare_step(project, conn, uid, subject_id):
             # imprecise quotation, repeated fact). Ask for a few independent
             # candidates, but only keep the exact number missing. Every
             # candidate still passes the normal source-evidence verification.
-            candidate_count = min(10, max(missing, 3))
+            candidate_count = max(missing, 3)
             generated = project.build_quiz(
                 source, candidate_count, session_mode=True,
                 avoid_questions=used_before, allow_partial=True
