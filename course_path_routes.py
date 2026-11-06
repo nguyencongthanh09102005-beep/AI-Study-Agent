@@ -138,16 +138,29 @@ def learning_path(subject_id):
                         "course_path.learning_path", subject_id=subject_id,
                         notice="Lộ trình chưa hợp lệ. Hãy phân tích/tạo lại trước khi đưa vào lịch.",
                     ), code=303)
+                preferred_start_time = request.form.get(
+                    "preferred_start_time", ""
+                ).strip()
                 try:
                     summary = import_roadmap_lessons(
                         conn, uid, subject_id, saved_sessions, project.now(),
                         reschedule_existing=(action == "reflow"),
+                        preferred_start_time=preferred_start_time,
                     )
                 except ValueError as exc:
                     return redirect(url_for(
                         "course_path.learning_path", subject_id=subject_id,
                         notice=str(exc),
                     ), code=303)
+                # Save the preference only after a successful import/reflow.
+                # A blank time switches back to automatic daytime scheduling.
+                conn.execute("""
+                    INSERT INTO roadmap_schedule_preferences(
+                        user_id, subject_id, preferred_start_time
+                    ) VALUES(?,?,?)
+                    ON CONFLICT(user_id, subject_id) DO UPDATE SET
+                        preferred_start_time=excluded.preferred_start_time
+                """, (uid, subject_id, preferred_start_time))
                 if summary["created"]:
                     project.recalculate_subject_progress(uid, subject_id, conn)
                 conn.commit()
@@ -165,7 +178,13 @@ def learning_path(subject_id):
                         f" Đã tự chuyển {summary['moved']} buổi chưa học sang "
                         "khung giờ trống, không đụng lịch bạn tự chỉnh."
                     )
-                if summary["created"]:
+                if preferred_start_time:
+                    message += (
+                        f" Giờ học mong muốn: {preferred_start_time}. "
+                        "Khi bị trùng lịch, hệ thống chuyển sang ngày trống "
+                        "tiếp theo nhưng vẫn giữ đúng giờ bạn chọn."
+                    )
+                elif summary["created"]:
                     message += (
                         " Giờ học được chọn theo lịch trống của tất cả các môn "
                         "và giờ học ưu tiên; xem giờ chính thức trong thẻ buổi học."
@@ -280,6 +299,11 @@ def learning_path(subject_id):
                         confirmed = linked_by_chapter.get(lesson["unit_id"], [])
                         # Official schedule consumes Admin-approved resources only.
                         lesson["materials"] = confirmed
+        preference = conn.execute("""
+            SELECT preferred_start_time FROM roadmap_schedule_preferences
+            WHERE user_id=? AND subject_id=?
+        """, (uid, subject_id)).fetchone()
+        preferred_start_time = preference["preferred_start_time"] if preference else ""
         linked = scheduled_lessons(conn, uid, subject_id) if sessions else {}
         schedule_status = {
             int(lesson["session_id"]): (
@@ -307,6 +331,7 @@ def learning_path(subject_id):
             lesson_signatures=lesson_signatures,
             prepare_quizzes=request.args.get("prepare_quizzes") == "1",
             session_quiz_csrf=session.get("session_quiz_csrf", ""),
+            preferred_start_time=preferred_start_time,
         )
     finally:
         conn.close()
