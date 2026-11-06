@@ -34,7 +34,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const next = pending[0];
     const state = data.job?.state || "not_started";
     const resumeAvailable = data.job?.resume_available === true;
-    const active = (state === "running" || state === "queued") && !resumeAvailable;
+    const cooling = state === "cooldown";
+    const active = (state === "running" || state === "queued" || cooling) && !resumeAvailable;
     let message = "Đã chuẩn bị " + data.ready + "/" + applicable +
       " bộ Quiz theo lộ trình hiện tại";
     if (archived) message += " · " + archived +
@@ -42,6 +43,15 @@ document.addEventListener("DOMContentLoaded", () => {
     if (data.done) message += " · các buổi có thể chuẩn bị đã hoàn tất.";
     else if (resumeAvailable) message +=
       " · tiến trình nền chưa chạy trên máy chủ này. Bấm Tiếp tục để khởi động lại.";
+    else if (cooling) {
+      const when = data.job?.retry_after && new Date(data.job.retry_after);
+      const labelTime = when instanceof Date && !Number.isNaN(when.getTime())
+        ? when.toLocaleTimeString("vi-VN", {hour:"2-digit", minute:"2-digit", second:"2-digit"})
+        : "";
+      message += " · " + (data.job?.message || "Dịch vụ AI giới hạn API (HTTP 429).");
+      if (labelTime) message += " Dự kiến thử lại lúc " + labelTime + ".";
+      message += " Có thể tạm dừng; không cần bấm tạo liên tục.";
+    }
     else if (active) message +=
       " · AI đang tạo trên máy chủ. Bạn có thể chuyển trang, không làm dừng tiến trình.";
     else if (state === "paused") message +=
@@ -53,6 +63,7 @@ document.addEventListener("DOMContentLoaded", () => {
     else message += " · tiếp theo: buổi " + (data.items.indexOf(next) + 1);
     label.textContent = message;
     start.textContent = data.done ? "✓ Đã chuẩn bị xong" :
+      cooling && !resumeAvailable ? "◷ Đang chờ hạn mức AI..." :
       active ? "◷ AI đang tạo Quiz..." : "✦ Chuẩn bị / Tiếp tục tạo Quiz";
     start.disabled = working || active || data.done || data.total === 0;
     stop.hidden = !active;

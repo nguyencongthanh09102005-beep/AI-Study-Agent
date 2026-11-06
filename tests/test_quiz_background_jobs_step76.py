@@ -8,6 +8,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import app as project
 from course_schedule_sync import ensure_session_schedule_schema
 from quiz_preparation_jobs import enqueue, pause, status, tick
+from quiz_provider_limits import QuizRateLimitError
 
 
 def login(client,uid):
@@ -121,6 +122,62 @@ def run():
             job=status(conn,uid,sid)
             assert job["state"]=="error",job
             assert "Tiếp tục" in job["message"],job
+            conn.close()
+
+            # Real provider 429 should not be disguised as a missing-Quiz
+            # validation error or spend quota in a tight worker loop.
+            with patch("quiz_preparation_jobs.preparation_status",
+                       return_value=[{"status":"pending"}]):
+                conn=project.db()
+                assert enqueue(conn,project,uid,sid)=="queued"
+                conn.close()
+            with patch("quiz_preparation_jobs.prepare_step",
+                       side_effect=QuizRateLimitError()):
+                assert tick(project) is True
+                conn=project.db()
+                cooldown=status(conn,uid,sid)
+                assert cooldown["state"]=="cooldown",cooldown
+                assert cooldown["rate_limit_attempts"]==1,cooldown
+                assert "HTTP 429" in cooldown["message"],cooldown
+                assert cooldown["retry_after"]
+                conn.close()
+                # A pending cooldown never invokes Gemini again immediately.
+                assert tick(project) is False
+                # Simulate the scheduled retry time without sleeping.
+                conn=project.db()
+                conn.execute("""UPDATE quiz_preparation_jobs
+                    SET retry_after='2000-01-01T00:00:00+07:00'
+                    WHERE user_id=? AND subject_id=?""",(uid,sid))
+                conn.commit();conn.close()
+                assert tick(project) is True
+                conn=project.db()
+                second=status(conn,uid,sid)
+                assert second["state"]=="cooldown",second
+                assert second["rate_limit_attempts"]==2,second
+                conn.execute("""UPDATE quiz_preparation_jobs
+                    SET retry_after='2000-01-01T00:00:00+07:00'
+                    WHERE user_id=? AND subject_id=?""",(uid,sid))
+                conn.commit();conn.close()
+                assert tick(project) is True
+                conn=project.db()
+                stopped=status(conn,uid,sid)
+                assert stopped["state"]=="paused",stopped
+                assert stopped["rate_limit_attempts"]==3,stopped
+                assert "3 lần chờ" in stopped["message"],stopped
+                conn.close()
+                assert tick(project) is False
+            with patch("quiz_preparation_jobs.preparation_status",
+                       return_value=[{"status":"pending"}]):
+                conn=project.db()
+                assert enqueue(conn,project,uid,sid)=="queued"
+                fresh=status(conn,uid,sid)
+                assert fresh["rate_limit_attempts"]==0
+                assert fresh["retry_after"]==""
+                conn.close()
+            conn=project.db()
+            # Pause a queued job and keep its retry metadata / queue durable.
+            assert pause(conn,uid,sid)=="paused"
+            assert status(conn,uid,sid)["state"]=="paused"
             conn.close()
         finally:
             project.DB_PATH,project.UPLOAD_DIR=old_db,old_up
