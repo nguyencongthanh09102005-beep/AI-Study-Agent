@@ -12,7 +12,8 @@ from course_path_learning import (
 from syllabus_learning import syllabus_hash
 from course_schedule_sync import (
     ensure_session_schedule_schema, import_roadmap_lessons,
-    scheduled_lessons, session_signature,
+    scheduled_lessons, session_signature, reconcile_blocker,
+    confirm_changed_roadmap_lesson,
 )
 from syllabus_routes import _source, ensure_syllabus_schema
 from chapter_material_routes import (
@@ -99,6 +100,36 @@ def learning_path(subject_id):
             if not secrets.compare_digest(request.form.get("csrf_token", ""), token):
                 return "Phiên biểu mẫu không hợp lệ.", 403
             action = request.form.get("action")
+            if action == "confirm_lesson":
+                if not fresh:
+                    return redirect(url_for(
+                        "course_path.learning_path", subject_id=subject_id,
+                        notice="Đề cương hoặc lộ trình chưa hợp lệ. Hãy xác nhận lại trước.",
+                    ), code=303)
+                try:
+                    task_id = int(request.form.get("task_id", ""))
+                    session_id = int(request.form.get("session_id", ""))
+                    if task_id <= 0 or session_id <= 0:
+                        raise ValueError("Mã buổi học không hợp lệ.")
+                    lesson = next(
+                        (x for x in saved_sessions
+                         if isinstance(x, dict) and x.get("session_id") == session_id),
+                        None)
+                    changed = confirm_changed_roadmap_lesson(
+                        conn, uid, subject_id, task_id, lesson,
+                        request.form.get("expected_old", ""),
+                        request.form.get("expected_new", ""),
+                    )
+                    conn.commit()
+                    return redirect(url_for(
+                        "study_session.learning_session", task_id=task_id,
+                    ), code=303)
+                except (ValueError, TypeError) as exc:
+                    conn.rollback()
+                    return redirect(url_for(
+                        "course_path.learning_path", subject_id=subject_id,
+                        notice=str(exc)[:380],
+                    ), code=303)
             if action in ("schedule", "reflow"):
                 # Import is explicit: creating a roadmap alone never creates
                 # or deletes Study Plan tasks, and old/stale plans are rejected.
@@ -258,12 +289,22 @@ def learning_path(subject_id):
             for lesson in sessions
             if int(lesson["session_id"]) in linked
         }
+        reconcile_blocks = {}
+        lesson_signatures = {}
+        for lesson in sessions:
+            sid = int(lesson["session_id"])
+            if schedule_status.get(sid) == "changed":
+                reconcile_blocks[sid] = reconcile_blocker(
+                    conn, uid, subject_id, linked[sid])
+                lesson_signatures[sid] = session_signature(lesson)
         return render_template(
             "course_learning_path.html", page="subjects", subject=subject,
             syllabus_name=syllabus_name, units=units, sessions=sessions,
             schedule_status=schedule_status, actual_schedule=linked,
             stale=bool(plan_row and not fresh),
             notice=request.args.get("notice", "")[:400], csrf_token=token,
+            reconcile_blocks=reconcile_blocks,
+            lesson_signatures=lesson_signatures,
             prepare_quizzes=request.args.get("prepare_quizzes") == "1",
             session_quiz_csrf=session.get("session_quiz_csrf", ""),
         )

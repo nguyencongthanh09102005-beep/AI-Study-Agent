@@ -27,9 +27,10 @@ from chapter_chat_context import LessonContextError
 study_session_bp = Blueprint("study_session", __name__)
 
 
-def _unavailable(subject, message):
+def _unavailable(subject, message, review_session_id=None):
     return render_template("study_session_unavailable.html",
-                           page="study_plan", subject=subject, message=message), 409
+                           page="study_plan", subject=subject, message=message,
+                           review_session_id=review_session_id), 409
 
 
 def _schedule_display(value, minutes):
@@ -102,7 +103,8 @@ def learning_session(task_id):
         if not fresh or not lesson or \
                 session_signature(lesson) != task["roadmap_session_signature"]:
             return _unavailable(subject,
-                "Nội dung lộ trình khác buổi đã lưu. Hãy rà soát lại lộ trình; giờ và tiến độ cũ vẫn được giữ.")
+                "Nội dung lộ trình khác buổi đã lưu. Hãy rà soát lại lộ trình; giờ và tiến độ cũ vẫn được giữ.",
+                review_session_id=task["roadmap_session_id"])
 
         # An academic lesson never imports a student's private uploads.
         # Private PDFs belong exclusively to manual self-study rooms.

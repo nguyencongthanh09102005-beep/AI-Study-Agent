@@ -55,7 +55,7 @@
       </section>
       {% endif %}
       {% for lesson in sessions %}
-      <article style="background:#f6f8fe;border:1px solid #e1e8f4;border-radius:14px;padding:20px;margin:15px 0">
+      <article id="lesson-{{ lesson.session_id }}" style="background:#f6f8fe;border:1px solid #e1e8f4;border-radius:14px;padding:20px;margin:15px 0">
         <div style="display:flex;gap:12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap">
           <div>
             <span style="color:#526be5;font-weight:700;font-size:13px">Buổi {{ lesson.session_id }} · Chương {{ lesson.unit_id }}</span>
@@ -63,6 +63,25 @@
               <span style="display:inline-block;background:#def5e8;border-radius:9px;padding:4px 8px;color:#186747;font-size:12px;margin-left:7px">✓ Đã đưa vào Kế hoạch học</span>
             {% elif schedule_status.get(lesson.session_id) == 'changed' %}
               <span style="display:inline-block;background:#fff0dc;border-radius:9px;padding:4px 8px;color:#96521a;font-size:12px;margin-left:7px">Lộ trình mới khác lịch đã lưu — cần rà soát</span>
+              <div style="margin-top:12px;padding:14px;border:1px solid #f1d4a6;border-radius:10px;background:#fffaf0;color:#6d491e">
+                <strong>Rà soát nội dung buổi {{ lesson.session_id }}</strong>
+                <p style="margin:8px 0">Đã lưu trong lịch: <b>{{ actual_schedule[lesson.session_id].title }}</b></p>
+                <p style="margin:8px 0">Lộ trình hiện tại: <b>{{ lesson.title }}</b> · {{ lesson.chapter }}</p>
+                {% if reconcile_blocks.get(lesson.session_id) %}
+                  <p role="alert" style="color:#944c1f">{{ reconcile_blocks[lesson.session_id] }} Không tự ghi đè dữ liệu đã học.</p>
+                {% else %}
+                  <p style="font-size:13px;line-height:1.6">Nếu xác nhận, hệ thống cập nhật nội dung buổi này; giữ nguyên giờ học, thời lượng, ghi chú, trạng thái và lịch sử Quiz. Quiz cũ chưa làm sẽ vẫn lưu nhưng bị khóa theo nguồn cũ; Quiz cho nội dung mới cần chuẩn bị lại.</p>
+                  <form method="post" style="margin:10px 0 0">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <input type="hidden" name="action" value="confirm_lesson">
+                    <input type="hidden" name="task_id" value="{{ actual_schedule[lesson.session_id].id }}">
+                    <input type="hidden" name="session_id" value="{{ lesson.session_id }}">
+                    <input type="hidden" name="expected_old" value="{{ actual_schedule[lesson.session_id].roadmap_session_signature }}">
+                    <input type="hidden" name="expected_new" value="{{ lesson_signatures[lesson.session_id] }}">
+                    <button type="submit" class="soft-primary">✓ Xác nhận cập nhật nội dung buổi {{ lesson.session_id }}</button>
+                  </form>
+                {% endif %}
+              </div>
             {% endif %}
             <div style="margin-top:9px"><a href="{{ url_for('chapter_material.student_chapter', subject_id=subject.id, chapter_number=lesson.unit_id) }}" style="color:#435bc9;font-weight:700">📖 Mở bài học và học liệu Chương {{ lesson.unit_id }} →</a></div>
             <h3 style="color:#253c75;margin:8px 0">{{ lesson.title }}</h3>
