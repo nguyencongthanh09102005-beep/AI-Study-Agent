@@ -1,111 +1,114 @@
 {% extends "base.html" %}
 {% block page_title %}Tổng quan{% endblock %}
-{% block page_desc %}Theo dõi hành trình học tập thông minh{% endblock %}
-{% block page_styles %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/weekly-progress.css') }}">
-{% endblock %}
-
+{% block page_desc %}Theo dõi lịch và tiến độ học tập{% endblock %}
 {% block content %}
 <section class="mock-page-head dashboard-head">
   <div>
-    <h2>Chào mừng trở lại, {{ session.get('user_name','Nguyễn Hoàng') }}! 👋</h2>
-    <p>Hôm nay là một ngày tuyệt vời để học thêm điều mới!</p>
-  </div>
-  <div class="head-actions">
-    <a class="soft-primary" href="{{ url_for('chat') }}">✦ <span>Hỏi AI ngay</span> <b>›</b></a>
-    <div class="quote-card">❝ <span>"Học không phải để hơn người khác,<br>mà để trở thành phiên bản tốt hơn của chính mình."</span></div>
+    <span class="dashboard-kicker">KHÔNG GIAN HỌC TẬP</span>
+    <h2>Xin chào, {{ (session.get('user_name') or 'bạn').split()[-1] }}! 👋</h2>
+    <p>Hôm nay bạn muốn học gì trước?</p>
   </div>
 </section>
 
-<section class="metric-grid">
+<section class="metric-grid dashboard-metrics" aria-label="Tổng quan số liệu">
   <a class="metric-card" href="{{ url_for('subjects') }}" data-searchable="môn học">
-    <span class="metric-icon blue">▱</span><span class="metric-copy"><small>Môn học</small><strong>{{ subjects|length }}</strong><em>Đang theo học</em></span><b class="metric-go">›</b>
+    <span class="metric-icon blue" aria-hidden="true">▱</span>
+    <span class="metric-copy"><small>Môn học</small><strong>{{ subjects|length }}</strong></span>
+    <b class="metric-go" aria-hidden="true">›</b>
   </a>
   <a class="metric-card" href="{{ url_for('documents') }}" data-searchable="tài liệu">
-    <span class="metric-icon purple">▤</span><span class="metric-copy"><small>Tài liệu</small><strong>{{ documents|length }}</strong><em>Đã lưu trữ</em></span><b class="metric-go">›</b>
+    <span class="metric-icon purple" aria-hidden="true">▤</span>
+    <span class="metric-copy"><small>Tài liệu</small><strong>{{ documents|length }}</strong></span>
+    <b class="metric-go" aria-hidden="true">›</b>
   </a>
   <a class="metric-card" href="{{ url_for('quiz') }}" data-searchable="quiz">
-    <span class="metric-icon green">?</span><span class="metric-copy"><small>Quiz đã làm</small><strong>{{ quiz_count }}</strong><em>Bài luyện tập</em></span><b class="metric-go">›</b>
-  </a>
-  <a class="metric-card" href="{{ url_for('study_plan') }}" data-searchable="tiến độ">
-    <span class="metric-icon orange">▥</span><span class="metric-copy"><small>Tiến độ TB</small><strong>{{ avg_progress }}%</strong><em>Tất cả môn học</em></span><b class="metric-go">›</b>
+    <span class="metric-icon green" aria-hidden="true">✓</span>
+    <span class="metric-copy"><small>Quiz đã làm</small><strong>{{ quiz_count }}</strong></span>
+    <b class="metric-go" aria-hidden="true">›</b>
   </a>
 </section>
 
 {% if next_best_action %}
-<section class="soft-card proactive-agent-card proactive-{{ next_best_action.kind }}">
+<section class="soft-card proactive-agent-card dashboard-recommend-card proactive-{{ next_best_action.kind }}" aria-labelledby="dashboardAgentTitle">
   <div class="proactive-agent-main">
-    <span class="proactive-agent-avatar">🤖</span>
+    <span class="proactive-agent-avatar" aria-hidden="true">🤖</span>
     <div class="proactive-agent-copy">
       <div class="proactive-agent-kicker">
-        <span>STUDY AGENT</span>
-        <b>{{ next_best_action.eyebrow }}</b>
+        <span>✦ STUDY AGENT ĐỀ XUẤT</span>
+        {% if next_best_action.kind == 'deadline' %}<b>Ưu tiên deadline</b>
+        {% elif next_best_action.kind == 'weakness' %}<b>Ôn điểm yếu</b>
+        {% endif %}
       </div>
-      <h3>{{ next_best_action.title }}</h3>
-      <p>{{ next_best_action.reason }}</p>
-      <div class="proactive-agent-meta">
-        {% for item in next_best_action.meta %}
-        <span>{{ item }}</span>
-        {% endfor %}
-      </div>
+      <h3 id="dashboardAgentTitle">{{ next_best_action.title }}</h3>
+      <p class="dashboard-recommend-summary">{{ next_best_action.reason | truncate(130, True, '…') }}</p>
+      <details class="dashboard-recommend-details">
+        <summary>Vì sao đề xuất?</summary>
+        <p>{{ next_best_action.reason }}</p>
+        {% if next_best_action.meta %}
+        <ul>{% for item in next_best_action.meta %}<li>{{ item }}</li>{% endfor %}</ul>
+        {% endif %}
+      </details>
     </div>
   </div>
   <div class="proactive-agent-actions">
     <a class="proactive-primary" href="{{ next_best_action.primary_url }}">{{ next_best_action.primary_label }} →</a>
-    <a class="proactive-secondary" href="{{ next_best_action.secondary_url }}">{{ next_best_action.secondary_label }}</a>
   </div>
 </section>
 {% endif %}
 
-<section class="dashboard-main-grid">
+<section class="dashboard-main-grid" aria-label="Tiến độ và lịch học">
   <article class="soft-card weekly-card">
     <div class="card-title-row">
-      <div><h3>▥ &nbsp; Tiến độ học tập trong tuần</h3><p>Bạn đã học {{ weekly_total_hours }} giờ từ các buổi đã hoàn thành.</p></div>
-      <div class="weekly-score"><strong>{{ avg_progress }}%</strong><span class="{{ weekly_growth_class }}">↑ {{ weekly_growth_text }}</span></div>
+      <div>
+        <h3>▥ &nbsp; Tiến độ học tập trong tuần</h3>
+        <p>Số giờ học theo từng ngày, từ các buổi đã hoàn thành.</p>
+      </div>
+      <div class="dashboard-week-summary">
+        <strong>{{ weekly_total_hours | round(1) }} giờ</strong>
+        <span class="weekly-growth-badge {{ weekly_growth_class }}">{{ weekly_growth_text }}</span>
+      </div>
     </div>
-    <div class="progress-track large"><i style="width: {{ avg_progress }}%"></i></div>
-    <div class="weekly-chart-wrap"><canvas id="weeklyStudyChart"></canvas></div>
+    <div class="weekly-chart-wrap">
+      <canvas id="weeklyStudyChart" role="img" aria-label="Biểu đồ cột số giờ học từ thứ Hai đến Chủ nhật"></canvas>
+    </div>
   </article>
 
   <article class="soft-card today-card">
-    <div class="card-title-row"><h3>▦ &nbsp; Lịch học hôm nay</h3><a href="{{ url_for('study_plan') }}">Xem tất cả →</a></div>
+    <div class="card-title-row">
+      <div><h3>▦ &nbsp; Lịch học hôm nay</h3><p>{{ today_tasks | length }} buổi trong hôm nay</p></div>
+      <a href="{{ url_for('study_plan') }}">Xem lịch →</a>
+    </div>
     <div class="today-list">
       {% for task in today_tasks[:4] %}
       <div class="today-row" data-searchable="{{ task.title|e }}">
-        <span class="timeline-dot dot-{{ loop.index }}"></span>
+        <span class="timeline-dot dot-{{ loop.index }}" aria-hidden="true"></span>
         <span class="today-time">{{ task.time_text }}</span>
         <span class="today-copy">
           <strong>{{ task.title }}</strong>
-          <small>{{ task.subject_name or 'Tự học' }}{% if task.source == 'adaptive' %} · Adaptive{% endif %}</small>
+          <small>{{ task.subject_name or 'Tự học' }}{% if task.source == 'adaptive' %} · Ôn tập{% endif %}</small>
         </span>
         <span class="duration-pill">{% if task.done %}✓ Đã xong{% else %}{{ task.duration }} phút{% endif %}</span>
       </div>
       {% else %}
-      <div class="empty-soft">Hôm nay chưa có buổi học nào. <a href="{{ url_for('study_plan') }}">Tạo kế hoạch →</a></div>
+      <div class="empty-soft">Hôm nay chưa có buổi học. <a href="{{ url_for('study_plan') }}">Xem kế hoạch →</a></div>
       {% endfor %}
     </div>
   </article>
 </section>
 
-<section class="dashboard-bottom-grid">
+<section class="dashboard-bottom-grid" aria-label="Tài liệu mới thêm">
   <article class="soft-card recent-card">
-    <div class="card-title-row"><h3>◷ &nbsp; Hoạt động gần đây</h3><a href="{{ url_for('documents') }}">Xem tất cả →</a></div>
+    <div class="card-title-row"><h3>◷ &nbsp; Tài liệu gần đây</h3><a href="{{ url_for('documents') }}">Xem tài liệu →</a></div>
     <div class="activity-list">
       {% for d in documents[:4] %}
-      <div class="activity-row" data-searchable="{{ d.original_name|e }}"><span class="mini-activity purple">▤</span><span>Đã thêm tài liệu <b>“{{ d.original_name }}”</b></span><small>{{ d.created_at }}</small></div>
+      <div class="activity-row" data-searchable="{{ d.original_name|e }}">
+        <span class="mini-activity purple" aria-hidden="true">▤</span>
+        <span><b>{{ d.original_name }}</b></span>
+        <small>{{ d.created_at }}</small>
+      </div>
       {% else %}
-      <div class="activity-row"><span class="mini-activity green">✦</span><span>Bắt đầu bằng cách tải tài liệu đầu tiên.</span><small>Ngay bây giờ</small></div>
+      <p class="dashboard-empty-recent">Chưa có tài liệu nào. Bạn có thể tải tài liệu từ mục Tài liệu.</p>
       {% endfor %}
-    </div>
-  </article>
-
-  <article class="soft-card quick-card">
-    <div class="card-title-row"><h3>ϟ &nbsp; Thao tác nhanh</h3></div>
-    <div class="quick-grid">
-      <a href="{{ url_for('documents') }}"><span class="mini-activity purple">▤</span><b>Tải tài liệu lên</b><small>PDF, TXT, MD...</small><em>›</em></a>
-      <a href="{{ url_for('quiz') }}"><span class="mini-activity green">?</span><b>Tạo quiz từ tài liệu</b><small>AI tạo câu hỏi tự động</small><em>›</em></a>
-      <a href="{{ url_for('study_plan') }}"><span class="mini-activity orange">▦</span><b>Lập kế hoạch học</b><small>Tạo thời khóa biểu</small><em>›</em></a>
-      <a href="{{ url_for('chat') }}"><span class="mini-activity blue">?</span><b>Hỏi AI bất kỳ điều gì</b><small>Giải đáp, tóm tắt, gợi ý</small><em>›</em></a>
     </div>
   </article>
 </section>
