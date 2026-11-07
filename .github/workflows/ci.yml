@@ -48,6 +48,8 @@ jobs:
         run: python tests/test_mobile_study_room.py
       - name: Mobile roadmap scheduling and private-document isolation
         run: python tests/test_mobile_roadmap_plan_parity.py
+      - name: Mobile manual study-room isolation and persistent file access
+        run: python tests/test_mobile_manual_study_room.py
 
       - name: Initialize SQLite schema
         run: python -c "import app; app.init_db(); print('DB init OK')"
@@ -97,6 +99,7 @@ jobs:
           node --check mobile/src/plan-utils.js
           node --check mobile/src/date-time-utils.js
           node tests/test_mobile_ux_parity.js
+          node tests/test_mobile_manual_study_ui.js
           node tests/test_mobile_plan_ui.js
           node tests/test_mobile_learning_ui.js
           node tests/test_mobile_minimal_ui.js
