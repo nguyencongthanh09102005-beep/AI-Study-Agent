@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Lộ trình học · AI Study Agent{% endblock %}
+{% block page_title %}Lộ trình học{% endblock %}
+{% block page_desc %}Chọn môn để học theo chương và buổi đã xác nhận{% endblock %}
+{% block content %}
+<section class="mock-page-head roadmap-library-head">
+  <div>
+    <h2>Lộ trình học 📚</h2>
+    <p>Học theo đề cương, từng chương và từng buổi.</p>
+  </div>
+</section>
+<p class="roadmap-library-intro">Chọn một môn để xem nội dung, mục tiêu, học liệu và Quiz theo buổi. Khi sẵn sàng, bạn có thể đưa các buổi học vào Kế hoạch học để xếp thời gian.</p>
+{% if learning_subjects %}
+<section class="roadmap-library-grid" aria-label="Lộ trình của các môn học">
+  {% for s in learning_subjects %}
+  {% set progress = s.progress or 0 %}
+  <article class="soft-card roadmap-library-item">
+    <div class="roadmap-item-head">
+      <div>
+        <h3>{{ s.name }}</h3>
+        <small>{{ s.code or 'Chưa có mã môn' }}{% if s.credits %} · {{ s.credits }} tín chỉ{% endif %}</small>
+      </div>
+      <span class="status-chip {{ 'done' if progress >= 100 else 'active' }}">{{ 'Hoàn thành' if progress >= 100 else 'Đang học' }}</span>
+    </div>
+    <div class="roadmap-item-progress"><span>Tiến độ môn học</span><strong>{{ progress }}%</strong></div>
+    <div class="progress-track" aria-label="Tiến độ môn {{ s.name }}: {{ progress }}%">
+      <i style="width: {{ 100 if progress > 100 else 0 if progress < 0 else progress }}%"></i>
+    </div>
+    <div class="roadmap-item-actions">
+      <a class="soft-primary" href="{{ url_for('course_path.learning_path', subject_id=s.id) }}">Xem lộ trình →</a>
+      <a class="roadmap-secondary" href="{{ url_for('subject_detail', subject_id=s.id) }}">Chi tiết môn</a>
+    </div>
+  </article>
+  {% endfor %}
+</section>
+{% else %}
+<div class="soft-card roadmap-empty">
+  <p>Bạn chưa có môn học nào để xây dựng lộ trình.</p>
+  <a class="soft-primary" href="{{ url_for('subjects') }}">Thêm môn học →</a>
+</div>
+{% endif %}
+{% endblock %}
