@@ -224,6 +224,12 @@ export const api = {
   roadmap: (subjectId) =>
     request(`/api/mobile/subjects/${subjectId}/roadmap`),
 
+  scheduleRoadmap: subjectId =>
+    request(`/api/mobile/subjects/${subjectId}/roadmap/schedule`, {
+      method: 'POST',
+      body: JSON.stringify({confirm: true}),
+    }),
+
   studyRoom: (taskId) =>
     request(`/api/mobile/study-room/${taskId}`),
   sessionQuizStatus: taskId =>
