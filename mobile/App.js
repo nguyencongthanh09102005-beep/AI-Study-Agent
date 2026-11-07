@@ -16,6 +16,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import FloatingStudyChat from './src/FloatingStudyChat';
 import StudyRoom from './src/StudyRoom';
 import ConnectionSettings from './src/ConnectionSettings';
+import { restoreServerAddress } from './src/serverAddressStorage';
 import StudyDateTimePicker from './src/StudyDateTimePicker';
 const {
   localDateKey, addDays, getWeekDates, getPlanOverview,
@@ -1904,11 +1905,13 @@ export default function App() {
     }
   };
 
-  // Khôi phục phiên nếu cookie session vẫn còn hợp lệ sau khi mở lại ứng dụng.
-  // Không lưu mật khẩu trên thiết bị; nếu phiên đã hết hạn thì đăng nhập lại.
+  // Khôi phục địa chỉ API trước khi hỏi phiên đăng nhập. Địa chỉ đã lưu
+  // không được dùng để khôi phục mật khẩu hoặc tự đăng nhập tài khoản cũ.
   useEffect(() => {
     let active = true;
-    api.session()
+    restoreServerAddress()
+      .catch(() => null) // Missing local storage should still allow manual setup.
+      .then(() => api.session())
       .then(() => refreshData())
       .then(() => { if (active) setLoggedIn(true); })
       .catch(() => { if (active) setLoggedIn(false); })
