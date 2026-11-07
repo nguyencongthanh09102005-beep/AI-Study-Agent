@@ -1776,6 +1776,13 @@ export default function App() {
   const [quizToOpenId,setQuizToOpenId]=useState(null);
   const [showConnectionSettings, setShowConnectionSettings] = useState(false);
   const [chatOpenSignal, setChatOpenSignal] = useState(0);
+  const [subjectsEntry, setSubjectsEntry] = useState(null);
+  const openSubjectJourney = (subjectId, mode = 'roadmap') => {
+    setActiveStudyTask(null);
+    setActiveLesson(null);
+    setSubjectsEntry({subjectId, mode, token: Date.now()});
+    setTab('subjects');
+  };
   const openQuiz = (subjectId, quizId=null) => {
     setQuizSubjectId(subjectId || null);
     setQuizToOpenId(quizId || null);
@@ -1875,6 +1882,7 @@ export default function App() {
     );
     if (tab === 'subjects') return <SubjectsScreen subjects={subjects}
       userName={userName} refreshData={refreshData}
+      entryIntent={subjectsEntry}
       onOpenStudy={openStudyRoom} onOpenQuiz={openQuiz} />;
     if (tab === 'agent') return <AgentScreen subjects={subjects} userName={userName} />;
     if (tab === 'quiz') return <QuizScreen subjects={subjects}
@@ -1889,11 +1897,12 @@ export default function App() {
         loading={loading}
         onOpenStudy={openStudyRoom}
         onAskAI={() => setChatOpenSignal(value => value+1)}
+        onOpenSubjectJourney={openSubjectJourney}
         onOpenQuiz={openQuiz}
       />
     );
   }, [tab, subjects, dashboard, plan, loading, userName, loggedIn,
-      activeStudyTask, activeLesson?.subjectId, quizSubjectId, quizToOpenId]);
+      activeStudyTask, activeLesson?.subjectId, quizSubjectId, quizToOpenId, subjectsEntry]);
 
   if (checkingSession) {
     return (
@@ -1940,6 +1949,7 @@ export default function App() {
             onPress={() => {
               setActiveStudyTask(null);
               setActiveLesson(null);
+              setSubjectsEntry(null);
               setTab(key);
               refreshData().catch(() => {});
             }}
