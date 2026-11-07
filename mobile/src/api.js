@@ -230,6 +230,34 @@ export const api = {
       body: JSON.stringify({confirm: true}),
     }),
 
+
+  manualRoom: taskId =>
+    request(`/api/mobile/manual-study/${taskId}`),
+
+  manualTimer: (taskId, action, csrf) =>
+    request(`/api/mobile/manual-study/${taskId}/timer`, {
+      method: 'POST',
+      headers: {'X-Manual-CSRF': csrf},
+      body: JSON.stringify({action}),
+    }),
+
+  manualAsk: (taskId, question, csrf) =>
+    request(`/api/mobile/manual-study/${taskId}/ask`, {
+      method: 'POST',
+      headers: {'X-Manual-CSRF': csrf},
+      body: JSON.stringify({question}),
+    }),
+
+  manualPrepareQuiz: (taskId, csrf) =>
+    request(`/api/mobile/manual-study/${taskId}/prepare-quiz`, {
+      method: 'POST',
+      headers: {'X-Manual-CSRF': csrf},
+      body: JSON.stringify({confirm: true}),
+    }),
+
+  manualFile: taskId =>
+    request(`/api/mobile/manual-study/${taskId}/file`),
+
   studyRoom: (taskId) =>
     request(`/api/mobile/study-room/${taskId}`),
   sessionQuizStatus: taskId =>
