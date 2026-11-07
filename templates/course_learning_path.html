@@ -7,7 +7,10 @@
 {% block page_desc %}Học theo từng chương, tiểu mục và nguồn tài liệu của đúng môn học{% endblock %}
 {% block content %}
 <section class="soft-card" style="max-width:1050px;margin:0 auto;padding:26px">
-  <a class="back-link" href="{{ url_for('subject_detail', subject_id=subject.id) }}">← Quay lại môn học</a>
+  <div style="display:flex;gap:15px;flex-wrap:wrap;align-items:center">
+    <a class="back-link" href="{{ url_for('learning_paths') }}">← Tất cả lộ trình</a>
+    <a class="back-link" href="{{ url_for('subject_detail', subject_id=subject.id) }}">Chi tiết môn học</a>
+  </div>
   <h2 style="color:#263d79;margin:12px 0">{{ subject.name }}</h2>
   <p style="color:#67799e;line-height:1.7">Lộ trình gồm các buổi học theo thứ tự chương, kèm nội dung, mục tiêu, tài liệu và bài kiểm tra.</p>
   {% if notice %}<p role="status" style="background:#e9f8ee;color:#176945;border-radius:10px;padding:12px">{{ notice }}</p>{% endif %}
