@@ -1,0 +1,201 @@
+/* Study Plan focus pass: calendar first, two useful context cards below.
+   Visual-only changes; scheduling, reminders and confirmation forms remain intact. */
+.page-study_plan .planner-layout-new {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 16px !important;
+}
+.page-study_plan .planner-focus-bottom {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+  gap: 18px !important;
+  align-items: start !important;
+  margin-top: 18px !important;
+}
+.page-study_plan .planner-focus-bottom > .soft-card {
+  min-width: 0;
+  padding: 20px 22px;
+  border-radius: 20px;
+}
+.page-study_plan .planner-focus-bottom .card-title-row {
+  align-items: center;
+  gap: 10px;
+}
+.page-study_plan .planner-focus-bottom .card-title-row h3 {
+  margin: 0;
+  font-size: 16px;
+  color: #273c70;
+}
+.page-study_plan .planner-focus-bottom .card-title-row p {
+  margin: 6px 0 0;
+  color: #7183aa;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.page-study_plan .planner-today-open,
+.page-study_plan .planner-conflict-action {
+  flex: 0 0 auto;
+  border: 0;
+  background: transparent;
+  color: #5662dd;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  padding: 8px 3px;
+}
+.page-study_plan .planner-today-open:hover,
+.page-study_plan .planner-conflict-action:hover {
+  color: #353bc0;
+  text-decoration: underline;
+}
+.page-study_plan .planner-today-list {
+  margin-top: 13px;
+  display: grid;
+  gap: 9px;
+}
+.page-study_plan .planner-today-item {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) auto;
+  gap: 11px;
+  align-items: center;
+  padding: 12px;
+  background: #edf3fd;
+  border: 1px solid #e0e8f8;
+  border-radius: 12px;
+}
+.page-study_plan .planner-today-time {
+  color: #465b93;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.page-study_plan .planner-today-info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.page-study_plan .planner-today-info strong {
+  color: #263966;
+  line-height: 1.4;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.page-study_plan .planner-today-info small {
+  color: #7282a2;
+  line-height: 1.4;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.page-study_plan .planner-today-state {
+  background: #e5eafd;
+  color: #6878a2;
+  border-radius: 9px;
+  padding: 5px 8px;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.page-study_plan .planner-today-state.done {
+  background: #dcf4e8;
+  color: #248660;
+}
+.page-study_plan .planner-today-item.is-done .planner-today-info strong {
+  color: #607195;
+}
+.page-study_plan .planner-today-empty,
+.page-study_plan .planner-today-more {
+  margin: 0;
+  padding: 12px 13px;
+  border-radius: 12px;
+  background: #edf3fb;
+  color: #687b9f;
+  font-size: 12px;
+  line-height: 1.55;
+}
+.page-study_plan .planner-today-more {
+  padding: 5px 2px;
+  background: transparent;
+}
+.page-study_plan .planner-deadline-card .card-title-row {
+  margin-bottom: 10px;
+}
+.page-study_plan .planner-deadline-card .goal-list {
+  margin-top: 12px;
+}
+.page-study_plan .planner-deadline-card .planner-compact-conflict {
+  display: flex !important;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 9px;
+  margin: 12px 0 4px;
+  padding: 11px 13px;
+  border: 1px solid #f2d5b8;
+  border-radius: 12px;
+  background: #fff8ee;
+  box-shadow: none;
+}
+.page-study_plan .planner-compact-conflict strong {
+  font-size: 12px;
+  color: #ad5b32;
+}
+.page-study_plan .planner-compact-conflict p {
+  margin: 4px 0 0;
+  color: #94674c;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.page-study_plan .planner-compact-conflict .planner-conflict-action {
+  color: #a65e36;
+  white-space: nowrap;
+}
+.page-study_plan .planner-deadline-card .planner-agent-details {
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid #dbe4f5;
+}
+.page-study_plan .planner-deadline-card .planner-agent-details summary {
+  list-style: none;
+  cursor: pointer;
+  color: #5664a4;
+  font-size: 12px;
+  font-weight: 800;
+  border-radius: 8px;
+  padding: 7px 2px;
+}
+.page-study_plan .planner-deadline-card .planner-agent-details summary::-webkit-details-marker {display:none}
+.page-study_plan .planner-deadline-card .planner-agent-details p {
+  margin: 4px 0 0;
+  color: #657693;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.page-study_plan .planner-focus-bottom :is(button,summary):focus-visible {
+  outline: 2px solid #5568ea;
+  outline-offset: 2px;
+}
+@media (max-width: 1000px) {
+  .page-study_plan .planner-focus-bottom {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+@media (max-width: 560px) {
+  .page-study_plan .planner-focus-bottom > .soft-card {
+    padding: 15px;
+  }
+  .page-study_plan .planner-focus-bottom .card-title-row h3 {
+    font-size: 14px;
+  }
+  .page-study_plan .planner-today-item {
+    grid-template-columns: 42px minmax(0,1fr);
+    gap: 8px;
+  }
+  .page-study_plan .planner-today-state {
+    grid-column: 2;
+    justify-self: start;
+  }
+  .page-study_plan .planner-focus-bottom .card-title-row {
+    flex-wrap: wrap;
+  }
+}
