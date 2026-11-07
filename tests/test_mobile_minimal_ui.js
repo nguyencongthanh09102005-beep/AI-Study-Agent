@@ -26,6 +26,11 @@ assert(app.includes("if (tab === 'quiz') return <QuizScreen"),
   "Quiz remains fully accessible by secondary navigation");
 assert(app.includes("if (tab === 'plan') return <PlanScreen"),
   "Timetable must remain accessible");
+assert(app.includes("api.scheduleRoadmap(selectedId)"),
+  "Official roadmap sessions must be schedulable on Mobile");
+assert(app.includes("onOpenSubjectJourney(item.subject_id || null, 'roadmap')"),
+  "Learning plan suggestions must open the verified roadmap");
+
 assert(app.includes("setShowLearningSettings(v => !v)"),
   "Advanced learning preferences should be disclosed on demand");
 assert(app.includes("onOpenConnection={() => setShowConnectionSettings(true)}"),
