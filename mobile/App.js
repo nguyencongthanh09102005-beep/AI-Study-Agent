@@ -2068,7 +2068,7 @@ export default function App() {
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="dark-content" />
       <View style={styles.app}>{screen}</View>
-      <View style={styles.bottomNav}>
+      {!activeManualTask && <View style={styles.bottomNav}>
         {tabs.map(([key, icon, label]) => (
           <TouchableOpacity
             key={key}
@@ -2086,7 +2086,7 @@ export default function App() {
             <Text style={[styles.navLabel, (tab === key || (tab === 'quiz' && key === 'subjects')) && styles.navActive]}>{label}</Text>
           </TouchableOpacity>
         ))}
-      </View>
+      </View>}
       {!activeManualTask && <FloatingStudyChat subjects={subjects} lesson={activeLesson}
         openSignal={chatOpenSignal}/>} 
     </SafeAreaView>
