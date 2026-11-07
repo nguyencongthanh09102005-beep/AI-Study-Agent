@@ -383,6 +383,9 @@ def mobile_manual_prepare_quiz(task_id):
         return error
     if not _mobile_csrf_valid():
         return jsonify({"error": "Phiên xác nhận đã hết hạn. Mở lại buổi học."}), 403
+    # The client must explicitly confirm AI generation, even if CSRF is valid.
+    if (request.get_json(silent=True) or {}).get("confirm") is not True:
+        return jsonify({"error": "Hãy xác nhận trước khi tạo Quiz bằng AI."}), 400
     # Opt-in only; helper rechecks owner, source fingerprint and valid Quiz.
     conn = project.db()
     try:
