@@ -7521,8 +7521,9 @@ def api_mobile_dashboard():
 
     task_rows = conn.execute(
         """
-        SELECT t.id,t.title,t.study_at,t.duration,t.done,t.source,
-               t.roadmap_session_id, s.id AS subject_id,s.name AS subject_name
+        SELECT t.id,t.user_id,t.title,t.study_at,t.duration,t.done,t.source,
+               t.roadmap_session_id,t.roadmap_session_signature,
+               s.id AS subject_id,s.name AS subject_name
         FROM study_tasks t
         LEFT JOIN subjects s
           ON s.id=t.subject_id AND s.user_id=t.user_id
@@ -7534,6 +7535,15 @@ def api_mobile_dashboard():
     ).fetchall()
 
     profile = ensure_learning_profile(conn, uid)
+    from study_plan_roadmap_labels import roadmap_timetable_labels
+    dashboard_roadmap_labels = roadmap_timetable_labels(conn, uid, task_rows)
+    mobile_tasks = []
+    for item in task_rows:
+        task = dict(item)
+        task["roadmap_label"] = dashboard_roadmap_labels.get(item["id"], "")
+        task.pop("roadmap_session_signature", None)
+        task.pop("user_id", None)
+        mobile_tasks.append(task)
     next_best_action = get_next_best_action(conn, uid)
     stats = {
         "subject_count": len(subjects),
@@ -7550,7 +7560,7 @@ def api_mobile_dashboard():
     return jsonify({
         "user": dict(user) if user else {},
         "subjects": subjects,
-        "tasks": [dict(row) for row in task_rows],
+        "tasks": mobile_tasks,
         "next_best_action": next_best_action,
         "stats": stats,
         "profile": {
@@ -8424,8 +8434,8 @@ def api_mobile_study_plan():
         ensure_manual_schema(conn)
         rows = conn.execute(
             """
-            SELECT t.id,t.subject_id,t.title,t.study_at,t.duration,t.note,t.done,t.source,
-                   t.roadmap_session_id, s.name AS subject_name,
+            SELECT t.id,t.user_id,t.subject_id,t.title,t.study_at,t.duration,t.note,t.done,t.source,
+                   t.roadmap_session_id,t.roadmap_session_signature, s.name AS subject_name,
                    m.document_id, d.original_name AS personal_document_name
             FROM study_tasks t
             LEFT JOIN subjects s
@@ -8443,6 +8453,15 @@ def api_mobile_study_plan():
         total_tasks = conn.execute(
             "SELECT COUNT(*) FROM study_tasks WHERE user_id=?", (uid,)
         ).fetchone()[0]
+        from study_plan_roadmap_labels import roadmap_timetable_labels
+        signed_labels = roadmap_timetable_labels(conn, uid, rows)
+        mobile_tasks = []
+        for item in rows:
+            task = dict(item)
+            task["roadmap_label"] = signed_labels.get(item["id"], "")
+            task.pop("roadmap_session_signature", None)
+            task.pop("user_id", None)
+            mobile_tasks.append(task)
         conn.close()
         return jsonify({
             "total_tasks": total_tasks,
@@ -8454,7 +8473,7 @@ def api_mobile_study_plan():
                 "goals": profile["goals"],
                 "notes": profile["notes"]
             },
-            "tasks": [dict(row) for row in rows]
+            "tasks": mobile_tasks
         })
 
     payload = request.get_json(silent=True) or {}
