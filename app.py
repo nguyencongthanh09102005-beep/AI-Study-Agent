@@ -6830,6 +6830,10 @@ def study_plan():
         (uid,)
     ).fetchall()
     adaptive_weaknesses = [dict(row) for row in adaptive_weakness_rows]
+    # The weekly timetable may display chapter/session metadata, but only if
+    # the scheduled task matches this user's saved roadmap snapshot.
+    from study_plan_roadmap_labels import roadmap_timetable_labels
+    roadmap_labels = roadmap_timetable_labels(conn, uid, task_rows)
     conn.close()
 
     today = datetime.now().date()
@@ -6843,6 +6847,7 @@ def study_plan():
     overdue_tasks = 0
     for row in task_rows:
         item = dict(row)
+        item["roadmap_label"] = roadmap_labels.get(item["id"], "")
         try:
             study_dt = datetime.fromisoformat(row["study_at"])
         except (TypeError, ValueError):

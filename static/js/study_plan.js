@@ -396,23 +396,31 @@ document.addEventListener("DOMContentLoaded", () => {
           const timeText = calendar.formatStudyTimeRange(
             item.dataset.taskDatetime, item.dataset.taskDuration
           );
+          // Keep the card concise; only an exact signed roadmap session
+          // can contribute its official chapter and session label.
+          const roadmapLabel = item.dataset.taskSource === "roadmap"
+            ? (item.dataset.taskRoadmapLabel || "") : "";
+          const subtitle = roadmapLabel || title;
           button.appendChild(makeDiv("study-hour-event-time", timeText));
           button.appendChild(makeDiv("study-hour-event-subject", subject));
-          const titleEl = makeDiv("study-hour-event-title", title);
-          titleEl.title = title;
+          const titleEl = makeDiv("study-hour-event-title", subtitle);
+          titleEl.title = roadmapLabel ? roadmapLabel + " · " + title : title;
           button.appendChild(titleEl);
-          if (item.dataset.taskSource === "roadmap") {
-            button.appendChild(makeDiv("study-hour-event-tag", "Từ lộ trình"));
-          }
           if (item.dataset.taskConflict === "1") {
             button.classList.add("conflict");
             button.appendChild(makeDiv("study-hour-event-conflict", "⚠ Trùng giờ"));
           }
           if (item.dataset.taskDone === "1") {
-            button.appendChild(makeDiv("study-hour-event-tag", "Đã hoàn thành"));
+            const done = makeDiv("study-hour-event-complete", "✓");
+            done.setAttribute("aria-hidden", "true");
+            button.appendChild(done);
           }
+          button.title = [timeText, subject, title,
+            roadmapLabel && roadmapLabel !== title ? roadmapLabel : "",
+            item.dataset.taskDone === "1" ? "Đã hoàn thành" : ""
+          ].filter(Boolean).join(" · ");
           button.setAttribute("aria-label",
-            timeText + ", " + subject + ", " + title + ". Mở lịch ngày.");
+            button.title + ". Mở lịch ngày.");
           // Independent link: the lesson button still opens the selected day.
           // Only scheduled roadmap sessions have a Study Session (6.3.1).
           const card = makeDiv("study-hour-event-shell");

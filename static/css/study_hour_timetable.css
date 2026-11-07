@@ -80,12 +80,15 @@
   -webkit-line-clamp:2; overflow:hidden; overflow-wrap:anywhere;
 }
 .page-study_plan .study-hour-event-title {
-  font-size:10.5px; line-height:1.5;
-  display:-webkit-box; -webkit-box-orient:vertical;
-  -webkit-line-clamp:3; overflow:hidden; overflow-wrap:anywhere;
+  font-size:10.5px; line-height:1.5; color:#576b96;
+  display:block; overflow:hidden; text-overflow:ellipsis;
+  white-space:nowrap; max-width:100%;
 }
-.page-study_plan .study-hour-event-tag {
-  font-size:9px; color:#5470a3; font-weight:750;
+.page-study_plan .study-hour-event-complete {
+  justify-self:end; width:20px; height:20px;
+  display:grid; place-items:center; border-radius:50%;
+  background:#ccebdd; color:#11774e; font-size:13px;
+  font-weight:900;
 }
 .page-study_plan .study-hour-empty {
   margin:12px 0 0; color:#60729a; font-size:12px;
