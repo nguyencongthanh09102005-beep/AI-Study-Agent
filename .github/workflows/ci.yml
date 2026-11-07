@@ -154,6 +154,7 @@ jobs:
       - name: Study Plan layout and task action regressions
         run: |
           python tests/test_study_plan_ui.py
+          python tests/test_study_plan_roadmap_labels.py
           python tests/test_study_plan_roadmap_first.py
           python tests/test_manual_lesson_flow.py
           python tests/test_schedule_conflicts.py
