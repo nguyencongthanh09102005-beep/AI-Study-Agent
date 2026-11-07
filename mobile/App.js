@@ -658,13 +658,16 @@ function SubjectsScreen({ subjects, userName, refreshData, onOpenStudy, onOpenQu
   );
 }
 
-function SubjectSelector({ subjects, selectedId, onSelect }) {
+function SubjectSelector({ subjects, selectedId, onSelect, disabled = false }) {
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 46, marginBottom: 10 }}>
       <View style={{ flexDirection: 'row', gap: 8 }}>
         {subjects.map((subject) => (
           <TouchableOpacity
             key={subject.id}
+            disabled={disabled}
+            accessibilityRole="button"
+            accessibilityState={{selected:selectedId===subject.id,disabled}}
             onPress={() => onSelect(subject.id)}
             style={[
               styles.pill,
@@ -1159,7 +1162,7 @@ function QuizScreen({ subjects, userName, refreshData, initialSubjectId, initial
   );
 }
 
-function PlanScreen({ plan, subjects, userName, refreshData, onOpenStudy }) {
+function PlanScreen({ plan, subjects, userName, refreshData, onOpenStudy, onOpenRoadmap }) {
   const [local, setLocal] = useState(plan || {});
   const [mode, setMode] = useState('list');
   const [planView, setPlanView] = useState('week');
@@ -1425,7 +1428,11 @@ function PlanScreen({ plan, subjects, userName, refreshData, onOpenStudy }) {
 
   const tasks = local?.tasks || [];
   const weekDays = getWeekDates(selectedDate);
-  const overview = getPlanOverview(tasks, selectedDate);
+  const todayTasks = tasks.filter(item =>
+    String(item.study_at || '').slice(0,10) === localDateKey(new Date()));
+  const completedToday = todayTasks.filter(item => !!item.done).length;
+  const conflictingTasks = tasks.filter(task =>
+    findTaskConflicts(tasks,task,task.id).length > 0);
   const displayedTasks = getVisiblePlanTasks(tasks, selectedDate, planView === 'list');
   const { pending, completed } = splitReminders(reminders);
   const pendingVisible = showAllPending ? pending : pending.slice(0, 5);
@@ -1468,12 +1475,13 @@ function PlanScreen({ plan, subjects, userName, refreshData, onOpenStudy }) {
 
   return (
     <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
-      <Header title="Kế hoạch học tập" subtitle="Học theo lịch · Theo dõi tiến độ · Ôn tập cùng AI" userName={userName} />
+      <Header title="Kế hoạch học tập" subtitle="Xếp lịch học và theo dõi deadline" userName={userName} />
       <ErrorCard message={error} />
       {busy && <ActivityIndicator />}
-      <TouchableOpacity style={styles.primaryButton} disabled={busy} onPress={() => setMode('generate')}>
-        <Text style={styles.primaryButtonText}>✦ Tạo kế hoạch bằng AI</Text>
-      </TouchableOpacity>
+      <View style={styles.planTodaySummary}>
+        <Text style={styles.planTodaySummaryLabel}>Hôm nay</Text>
+        <Text style={styles.planTodaySummaryValue}>{completedToday}/{todayTasks.length} buổi đã hoàn thành</Text>
+      </View>
       <View style={styles.planToolbar}>
         <TouchableOpacity style={styles.smallAction} disabled={busy} onPress={() => openTask()}>
           <Text style={styles.smallActionText}>＋ Buổi học</Text>
@@ -1481,8 +1489,8 @@ function PlanScreen({ plan, subjects, userName, refreshData, onOpenStudy }) {
         <TouchableOpacity style={styles.smallAction} disabled={busy} onPress={() => openReminder()}>
           <Text style={styles.smallActionText}>＋ Deadline</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.smallAction} disabled={busy} onPress={() => run(async () => {}, 'list')}>
-          <Text style={styles.smallActionText}>↻ Làm mới</Text>
+        <TouchableOpacity style={styles.smallAction} disabled={busy} onPress={onOpenRoadmap}>
+          <Text style={styles.smallActionText}>⇢ Lộ trình học</Text>
         </TouchableOpacity>
       </View>
 
@@ -1563,30 +1571,45 @@ function PlanScreen({ plan, subjects, userName, refreshData, onOpenStudy }) {
         )}
         {!displayedTasks.length && (
           <Text style={styles.planEmptyText}>
-            {planView === 'week' ? 'Ngày này chưa có lịch học. Chọn ngày khác hoặc tạo kế hoạch mới.' : 'Chưa có nhiệm vụ học. Hãy tạo kế hoạch để bắt đầu.'}
+            {planView === 'week' ? 'Ngày này chưa có lịch. Chọn ngày khác hoặc thêm buổi học.' : 'Chưa có buổi học nào. Mở Lộ trình học để xếp lịch, hoặc thêm buổi tự học.'}
           </Text>
         )}
         {displayedTasks.map(task => (
           <View key={task.id} style={[styles.planTaskRow, task.done && styles.planTaskDone]}>
             <TouchableOpacity
               accessibilityRole="button"
-              accessibilityLabel={(task.done ? 'Đánh dấu chưa xong: ' : 'Hoàn thành: ') + task.title}
+              accessibilityLabel={task.source === 'roadmap'
+                ? (task.done ? 'Đã học: ' : 'Mở không gian học tập: ') + task.title
+                : (task.done ? 'Đánh dấu chưa xong: ' : 'Hoàn thành: ') + task.title}
               style={[styles.planCheck, task.done && styles.planCheckDone]}
-              disabled={busy} onPress={() => run(() => api.toggleTask(task.id))}>
-              <Text style={[styles.planCheckText, task.done && styles.planCheckTextDone]}>{task.done ? '✓' : ''}</Text>
+              disabled={busy || (task.source === 'roadmap' && !task.roadmap_label)}
+              onPress={() => task.source === 'roadmap'
+                ? onOpenStudy(task.id) : run(() => api.toggleTask(task.id))}>
+              <Text style={[styles.planCheckText, task.done && styles.planCheckTextDone]}>
+                {task.done ? '✓' : task.source === 'roadmap' ? '▶' : ''}
+              </Text>
             </TouchableOpacity>
             <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={[styles.planTaskTitle, task.done && styles.planDoneTitle]}>{task.title}</Text>
-              <Text style={styles.planTaskMeta}>
-                {String(task.study_at || '').replace('T', ' ').slice(0, 16)} · {task.subject_name || 'Tự học'} · {task.duration} phút
+              <Text style={[styles.planTaskTitle, task.done && styles.planDoneTitle]} numberOfLines={2}>
+                {task.subject_name || 'Tự học'}
               </Text>
-              {!!task.note && <Text style={styles.planTaskNote} numberOfLines={3}>{task.note}</Text>}
-              {task.source === 'roadmap' && !!task.roadmap_session_id &&
-                <TouchableOpacity onPress={() => onOpenStudy(task.id)}
+              <Text style={styles.planTaskMeta}>
+                {String(task.study_at || '').slice(11,16)} · {task.duration} phút
+              </Text>
+              <Text style={styles.planTaskNote} numberOfLines={1}>
+                {task.roadmap_label || task.title}
+              </Text>
+              {!!task.personal_document_name && <Text style={styles.planTaskDoc} numberOfLines={1}>
+                📄 {task.personal_document_name}
+              </Text>}
+              {task.source === 'roadmap' && !!task.roadmap_session_id && (
+                task.roadmap_label ? <TouchableOpacity onPress={() => onOpenStudy(task.id)}
                   accessibilityRole="button" accessibilityLabel={'Bắt đầu học: '+task.title}
                   style={{paddingVertical:7}}>
                   <Text style={styles.smallActionText}>▶ Bắt đầu học →</Text>
-                </TouchableOpacity>}
+                </TouchableOpacity> :
+                <Text style={styles.planAdaptiveTag}>⚠ Buổi cần rà soát lộ trình</Text>
+              )}
               {task.source === 'adaptive' && <Text style={styles.planAdaptiveTag}>✦ Ôn tập điểm yếu</Text>}
             </View>
             <View style={styles.planTaskActions}>
@@ -1605,30 +1628,22 @@ function PlanScreen({ plan, subjects, userName, refreshData, onOpenStudy }) {
         ))}
       </View>
 
-      <View style={styles.planProgressCard}>
-        <View style={styles.planSectionRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.planSectionTitle}>◉ Tiến độ tuần đang chọn</Text>
-            <Text style={styles.planSectionSubtitle}>{overview.completed}/{overview.total} buổi học đã hoàn thành</Text>
-          </View>
-          <Text style={styles.planProgressPercent}>{overview.percentage}%</Text>
-        </View>
-        <Progress value={overview.percentage} />
-        <Text style={styles.planProgressHours}>
-          ◷ Thời gian học: {(overview.completedMinutes / 60).toFixed(1)} / {(overview.minutes / 60).toFixed(1)} giờ
-        </Text>
-      </View>
-
       <View style={styles.card}>
         <View style={styles.planSectionRow}>
-          <Text style={styles.planSectionTitle}>◎ Mục tiêu & deadline</Text>
+          <Text style={styles.planSectionTitle}>⚑ Deadline & cảnh báo</Text>
           <Text style={styles.planSectionSubtitle}>{pending.length} cần làm</Text>
         </View>
         {!pending.length && (
           <Text style={styles.planEmptyText}>
-            {completed.length ? '✓ Không còn deadline chưa hoàn thành.' : 'Chưa có mục tiêu. Bạn có thể thêm deadline mới.'}
+            {completed.length ? '✓ Không còn deadline chưa hoàn thành.' : 'Chưa có deadline. Bạn có thể thêm mới.'}
           </Text>
         )}
+        {!!conflictingTasks.length && <View style={styles.planConflictNote}>
+          <Text style={styles.planConflictText}>⚠ {conflictingTasks.length} buổi học đang trùng giờ</Text>
+          <TouchableOpacity accessibilityRole="button" onPress={()=>setPlanView('list')}>
+            <Text style={styles.smallActionText}>Xem danh sách buổi →</Text>
+          </TouchableOpacity>
+        </View>}
         {pendingVisible.map(renderReminder)}
         {pending.length > 5 && (
           <TouchableOpacity style={styles.planCollapseButton}
@@ -1960,7 +1975,9 @@ export default function App() {
       initialSubjectId={quizSubjectId} initialQuizId={quizToOpenId}
       onBack={() => {setQuizToOpenId(null);setTab('subjects');}}
       userName={userName} refreshData={refreshData} />;
-    if (tab === 'plan') return <PlanScreen plan={plan} subjects={subjects} userName={userName} refreshData={refreshData} onOpenStudy={openStudyRoom} />;
+    if (tab === 'plan') return <PlanScreen plan={plan} subjects={subjects} userName={userName}
+      refreshData={refreshData} onOpenStudy={openStudyRoom}
+      onOpenRoadmap={() => openSubjectJourney(null, 'roadmap')} />;
     return (
       <HomeScreen
         dashboard={dashboard}
