@@ -309,7 +309,7 @@ body.page-chat .chat-messages.chat-subject-enter {
   }
 }
 
-/* Chat AI sidebar refinement: keep the five other pages available as
+/* Chat AI sidebar refinement: keep the six other pages available as
    compact shortcuts, so the course list gets the vertical space. */
 body.page-chat .side-nav .chat-nav-toggle { display: none; }
 
@@ -371,7 +371,7 @@ body.page-chat .side-nav .chat-nav-toggle { display: none; }
     transform: rotate(180deg);
   }
   body.page-chat .side-nav a.chat-nav-secondary {
-    flex: 0 0 calc((100% - 24px) / 5);
+    flex: 0 0 calc((100% - 30px) / 6);
     order: 0;
     justify-content: center !important;
     min-width: 0 !important;
