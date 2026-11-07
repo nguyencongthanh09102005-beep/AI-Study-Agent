@@ -270,6 +270,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const timetableGrid = document.getElementById("plannerTimetableGrid");
   const timetableEmpty = document.getElementById("plannerTimetableEmpty");
   const agendaCard = document.querySelector(".day-schedule-card");
+  const viewTodayAgenda = document.getElementById("viewTodayAgenda");
+  const plannerShowConflicts = document.getElementById("plannerShowConflicts");
   const quickTask = document.getElementById("openQuickTask");
   quickTask?.addEventListener("click", () => document.getElementById("addTaskButton")?.click());
 
@@ -621,6 +623,24 @@ document.addEventListener("DOMContentLoaded", () => {
     currentView = "week";
     renderView();
   });
+
+  // A compact summary only previews today's tasks; the existing day view
+  // remains the single place for completion, editing and rescheduling.
+  viewTodayAgenda?.addEventListener("click", () => {
+    selectedDate = cloneDate(new Date());
+    currentView = "day";
+    renderView();
+    agendaCard?.scrollIntoView({ block: "start" });
+  });
+
+  // Show the complete list so conflicts outside the displayed week are
+  // reachable too. Never automatically move or change scheduled tasks.
+  plannerShowConflicts?.addEventListener("click", () => {
+    currentView = "list";
+    renderView();
+    agendaCard?.scrollIntoView({ block: "start" });
+  });
+
 
   prevButton?.addEventListener("click", () => {
     if (currentView === "month") {
