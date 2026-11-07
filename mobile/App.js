@@ -15,6 +15,7 @@ import { api } from './src/api';
 import * as DocumentPicker from 'expo-document-picker';
 import FloatingStudyChat from './src/FloatingStudyChat';
 import StudyRoom from './src/StudyRoom';
+import ManualStudyRoom from './src/ManualStudyRoom';
 import ConnectionSettings from './src/ConnectionSettings';
 import { restoreServerAddress } from './src/serverAddressStorage';
 import StudyDateTimePicker from './src/StudyDateTimePicker';
@@ -66,7 +67,7 @@ function ErrorCard({ message }) {
   );
 }
 
-function HomeScreen({ dashboard, setTab, loading, onOpenStudy, onAskAI, onOpenQuiz, onOpenSubjectJourney }) {
+function HomeScreen({ dashboard, setTab, loading, onOpenStudy, onOpenManualStudy, onAskAI, onOpenQuiz, onOpenSubjectJourney }) {
   const user = dashboard?.user || {};
   const subjects = dashboard?.subjects || [];
   const tasks = dashboard?.tasks || [];
@@ -113,8 +114,10 @@ function HomeScreen({ dashboard, setTab, loading, onOpenStudy, onAskAI, onOpenQu
       <Text style={styles.sectionTitle}>Lịch học hôm nay & sắp tới</Text>
       {tasks.length ? tasks.slice(0, 5).map((task) => (
         <TouchableOpacity key={task.id} style={styles.card}
-          disabled={task.source !== 'roadmap' || !task.roadmap_session_id}
-          onPress={() => onOpenStudy(task.id)}>
+          disabled={!(task.source === 'roadmap' && task.roadmap_label) &&
+            !(task.source === 'manual' && task.document_id)}
+          onPress={() => task.source === 'manual'
+            ? onOpenManualStudy(task.id) : onOpenStudy(task.id)}>
           <View style={styles.rowBetween}>
             <Text style={[styles.cardTitle, { flex: 1 }]}>{task.title}</Text>
             <Text style={styles.time}>{String(task.study_at || '').slice(11, 16)}</Text>
@@ -123,7 +126,8 @@ function HomeScreen({ dashboard, setTab, loading, onOpenStudy, onAskAI, onOpenQu
             {task.subject_name || 'Tự học'} · {task.duration} phút
             {task.source === 'adaptive' ? ' · Adaptive' : ''}
           </Text>
-          {task.source === 'roadmap' && !!task.roadmap_session_id &&
+          {((task.source === 'roadmap' && !!task.roadmap_label) ||
+            (task.source === 'manual' && !!task.document_id)) &&
             <Text style={styles.smallActionText}>Vào không gian học tập →</Text>}
         </TouchableOpacity>
       )) : <View style={styles.card}><Text style={styles.muted}>Chưa có nhiệm vụ học nào.</Text></View>}
@@ -1163,7 +1167,7 @@ function QuizScreen({ subjects, userName, refreshData, initialSubjectId, initial
   );
 }
 
-function PlanScreen({ plan, subjects, userName, refreshData, onOpenStudy, onOpenRoadmap }) {
+function PlanScreen({ plan, subjects, userName, refreshData, onOpenStudy, onOpenManualStudy, onOpenRoadmap }) {
   const [local, setLocal] = useState(plan || {});
   const [mode, setMode] = useState('list');
   const [planView, setPlanView] = useState('week');
@@ -1579,15 +1583,19 @@ function PlanScreen({ plan, subjects, userName, refreshData, onOpenStudy, onOpen
           <View key={task.id} style={[styles.planTaskRow, task.done && styles.planTaskDone]}>
             <TouchableOpacity
               accessibilityRole="button"
-              accessibilityLabel={task.source === 'roadmap'
-                ? (task.done ? 'Đã học: ' : 'Mở không gian học tập: ') + task.title
+              accessibilityLabel={task.source === 'roadmap' || (task.source === 'manual' && task.document_id)
+                ? 'Mở không gian học tập: ' + task.title
                 : (task.done ? 'Đánh dấu chưa xong: ' : 'Hoàn thành: ') + task.title}
               style={[styles.planCheck, task.done && styles.planCheckDone]}
               disabled={busy || (task.source === 'roadmap' && !task.roadmap_label)}
               onPress={() => task.source === 'roadmap'
-                ? onOpenStudy(task.id) : run(() => api.toggleTask(task.id))}>
+                ? onOpenStudy(task.id)
+                : task.source === 'manual' && task.document_id
+                  ? onOpenManualStudy(task.id)
+                  : run(() => api.toggleTask(task.id))}>
               <Text style={[styles.planCheckText, task.done && styles.planCheckTextDone]}>
-                {task.done ? '✓' : task.source === 'roadmap' ? '▶' : ''}
+                {task.done ? '✓' : task.source === 'roadmap' ||
+                  (task.source === 'manual' && task.document_id) ? '▶' : ''}
               </Text>
             </TouchableOpacity>
             <View style={{ flex: 1, minWidth: 0 }}>
@@ -1600,9 +1608,17 @@ function PlanScreen({ plan, subjects, userName, refreshData, onOpenStudy, onOpen
               <Text style={styles.planTaskNote} numberOfLines={1}>
                 {task.roadmap_label || task.title}
               </Text>
-              {!!task.personal_document_name && <Text style={styles.planTaskDoc} numberOfLines={1}>
-                📄 {task.personal_document_name}
-              </Text>}
+              {!!task.personal_document_name && <>
+                <Text style={styles.planTaskDoc} numberOfLines={1}>
+                  📄 {task.personal_document_name}
+                </Text>
+                <TouchableOpacity accessibilityRole="button"
+                  accessibilityLabel={'Vào Không gian tự học: '+task.title}
+                  onPress={()=>onOpenManualStudy(task.id)}
+                  style={{minHeight:42,justifyContent:'center'}}>
+                  <Text style={styles.smallActionText}>▶ Vào Không gian tự học →</Text>
+                </TouchableOpacity>
+              </>}
               {task.source === 'roadmap' && !!task.roadmap_session_id && (
                 task.roadmap_label ? <TouchableOpacity onPress={() => onOpenStudy(task.id)}
                   accessibilityRole="button" accessibilityLabel={'Bắt đầu học: '+task.title}
@@ -1859,6 +1875,7 @@ export default function App() {
   const [plan, setPlan] = useState(null);
   const [loading, setLoading] = useState(false);
   const [activeStudyTask, setActiveStudyTask] = useState(null);
+  const [activeManualTask, setActiveManualTask] = useState(null);
   const [activeLesson, setActiveLesson] = useState(null);
   const [quizSubjectId, setQuizSubjectId] = useState(null);
   const [quizToOpenId,setQuizToOpenId]=useState(null);
@@ -1867,6 +1884,7 @@ export default function App() {
   const [subjectsEntry, setSubjectsEntry] = useState(null);
   const openSubjectJourney = (subjectId, mode = 'roadmap') => {
     setActiveStudyTask(null);
+    setActiveManualTask(null);
     setActiveLesson(null);
     setSubjectsEntry({subjectId, mode, token: Date.now()});
     setTab('subjects');
@@ -1875,17 +1893,25 @@ export default function App() {
     setQuizSubjectId(subjectId || null);
     setQuizToOpenId(quizId || null);
     setActiveStudyTask(null);
+    setActiveManualTask(null);
     setActiveLesson(null);
     setTab('quiz');
   };
 
   const openStudyRoom = taskId => {
     setActiveLesson(null);
+    setActiveManualTask(null);
     setActiveStudyTask(taskId);
+  };
+  const openManualStudy = taskId => {
+    setActiveLesson(null);
+    setActiveStudyTask(null);
+    setActiveManualTask(taskId);
   };
   const closeStudyRoom = () => {
     setActiveLesson(null);
     setActiveStudyTask(null);
+    setActiveManualTask(null);
     refreshData().catch(() => {});
   };
 
@@ -1940,6 +1966,7 @@ export default function App() {
       setQuizSubjectId(null);
       setQuizToOpenId(null);
       setActiveStudyTask(null);
+      setActiveManualTask(null);
       setActiveLesson(null);
       setDashboard(null);
       setSubjects([]);
@@ -1956,6 +1983,11 @@ export default function App() {
   const userName = dashboard?.user?.name || '';
 
   const screen = useMemo(() => {
+    if (activeManualTask) return (
+      <ManualStudyRoom key={activeManualTask} taskId={activeManualTask}
+        onBack={closeStudyRoom}
+        onOpenQuiz={info => openQuiz(info?.subjectId,info?.quizId)} />
+    );
     if (activeStudyTask) return (
       <StudyRoom key={activeStudyTask} taskId={activeStudyTask}
         onBack={closeStudyRoom} onContext={setActiveLesson}
@@ -1981,6 +2013,7 @@ export default function App() {
       userName={userName} refreshData={refreshData} />;
     if (tab === 'plan') return <PlanScreen plan={plan} subjects={subjects} userName={userName}
       refreshData={refreshData} onOpenStudy={openStudyRoom}
+      onOpenManualStudy={openManualStudy}
       onOpenRoadmap={() => openSubjectJourney(null, 'roadmap')} />;
     return (
       <HomeScreen
@@ -1988,13 +2021,14 @@ export default function App() {
         setTab={setTab}
         loading={loading}
         onOpenStudy={openStudyRoom}
+        onOpenManualStudy={openManualStudy}
         onAskAI={() => setChatOpenSignal(value => value+1)}
         onOpenSubjectJourney={openSubjectJourney}
         onOpenQuiz={openQuiz}
       />
     );
   }, [tab, subjects, dashboard, plan, loading, userName, loggedIn,
-      activeStudyTask, activeLesson?.subjectId, quizSubjectId, quizToOpenId, subjectsEntry]);
+      activeStudyTask, activeManualTask, activeLesson?.subjectId, quizSubjectId, quizToOpenId, subjectsEntry]);
 
   if (checkingSession) {
     return (
@@ -2013,6 +2047,7 @@ export default function App() {
         setSubjects([]);
         setPlan(null);
         setActiveStudyTask(null);
+        setActiveManualTask(null);
         setActiveLesson(null);
         setTab('home');
         setShowConnectionSettings(false);
@@ -2040,6 +2075,7 @@ export default function App() {
             style={styles.navItem}
             onPress={() => {
               setActiveStudyTask(null);
+              setActiveManualTask(null);
               setActiveLesson(null);
               setSubjectsEntry(null);
               setTab(key);
@@ -2051,8 +2087,8 @@ export default function App() {
           </TouchableOpacity>
         ))}
       </View>
-      <FloatingStudyChat subjects={subjects} lesson={activeLesson}
-        openSignal={chatOpenSignal}/>
+      {!activeManualTask && <FloatingStudyChat subjects={subjects} lesson={activeLesson}
+        openSignal={chatOpenSignal}/>} 
     </SafeAreaView>
   );
 }
