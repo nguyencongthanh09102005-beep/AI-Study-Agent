@@ -64,7 +64,7 @@ function ErrorCard({ message }) {
   );
 }
 
-function HomeScreen({ dashboard, setTab, loading, onOpenStudy, onAskAI, onOpenQuiz }) {
+function HomeScreen({ dashboard, setTab, loading, onOpenStudy, onAskAI, onOpenQuiz, onOpenSubjectJourney }) {
   const user = dashboard?.user || {};
   const subjects = dashboard?.subjects || [];
   const tasks = dashboard?.tasks || [];
@@ -86,10 +86,18 @@ function HomeScreen({ dashboard, setTab, loading, onOpenStudy, onAskAI, onOpenQu
       {dashboard?.next_best_action && (
         <TouchableOpacity style={styles.recommendCard}
           onPress={() => {
-            if (dashboard.next_best_action.kind === 'weakness')
-              onOpenQuiz(dashboard.next_best_action.subject_id || null);
-            else if (['task','deadline','plan'].includes(dashboard.next_best_action.kind)) setTab('plan');
-            else onAskAI();
+            const item = dashboard.next_best_action;
+            if (item.kind === 'weakness' || item.kind === 'check') {
+              onOpenQuiz(item.subject_id || null);
+            } else if (item.kind === 'setup') {
+              onOpenSubjectJourney(null, 'create');
+            } else if (item.kind === 'plan') {
+              onOpenSubjectJourney(item.subject_id || null, 'roadmap');
+            } else if (item.kind === 'task' || item.kind === 'deadline') {
+              setTab('plan');
+            } else {
+              onAskAI();
+            }
           }}>
           <Text style={styles.eyebrow}>✦ STUDY AGENT ĐỀ XUẤT</Text>
           <Text style={styles.cardTitle}>{dashboard.next_best_action.title}</Text>
@@ -97,8 +105,6 @@ function HomeScreen({ dashboard, setTab, loading, onOpenStudy, onAskAI, onOpenQu
           <Text style={styles.smallActionText}>Xem việc nên làm tiếp →</Text>
         </TouchableOpacity>
       )}
-
-      <Text style={styles.muted}>Bấm nút 🤖 ở góc màn hình để hỏi AI bất kỳ lúc nào.</Text>
 
       {loading && <ActivityIndicator />}
 
@@ -175,7 +181,7 @@ function SubjectForm({ initial, onSave, onCancel, busy }) {
   );
 }
 
-function SubjectsScreen({ subjects, userName, refreshData, onOpenStudy, onOpenQuiz }) {
+function SubjectsScreen({ subjects, userName, refreshData, onOpenStudy, onOpenQuiz, entryIntent }) {
   const [mode, setMode] = useState('list');
   const [selectedId, setSelectedId] = useState(null);
   const [editing, setEditing] = useState(null);
@@ -194,7 +200,7 @@ function SubjectsScreen({ subjects, userName, refreshData, onOpenStudy, onOpenQu
   });
   const toggleSection = key => setExpanded(old => ({...old,[key]:!old[key]}));
 
-  const loadDetail = async (id) => {
+  const loadDetail = async (id, revealRoadmap = false) => {
     setBusy(true);
     setError('');
     try {
@@ -204,7 +210,7 @@ function SubjectsScreen({ subjects, userName, refreshData, onOpenStudy, onOpenQu
           chapters:[],sessions:[]})),
       ]);
       setRoadmap(roadmapData);
-      setExpanded({roadmap:false,personal:false,shared:false,weaknesses:false});
+      setExpanded({roadmap:revealRoadmap,personal:false,shared:false,weaknesses:false});
       setSelectedId(id);
       setDetail(subjectData);
       setDocuments(documentData.documents || []);
@@ -214,6 +220,48 @@ function SubjectsScreen({ subjects, userName, refreshData, onOpenStudy, onOpenQu
     } finally {
       setBusy(false);
     }
+  };
+
+  // Mobile keeps four bottom tabs. A recommendation may deep-link to the
+  // verified roadmap inside Môn học without creating a duplicate plan flow.
+  useEffect(() => {
+    if (!entryIntent) return;
+    if (entryIntent.mode === 'create') {
+      setEditing(null);
+      setError('');
+      setMode('form');
+    } else if (entryIntent.subjectId) {
+      loadDetail(entryIntent.subjectId, true);
+    } else {
+      setMode('list');
+    }
+  }, [entryIntent?.token]);
+
+  const confirmScheduleRoadmap = () => {
+    if (!selectedId || !roadmap?.ready || busy) return;
+    const missing = (roadmap.sessions || []).filter(item => !item.scheduled_task_id).length;
+    if (!missing) {
+      Alert.alert('Đã có lịch', 'Các buổi trong lộ trình đã có lịch học hợp lệ.');
+      return;
+    }
+    Alert.alert(
+      'Đưa lộ trình vào Kế hoạch học?',
+      'Hệ thống sẽ xếp các buổi chưa có lịch vào khung giờ trống (thứ Hai–thứ Bảy). Các buổi đã có lịch sẽ được giữ nguyên.',
+      [
+        {text:'Hủy',style:'cancel'},
+        {text:'Xác nhận xếp lịch',onPress:async () => {
+          setBusy(true); setError('');
+          try {
+            const result = await api.scheduleRoadmap(selectedId);
+            await loadDetail(selectedId, true);
+            await refreshData();
+            Alert.alert('Đã cập nhật lịch', result.message || 'Các buổi mới đã được xếp lịch.');
+          } catch (err) {
+            setError(err.message || 'Không thể đưa lộ trình vào lịch.');
+          } finally { setBusy(false); }
+        }},
+      ]
+    );
   };
 
   const saveSubject = async (payload) => {
@@ -455,6 +503,15 @@ function SubjectsScreen({ subjects, userName, refreshData, onOpenStudy, onOpenQu
           {!!roadmap?.sessions?.length && <Text style={[styles.cardTitle,{marginTop:13}]}>
             Lộ trình theo buổi ({roadmap.sessions.length})
           </Text>}
+          {!!roadmap?.ready && (roadmap.sessions || []).some(item => !item.scheduled_task_id) && (
+            <TouchableOpacity style={styles.primaryButton} disabled={busy}
+              accessibilityRole="button" onPress={confirmScheduleRoadmap}>
+              <Text style={styles.primaryButtonText}>▦ Đưa buổi chưa có lịch vào Kế hoạch</Text>
+            </TouchableOpacity>
+          )}
+          {!!roadmap?.ready && <Text style={styles.muted}>
+            {(roadmap.sessions || []).filter(item => !!item.scheduled_task_id).length}/{roadmap.sessions.length} buổi đã có lịch. Những buổi cũ sẽ không bị tự dời.
+          </Text>}
           {(roadmap?.sessions || []).map((lesson,index)=>(
             <TouchableOpacity key={'lesson-'+index}
               style={{paddingVertical:11,borderTopWidth:1,borderTopColor:'#E6EAF5'}}
@@ -467,7 +524,7 @@ function SubjectsScreen({ subjects, userName, refreshData, onOpenStudy, onOpenQu
                   : 'Chưa đưa vào thời khóa biểu'}
               </Text>
               <Text style={styles.smallActionText}>
-                {lesson.scheduled_task_id ? 'Vào học →' : 'Tạo lịch cho buổi này trên Web'}
+                {lesson.scheduled_task_id ? 'Vào học →' : 'Chưa có lịch · Chọn xếp lịch ở trên'}
               </Text>
             </TouchableOpacity>
           ))}
