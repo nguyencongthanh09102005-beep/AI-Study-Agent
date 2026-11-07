@@ -135,6 +135,53 @@ def mobile_roadmap(subject_id):
         conn.close()
 
 
+@mobile_learning_bp.route(
+    "/api/mobile/subjects/<int:subject_id>/roadmap/schedule", methods=["POST"]
+)
+def mobile_schedule_roadmap(subject_id):
+    """Opt-in scheduling through the *same* safe importer as Web.
+
+    Never create a parallel AI plan or move existing scheduled sessions.
+    The client must first show the person a confirmation.
+    """
+    project = _project()
+    uid, error = _student(project)
+    if error:
+        return error
+    payload = request.get_json(silent=True) or {}
+    if payload.get("confirm") is not True:
+        return jsonify({"error": "Hãy xác nhận trước khi đưa lộ trình vào lịch."}), 400
+
+    conn = project.db()
+    try:
+        subject, units, sessions, notice = _verified_course(
+            conn, project, uid, subject_id,
+        )
+        if subject is None:
+            return jsonify({"error": notice}), 404
+        if not sessions:
+            return jsonify({"error": notice or "Lộ trình chưa xác nhận."}), 409
+        from course_schedule_sync import import_roadmap_lessons
+        try:
+            summary = import_roadmap_lessons(
+                conn, uid, subject_id, sessions, project.now(),
+                reschedule_existing=False,
+            )
+        except ValueError as exc:
+            conn.rollback()
+            return jsonify({"error": str(exc)}), 409
+        if summary["created"]:
+            project.recalculate_subject_progress(uid, subject_id, conn)
+        conn.commit()
+        return jsonify({"summary": summary,
+                        "message": (
+                            f"Đã xếp {summary['created']} buổi mới. "
+                            f"Giữ nguyên {summary['existing']} buổi đã có."
+                        )})
+    finally:
+        conn.close()
+
+
 @mobile_learning_bp.route("/api/mobile/study-room/<int:task_id>")
 def mobile_study_room(task_id):
     project = _project()

@@ -67,7 +67,7 @@ assert.equal(planned[0].duration,45);
 const app = fs.readFileSync(path.join(__dirname, '../mobile/App.js'), 'utf8');
 assert.ok(app.includes('getWeekDates(selectedDate)'), 'Week calendar must render');
 assert.ok(app.includes("planView === 'list'"), 'List view must remain available');
-assert.ok(app.includes('getPlanOverview(tasks, selectedDate)'), 'Progress based on selected week');
+assert.ok(app.includes('const completedToday = todayTasks.filter'), 'Today completion stays visible without duplicate weekly progress card');
 assert.ok(app.includes('splitReminders(reminders)'), 'Completed deadlines must be grouped');
 assert.ok(app.includes('accessibilityState={{ expanded: showCompletedReminders }}'));
 const connection = fs.readFileSync(
@@ -80,5 +80,5 @@ assert.ok(app.includes('secureTextEntry={!showConfirm}'));
 assert.ok(!app.includes('onAdminRegister'), 'No self-service mobile Admin registration');
 assert.ok(!app.includes('api.adminLogin'), 'Admin login stays exclusively in Web interface');
 assert.ok(app.includes("muted: { color: '#53678B'"), 'Improve helper-text contrast');
-assert.ok(app.includes("navLabel: { fontSize: 10, color: '#637493'"), 'Readable bottom navigation');
+assert.ok(app.includes("navLabel: { fontSize: 11, color: '#637493'"), 'Readable bottom navigation');
 console.log('Mobile readability, planner week and deadline grouping QA passed');

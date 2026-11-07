@@ -16,6 +16,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import FloatingStudyChat from './src/FloatingStudyChat';
 import StudyRoom from './src/StudyRoom';
 import ConnectionSettings from './src/ConnectionSettings';
+import StudyDateTimePicker from './src/StudyDateTimePicker';
 const {
   localDateKey, addDays, getWeekDates, getPlanOverview,
   getVisiblePlanTasks, splitReminders, findTaskConflicts,
@@ -64,7 +65,7 @@ function ErrorCard({ message }) {
   );
 }
 
-function HomeScreen({ dashboard, setTab, loading, onOpenStudy, onAskAI, onOpenQuiz }) {
+function HomeScreen({ dashboard, setTab, loading, onOpenStudy, onAskAI, onOpenQuiz, onOpenSubjectJourney }) {
   const user = dashboard?.user || {};
   const subjects = dashboard?.subjects || [];
   const tasks = dashboard?.tasks || [];
@@ -86,10 +87,18 @@ function HomeScreen({ dashboard, setTab, loading, onOpenStudy, onAskAI, onOpenQu
       {dashboard?.next_best_action && (
         <TouchableOpacity style={styles.recommendCard}
           onPress={() => {
-            if (dashboard.next_best_action.kind === 'weakness')
-              onOpenQuiz(dashboard.next_best_action.subject_id || null);
-            else if (['task','deadline','plan'].includes(dashboard.next_best_action.kind)) setTab('plan');
-            else onAskAI();
+            const item = dashboard.next_best_action;
+            if (item.kind === 'weakness' || item.kind === 'check') {
+              onOpenQuiz(item.subject_id || null);
+            } else if (item.kind === 'setup') {
+              onOpenSubjectJourney(null, 'create');
+            } else if (item.kind === 'plan') {
+              onOpenSubjectJourney(item.subject_id || null, 'roadmap');
+            } else if (item.kind === 'task' || item.kind === 'deadline') {
+              setTab('plan');
+            } else {
+              onAskAI();
+            }
           }}>
           <Text style={styles.eyebrow}>✦ STUDY AGENT ĐỀ XUẤT</Text>
           <Text style={styles.cardTitle}>{dashboard.next_best_action.title}</Text>
@@ -97,8 +106,6 @@ function HomeScreen({ dashboard, setTab, loading, onOpenStudy, onAskAI, onOpenQu
           <Text style={styles.smallActionText}>Xem việc nên làm tiếp →</Text>
         </TouchableOpacity>
       )}
-
-      <Text style={styles.muted}>Bấm nút 🤖 ở góc màn hình để hỏi AI bất kỳ lúc nào.</Text>
 
       {loading && <ActivityIndicator />}
 
@@ -175,7 +182,7 @@ function SubjectForm({ initial, onSave, onCancel, busy }) {
   );
 }
 
-function SubjectsScreen({ subjects, userName, refreshData, onOpenStudy, onOpenQuiz }) {
+function SubjectsScreen({ subjects, userName, refreshData, onOpenStudy, onOpenQuiz, entryIntent }) {
   const [mode, setMode] = useState('list');
   const [selectedId, setSelectedId] = useState(null);
   const [editing, setEditing] = useState(null);
@@ -194,7 +201,7 @@ function SubjectsScreen({ subjects, userName, refreshData, onOpenStudy, onOpenQu
   });
   const toggleSection = key => setExpanded(old => ({...old,[key]:!old[key]}));
 
-  const loadDetail = async (id) => {
+  const loadDetail = async (id, revealRoadmap = false) => {
     setBusy(true);
     setError('');
     try {
@@ -204,7 +211,7 @@ function SubjectsScreen({ subjects, userName, refreshData, onOpenStudy, onOpenQu
           chapters:[],sessions:[]})),
       ]);
       setRoadmap(roadmapData);
-      setExpanded({roadmap:false,personal:false,shared:false,weaknesses:false});
+      setExpanded({roadmap:revealRoadmap,personal:false,shared:false,weaknesses:false});
       setSelectedId(id);
       setDetail(subjectData);
       setDocuments(documentData.documents || []);
@@ -214,6 +221,48 @@ function SubjectsScreen({ subjects, userName, refreshData, onOpenStudy, onOpenQu
     } finally {
       setBusy(false);
     }
+  };
+
+  // Mobile keeps four bottom tabs. A recommendation may deep-link to the
+  // verified roadmap inside Môn học without creating a duplicate plan flow.
+  useEffect(() => {
+    if (!entryIntent) return;
+    if (entryIntent.mode === 'create') {
+      setEditing(null);
+      setError('');
+      setMode('form');
+    } else if (entryIntent.subjectId) {
+      loadDetail(entryIntent.subjectId, true);
+    } else {
+      setMode('list');
+    }
+  }, [entryIntent?.token]);
+
+  const confirmScheduleRoadmap = () => {
+    if (!selectedId || !roadmap?.ready || busy) return;
+    const missing = (roadmap.sessions || []).filter(item => !item.scheduled_task_id).length;
+    if (!missing) {
+      Alert.alert('Đã có lịch', 'Các buổi trong lộ trình đã có lịch học hợp lệ.');
+      return;
+    }
+    Alert.alert(
+      'Đưa lộ trình vào Kế hoạch học?',
+      'Hệ thống sẽ xếp các buổi chưa có lịch vào khung giờ trống (thứ Hai–thứ Bảy). Các buổi đã có lịch sẽ được giữ nguyên.',
+      [
+        {text:'Hủy',style:'cancel'},
+        {text:'Xác nhận xếp lịch',onPress:async () => {
+          setBusy(true); setError('');
+          try {
+            const result = await api.scheduleRoadmap(selectedId);
+            await loadDetail(selectedId, true);
+            await refreshData();
+            Alert.alert('Đã cập nhật lịch', result.message || 'Các buổi mới đã được xếp lịch.');
+          } catch (err) {
+            setError(err.message || 'Không thể đưa lộ trình vào lịch.');
+          } finally { setBusy(false); }
+        }},
+      ]
+    );
   };
 
   const saveSubject = async (payload) => {
@@ -455,6 +504,15 @@ function SubjectsScreen({ subjects, userName, refreshData, onOpenStudy, onOpenQu
           {!!roadmap?.sessions?.length && <Text style={[styles.cardTitle,{marginTop:13}]}>
             Lộ trình theo buổi ({roadmap.sessions.length})
           </Text>}
+          {!!roadmap?.ready && (roadmap.sessions || []).some(item => !item.scheduled_task_id) && (
+            <TouchableOpacity style={styles.primaryButton} disabled={busy}
+              accessibilityRole="button" onPress={confirmScheduleRoadmap}>
+              <Text style={styles.primaryButtonText}>▦ Đưa buổi chưa có lịch vào Kế hoạch</Text>
+            </TouchableOpacity>
+          )}
+          {!!roadmap?.ready && <Text style={styles.muted}>
+            {(roadmap.sessions || []).filter(item => !!item.scheduled_task_id).length}/{roadmap.sessions.length} buổi đã có lịch. Những buổi cũ sẽ không bị tự dời.
+          </Text>}
           {(roadmap?.sessions || []).map((lesson,index)=>(
             <TouchableOpacity key={'lesson-'+index}
               style={{paddingVertical:11,borderTopWidth:1,borderTopColor:'#E6EAF5'}}
@@ -467,7 +525,7 @@ function SubjectsScreen({ subjects, userName, refreshData, onOpenStudy, onOpenQu
                   : 'Chưa đưa vào thời khóa biểu'}
               </Text>
               <Text style={styles.smallActionText}>
-                {lesson.scheduled_task_id ? 'Vào học →' : 'Tạo lịch cho buổi này trên Web'}
+                {lesson.scheduled_task_id ? 'Vào học →' : 'Chưa có lịch · Chọn xếp lịch ở trên'}
               </Text>
             </TouchableOpacity>
           ))}
@@ -600,13 +658,16 @@ function SubjectsScreen({ subjects, userName, refreshData, onOpenStudy, onOpenQu
   );
 }
 
-function SubjectSelector({ subjects, selectedId, onSelect }) {
+function SubjectSelector({ subjects, selectedId, onSelect, disabled = false }) {
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 46, marginBottom: 10 }}>
       <View style={{ flexDirection: 'row', gap: 8 }}>
         {subjects.map((subject) => (
           <TouchableOpacity
             key={subject.id}
+            disabled={disabled}
+            accessibilityRole="button"
+            accessibilityState={{selected:selectedId===subject.id,disabled}}
             onPress={() => onSelect(subject.id)}
             style={[
               styles.pill,
@@ -1101,7 +1162,7 @@ function QuizScreen({ subjects, userName, refreshData, initialSubjectId, initial
   );
 }
 
-function PlanScreen({ plan, subjects, userName, refreshData, onOpenStudy }) {
+function PlanScreen({ plan, subjects, userName, refreshData, onOpenStudy, onOpenRoadmap }) {
   const [local, setLocal] = useState(plan || {});
   const [mode, setMode] = useState('list');
   const [planView, setPlanView] = useState('week');
@@ -1118,6 +1179,9 @@ function PlanScreen({ plan, subjects, userName, refreshData, onOpenStudy }) {
   const [taskAt, setTaskAt] = useState('');
   const [taskDuration, setTaskDuration] = useState('45');
   const [taskNote, setTaskNote] = useState('');
+  const [taskDocumentId, setTaskDocumentId] = useState(null);
+  const [taskDocuments, setTaskDocuments] = useState([]);
+  const [uploadingTaskDoc, setUploadingTaskDoc] = useState(false);
   const [reminders, setReminders] = useState([]);
   const [reminderEdit, setReminderEdit] = useState(null);
   const [reminderTitle, setReminderTitle] = useState('');
@@ -1160,12 +1224,44 @@ function PlanScreen({ plan, subjects, userName, refreshData, onOpenStudy }) {
 
   const openTask = (task = null) => {
     setTaskEdit(task);
+    setTaskDocumentId(task?.document_id || null);
     setTaskTitle(task?.title || '');
     setTaskAt(task?.study_at || localInputDate(1, 19, 0));
     setTaskDuration(String(task?.duration || 45));
     setTaskNote(task?.note || '');
     setSelectedSubject(task?.subject_id || subjects[0]?.id || null);
     setMode('task');
+  };
+
+  useEffect(() => {
+    if (mode !== 'task') return;
+    let active = true;
+    api.documents()
+      .then(data => { if (active) setTaskDocuments(data.documents || []); })
+      .catch(err => { if (active) setError(err.message || 'Chưa đọc được tài liệu cá nhân.'); });
+    return () => { active = false; };
+  }, [mode]);
+
+  const uploadTaskDocument = async () => {
+    if (!selectedSubject || uploadingTaskDoc) {
+      if (!selectedSubject) setError('Hãy chọn môn học trước khi tải tài liệu.');
+      return;
+    }
+    try {
+      const picked = await DocumentPicker.getDocumentAsync({
+        type:['application/pdf','text/plain','text/markdown'],
+        copyToCacheDirectory:true,multiple:false,
+      });
+      if (picked.canceled || !picked.assets?.length) return;
+      setUploadingTaskDoc(true);
+      setError('');
+      const uploaded = await api.uploadDocument(selectedSubject,picked.assets[0]);
+      setTaskDocumentId(uploaded.document.id);
+      const docs = await api.documents();
+      setTaskDocuments(docs.documents || []);
+    } catch (err) {
+      setError(err.message || 'Không tải được tài liệu cá nhân.');
+    } finally { setUploadingTaskDoc(false); }
   };
 
   const openReminder = (reminder = null) => {
@@ -1199,7 +1295,9 @@ function PlanScreen({ plan, subjects, userName, refreshData, onOpenStudy }) {
       <ErrorCard message={error} />
       {busy && <ActivityIndicator />}
       <Text style={styles.fieldLabel}>Môn học</Text>
-      <SubjectSelector subjects={subjects} selectedId={selectedSubject} onSelect={setSelectedSubject} />
+      <SubjectSelector subjects={subjects} selectedId={selectedSubject}
+        disabled={mode === 'task' && !!taskEdit?.document_id}
+        onSelect={id => { setSelectedSubject(id); if (mode === 'task' && !taskEdit?.document_id) setTaskDocumentId(null); }} />
       {mode === 'generate' ? (
         <>
           {entryField('Mục tiêu học tập', goal, setGoal, 'Ví dụ: Đạt 8 điểm cuối kỳ')}
@@ -1236,9 +1334,39 @@ function PlanScreen({ plan, subjects, userName, refreshData, onOpenStudy }) {
               <Text style={styles.smallActionText}>Ngày mai 19:00</Text>
             </TouchableOpacity>
           </View>
-          {entryField('Ngày giờ (YYYY-MM-DDTHH:MM)', taskAt, setTaskAt, '2026-10-15T19:00')}
+          <StudyDateTimePicker label="Ngày và giờ học" value={taskAt} onChange={setTaskAt} disabled={busy} />
           {entryField('Thời lượng (phút)', taskDuration, setTaskDuration, '45')}
           {entryField('Ghi chú', taskNote, setTaskNote, 'Nội dung cần ôn tập', true)}
+          {(!taskEdit || taskEdit.source === 'manual') && <>
+            <Text style={styles.fieldLabel}>Tài liệu cá nhân cho buổi tự học (không bắt buộc)</Text>
+            {taskEdit?.document_id ? (
+              <Text style={styles.muted}>📄 {taskEdit.personal_document_name || 'Tài liệu đã gắn'} · Để bảo toàn lịch sử học, không đổi tài liệu của buổi này.</Text>
+            ) : <>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{maxHeight:52,marginBottom:9}}>
+                <TouchableOpacity style={[styles.smallAction,{marginRight:8},
+                  !taskDocumentId && styles.docSelected]}
+                  onPress={()=>setTaskDocumentId(null)}>
+                  <Text style={[styles.smallActionText,!taskDocumentId && styles.docSelectedText]}>Không gắn tài liệu</Text>
+                </TouchableOpacity>
+                {taskDocuments.filter(doc=>Number(doc.subject_id)===Number(selectedSubject)
+                  && Number(doc.extracted_chars)>0).map(doc=>(
+                  <TouchableOpacity key={doc.id} style={[styles.smallAction,{marginRight:8},
+                    taskDocumentId===doc.id && styles.docSelected]}
+                    accessibilityRole="button"
+                    accessibilityState={{selected:taskDocumentId===doc.id}}
+                    onPress={()=>setTaskDocumentId(doc.id)}>
+                    <Text numberOfLines={1} style={[styles.smallActionText,
+                      taskDocumentId===doc.id && styles.docSelectedText]}>📄 {doc.original_name}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <TouchableOpacity disabled={busy||uploadingTaskDoc} accessibilityRole="button"
+                onPress={uploadTaskDocument} style={styles.docUpload}>
+                <Text style={styles.docUploadText}>{uploadingTaskDoc?'Đang tải tài liệu…':'＋ Tải tài liệu mới và chọn cho buổi này'}</Text>
+              </TouchableOpacity>
+              <Text style={styles.helperNote}>File mới được lưu vào kho cá nhân của môn ngay sau khi tải lên, kể cả khi bạn hủy tạo buổi.</Text>
+            </>}
+          </>}
           {findTaskConflicts(local?.tasks || [],{
             study_at:taskAt,duration:Number(taskDuration)
           },taskEdit?.id).length>0 && (
@@ -1251,9 +1379,12 @@ function PlanScreen({ plan, subjects, userName, refreshData, onOpenStudy }) {
               </Text>
             </View>
           )}
-          <TouchableOpacity style={styles.primaryButton} disabled={busy} onPress={() => {
+          <TouchableOpacity style={styles.primaryButton} disabled={busy||uploadingTaskDoc} onPress={() => {
+            if (uploadingTaskDoc) return;
             const payload={subject_id:selectedSubject,title:taskTitle,
-              study_at:taskAt,duration:Number(taskDuration),note:taskNote};
+              study_at:taskAt,duration:Number(taskDuration),note:taskNote,
+              ...(!taskEdit || taskEdit.source === 'manual'
+                ? {document_id:taskDocumentId} : {})};
             const save=()=>run(()=>taskEdit
               ?api.updateTask(taskEdit.id,payload):api.createTask(payload));
             const conflicts=findTaskConflicts(local?.tasks||[],payload,taskEdit?.id);
@@ -1277,7 +1408,7 @@ function PlanScreen({ plan, subjects, userName, refreshData, onOpenStudy }) {
               </TouchableOpacity>
             ))}
           </View>
-          {entryField('Deadline (YYYY-MM-DDTHH:MM)', reminderAt, setReminderAt, '2026-10-20T23:59')}
+          <StudyDateTimePicker label="Hạn cần hoàn thành" value={reminderAt} onChange={setReminderAt} disabled={busy} />
           <TouchableOpacity style={styles.primaryButton} disabled={busy} onPress={() => run(() => (
             reminderEdit
               ? api.updateReminder(reminderEdit.id, {
@@ -1297,7 +1428,11 @@ function PlanScreen({ plan, subjects, userName, refreshData, onOpenStudy }) {
 
   const tasks = local?.tasks || [];
   const weekDays = getWeekDates(selectedDate);
-  const overview = getPlanOverview(tasks, selectedDate);
+  const todayTasks = tasks.filter(item =>
+    String(item.study_at || '').slice(0,10) === localDateKey(new Date()));
+  const completedToday = todayTasks.filter(item => !!item.done).length;
+  const conflictingTasks = tasks.filter(task =>
+    findTaskConflicts(tasks,task,task.id).length > 0);
   const displayedTasks = getVisiblePlanTasks(tasks, selectedDate, planView === 'list');
   const { pending, completed } = splitReminders(reminders);
   const pendingVisible = showAllPending ? pending : pending.slice(0, 5);
@@ -1340,12 +1475,13 @@ function PlanScreen({ plan, subjects, userName, refreshData, onOpenStudy }) {
 
   return (
     <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
-      <Header title="Kế hoạch học tập" subtitle="Học theo lịch · Theo dõi tiến độ · Ôn tập cùng AI" userName={userName} />
+      <Header title="Kế hoạch học tập" subtitle="Xếp lịch học và theo dõi deadline" userName={userName} />
       <ErrorCard message={error} />
       {busy && <ActivityIndicator />}
-      <TouchableOpacity style={styles.primaryButton} disabled={busy} onPress={() => setMode('generate')}>
-        <Text style={styles.primaryButtonText}>✦ Tạo kế hoạch bằng AI</Text>
-      </TouchableOpacity>
+      <View style={styles.planTodaySummary}>
+        <Text style={styles.planTodaySummaryLabel}>Hôm nay</Text>
+        <Text style={styles.planTodaySummaryValue}>{completedToday}/{todayTasks.length} buổi đã hoàn thành</Text>
+      </View>
       <View style={styles.planToolbar}>
         <TouchableOpacity style={styles.smallAction} disabled={busy} onPress={() => openTask()}>
           <Text style={styles.smallActionText}>＋ Buổi học</Text>
@@ -1353,8 +1489,8 @@ function PlanScreen({ plan, subjects, userName, refreshData, onOpenStudy }) {
         <TouchableOpacity style={styles.smallAction} disabled={busy} onPress={() => openReminder()}>
           <Text style={styles.smallActionText}>＋ Deadline</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.smallAction} disabled={busy} onPress={() => run(async () => {}, 'list')}>
-          <Text style={styles.smallActionText}>↻ Làm mới</Text>
+        <TouchableOpacity style={styles.smallAction} disabled={busy} onPress={onOpenRoadmap}>
+          <Text style={styles.smallActionText}>⇢ Lộ trình học</Text>
         </TouchableOpacity>
       </View>
 
@@ -1435,30 +1571,45 @@ function PlanScreen({ plan, subjects, userName, refreshData, onOpenStudy }) {
         )}
         {!displayedTasks.length && (
           <Text style={styles.planEmptyText}>
-            {planView === 'week' ? 'Ngày này chưa có lịch học. Chọn ngày khác hoặc tạo kế hoạch mới.' : 'Chưa có nhiệm vụ học. Hãy tạo kế hoạch để bắt đầu.'}
+            {planView === 'week' ? 'Ngày này chưa có lịch. Chọn ngày khác hoặc thêm buổi học.' : 'Chưa có buổi học nào. Mở Lộ trình học để xếp lịch, hoặc thêm buổi tự học.'}
           </Text>
         )}
         {displayedTasks.map(task => (
           <View key={task.id} style={[styles.planTaskRow, task.done && styles.planTaskDone]}>
             <TouchableOpacity
               accessibilityRole="button"
-              accessibilityLabel={(task.done ? 'Đánh dấu chưa xong: ' : 'Hoàn thành: ') + task.title}
+              accessibilityLabel={task.source === 'roadmap'
+                ? (task.done ? 'Đã học: ' : 'Mở không gian học tập: ') + task.title
+                : (task.done ? 'Đánh dấu chưa xong: ' : 'Hoàn thành: ') + task.title}
               style={[styles.planCheck, task.done && styles.planCheckDone]}
-              disabled={busy} onPress={() => run(() => api.toggleTask(task.id))}>
-              <Text style={[styles.planCheckText, task.done && styles.planCheckTextDone]}>{task.done ? '✓' : ''}</Text>
+              disabled={busy || (task.source === 'roadmap' && !task.roadmap_label)}
+              onPress={() => task.source === 'roadmap'
+                ? onOpenStudy(task.id) : run(() => api.toggleTask(task.id))}>
+              <Text style={[styles.planCheckText, task.done && styles.planCheckTextDone]}>
+                {task.done ? '✓' : task.source === 'roadmap' ? '▶' : ''}
+              </Text>
             </TouchableOpacity>
             <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={[styles.planTaskTitle, task.done && styles.planDoneTitle]}>{task.title}</Text>
-              <Text style={styles.planTaskMeta}>
-                {String(task.study_at || '').replace('T', ' ').slice(0, 16)} · {task.subject_name || 'Tự học'} · {task.duration} phút
+              <Text style={[styles.planTaskTitle, task.done && styles.planDoneTitle]} numberOfLines={2}>
+                {task.subject_name || 'Tự học'}
               </Text>
-              {!!task.note && <Text style={styles.planTaskNote} numberOfLines={3}>{task.note}</Text>}
-              {task.source === 'roadmap' && !!task.roadmap_session_id &&
-                <TouchableOpacity onPress={() => onOpenStudy(task.id)}
+              <Text style={styles.planTaskMeta}>
+                {String(task.study_at || '').slice(11,16)} · {task.duration} phút
+              </Text>
+              <Text style={styles.planTaskNote} numberOfLines={1}>
+                {task.roadmap_label || task.title}
+              </Text>
+              {!!task.personal_document_name && <Text style={styles.planTaskDoc} numberOfLines={1}>
+                📄 {task.personal_document_name}
+              </Text>}
+              {task.source === 'roadmap' && !!task.roadmap_session_id && (
+                task.roadmap_label ? <TouchableOpacity onPress={() => onOpenStudy(task.id)}
                   accessibilityRole="button" accessibilityLabel={'Bắt đầu học: '+task.title}
                   style={{paddingVertical:7}}>
                   <Text style={styles.smallActionText}>▶ Bắt đầu học →</Text>
-                </TouchableOpacity>}
+                </TouchableOpacity> :
+                <Text style={styles.planAdaptiveTag}>⚠ Buổi cần rà soát lộ trình</Text>
+              )}
               {task.source === 'adaptive' && <Text style={styles.planAdaptiveTag}>✦ Ôn tập điểm yếu</Text>}
             </View>
             <View style={styles.planTaskActions}>
@@ -1477,30 +1628,22 @@ function PlanScreen({ plan, subjects, userName, refreshData, onOpenStudy }) {
         ))}
       </View>
 
-      <View style={styles.planProgressCard}>
-        <View style={styles.planSectionRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.planSectionTitle}>◉ Tiến độ tuần đang chọn</Text>
-            <Text style={styles.planSectionSubtitle}>{overview.completed}/{overview.total} buổi học đã hoàn thành</Text>
-          </View>
-          <Text style={styles.planProgressPercent}>{overview.percentage}%</Text>
-        </View>
-        <Progress value={overview.percentage} />
-        <Text style={styles.planProgressHours}>
-          ◷ Thời gian học: {(overview.completedMinutes / 60).toFixed(1)} / {(overview.minutes / 60).toFixed(1)} giờ
-        </Text>
-      </View>
-
       <View style={styles.card}>
         <View style={styles.planSectionRow}>
-          <Text style={styles.planSectionTitle}>◎ Mục tiêu & deadline</Text>
+          <Text style={styles.planSectionTitle}>⚑ Deadline & cảnh báo</Text>
           <Text style={styles.planSectionSubtitle}>{pending.length} cần làm</Text>
         </View>
         {!pending.length && (
           <Text style={styles.planEmptyText}>
-            {completed.length ? '✓ Không còn deadline chưa hoàn thành.' : 'Chưa có mục tiêu. Bạn có thể thêm deadline mới.'}
+            {completed.length ? '✓ Không còn deadline chưa hoàn thành.' : 'Chưa có deadline. Bạn có thể thêm mới.'}
           </Text>
         )}
+        {!!conflictingTasks.length && <View style={styles.planConflictNote}>
+          <Text style={styles.planConflictText}>⚠ {conflictingTasks.length} buổi học đang trùng giờ</Text>
+          <TouchableOpacity accessibilityRole="button" onPress={()=>setPlanView('list')}>
+            <Text style={styles.smallActionText}>Xem danh sách buổi →</Text>
+          </TouchableOpacity>
+        </View>}
         {pendingVisible.map(renderReminder)}
         {pending.length > 5 && (
           <TouchableOpacity style={styles.planCollapseButton}
@@ -1589,15 +1732,6 @@ function ProfileScreen({ userName, email, refreshData, onOpenQuiz, onOpenConnect
         <Text style={styles.settingsEntryText}>⚙ Tùy chỉnh học tập</Text>
         <Text style={styles.settingsChevron}>{showLearningSettings ? '⌃' : '›'}</Text>
       </TouchableOpacity>
-      <Text style={styles.sectionTitle}>Ứng dụng</Text>
-      <TouchableOpacity style={styles.settingsEntry} onPress={onOpenConnection}>
-        <Text style={styles.settingsEntryText}>⌁ Cài đặt kết nối</Text>
-        <Text style={styles.settingsChevron}>›</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.settingsEntry} onPress={onLogout}>
-        <Text style={[styles.settingsEntryText,{color:'#B83F51'}]}>↪ Đăng xuất</Text>
-        <Text style={styles.settingsChevron}>›</Text>
-      </TouchableOpacity>
       {showLearningSettings && <View style={styles.card}>
       <ErrorCard message={error} />
       <Text style={styles.fieldLabel}>Phong cách học</Text>
@@ -1623,6 +1757,16 @@ function ProfileScreen({ userName, email, refreshData, onOpenQuiz, onOpenConnect
         <Text style={styles.primaryButtonText}>{busy ? 'Đang lưu...' : 'Lưu hồ sơ học tập'}</Text>
       </TouchableOpacity>
       </View>}
+      <Text style={styles.sectionTitle}>Ứng dụng</Text>
+      <TouchableOpacity style={styles.settingsEntry} onPress={onOpenConnection}>
+        <Text style={styles.settingsEntryText}>⌁ Cài đặt kết nối</Text>
+        <Text style={styles.settingsChevron}>›</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.settingsEntry} onPress={onLogout}>
+        <Text style={[styles.settingsEntryText,{color:'#B83F51'}]}>↪ Đăng xuất</Text>
+        <Text style={styles.settingsChevron}>›</Text>
+      </TouchableOpacity>
+
     </ScrollView>
   );
 }
@@ -1719,6 +1863,13 @@ export default function App() {
   const [quizToOpenId,setQuizToOpenId]=useState(null);
   const [showConnectionSettings, setShowConnectionSettings] = useState(false);
   const [chatOpenSignal, setChatOpenSignal] = useState(0);
+  const [subjectsEntry, setSubjectsEntry] = useState(null);
+  const openSubjectJourney = (subjectId, mode = 'roadmap') => {
+    setActiveStudyTask(null);
+    setActiveLesson(null);
+    setSubjectsEntry({subjectId, mode, token: Date.now()});
+    setTab('subjects');
+  };
   const openQuiz = (subjectId, quizId=null) => {
     setQuizSubjectId(subjectId || null);
     setQuizToOpenId(quizId || null);
@@ -1818,13 +1969,16 @@ export default function App() {
     );
     if (tab === 'subjects') return <SubjectsScreen subjects={subjects}
       userName={userName} refreshData={refreshData}
+      entryIntent={subjectsEntry}
       onOpenStudy={openStudyRoom} onOpenQuiz={openQuiz} />;
     if (tab === 'agent') return <AgentScreen subjects={subjects} userName={userName} />;
     if (tab === 'quiz') return <QuizScreen subjects={subjects}
       initialSubjectId={quizSubjectId} initialQuizId={quizToOpenId}
       onBack={() => {setQuizToOpenId(null);setTab('subjects');}}
       userName={userName} refreshData={refreshData} />;
-    if (tab === 'plan') return <PlanScreen plan={plan} subjects={subjects} userName={userName} refreshData={refreshData} onOpenStudy={openStudyRoom} />;
+    if (tab === 'plan') return <PlanScreen plan={plan} subjects={subjects} userName={userName}
+      refreshData={refreshData} onOpenStudy={openStudyRoom}
+      onOpenRoadmap={() => openSubjectJourney(null, 'roadmap')} />;
     return (
       <HomeScreen
         dashboard={dashboard}
@@ -1832,11 +1986,12 @@ export default function App() {
         loading={loading}
         onOpenStudy={openStudyRoom}
         onAskAI={() => setChatOpenSignal(value => value+1)}
+        onOpenSubjectJourney={openSubjectJourney}
         onOpenQuiz={openQuiz}
       />
     );
   }, [tab, subjects, dashboard, plan, loading, userName, loggedIn,
-      activeStudyTask, activeLesson?.subjectId, quizSubjectId, quizToOpenId]);
+      activeStudyTask, activeLesson?.subjectId, quizSubjectId, quizToOpenId, subjectsEntry]);
 
   if (checkingSession) {
     return (
@@ -1883,6 +2038,7 @@ export default function App() {
             onPress={() => {
               setActiveStudyTask(null);
               setActiveLesson(null);
+              setSubjectsEntry(null);
               setTab(key);
               refreshData().catch(() => {});
             }}
@@ -1922,7 +2078,7 @@ const styles = StyleSheet.create({
   fieldInput: { backgroundColor: 'white', borderWidth: 1, borderColor: '#DFE3F0', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, color: '#17203A', marginBottom: 16 },
   backLink: { color: '#6567E8', fontWeight: '700', marginBottom: 16, fontSize: 13 },
   actionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
-  smallAction: { paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, backgroundColor: '#EEF0FF' },
+  smallAction: { paddingHorizontal: 12, minHeight: 43, justifyContent: 'center', borderRadius: 10, backgroundColor: '#EEF0FF' },
   smallActionText: { color: '#505AD0', fontSize: 12, fontWeight: '700' },
   deleteAction: { backgroundColor: '#FFF0F1' },
   deleteActionText: { color: '#B83647', fontSize: 12, fontWeight: '700' },
@@ -1982,7 +2138,7 @@ const styles = StyleSheet.create({
   bottomNav: { height: 78, backgroundColor: 'white', flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#E9ECF3', paddingTop: 10, paddingBottom: 8 },
   navItem: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   navIcon: { fontSize: 19, color: '#637493' },
-  navLabel: { fontSize: 10, color: '#637493', marginTop: 4, fontWeight: '700' },
+  navLabel: { fontSize: 11, color: '#637493', marginTop: 4, fontWeight: '700' },
   navActive: { color: '#5E66D8' },
   loginSafe: { flex: 1, backgroundColor: '#F6F8FC', justifyContent: 'center' },
   loginWrap: { flexGrow: 1, paddingHorizontal: 26, paddingTop: 32, paddingBottom: 32, justifyContent: 'center', alignItems: 'stretch' },
@@ -2034,7 +2190,7 @@ const styles = StyleSheet.create({
   planDayCellActive: { backgroundColor: '#6567E8' },
   planDayName: { fontWeight: '800', color: '#566A91', fontSize: 10 },
   planDayDate: { color: '#354B73', fontSize: 12, fontWeight: '800' },
-  planDayCount: { color: '#65789B', fontSize: 9 },
+  planDayCount: { color: '#65789B', fontSize: 10 },
   planDayActiveText: { color: 'white' },
   planEditButton: { borderRadius: 10, paddingVertical: 9, paddingHorizontal: 12, backgroundColor: '#E8ECFF' },
   planEditButtonText: { color: '#4F5BC6', fontSize: 12, fontWeight: '800' },
@@ -2042,7 +2198,7 @@ const styles = StyleSheet.create({
   planTaskRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start', backgroundColor: '#F1F5FC', padding: 12, borderRadius: 13, marginTop: 8 },
   planTaskDone: { backgroundColor: '#F0F3FA' },
   planTaskActions: { flexDirection: 'column', gap: 8 },
-  planCheck: { width: 27, height: 27, borderWidth: 1.5, borderColor: '#8A98C4', borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: 'white' },
+  planCheck: { width: 44, height: 44, borderWidth: 1.5, borderColor: '#8A98C4', borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: 'white' },
   planCheckDone: { borderColor: '#6567E8', backgroundColor: '#6567E8' },
   planCheckText: { color: '#45578C', fontSize: 14, fontWeight: '900' },
   planCheckTextDone: { color: 'white' },
@@ -2051,9 +2207,23 @@ const styles = StyleSheet.create({
   planTaskMeta: { color: '#51668A', fontSize: 11.5, lineHeight: 18, marginTop: 4 },
   planTaskNote: { color: '#566C91', fontSize: 11.5, lineHeight: 17, marginTop: 5 },
   planAdaptiveTag: { color: '#6C589A', fontWeight: '800', fontSize: 10.5, marginTop: 5 },
-  planIconAction: { backgroundColor: '#E6ECFA', width: 28, height: 28, borderRadius: 9, justifyContent: 'center', alignItems: 'center' },
+  planIconAction: { backgroundColor: '#E6ECFA', width: 44, height: 44, borderRadius: 11, justifyContent: 'center', alignItems: 'center' },
   planIconText: { color: '#5869BC', fontSize: 16, fontWeight: '800' },
-  planProgressCard: { backgroundColor: '#F0F2FF', borderWidth: 1, borderColor: '#D7DEFF', borderRadius: 18, padding: 17, marginBottom: 13 },
+  planTodaySummary: { backgroundColor: '#EEF0FF', borderColor: '#D6DEFD', borderWidth: 1, borderRadius: 15,
+    paddingVertical: 13, paddingHorizontal: 15, flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between', gap: 9 },
+  planTodaySummaryLabel: {fontSize: 13, color: '#5364A3', fontWeight: '800'},
+  planTodaySummaryValue: {fontSize: 13, color: '#3E4C9F', fontWeight: '800', flexShrink: 1, textAlign: 'right'},
+  planConflictNote: {padding:12, backgroundColor:'#FFF7E9', borderColor:'#EED3A8',
+    borderWidth:1,borderRadius:12,gap:7,marginBottom:9},
+  planConflictText: {color:'#956021',fontSize:12,fontWeight:'800'},
+  planTaskDoc: {fontSize:11,color:'#536AA1',marginTop:4},
+  docSelected: {backgroundColor:'#6265E8'},
+  docSelectedText: {color:'white'},
+  docUpload: {borderWidth:1,borderColor:'#CDD4F6',backgroundColor:'#F0F2FF',
+    borderRadius:12,minHeight:45,alignItems:'center',justifyContent:'center',paddingHorizontal:12},
+  docUploadText: {fontSize:12,color:'#4A5EBD',fontWeight:'800'},
+  helperNote: {fontSize:11,color:'#63769A',lineHeight:18,marginTop:7,marginBottom:13},
   planProgressPercent: { color: '#5C5DDC', fontSize: 24, fontWeight: '900' },
   planProgressHours: { color: '#53668A', fontSize: 12, lineHeight: 17, marginTop: 11 },
   planReminderRow: { flexDirection: 'row', alignItems: 'center', gap: 9, borderBottomWidth: 1, borderBottomColor: '#E8EDF8', paddingVertical: 12 },
