@@ -1,0 +1,103 @@
+/* Dashboard 2026: compact, scannable, no duplicated quick actions or progress stat.
+   Loaded after existing styles so other Web screens are unaffected. */
+body.study-ui.page-dashboard .dashboard-head {margin:4px 0 20px}
+body.study-ui.page-dashboard .dashboard-kicker {display:inline-block;margin-bottom:8px;color:#6276b5;font-size:11px;font-weight:800;letter-spacing:.11em}
+body.study-ui.page-dashboard .dashboard-head h2 {font-size:clamp(25px,2.4vw,32px);letter-spacing:-.035em;line-height:1.18;margin-bottom:7px}
+body.study-ui.page-dashboard .dashboard-head p {font-size:14px;color:#697caa}
+body.study-ui.page-dashboard .dashboard-metrics {grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin-bottom:21px}
+body.study-ui.page-dashboard .dashboard-metrics .metric-card {min-height:89px;padding:13px 18px;grid-template-columns:48px minmax(0,1fr) 27px;gap:13px}
+body.study-ui.page-dashboard .dashboard-metrics .metric-icon {width:48px;height:48px;border-radius:15px;font-size:23px}
+body.study-ui.page-dashboard .dashboard-metrics .metric-copy small {font-size:13px}
+body.study-ui.page-dashboard .dashboard-metrics .metric-copy strong {font-size:27px;margin:2px 0 0}
+body.study-ui.page-dashboard .dashboard-metrics .metric-go {width:27px;height:27px;font-size:19px}
+body.study-ui.page-dashboard .dashboard-recommend-card {margin-bottom:21px;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:center;padding:19px 22px}
+body.study-ui.page-dashboard .dashboard-recommend-card .proactive-agent-avatar {width:48px;height:48px;flex-basis:48px}
+body.study-ui.page-dashboard .dashboard-recommend-card .proactive-agent-kicker span {font-size:11px;letter-spacing:.065em}
+body.study-ui.page-dashboard .dashboard-recommend-card .proactive-agent-kicker b {font-size:11px;padding:4px 9px}
+body.study-ui.page-dashboard .dashboard-recommend-card .proactive-agent-copy h3 {font-size:19px;line-height:1.35}
+body.study-ui.page-dashboard .dashboard-recommend-card .proactive-agent-copy .dashboard-recommend-summary {font-size:13px;line-height:1.55;color:#536689;max-width:700px;margin-top:6px}
+body.study-ui.page-dashboard .dashboard-recommend-details {margin-top:8px;color:#576ba0;font-size:12px}
+body.study-ui.page-dashboard .dashboard-recommend-details summary {width:fit-content;cursor:pointer;font-weight:750;color:#5362d5}
+body.study-ui.page-dashboard .dashboard-recommend-details[open] {max-width:750px}
+body.study-ui.page-dashboard .dashboard-recommend-details p {font-size:12px;line-height:1.55;margin:8px 0}
+body.study-ui.page-dashboard .dashboard-recommend-details ul {margin:6px 0 0;padding-left:20px}
+body.study-ui.page-dashboard .dashboard-recommend-details li {margin:3px 0}
+body.study-ui.page-dashboard .dashboard-recommend-card .proactive-agent-actions {min-width:160px}
+body.study-ui.page-dashboard .dashboard-recommend-card .proactive-agent-actions a {min-height:42px;font-size:13px;padding:0 17px}
+body.study-ui.page-dashboard .dashboard-main-grid {grid-template-columns:minmax(0,1.55fr) minmax(310px,1fr);gap:19px;margin-bottom:19px}
+body.study-ui.page-dashboard .dashboard-bottom-grid {display:block}
+body.study-ui.page-dashboard .weekly-card,
+body.study-ui.page-dashboard .today-card,
+body.study-ui.page-dashboard .recent-card {padding:20px 22px}
+body.study-ui.page-dashboard .card-title-row h3 {font-size:16px}
+body.study-ui.page-dashboard .card-title-row p {font-size:12px;line-height:1.5;margin:6px 0 0}
+body.study-ui.page-dashboard .card-title-row > a {font-size:12px;white-space:nowrap}
+body.study-ui.page-dashboard .dashboard-week-summary {display:flex;align-items:flex-end;flex-direction:column;gap:6px;flex-shrink:0}
+body.study-ui.page-dashboard .dashboard-week-summary strong {font-size:23px;white-space:nowrap;color:#5463e4}
+body.study-ui.page-dashboard .dashboard-week-summary .weekly-growth-badge {font-size:11px;text-align:right}
+body.study-ui.page-dashboard .weekly-chart-wrap {height:235px!important;max-height:none!important;margin-top:16px}
+body.study-ui.page-dashboard .today-list {margin-top:19px;gap:10px}
+body.study-ui.page-dashboard .today-row {grid-template-columns:9px 48px minmax(0,1fr) auto;gap:10px;min-height:64px;padding:11px 12px}
+body.study-ui.page-dashboard .today-copy {min-width:0}
+body.study-ui.page-dashboard .today-copy strong {font-size:12px;line-height:1.45;overflow-wrap:anywhere}
+body.study-ui.page-dashboard .today-copy small {font-size:11px}
+body.study-ui.page-dashboard .today-time {font-size:12px;font-weight:800}
+body.study-ui.page-dashboard .duration-pill {font-size:10px;white-space:nowrap}
+body.study-ui.page-dashboard .recent-card {min-height:0}
+body.study-ui.page-dashboard .activity-list {margin-top:11px}
+body.study-ui.page-dashboard .activity-row {font-size:12px;padding:9px 0;grid-template-columns:32px minmax(0,1fr) auto;border-bottom:1px solid rgba(148,161,190,.15)}
+body.study-ui.page-dashboard .activity-row:last-child {border-bottom:0}
+body.study-ui.page-dashboard .activity-row span:nth-child(2) {min-width:0;overflow-wrap:anywhere}
+body.study-ui.page-dashboard .activity-row small {font-size:11px}
+body.study-ui.page-dashboard .dashboard-empty-recent {margin:0;padding:9px 0;color:#7180a4;font-size:13px}
+
+/* Dedicated entry point for official roadmaps, preserving per-course workflow. */
+body.study-ui.page-learning_paths .roadmap-library-head {margin-bottom:20px}
+body.study-ui.page-learning_paths .roadmap-library-head h2 {font-size:clamp(24px,2.2vw,32px)}
+body.study-ui.page-learning_paths .roadmap-library-intro {max-width:700px;font-size:14px;line-height:1.6;color:#6d7e9f;margin:0 0 22px}
+body.study-ui.page-learning_paths .roadmap-library-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+body.study-ui.page-learning_paths .roadmap-library-item {display:flex;flex-direction:column;gap:12px;min-width:0;padding:20px 22px}
+body.study-ui.page-learning_paths .roadmap-item-head {display:flex;align-items:start;justify-content:space-between;gap:14px}
+body.study-ui.page-learning_paths .roadmap-item-head h3 {font-size:17px;margin:0;color:#263865;overflow-wrap:anywhere}
+body.study-ui.page-learning_paths .roadmap-item-head small {display:block;font-size:12px;color:#7c8baa;margin-top:5px}
+body.study-ui.page-learning_paths .roadmap-item-progress {display:flex;justify-content:space-between;gap:10px;align-items:center;color:#687b9d;font-size:12px}
+body.study-ui.page-learning_paths .roadmap-item-progress strong {color:#5363d5;font-size:13px}
+body.study-ui.page-learning_paths .roadmap-item-actions {margin-top:auto;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+body.study-ui.page-learning_paths .roadmap-item-actions .soft-primary {min-height:41px;padding:0 17px;border-radius:12px;font-size:12px}
+body.study-ui.page-learning_paths .roadmap-item-actions .roadmap-secondary {font-size:12px;color:#596e9d;font-weight:750}
+body.study-ui.page-learning_paths .roadmap-empty {padding:25px}
+
+/* Seventh sidebar item: avoid cramming seven equal tabs into narrow mobile width. */
+@media (min-width:981px) {
+  body.study-ui:not(.page-admin) .side-nav {gap:7px!important;margin-top:34px!important}
+  body.study-ui:not(.page-admin) .side-nav a {height:49px!important}
+}
+@media (max-width:1100px) {
+  body.study-ui.page-dashboard .dashboard-main-grid {grid-template-columns:minmax(0,1fr)}
+  body.study-ui.page-learning_paths .roadmap-library-grid {grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:980px) {
+  body.study-ui:not(.page-admin):not(.page-chat) .side-nav {display:flex!important;overflow-x:auto!important;overflow-y:hidden!important;gap:4px!important;scrollbar-width:thin}
+  body.study-ui:not(.page-admin):not(.page-chat) .side-nav a {flex:0 0 65px!important;min-width:65px!important}
+}
+@media (max-width:700px) {
+  body.study-ui.page-dashboard .dashboard-metrics {gap:8px}
+  body.study-ui.page-dashboard .dashboard-metrics .metric-card {min-height:85px;padding:11px 8px;display:flex;justify-content:center;text-align:center}
+  body.study-ui.page-dashboard .dashboard-metrics .metric-icon,
+  body.study-ui.page-dashboard .dashboard-metrics .metric-go {display:none}
+  body.study-ui.page-dashboard .dashboard-metrics .metric-copy small {font-size:11px}
+  body.study-ui.page-dashboard .dashboard-metrics .metric-copy strong {font-size:24px}
+  body.study-ui.page-dashboard .dashboard-recommend-card {grid-template-columns:1fr;padding:17px;gap:14px}
+  body.study-ui.page-dashboard .dashboard-recommend-card .proactive-agent-actions {min-width:0}
+  body.study-ui.page-dashboard .dashboard-recommend-card .proactive-agent-actions a {width:100%}
+  body.study-ui.page-dashboard .dashboard-recommend-card .proactive-agent-avatar {width:42px;height:42px;flex-basis:42px}
+  body.study-ui.page-dashboard .weekly-card,body.study-ui.page-dashboard .today-card,body.study-ui.page-dashboard .recent-card {padding:17px}
+  body.study-ui.page-dashboard .weekly-chart-wrap {height:210px!important}
+  body.study-ui.page-dashboard .card-title-row {gap:8px}
+  body.study-ui.page-dashboard .dashboard-week-summary strong {font-size:20px}
+  body.study-ui.page-dashboard .today-row {grid-template-columns:8px 42px minmax(0,1fr);gap:8px}
+  body.study-ui.page-dashboard .duration-pill {grid-column:3;justify-self:start}
+}
+@media (prefers-reduced-motion:reduce) {
+  body.study-ui.page-dashboard .dashboard-metrics .metric-card {transition:none}
+}

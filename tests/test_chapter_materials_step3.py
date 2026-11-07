@@ -317,13 +317,13 @@ Thuật toán độ phức tạp Big O cũng có thể áp dụng cho linked lis
             assert "css/chat_stage2.css" in chat_html
             assert 'class="sidebar-course-list"' in chat_html
             assert chat_html.count('class="chat-history-list"') == 1
-            # Stage 6: in Chat AI, other pages compact to five icon shortcuts
+            # Stage 6: in Chat AI, other pages compact to six icon shortcuts
             # while course list is exposed. All links remain accessible.
             assert 'id="chatNavToggle"' in chat_html
             assert 'id="chatSidebarNav"' in chat_html
             assert 'aria-expanded="false"' in chat_html
             assert 'chat-nav-primary' in chat_html
-            assert chat_html.count('chat-nav-secondary') == 5
+            assert chat_html.count('chat-nav-secondary') == 6
             assert 'Đang tải danh sách môn học...' in chat_html
             assert 'aria-busy="true"' in chat_html
             assert 'class="soft-card chat-history-panel"' not in chat_html
