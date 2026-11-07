@@ -1,6 +1,9 @@
 {% extends "base.html" %}
 {% block page_title %}Tổng quan{% endblock %}
 {% block page_desc %}Theo dõi lịch và tiến độ học tập{% endblock %}
+{% block page_styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/weekly-progress.css') }}">
+{% endblock %}
 {% block content %}
 <section class="mock-page-head dashboard-head">
   <div>
