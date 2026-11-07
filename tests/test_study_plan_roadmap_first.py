@@ -74,9 +74,12 @@ def run():
             assert 'data-view="month"' in html
             assert 'data-view="list"' in html
             assert 'id="deadline-list"' in html
-            assert "Tiến độ tuần này" in html
-            assert "Gợi ý từ Study Agent" in html
-            assert "Mục tiêu & deadline" in html
+            assert "Tiến độ tuần này" not in html
+            assert "planner-progress-summary" not in html
+            assert "Buổi học hôm nay" in html
+            assert 'id="viewTodayAgenda"' in html
+            assert "Gợi ý từ Study Agent" in html  # Collapsible help, not another card
+            assert "Deadline & cảnh báo" in html
             for kind, title in sources.items():
                 assert title in html
                 assert f'data-task-source="{kind}"' in html
