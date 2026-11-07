@@ -3,10 +3,11 @@ import {
   ActivityIndicator, SafeAreaView, ScrollView, StyleSheet,
   Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
-import { getApiBaseUrl, setApiBaseUrl, testApiConnection } from './api';
+import { getApiBaseUrl, testApiConnection } from './api';
+import { persistServerAddress } from './serverAddressStorage';
 
-// Designed for local Expo Go demos: this changes only the URL of THIS
-// running app instance. Put the verified URL into mobile/.env to persist.
+// Only a working, verified server URL is persisted locally. Neither passwords
+// nor browser sessions are saved here; changing host requires a new login.
 export default function ConnectionSettings({onBack, onSaved}) {
   const [address,setAddress] = useState(getApiBaseUrl());
   const [busy,setBusy] = useState(false);
@@ -18,7 +19,7 @@ export default function ConnectionSettings({onBack, onSaved}) {
     setBusy(true); setError(''); setNotice('');
     try {
       await testApiConnection(address);
-      const saved = setApiBaseUrl(address);
+      const saved = await persistServerAddress(address);
       setNotice('Đã kết nối Flask thành công.');
       onSaved?.(saved);
     } catch (err) {
@@ -55,9 +56,9 @@ export default function ConnectionSettings({onBack, onSaved}) {
         </TouchableOpacity>
       </View>
       <Text style={styles.info}>
-        Địa chỉ đổi tại đây chỉ có hiệu lực khi ứng dụng còn chạy.
-        Để lưu lâu dài, cập nhật EXPO_PUBLIC_API_URL trong mobile/.env
-        và khởi động lại Expo.
+        Địa chỉ đã kiểm tra được lưu trên điện thoại và tự khôi phục khi mở lại.
+        Nếu IP của laptop thay đổi, hãy kiểm tra và lưu địa chỉ mới tại đây.
+        Laptop vẫn phải chạy Flask để Mobile kết nối được.
       </Text>
       <Text style={styles.info}>Quản trị viên chỉ đăng nhập trên Web.</Text>
     </ScrollView>
