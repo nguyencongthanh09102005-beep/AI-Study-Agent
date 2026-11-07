@@ -16,6 +16,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import FloatingStudyChat from './src/FloatingStudyChat';
 import StudyRoom from './src/StudyRoom';
 import ConnectionSettings from './src/ConnectionSettings';
+import StudyDateTimePicker from './src/StudyDateTimePicker';
 const {
   localDateKey, addDays, getWeekDates, getPlanOverview,
   getVisiblePlanTasks, splitReminders, findTaskConflicts,
@@ -1175,6 +1176,9 @@ function PlanScreen({ plan, subjects, userName, refreshData, onOpenStudy }) {
   const [taskAt, setTaskAt] = useState('');
   const [taskDuration, setTaskDuration] = useState('45');
   const [taskNote, setTaskNote] = useState('');
+  const [taskDocumentId, setTaskDocumentId] = useState(null);
+  const [taskDocuments, setTaskDocuments] = useState([]);
+  const [uploadingTaskDoc, setUploadingTaskDoc] = useState(false);
   const [reminders, setReminders] = useState([]);
   const [reminderEdit, setReminderEdit] = useState(null);
   const [reminderTitle, setReminderTitle] = useState('');
@@ -1217,12 +1221,44 @@ function PlanScreen({ plan, subjects, userName, refreshData, onOpenStudy }) {
 
   const openTask = (task = null) => {
     setTaskEdit(task);
+    setTaskDocumentId(task?.document_id || null);
     setTaskTitle(task?.title || '');
     setTaskAt(task?.study_at || localInputDate(1, 19, 0));
     setTaskDuration(String(task?.duration || 45));
     setTaskNote(task?.note || '');
     setSelectedSubject(task?.subject_id || subjects[0]?.id || null);
     setMode('task');
+  };
+
+  useEffect(() => {
+    if (mode !== 'task') return;
+    let active = true;
+    api.documents()
+      .then(data => { if (active) setTaskDocuments(data.documents || []); })
+      .catch(err => { if (active) setError(err.message || 'Chưa đọc được tài liệu cá nhân.'); });
+    return () => { active = false; };
+  }, [mode]);
+
+  const uploadTaskDocument = async () => {
+    if (!selectedSubject || uploadingTaskDoc) {
+      if (!selectedSubject) setError('Hãy chọn môn học trước khi tải tài liệu.');
+      return;
+    }
+    try {
+      const picked = await DocumentPicker.getDocumentAsync({
+        type:['application/pdf','text/plain','text/markdown'],
+        copyToCacheDirectory:true,multiple:false,
+      });
+      if (picked.canceled || !picked.assets?.length) return;
+      setUploadingTaskDoc(true);
+      setError('');
+      const uploaded = await api.uploadDocument(selectedSubject,picked.assets[0]);
+      setTaskDocumentId(uploaded.document.id);
+      const docs = await api.documents();
+      setTaskDocuments(docs.documents || []);
+    } catch (err) {
+      setError(err.message || 'Không tải được tài liệu cá nhân.');
+    } finally { setUploadingTaskDoc(false); }
   };
 
   const openReminder = (reminder = null) => {
@@ -1256,7 +1292,9 @@ function PlanScreen({ plan, subjects, userName, refreshData, onOpenStudy }) {
       <ErrorCard message={error} />
       {busy && <ActivityIndicator />}
       <Text style={styles.fieldLabel}>Môn học</Text>
-      <SubjectSelector subjects={subjects} selectedId={selectedSubject} onSelect={setSelectedSubject} />
+      <SubjectSelector subjects={subjects} selectedId={selectedSubject}
+        disabled={mode === 'task' && !!taskEdit?.document_id}
+        onSelect={id => { setSelectedSubject(id); if (mode === 'task' && !taskEdit?.document_id) setTaskDocumentId(null); }} />
       {mode === 'generate' ? (
         <>
           {entryField('Mục tiêu học tập', goal, setGoal, 'Ví dụ: Đạt 8 điểm cuối kỳ')}
@@ -1293,9 +1331,39 @@ function PlanScreen({ plan, subjects, userName, refreshData, onOpenStudy }) {
               <Text style={styles.smallActionText}>Ngày mai 19:00</Text>
             </TouchableOpacity>
           </View>
-          {entryField('Ngày giờ (YYYY-MM-DDTHH:MM)', taskAt, setTaskAt, '2026-10-15T19:00')}
+          <StudyDateTimePicker label="Ngày và giờ học" value={taskAt} onChange={setTaskAt} disabled={busy} />
           {entryField('Thời lượng (phút)', taskDuration, setTaskDuration, '45')}
           {entryField('Ghi chú', taskNote, setTaskNote, 'Nội dung cần ôn tập', true)}
+          {(!taskEdit || taskEdit.source === 'manual') && <>
+            <Text style={styles.fieldLabel}>Tài liệu cá nhân cho buổi tự học (không bắt buộc)</Text>
+            {taskEdit?.document_id ? (
+              <Text style={styles.muted}>📄 {taskEdit.personal_document_name || 'Tài liệu đã gắn'} · Để bảo toàn lịch sử học, không đổi tài liệu của buổi này.</Text>
+            ) : <>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{maxHeight:52,marginBottom:9}}>
+                <TouchableOpacity style={[styles.smallAction,{marginRight:8},
+                  !taskDocumentId && styles.docSelected]}
+                  onPress={()=>setTaskDocumentId(null)}>
+                  <Text style={[styles.smallActionText,!taskDocumentId && styles.docSelectedText]}>Không gắn tài liệu</Text>
+                </TouchableOpacity>
+                {taskDocuments.filter(doc=>Number(doc.subject_id)===Number(selectedSubject)
+                  && Number(doc.extracted_chars)>0).map(doc=>(
+                  <TouchableOpacity key={doc.id} style={[styles.smallAction,{marginRight:8},
+                    taskDocumentId===doc.id && styles.docSelected]}
+                    accessibilityRole="button"
+                    accessibilityState={{selected:taskDocumentId===doc.id}}
+                    onPress={()=>setTaskDocumentId(doc.id)}>
+                    <Text numberOfLines={1} style={[styles.smallActionText,
+                      taskDocumentId===doc.id && styles.docSelectedText]}>📄 {doc.original_name}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <TouchableOpacity disabled={busy||uploadingTaskDoc} accessibilityRole="button"
+                onPress={uploadTaskDocument} style={styles.docUpload}>
+                <Text style={styles.docUploadText}>{uploadingTaskDoc?'Đang tải tài liệu…':'＋ Tải tài liệu mới và chọn cho buổi này'}</Text>
+              </TouchableOpacity>
+              <Text style={styles.helperNote}>File mới được lưu vào kho cá nhân của môn ngay sau khi tải lên, kể cả khi bạn hủy tạo buổi.</Text>
+            </>}
+          </>}
           {findTaskConflicts(local?.tasks || [],{
             study_at:taskAt,duration:Number(taskDuration)
           },taskEdit?.id).length>0 && (
@@ -1308,9 +1376,12 @@ function PlanScreen({ plan, subjects, userName, refreshData, onOpenStudy }) {
               </Text>
             </View>
           )}
-          <TouchableOpacity style={styles.primaryButton} disabled={busy} onPress={() => {
+          <TouchableOpacity style={styles.primaryButton} disabled={busy||uploadingTaskDoc} onPress={() => {
+            if (uploadingTaskDoc) return;
             const payload={subject_id:selectedSubject,title:taskTitle,
-              study_at:taskAt,duration:Number(taskDuration),note:taskNote};
+              study_at:taskAt,duration:Number(taskDuration),note:taskNote,
+              ...(!taskEdit || taskEdit.source === 'manual'
+                ? {document_id:taskDocumentId} : {})};
             const save=()=>run(()=>taskEdit
               ?api.updateTask(taskEdit.id,payload):api.createTask(payload));
             const conflicts=findTaskConflicts(local?.tasks||[],payload,taskEdit?.id);
@@ -1334,7 +1405,7 @@ function PlanScreen({ plan, subjects, userName, refreshData, onOpenStudy }) {
               </TouchableOpacity>
             ))}
           </View>
-          {entryField('Deadline (YYYY-MM-DDTHH:MM)', reminderAt, setReminderAt, '2026-10-20T23:59')}
+          <StudyDateTimePicker label="Hạn cần hoàn thành" value={reminderAt} onChange={setReminderAt} disabled={busy} />
           <TouchableOpacity style={styles.primaryButton} disabled={busy} onPress={() => run(() => (
             reminderEdit
               ? api.updateReminder(reminderEdit.id, {
