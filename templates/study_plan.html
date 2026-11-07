@@ -29,8 +29,6 @@
   <div class="week-days" id="weekDays" aria-live="polite" hidden></div>
 </section>
 
-{% if conflict_task_count %}<section class="study-conflict-banner" role="status"><strong>⚠ {{ conflict_task_count }} buổi học đang trùng giờ</strong><p>Các buổi học đang giao nhau về thời gian. Mở thời khóa biểu Tuần để xem và chủ động đổi lịch; hệ thống không tự dời buổi học.</p></section>{% endif %}
-
 <section class="planner-layout-new">
   <section class="soft-card study-hour-timetable" id="plannerTimetable" aria-label="Thời khóa biểu tuần theo buổi">
     <header class="study-hour-heading">
@@ -63,21 +61,49 @@
 
   </article>
 
-  <aside class="planner-side-stack">
-    <article class="soft-card planner-progress-summary">
-      <div class="planner-progress-heading">
-        <div><h3>◉ &nbsp; Tiến độ tuần này</h3><small>{{ weekly_completed_count }} / {{ weekly_task_count }} buổi học đã hoàn thành</small></div>
-        <strong class="planner-progress-percent">{{ completion }}%</strong>
-      </div>
-      <div class="planner-progress-bar" role="progressbar" aria-label="Tiến độ tuần này" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ completion }}"><span style="width: {{ completion }}%"></span></div>
-      <div class="planner-progress-hours"><span>◷ Thời gian học</span><strong>{{ (completed_minutes / 60)|round(1) }} / {{ (planned_minutes / 60)|round(1) }} giờ</strong></div>
-    </article>
+</section>
 
-    <article class="soft-card goal-card">
+<section class="planner-bottom-grid planner-focus-bottom" aria-label="Lịch hôm nay và deadline">
+  <article class="soft-card planner-today-card" id="plannerTodaySummary">
+    <div class="card-title-row">
+      <div>
+        <h3>▦ &nbsp; Buổi học hôm nay</h3>
+        <p>{{ today_tasks|selectattr('done')|list|length }} / {{ today_tasks|length }} buổi hoàn thành</p>
+      </div>
+      <button type="button" class="planner-today-open" id="viewTodayAgenda">Xem chi tiết →</button>
+    </div>
+    <div class="planner-today-list">
+      {% for task in today_tasks[:4] %}
+      <div class="planner-today-item {{ 'is-done' if task.done else '' }}">
+        <span class="planner-today-time">{{ task.time_text }}</span>
+        <span class="planner-today-info">
+          <strong>{{ task.title }}</strong>
+          <small>{{ task.subject_name or 'Tự học' }} · {{ task.duration }} phút</small>
+        </span>
+        <span class="planner-today-state {{ 'done' if task.done else '' }}">{{ '✓ Xong' if task.done else 'Chưa học' }}</span>
+      </div>
+      {% else %}
+      <p class="planner-today-empty">Hôm nay chưa có buổi học. Bạn có thể thêm buổi thủ công từ nút phía trên.</p>
+      {% endfor %}
+      {% if today_tasks|length > 4 %}
+      <p class="planner-today-more">Còn {{ today_tasks|length - 4 }} buổi khác. Chọn “Xem chi tiết” để mở toàn bộ.</p>
+      {% endif %}
+    </div>
+  </article>
+<article class="soft-card goal-card planner-deadline-card">
       <div class="card-title-row">
-        <h3>◎ &nbsp; Mục tiêu & deadline</h3>
+        <h3>⚑ &nbsp; Deadline & cảnh báo</h3>
         <span class="planner-deadline-count">{{ pending_reminders|length }} cần làm</span>
       </div>
+      {% if conflict_task_count %}
+      <div class="study-conflict-banner planner-compact-conflict" role="status">
+        <div>
+          <strong>⚠ {{ conflict_task_count }} buổi học đang trùng giờ</strong>
+          <p>Kiểm tra các buổi trùng trước khi đổi lịch. Hệ thống không tự dời buổi học.</p>
+        </div>
+        <button type="button" class="planner-conflict-action" id="plannerShowConflicts">Xem lịch trùng →</button>
+      </div>
+      {% endif %}
       {% macro deadline_row(r) %}
       <div class="deadline-item {{ 'completed' if r.done else '' }}"
            data-reminder-id="{{ r.id }}" data-reminder-title="{{ r.title|e }}"
@@ -98,9 +124,9 @@
           {{ deadline_row(r) }}
         {% else %}
           {% if completed_reminders %}
-          <div class="planner-deadline-empty">✓ Không còn mục tiêu chưa hoàn thành.</div>
+          <div class="planner-deadline-empty">✓ Không còn deadline cần xử lý.</div>
           {% else %}
-          <div class="planner-deadline-empty">Chưa có mục tiêu hoặc deadline.</div>
+          <div class="planner-deadline-empty">Chưa có deadline nào.</div>
           {% endif %}
         {% endfor %}
       </div>
@@ -120,10 +146,11 @@
         </div>
       </details>
       {% endif %}
+      <details class="planner-agent-details">
+        <summary>✦ Gợi ý từ Study Agent</summary>
+        <p>{{ agent_tip }}</p>
+      </details>
     </article>
-
-    <article class="soft-card planner-insight"><span class="planner-insight-icon" aria-hidden="true">✦</span><div><h3>Gợi ý từ Study Agent</h3><p>{{ agent_tip }}</p></div></article>
-  </aside>
 </section>
 
 <div class="planner-modal" id="taskModal" aria-hidden="true"><div class="planner-modal-backdrop" data-close-task-modal></div><div class="planner-modal-panel small"><div class="modal-head"><h3 id="taskModalTitle">Sửa buổi học</h3><button type="button" class="modal-close" data-close-task-modal aria-label="Đóng chỉnh sửa buổi học">×</button></div><form method="post" id="taskForm" class="planner-form"><label class="full-field"><span>Nội dung học</span><input type="text" name="title" id="taskTitle" required></label><label><span>Môn học</span><select name="subject_id" id="taskSubject"><option value="">Không chọn môn</option>{% for subject in subjects %}<option value="{{ subject.id }}">{{ subject.name }}</option>{% endfor %}</select></label><label><span>Thời gian</span><input type="datetime-local" name="study_at" id="taskStudyAt" required></label><label><span>Thời lượng</span><input type="number" name="duration" id="taskDuration" min="15" max="240" value="45" required></label><div class="manual-task-doc-section full-field" id="manualTaskDocumentSection"><label for="taskPersonalDocument"><span>Tài liệu cá nhân (không bắt buộc)</span></label><select name="document_id" id="taskPersonalDocument"><option value="">Không gắn tài liệu · Buổi nhắc học thông thường</option>{% for d in personal_study_documents %}<option value="{{ d.id }}" data-subject-id="{{ d.subject_id }}">{{ d.original_name }}</option>{% endfor %}</select><p class="manual-doc-hint" id="manualTaskDocHint">Chọn môn trước; chỉ hiện tài liệu cá nhân của môn đã chọn và đã trích xuất đủ nội dung.</p><label class="manual-quiz-choice"><input type="checkbox" id="taskPrepareQuiz" name="prepare_quiz" value="1"><span>Chuẩn bị Quiz 10 câu từ tài liệu này sau khi lưu (chỉ khi bạn chọn)</span></label></div><label class="full-field"><span>Ghi chú</span><textarea name="note" id="taskNote" rows="3"></textarea></label><div class="study-schedule-warning full-field" id="taskScheduleWarning" role="status" aria-live="polite" hidden><p id="taskScheduleWarningText"></p><button type="button" id="suggestTimeButton" hidden>Chọn giờ trống gợi ý</button></div><div class="modal-actions full-field"><button type="button" class="planner-btn secondary" data-close-task-modal>Hủy</button><button type="submit" class="planner-btn primary">Lưu thay đổi</button></div></form></div></div>

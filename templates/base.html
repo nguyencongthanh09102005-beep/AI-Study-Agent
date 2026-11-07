@@ -23,6 +23,9 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/study_plan_cleanup.css') }}">
   {% endif %}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/phase9_accessibility.css') }}">
+  {% if page == 'study_plan' %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/study_plan_compact.css') }}">
+  {% endif %}
   {% if page in ['dashboard', 'learning_paths'] %}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard_refresh.css') }}">
   {% endif %}

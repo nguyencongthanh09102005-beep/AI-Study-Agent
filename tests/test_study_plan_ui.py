@@ -21,7 +21,7 @@ def verify():
         (user, "Điện toán đám mây", "CLOUD-UI", now)
     ).lastrowid
     monday = datetime.now().date() - timedelta(days=datetime.now().weekday())
-    first = (monday + timedelta(days=1)).strftime("%Y-%m-%dT19:00")
+    first = datetime.now().strftime("%Y-%m-%dT19:00")
     second = (monday + timedelta(days=2)).strftime("%Y-%m-%dT20:00")
     task1 = conn.execute(
         """INSERT INTO study_tasks(user_id,subject_id,title,study_at,duration,note,done,created_at)
@@ -99,17 +99,29 @@ def verify():
     assert 'id="compactTaskTitle"' not in html
     assert 'id="task-compact-list"' not in html
     assert 'quote-card compact' not in html
-    assert 'class="planner-progress-summary"' not in html  # class contains soft-card too
-    assert "planner-progress-summary" in html
-    assert "1 / 2 buổi học đã hoàn thành" in html
-    assert 'aria-valuenow="50"' in html
+    # Calendar-first design: no duplicated weekly progress or goals cards.
+    assert "planner-progress-summary" not in html
+    assert "Tiến độ tuần này" not in html
+    assert "Mục tiêu & deadline" not in html
+    assert 'class="planner-focus-bottom"' not in html  # class contains grid class too
+    assert 'class="planner-bottom-grid planner-focus-bottom"' in html
+    assert 'id="plannerTodaySummary"' in html
+    assert 'id="viewTodayAgenda"' in html
+    assert "Buổi học hôm nay" in html
+    assert "Deadline & cảnh báo" in html
+    assert "study_plan_compact.css" in html
+    assert "viewTodayAgenda?.addEventListener" in timetable_js
+    assert "plannerShowConflicts?.addEventListener" in timetable_js
+    today = datetime.now().date()
+    todays = [date for date in (first, second) if datetime.fromisoformat(date).date() == today]
+    assert f"{1} / {len(todays)} buổi hoàn thành" in html
     for tid in (task1, task2):
         assert html.count(f'data-task-id="{tid}"') == 1
         assert f"/study-plan/tasks/{tid}/toggle" in html
         assert f"/study-plan/tasks/{tid}/delete" in html
     assert "Ôn chương IaaS" in html
     assert "Ghi chú cá nhân" in html
-    assert "Mục tiêu & deadline" in html
+    assert "Deadline & cảnh báo" in html
     assert "Ôn trước ngày thi" in html
     assert "Đã nộp báo cáo" in html
     assert "Gợi ý từ Study Agent" in html
@@ -138,7 +150,8 @@ def verify():
     # Action semantics must remain functional after template/layout cleanup.
     check = client.post(f"/study-plan/tasks/{task2}/toggle")
     assert check.status_code in (302, 303)
-    assert 'aria-valuenow="100"' in client.get("/study-plan").get_data(as_text=True)
+    updated_html = client.get("/study-plan").get_data(as_text=True)
+    assert updated_html.count('data-task-done="1"') == 2
     deleted = client.post(f"/study-plan/tasks/{task2}/delete")
     assert deleted.status_code in (302, 303)
     conn = project.db()
@@ -155,6 +168,7 @@ def verify():
     empty_html = client.get("/study-plan").get_data(as_text=True)
     assert 'id="scheduleFilterEmpty"' in empty_html
     assert 'id="compactTaskList"' not in empty_html
+    assert "Hôm nay chưa có buổi học" in empty_html
     assert "✓ Đã hoàn thành (1)" in empty_html
 
 
