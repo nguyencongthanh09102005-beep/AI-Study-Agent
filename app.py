@@ -1600,7 +1600,7 @@ def get_next_best_action(conn, user_id, subject_id=None):
                 )
             ],
             "primary_label": "Tạo kế hoạch",
-            "primary_url": url_for("study_plan", subject_id=subject_id),
+            "primary_url": url_for("course_path.learning_path", subject_id=subject_id),
             "secondary_label": "Hỏi Study Agent",
             "secondary_url": url_for("chat") + f"?subject_id={subject_id}"
         }
@@ -3967,6 +3967,33 @@ def dashboard():
         weekly_growth_class=weekly_growth_class,
         next_best_action=next_best_action
     )
+
+@app.route("/learning-paths", methods=["GET"])
+@login_required
+def learning_paths():
+    """Single entry point for the existing syllabus-based course roadmaps."""
+    uid = session["user_id"]
+    conn = db()
+    try:
+        user = conn.execute(
+            "SELECT role FROM users WHERE id=?", (uid,)
+        ).fetchone()
+        if not user or user["role"] != "student":
+            return "Chỉ sinh viên được truy cập lộ trình cá nhân.", 403
+        learning_subjects = conn.execute(
+            """SELECT id, name, code, credits, progress
+               FROM subjects WHERE user_id=?
+               ORDER BY progress ASC, name COLLATE NOCASE""",
+            (uid,)
+        ).fetchall()
+        return render_template(
+            "learning_paths.html",
+            page="learning_paths",
+            learning_subjects=learning_subjects
+        )
+    finally:
+        conn.close()
+
 
 @app.route("/subjects", methods=["GET", "POST"])
 @login_required
