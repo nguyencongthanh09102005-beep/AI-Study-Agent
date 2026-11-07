@@ -298,7 +298,7 @@ def learning_path(subject_id):
                     conn, uid, subject_id, linked[sid])
                 lesson_signatures[sid] = session_signature(lesson)
         return render_template(
-            "course_learning_path.html", page="subjects", subject=subject,
+            "course_learning_path.html", page="learning_paths", subject=subject,
             syllabus_name=syllabus_name, units=units, sessions=sessions,
             schedule_status=schedule_status, actual_schedule=linked,
             stale=bool(plan_row and not fresh),
