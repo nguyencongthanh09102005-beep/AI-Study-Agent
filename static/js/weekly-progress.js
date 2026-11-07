@@ -1,263 +1,56 @@
-document.addEventListener(
-  "DOMContentLoaded",
-  function () {
-
-    const canvas =
-      document.getElementById(
-        "weeklyStudyChart"
-      );
-
-    if (
-      !canvas ||
-      typeof Chart === "undefined"
-    ) {
-      return;
-    }
-
-
-    const weeklyData =
-      Array.isArray(
-        window.weeklyStudyData
-      )
-        ? window.weeklyStudyData
-        : [0, 0, 0, 0, 0, 0, 0];
-
-
-    const context =
-      canvas.getContext("2d");
-
-
-    const gradient =
-      context.createLinearGradient(
-        0,
-        0,
-        0,
-        280
-      );
-
-
-    gradient.addColorStop(
-      0,
-      "rgba(100, 88, 255, 0.24)"
-    );
-
-    gradient.addColorStop(
-      1,
-      "rgba(100, 88, 255, 0)"
-    );
-
-
-    const largestValue =
-      Math.max(
-        ...weeklyData,
-        0
-      );
-
-
-    const suggestedMax =
-      Math.max(
-        2,
-        Math.ceil(
-          largestValue + 1
-        )
-      );
-
-
-    new Chart(
-      context,
-      {
-        type: "line",
-
-        data: {
-          labels: [
-            "T2",
-            "T3",
-            "T4",
-            "T5",
-            "T6",
-            "T7",
-            "CN"
-          ],
-
-          datasets: [
-            {
-              label: "Giờ học",
-
-              data:
-                weeklyData,
-
-              borderColor:
-                "#665cff",
-
-              backgroundColor:
-                gradient,
-
-              borderWidth:
-                3,
-
-              fill:
-                true,
-
-              tension:
-                0.42,
-
-              pointRadius:
-                3,
-
-              pointHoverRadius:
-                6,
-
-              pointBackgroundColor:
-                "#665cff",
-
-              pointHoverBackgroundColor:
-                "#665cff",
-
-              pointHoverBorderColor:
-                "#ffffff",
-
-              pointHoverBorderWidth:
-                3
-            }
-          ]
+// Weekly study hours come from completed study_tasks; never substitute sample data.
+document.addEventListener("DOMContentLoaded", () => {
+  const canvas = document.getElementById("weeklyStudyChart");
+  if (!canvas || typeof Chart === "undefined") return;
+  const raw = Array.isArray(window.weeklyStudyData) ? window.weeklyStudyData.slice(0, 7) : [];
+  const values = Array.from({ length: 7 }, (_, i) => {
+    const n = Number(raw[i]);
+    return Number.isFinite(n) ? Math.max(0, n) : 0;
+  });
+  const ctx = canvas.getContext("2d");
+  const fill = ctx.createLinearGradient(0, 0, 0, 260);
+  fill.addColorStop(0, "#7664f3");
+  fill.addColorStop(1, "#a6b5ff");
+  const maxValue = Math.max(...values, 0);
+  new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: ["T2", "T3", "T4", "T5", "T6", "T7", "CN"],
+      datasets: [{
+        label: "Giờ đã học",
+        data: values,
+        backgroundColor: fill,
+        hoverBackgroundColor: "#5f55d8",
+        borderRadius: 7,
+        borderSkipped: false,
+        maxBarThickness: 42
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 350 },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          displayColors: false,
+          callbacks: { label: context => `${Number(context.parsed.y || 0)} giờ đã học` }
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          border: { display: false },
+          ticks: { color: "#687ba0", font: { size: 12, weight: "600" } }
         },
-
-
-        options: {
-          responsive:
-            true,
-
-          maintainAspectRatio:
-            false,
-
-          interaction: {
-            mode:
-              "index",
-
-            intersect:
-              false
-          },
-
-          plugins: {
-
-            legend: {
-              display:
-                false
-            },
-
-
-            tooltip: {
-              backgroundColor:
-                "#172033",
-
-              titleColor:
-                "#ffffff",
-
-              bodyColor:
-                "#ffffff",
-
-              displayColors:
-                false,
-
-              padding:
-                12,
-
-              callbacks: {
-
-                label(context) {
-
-                  const value =
-                    Number(
-                      context.parsed.y || 0
-                    );
-
-
-                  return (
-                    `${value} giờ học`
-                  );
-                }
-              }
-            }
-          },
-
-
-          scales: {
-
-            x: {
-
-              border: {
-                display:
-                  false
-              },
-
-              grid: {
-                color:
-                  "rgba(133, 143, 166, 0.10)",
-
-                borderDash:
-                  [5, 6],
-
-                drawTicks:
-                  false
-              },
-
-              ticks: {
-                color:
-                  "#7f889c",
-
-                padding:
-                  10,
-
-                font: {
-                  size:
-                    12,
-
-                  weight:
-                    "600"
-                }
-              }
-            },
-
-
-            y: {
-
-              beginAtZero:
-                true,
-
-              suggestedMax:
-                suggestedMax,
-
-              border: {
-                display:
-                  false
-              },
-
-              grid: {
-                color:
-                  "rgba(133, 143, 166, 0.12)",
-
-                borderDash:
-                  [5, 6],
-
-                drawTicks:
-                  false
-              },
-
-              ticks: {
-                color:
-                  "#7f889c",
-
-                padding:
-                  12,
-
-                precision:
-                  0
-              }
-            }
-          }
+        y: {
+          beginAtZero: true,
+          suggestedMax: Math.max(2, Math.ceil(maxValue)),
+          border: { display: false },
+          grid: { color: "rgba(130,148,188,.16)" },
+          ticks: { color: "#7c8cac", precision: 0, stepSize: maxValue <= 8 ? 1 : undefined }
         }
       }
-    );
-
-  }
-);
+    }
+  });
+});
