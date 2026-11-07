@@ -1732,15 +1732,6 @@ function ProfileScreen({ userName, email, refreshData, onOpenQuiz, onOpenConnect
         <Text style={styles.settingsEntryText}>⚙ Tùy chỉnh học tập</Text>
         <Text style={styles.settingsChevron}>{showLearningSettings ? '⌃' : '›'}</Text>
       </TouchableOpacity>
-      <Text style={styles.sectionTitle}>Ứng dụng</Text>
-      <TouchableOpacity style={styles.settingsEntry} onPress={onOpenConnection}>
-        <Text style={styles.settingsEntryText}>⌁ Cài đặt kết nối</Text>
-        <Text style={styles.settingsChevron}>›</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.settingsEntry} onPress={onLogout}>
-        <Text style={[styles.settingsEntryText,{color:'#B83F51'}]}>↪ Đăng xuất</Text>
-        <Text style={styles.settingsChevron}>›</Text>
-      </TouchableOpacity>
       {showLearningSettings && <View style={styles.card}>
       <ErrorCard message={error} />
       <Text style={styles.fieldLabel}>Phong cách học</Text>
@@ -1766,6 +1757,16 @@ function ProfileScreen({ userName, email, refreshData, onOpenQuiz, onOpenConnect
         <Text style={styles.primaryButtonText}>{busy ? 'Đang lưu...' : 'Lưu hồ sơ học tập'}</Text>
       </TouchableOpacity>
       </View>}
+      <Text style={styles.sectionTitle}>Ứng dụng</Text>
+      <TouchableOpacity style={styles.settingsEntry} onPress={onOpenConnection}>
+        <Text style={styles.settingsEntryText}>⌁ Cài đặt kết nối</Text>
+        <Text style={styles.settingsChevron}>›</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.settingsEntry} onPress={onLogout}>
+        <Text style={[styles.settingsEntryText,{color:'#B83F51'}]}>↪ Đăng xuất</Text>
+        <Text style={styles.settingsChevron}>›</Text>
+      </TouchableOpacity>
+
     </ScrollView>
   );
 }
@@ -2077,7 +2078,7 @@ const styles = StyleSheet.create({
   fieldInput: { backgroundColor: 'white', borderWidth: 1, borderColor: '#DFE3F0', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, color: '#17203A', marginBottom: 16 },
   backLink: { color: '#6567E8', fontWeight: '700', marginBottom: 16, fontSize: 13 },
   actionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
-  smallAction: { paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, backgroundColor: '#EEF0FF' },
+  smallAction: { paddingHorizontal: 12, minHeight: 43, justifyContent: 'center', borderRadius: 10, backgroundColor: '#EEF0FF' },
   smallActionText: { color: '#505AD0', fontSize: 12, fontWeight: '700' },
   deleteAction: { backgroundColor: '#FFF0F1' },
   deleteActionText: { color: '#B83647', fontSize: 12, fontWeight: '700' },
@@ -2137,7 +2138,7 @@ const styles = StyleSheet.create({
   bottomNav: { height: 78, backgroundColor: 'white', flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#E9ECF3', paddingTop: 10, paddingBottom: 8 },
   navItem: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   navIcon: { fontSize: 19, color: '#637493' },
-  navLabel: { fontSize: 10, color: '#637493', marginTop: 4, fontWeight: '700' },
+  navLabel: { fontSize: 11, color: '#637493', marginTop: 4, fontWeight: '700' },
   navActive: { color: '#5E66D8' },
   loginSafe: { flex: 1, backgroundColor: '#F6F8FC', justifyContent: 'center' },
   loginWrap: { flexGrow: 1, paddingHorizontal: 26, paddingTop: 32, paddingBottom: 32, justifyContent: 'center', alignItems: 'stretch' },
@@ -2189,7 +2190,7 @@ const styles = StyleSheet.create({
   planDayCellActive: { backgroundColor: '#6567E8' },
   planDayName: { fontWeight: '800', color: '#566A91', fontSize: 10 },
   planDayDate: { color: '#354B73', fontSize: 12, fontWeight: '800' },
-  planDayCount: { color: '#65789B', fontSize: 9 },
+  planDayCount: { color: '#65789B', fontSize: 10 },
   planDayActiveText: { color: 'white' },
   planEditButton: { borderRadius: 10, paddingVertical: 9, paddingHorizontal: 12, backgroundColor: '#E8ECFF' },
   planEditButtonText: { color: '#4F5BC6', fontSize: 12, fontWeight: '800' },
@@ -2197,7 +2198,7 @@ const styles = StyleSheet.create({
   planTaskRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start', backgroundColor: '#F1F5FC', padding: 12, borderRadius: 13, marginTop: 8 },
   planTaskDone: { backgroundColor: '#F0F3FA' },
   planTaskActions: { flexDirection: 'column', gap: 8 },
-  planCheck: { width: 27, height: 27, borderWidth: 1.5, borderColor: '#8A98C4', borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: 'white' },
+  planCheck: { width: 44, height: 44, borderWidth: 1.5, borderColor: '#8A98C4', borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: 'white' },
   planCheckDone: { borderColor: '#6567E8', backgroundColor: '#6567E8' },
   planCheckText: { color: '#45578C', fontSize: 14, fontWeight: '900' },
   planCheckTextDone: { color: 'white' },
@@ -2206,9 +2207,23 @@ const styles = StyleSheet.create({
   planTaskMeta: { color: '#51668A', fontSize: 11.5, lineHeight: 18, marginTop: 4 },
   planTaskNote: { color: '#566C91', fontSize: 11.5, lineHeight: 17, marginTop: 5 },
   planAdaptiveTag: { color: '#6C589A', fontWeight: '800', fontSize: 10.5, marginTop: 5 },
-  planIconAction: { backgroundColor: '#E6ECFA', width: 28, height: 28, borderRadius: 9, justifyContent: 'center', alignItems: 'center' },
+  planIconAction: { backgroundColor: '#E6ECFA', width: 44, height: 44, borderRadius: 11, justifyContent: 'center', alignItems: 'center' },
   planIconText: { color: '#5869BC', fontSize: 16, fontWeight: '800' },
-  planProgressCard: { backgroundColor: '#F0F2FF', borderWidth: 1, borderColor: '#D7DEFF', borderRadius: 18, padding: 17, marginBottom: 13 },
+  planTodaySummary: { backgroundColor: '#EEF0FF', borderColor: '#D6DEFD', borderWidth: 1, borderRadius: 15,
+    paddingVertical: 13, paddingHorizontal: 15, flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between', gap: 9 },
+  planTodaySummaryLabel: {fontSize: 13, color: '#5364A3', fontWeight: '800'},
+  planTodaySummaryValue: {fontSize: 13, color: '#3E4C9F', fontWeight: '800', flexShrink: 1, textAlign: 'right'},
+  planConflictNote: {padding:12, backgroundColor:'#FFF7E9', borderColor:'#EED3A8',
+    borderWidth:1,borderRadius:12,gap:7,marginBottom:9},
+  planConflictText: {color:'#956021',fontSize:12,fontWeight:'800'},
+  planTaskDoc: {fontSize:11,color:'#536AA1',marginTop:4},
+  docSelected: {backgroundColor:'#6265E8'},
+  docSelectedText: {color:'white'},
+  docUpload: {borderWidth:1,borderColor:'#CDD4F6',backgroundColor:'#F0F2FF',
+    borderRadius:12,minHeight:45,alignItems:'center',justifyContent:'center',paddingHorizontal:12},
+  docUploadText: {fontSize:12,color:'#4A5EBD',fontWeight:'800'},
+  helperNote: {fontSize:11,color:'#63769A',lineHeight:18,marginTop:7,marginBottom:13},
   planProgressPercent: { color: '#5C5DDC', fontSize: 24, fontWeight: '900' },
   planProgressHours: { color: '#53668A', fontSize: 12, lineHeight: 17, marginTop: 11 },
   planReminderRow: { flexDirection: 'row', alignItems: 'center', gap: 9, borderBottomWidth: 1, borderBottomColor: '#E8EDF8', paddingVertical: 12 },
