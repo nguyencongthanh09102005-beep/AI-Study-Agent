@@ -8420,13 +8420,20 @@ def api_mobile_study_plan():
 
     if request.method == "GET":
         profile = ensure_learning_profile(conn, uid)
+        from manual_lesson_routes import ensure_schema as ensure_manual_schema
+        ensure_manual_schema(conn)
         rows = conn.execute(
             """
             SELECT t.id,t.subject_id,t.title,t.study_at,t.duration,t.note,t.done,t.source,
-                   t.roadmap_session_id, s.name AS subject_name
+                   t.roadmap_session_id, s.name AS subject_name,
+                   m.document_id, d.original_name AS personal_document_name
             FROM study_tasks t
             LEFT JOIN subjects s
               ON s.id=t.subject_id AND s.user_id=t.user_id
+            LEFT JOIN manual_lesson_documents m
+              ON m.task_id=t.id AND m.user_id=t.user_id AND t.source='manual'
+            LEFT JOIN documents d
+              ON d.id=m.document_id AND d.user_id=t.user_id
             WHERE t.user_id=?
             ORDER BY t.done ASC,t.study_at ASC
             LIMIT 200
@@ -8665,6 +8672,45 @@ def api_mobile_tasks(task_id=None):
         conn.close()
         return jsonify({"error": "Cần tên nhiệm vụ và thời gian hợp lệ (YYYY-MM-DDTHH:MM)."}), 400
 
+    # A document is permitted only in the personal manual-lesson stream,
+    # never in an official roadmap task or from another user's subject.
+    from manual_lesson_routes import (
+        ensure_schema as ensure_manual_schema, owned_document, attach_document,
+    )
+    ensure_manual_schema(conn)
+    raw_doc = payload.get("document_id")
+    try:
+        document_id = int(raw_doc) if raw_doc not in (None, "") else None
+    except (ValueError, TypeError):
+        conn.close()
+        return jsonify({"error": "Tài liệu cá nhân không hợp lệ."}), 400
+    if document_id and not owned_document(conn, uid, subject_id, document_id):
+        conn.close()
+        return jsonify({"error": "Tài liệu không thuộc môn học đã chọn."}), 400
+
+    existing_binding = None
+    if old:
+        existing_binding = conn.execute(
+            "SELECT document_id FROM manual_lesson_documents WHERE task_id=? AND user_id=?",
+            (task_id, uid),
+        ).fetchone()
+        if existing_binding:
+            linked_id = existing_binding["document_id"]
+            if subject_id != old["subject_id"] or not owned_document(
+                conn, uid, subject_id, linked_id
+            ):
+                conn.close()
+                return jsonify({"error": "Không thể chuyển môn khi buổi tự học vẫn gắn tài liệu cũ."}), 400
+            if document_id and document_id != linked_id:
+                conn.close()
+                return jsonify({"error": "Không thể đổi tài liệu của buổi đã liên kết; hãy tạo buổi khác."}), 400
+        if old["source"] == "roadmap" and subject_id != old["subject_id"]:
+            conn.close()
+            return jsonify({"error": "Buổi từ lộ trình không được chuyển sang môn khác."}), 400
+        if old["source"] != "manual" and document_id:
+            conn.close()
+            return jsonify({"error": "Chỉ buổi tự học mới được gắn tài liệu."}), 400
+
     if old:
         conn.execute(
             """UPDATE study_tasks SET title=?,subject_id=?,study_at=?,duration=?,note=?
@@ -8674,6 +8720,11 @@ def api_mobile_tasks(task_id=None):
         if old["source"] == "adaptive":
             from adaptive_review_schedule import lock_adaptive_time
             lock_adaptive_time(conn, task_id, uid)
+        if old["source"] == "roadmap" and old["study_at"] != study_at:
+            from adaptive_plan_phase8 import lock_manual_roadmap_time
+            lock_manual_roadmap_time(conn, uid, task_id)
+        if old["source"] == "manual" and document_id and not existing_binding:
+            attach_document(conn, uid, task_id, subject_id, document_id, now())
         if old["subject_id"]:
             recalculate_subject_progress(uid, old["subject_id"], conn)
     else:
@@ -8683,6 +8734,8 @@ def api_mobile_tasks(task_id=None):
                ) VALUES(?,?,?,?,?,?,?,?,?)""",
             (uid, subject_id, title, study_at, duration, note, 0, "manual", now())
         ).lastrowid
+        if document_id:
+            attach_document(conn, uid, task_id, subject_id, document_id, now())
     if subject_id:
         recalculate_subject_progress(uid, subject_id, conn)
     conn.commit()
