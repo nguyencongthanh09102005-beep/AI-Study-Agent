@@ -7519,14 +7519,19 @@ def api_mobile_dashboard():
         item["weakness"] = dict(weakness) if weakness else None
         subjects.append(item)
 
+    from manual_lesson_routes import ensure_schema as ensure_manual_schema
+    ensure_manual_schema(conn)
     task_rows = conn.execute(
         """
         SELECT t.id,t.user_id,t.title,t.study_at,t.duration,t.done,t.source,
                t.roadmap_session_id,t.roadmap_session_signature,
-               s.id AS subject_id,s.name AS subject_name
+               s.id AS subject_id,s.name AS subject_name,
+               m.document_id
         FROM study_tasks t
         LEFT JOIN subjects s
           ON s.id=t.subject_id AND s.user_id=t.user_id
+        LEFT JOIN manual_lesson_documents m
+          ON m.task_id=t.id AND m.user_id=t.user_id AND t.source='manual'
         WHERE t.user_id=? AND t.done=0
         ORDER BY t.study_at ASC
         LIMIT 8

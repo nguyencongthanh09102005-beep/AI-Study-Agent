@@ -46,9 +46,9 @@ assert(login.includes("secureTextEntry={!showPassword}"),"Password visibility re
 assert(login.includes("secureTextEntry={!showConfirm}"),"Signup confirmation retained");
 assert(connection.includes("testApiConnection(address)"),
   "Check Flask before changing server URL");
-assert(connection.includes("setApiBaseUrl(address)"),"Runtime URL can be edited");
-assert(connection.includes("Địa chỉ đổi tại đây chỉ có hiệu lực"),
-  "Do not imply temporary settings are persisted");
+assert(connection.includes("persistServerAddress(address)"),"Validated Flask URL must persist on device");
+assert(connection.includes("Địa chỉ đã kiểm tra được lưu trên điện thoại"),
+  "Connection settings should explain persistent origin and required Flask server");
 assert(client.includes("fetch(value + '/api/mobile/session'"),
   "The URL probe must check real Flask API");
 assert(client.includes("response.status !== 401"),
