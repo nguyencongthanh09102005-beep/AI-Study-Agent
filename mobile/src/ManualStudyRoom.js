@@ -77,16 +77,18 @@ export default function ManualStudyRoom({taskId,onBack,onOpenQuiz}) {
   },[taskId,!!data]);
 
   const sendTimerAction=async action=>{
-    if(flight.current||!csrf.current)return;
+    if(flight.current||!csrf.current)return false;
     flight.current=true;setBusy(true);
     setError('');
     try {
       const result=await api.manualTimer(taskId,action,csrf.current);
       setData(old=>old?{...old,timer:result,task:{...old.task,done:!!result.done}}:old);
       lastSync.current=Date.now();
+      return true;
     } catch(err) {
       setError(err.message||'Không lưu được thời gian học.');
       try {await reload();}catch(_ignore){}
+      return false;
     } finally {
       flight.current=false;setBusy(false);
     }
@@ -175,8 +177,7 @@ export default function ManualStudyRoom({taskId,onBack,onOpenQuiz}) {
     Alert.alert('Đồng hồ đang chạy','Bạn nên tạm dừng trước khi rời Không gian tự học.',[
       {text:'Ở lại',style:'cancel'},
       {text:'Tạm dừng và thoát',onPress:async()=>{
-        await sendTimerAction('pause');
-        onBack();
+        if (await sendTimerAction('pause')) onBack();
       }},
     ]);
   };
@@ -273,7 +274,10 @@ export default function ManualStudyRoom({taskId,onBack,onOpenQuiz}) {
       <View style={styles.card}>
         <Text style={styles.heading}>📝 Quiz 10 câu theo tài liệu</Text>
         {data.quiz.id?<TouchableOpacity style={styles.primary} accessibilityRole="button"
-          onPress={()=>onOpenQuiz({subjectId:data.task.subject_id,quizId:data.quiz.id})}>
+          onPress={async()=>{
+            if(timer.status==='running' && !(await sendTimerAction('pause'))) return;
+            onOpenQuiz({subjectId:data.task.subject_id,quizId:data.quiz.id});
+          }}>
           <Text style={styles.primaryText}>▶ Mở Quiz đã chuẩn bị</Text>
         </TouchableOpacity>:<>
           <Text style={styles.faint}>Chỉ tạo bài khi bạn yêu cầu; không tự sinh Quiz mỗi lần mở buổi.</Text>
