@@ -335,6 +335,25 @@ def run():
             planned = datetime.fromisoformat(task_rows[0]["study_at"])
             assert not quiz_access(conn, project, student, first_quiz,
                                    planned-timedelta(minutes=1))["can_start"]
+            # Regression: students may open an old prepared Quiz even if
+            # they never clicked Start or submitted during its original
+            # lesson slot. Time alone unlocks it permanently for practice.
+            # The answer key remains protected until a real submission.
+            past_slot = planned + timedelta(days=30)
+            past_access = quiz_access(conn, project, student, first_quiz,
+                                      past_slot)
+            assert past_access["allowed"] and past_access["can_start"]
+            assert not past_access.get("review_unlocked", False)
+            with patch("study_session_quiz_runtime.study_now",
+                       return_value=past_slot):
+                old_mobile = client.get(f"/api/mobile/quizzes/{first_quiz}")
+                assert old_mobile.status_code == 200, old_mobile.get_json()
+                assert len(old_mobile.get_json()["questions"]) == 15
+                assert "answer" not in old_mobile.get_json()["questions"][0]
+                old_status = client.get(mobile_first).get_json()
+                assert old_status["state"] == "available", old_status
+                assert client.get(f"/api/mobile/quizzes/{first_quiz}/review").status_code == 403
+                assert f'data-quiz-id="{first_quiz}"' in client.get("/quiz").get_data(as_text=True)
             try:
                 start_quiz(conn, project, student, first_quiz,
                            planned-timedelta(minutes=1))
@@ -354,21 +373,24 @@ def run():
                                new_start+timedelta(minutes=1))["can_start"]
             assert start_quiz(conn, project, student, first_quiz,
                               new_start+timedelta(minutes=1))["allowed"]
-            # The previously granted in-progress attempt survives further
-            # schedule changes until its originally granted window ends.
+            # The previously opened Quiz stays accessible for revision after
+            # schedule changes, with no expiry at the old lesson end.
             conn.execute("UPDATE study_tasks SET study_at=? WHERE id=?",
                          ((new_start+timedelta(hours=2)).isoformat(timespec="minutes"),
                           task_rows[0]["id"]))
             assert quiz_access(conn, project, student, first_quiz,
                                new_start+timedelta(minutes=3))["allowed"]
-            assert not quiz_access(conn, project, student, first_quiz,
-                                   new_start+timedelta(hours=1))["allowed"]
+            # Previously opened sessions no longer relock after the short
+            # session ends; the owner can revise at any later date.
+            assert quiz_access(conn, project, student, first_quiz,
+                               new_start+timedelta(hours=1))["allowed"]
             conn.commit()
             conn.close()
 
             assert client.get("/quiz").status_code == 200
             # Still locked in the real current wall clock, because the test's
-            # future planned window has not actually started.
+            # rescheduled lesson is still in the future. The synthetic
+            # lookups above did not persist any actual student attempt.
             later_attempt = client.post("/api/quiz/submit", json={
                 "quiz_id": first_quiz, "answers": [0]*15
             })
