@@ -375,8 +375,8 @@ def per_lesson_quiz_status(conn, project, uid, task_id):
         reason=access.get("reason", ""),
         review_unlocked=bool(access.get("review_unlocked")),
         state=("review" if access.get("review_unlocked") else
-               "active" if access.get("allowed") else
-               "available" if access.get("can_start") else "locked"),
+               "available" if access.get("can_start") else
+               "active" if access.get("allowed") else "locked"),
     )
     row = conn.execute("""
         SELECT COUNT(*) AS attempts,MAX(score) AS best_score
@@ -651,10 +651,11 @@ def quiz_access(conn, project, uid, quiz_id, at=None):
             ctx["task_signature"] != link["session_signature"]):
         return {"linked": True, "allowed": False,
                 "reason": "Nguồn hoặc nội dung lộ trình đã thay đổi."}
-    # A submitted Quiz remains open for later revision. The persistent
-    # attempt row is the durable unlock; it cannot be forged from the client.
-    # Verify current course, roadmap and approved sources ABOVE this check.
-    # Revoked sources and deleted subjects stay blocked.
+    # Never expose linked Quiz questions ahead of the scheduled local start.
+    # Once the lesson starts, the same Quiz stays open for unlimited later
+    # practice (even when no attempt was submitted during the original slot).
+    # Owner, course, signed roadmap and approved sources are checked ABOVE;
+    # revoked sources / deleted subjects must remain blocked.
     submitted = conn.execute("""
         SELECT 1 FROM quiz_attempts
         WHERE quiz_id=? AND user_id=? LIMIT 1
@@ -667,16 +668,20 @@ def quiz_access(conn, project, uid, quiz_id, at=None):
         SELECT started_at,valid_until FROM quiz_session_grants
         WHERE quiz_id=? AND user_id=?
     """, (quiz_id, uid)).fetchone()
-    if (grant and datetime.fromisoformat(grant["started_at"]) <= at
-            < datetime.fromisoformat(grant["valid_until"])):
+    # A previously started Quiz keeps its durable right to revision even
+    # after the original end time or subsequent schedule changes.
+    if grant and datetime.fromisoformat(grant["started_at"]) <= at:
         return {"linked": True, "allowed": True, "count": count}
     start, end = _lesson_window(conn, uid, link["task_id"])
-    return {"linked": True, "allowed": False, "count": count,
-            "can_start": start <= at < end,
+    unlocked = at >= start
+    # Direct owner-scoped Quiz opens (including Saved Quiz on Mobile) work
+    # without an extra 'start session' click once the start time has passed.
+    # Before start, never return the question payload or answer key.
+    return {"linked": True, "allowed": unlocked, "count": count,
+            "can_start": unlocked,
             "study_at": start.isoformat(timespec="minutes"),
             "ends_at": end.isoformat(timespec="minutes"),
-            "reason": ("Chưa đến giờ mở bài kiểm tra." if at < start
-                       else "Đã hết khung giờ kiểm tra.")}
+            "reason": "" if unlocked else "Chưa đến giờ mở bài kiểm tra."}
 
 
 def start_quiz(conn, project, uid, quiz_id, at=None):
@@ -684,19 +689,22 @@ def start_quiz(conn, project, uid, quiz_id, at=None):
     status = quiz_access(conn, project, uid, quiz_id, at)
     if not status["linked"]:
         raise LessonContextError("Đây không phải Quiz theo buổi.", 404)
-    if status["allowed"]:
-        return status
-    if not status.get("can_start"):
+    if not status.get("allowed") and not status.get("can_start"):
         raise LessonContextError(status.get("reason") or "Quiz đang khóa.", 409)
-    link = conn.execute("""
-        SELECT task_id FROM quiz_session_links WHERE quiz_id=? AND user_id=?
-    """, (quiz_id, uid)).fetchone()
-    _, end = _lesson_window(conn, uid, link["task_id"])
+    # An existing attempt or grant is already a durable unlock. Otherwise
+    # persist the first legitimate start; later timetable edits cannot
+    # retroactively close a Quiz that the student already opened.
+    existing = conn.execute("""
+        SELECT 1 FROM quiz_session_grants
+        WHERE quiz_id=? AND user_id=? AND started_at<=?
+    """, (quiz_id, uid, at.isoformat(timespec="seconds"))).fetchone()
+    if status.get("review_unlocked") or existing:
+        return status
     conn.execute("""
         INSERT INTO quiz_session_grants(quiz_id,user_id,started_at,valid_until)
         VALUES(?,?,?,?)
         ON CONFLICT(quiz_id,user_id) DO UPDATE SET
             started_at=excluded.started_at,valid_until=excluded.valid_until
     """, (quiz_id, uid, at.isoformat(timespec="seconds"),
-          end.isoformat(timespec="seconds")))
+          "9999-12-31T23:59:59"))
     return quiz_access(conn, project, uid, quiz_id, at)
