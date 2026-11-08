@@ -12,6 +12,16 @@ const tabBlock = app.match(/const tabs = \[([\s\S]*?)\];/);
 assert(tabBlock, "Bottom tab definition missing");
 const tabs=[...tabBlock[1].matchAll(/\['([^']+)',/g)].map(m=>m[1]);
 assert.deepEqual(tabs,["home","subjects","plan","profile"]);
+assert(app.includes('accessibilityLabel="Làm Quiz theo môn hoặc tài liệu cá nhân"'),
+  "Home must show an accessible, obvious Quiz action");
+assert(app.includes('onPress={() => onOpenQuiz(null)}'),
+  "Home Quiz entry must open existing Quiz screen, not a separate flow");
+assert(app.includes('Theo môn · Tài liệu cá nhân · Ôn điểm yếu'),
+  "Home Quiz entry must explain the available learning sources");
+assert(app.includes('📝 Làm Quiz · Kết quả & ôn điểm yếu'),
+  "Profile entry must not look like history-only content");
+assert(app.includes('onOpenQuiz={() => openQuiz(null)}'),
+  "Quiz navigation must preserve a single shared Quiz flow");
 assert(!tabs.includes("agent")&&!tabs.includes("quiz"));
 assert(app.includes("<FloatingStudyChat subjects={subjects} lesson={activeLesson}"),
   "Keep floating AI globally accessible");
