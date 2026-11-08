@@ -86,6 +86,17 @@ function HomeScreen({ dashboard, setTab, loading, onOpenStudy, onOpenManualStudy
         <View style={styles.homeMetric}><Text style={styles.homeMetricValue}>{dashboard?.stats?.quiz_attempt_count || 0}</Text><Text style={styles.homeMetricLabel}>Bài làm</Text></View>
       </View>
 
+      <TouchableOpacity style={styles.homeQuizEntry}
+        accessibilityRole="button" accessibilityLabel="Làm Quiz theo môn hoặc tài liệu cá nhân"
+        onPress={() => onOpenQuiz(null)}>
+        <Text style={styles.homeQuizIcon}>📝</Text>
+        <View style={styles.homeQuizBody}>
+          <Text style={styles.homeQuizTitle}>Làm Quiz</Text>
+          <Text style={styles.homeQuizCaption}>Theo môn · Tài liệu cá nhân · Ôn điểm yếu</Text>
+        </View>
+        <Text style={styles.homeQuizArrow}>›</Text>
+      </TouchableOpacity>
+
       {dashboard?.next_best_action && (
         <TouchableOpacity style={styles.recommendCard}
           onPress={() => {
@@ -1741,7 +1752,7 @@ function ProfileScreen({ userName, email, refreshData, onOpenQuiz, onOpenConnect
       </View>
       <Text style={styles.sectionTitle}>Học tập</Text>
       <TouchableOpacity style={styles.settingsEntry} onPress={onOpenQuiz}>
-        <Text style={styles.settingsEntryText}>✓ Kết quả Quiz & điểm yếu</Text>
+        <Text style={styles.settingsEntryText}>📝 Làm Quiz · Kết quả & ôn điểm yếu</Text>
         <Text style={styles.settingsChevron}>›</Text>
       </TouchableOpacity>
       <TouchableOpacity style={styles.settingsEntry}
@@ -2128,6 +2139,14 @@ const styles = StyleSheet.create({
   homeMetricValue: { color: '#5965D8', fontSize: 21, fontWeight: '900' },
   homeMetricLabel: { color: '#526588', fontSize: 12, marginTop: 4, fontWeight: '600' },
   recommendCard: { padding: 17, borderRadius: 18, marginBottom: 15, backgroundColor: '#EDF0FF', borderWidth: 1, borderColor: '#CDD5FF', gap: 5 },
+  homeQuizEntry: { flexDirection:'row',alignItems:'center',minHeight:66,
+    backgroundColor:'#EDF0FF',borderWidth:1,borderColor:'#CDD5FF',
+    paddingHorizontal:14,paddingVertical:11,borderRadius:16,marginBottom:14,gap:11 },
+  homeQuizIcon: { fontSize:24 },
+  homeQuizBody: { flex:1,minWidth:0 },
+  homeQuizTitle: { fontSize:16,fontWeight:'900',color:'#424CC5' },
+  homeQuizCaption: { fontSize:11.5,lineHeight:17,marginTop:3,color:'#576990' },
+  homeQuizArrow: { fontSize:25,color:'#6671D0',paddingHorizontal:3 },
   loginScroll: { flex: 1, backgroundColor: '#F6F8FC' },
   sectionTitle: { fontSize: 17, fontWeight: '800', color: '#202943', marginBottom: 10, marginTop: 4 },
   card: { backgroundColor: 'white', borderRadius: 18, padding: 17, marginBottom: 12, borderWidth: 1, borderColor: '#EBEEF5' },
