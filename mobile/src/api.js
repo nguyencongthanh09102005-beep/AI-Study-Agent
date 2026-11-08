@@ -125,6 +125,10 @@ export const api = {
   deleteSubject: (subjectId) =>
     request(`/api/mobile/subjects/${subjectId}`, { method: 'DELETE' }),
 
+  personalDocumentFile: (id) => request(`/api/mobile/documents/${id}/file`),
+
+  sharedDocumentFile: (id) => request(`/api/mobile/shared-documents/${id}/file`),
+
   documents: () => request('/api/mobile/documents'),
 
   documentDetail: (id) => request(`/api/mobile/documents/${id}`),

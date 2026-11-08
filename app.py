@@ -7713,6 +7713,73 @@ def api_mobile_subject_detail(subject_id):
 
 
 
+def _mobile_original_file_payload(stored_name, original_name):
+    """Return the original source bytes to the native viewer, never text extraction.
+
+    Authorization must be checked before calling this helper. The 8 MiB
+    limit avoids sending an unbounded base64 payload to Expo Go.
+    """
+    import base64
+
+    root = UPLOAD_DIR.resolve()
+    path = (root / stored_name).resolve()
+    if path.parent != root or not path.is_file():
+        return jsonify({"error": "File gốc không còn trên máy chủ."}), 404
+    extension = Path(original_name).suffix.lower()
+    types = {
+        ".pdf": "application/pdf",
+        ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ".txt": "text/plain",
+        ".md": "text/markdown",
+    }
+    if extension not in types:
+        return jsonify({"error": "Định dạng file không hỗ trợ xem trên điện thoại."}), 415
+    if path.stat().st_size > 8 * 1024 * 1024:
+        return jsonify({"error": "File lớn hơn 8 MB. Hãy xem file gốc trên Web."}), 413
+    original_bytes = path.read_bytes()
+    if len(original_bytes) > 8 * 1024 * 1024:
+        return jsonify({"error": "File lớn hơn 8 MB. Hãy xem file gốc trên Web."}), 413
+    if not original_bytes:
+        return jsonify({"error": "File gốc trống hoặc bị hỏng."}), 422
+    response = jsonify({
+        "name": original_name,
+        "type": types[extension],
+        "base64": base64.b64encode(original_bytes).decode("ascii"),
+    })
+    response.headers["Cache-Control"] = "private, no-store"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
+@app.route("/api/mobile/shared-documents/<int:doc_id>/file")
+def api_mobile_shared_document_file(doc_id):
+    """Allow a student to preview only shared sources linked to their courses."""
+    uid, error = _mobile_require_user()
+    if error:
+        return error
+    conn = db()
+    try:
+        row = conn.execute(
+            "SELECT original_name,stored_name,shared_subject_id "
+            "FROM shared_documents WHERE id=?", (doc_id,)
+        ).fetchone()
+        if not row:
+            return jsonify({"error": "Không tìm thấy tài liệu chung."}), 404
+        for subject in conn.execute(
+            "SELECT id FROM subjects WHERE user_id=?", (uid,)
+        ).fetchall():
+            ensure_shared_subject_for_user_subject(conn, uid, subject["id"])
+        allowed = conn.execute(
+            "SELECT 1 FROM subjects WHERE user_id=? AND shared_subject_id=? LIMIT 1",
+            (uid, row["shared_subject_id"])
+        ).fetchone()
+        if not allowed:
+            return jsonify({"error": "Bạn chưa đăng ký môn học tương ứng."}), 403
+        return _mobile_original_file_payload(row["stored_name"], row["original_name"])
+    finally:
+        conn.close()
+
+
 @app.route("/api/mobile/shared-documents/<int:doc_id>")
 def api_mobile_shared_document(doc_id):
     uid, error = _mobile_require_user()
@@ -7952,6 +8019,25 @@ def api_mobile_document_detail(doc_id):
     payload = dict(row)
     payload["extracted_text"] = (payload["extracted_text"] or "")[:30000]
     return jsonify({"document": payload})
+
+
+@app.route("/api/mobile/documents/<int:doc_id>/file")
+def api_mobile_personal_document_file(doc_id):
+    """Only the owner may retrieve their original personal document bytes."""
+    uid, error = _mobile_require_user()
+    if error:
+        return error
+    conn = db()
+    try:
+        row = conn.execute(
+            "SELECT original_name,stored_name FROM documents "
+            "WHERE id=? AND user_id=?", (doc_id, uid)
+        ).fetchone()
+        if not row:
+            return jsonify({"error": "Không tìm thấy tài liệu cá nhân."}), 404
+        return _mobile_original_file_payload(row["stored_name"], row["original_name"])
+    finally:
+        conn.close()
 
 
 @app.route("/api/mobile/documents/<int:doc_id>/summary", methods=["POST"])

@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { api } from './src/api';
 import * as DocumentPicker from 'expo-document-picker';
+import {openOriginalDocument} from './src/originalDocumentPreview';
 import FloatingStudyChat from './src/FloatingStudyChat';
 import StudyRoom from './src/StudyRoom';
 import ManualStudyRoom from './src/ManualStudyRoom';
@@ -205,8 +206,7 @@ function SubjectsScreen({ subjects, userName, refreshData, onOpenStudy, onOpenQu
   const [detail, setDetail] = useState(null);
   const [roadmap, setRoadmap] = useState(null);
   const [documents, setDocuments] = useState([]);
-  const [docPreview, setDocPreview] = useState(null);
-  const [sharedDocPreview, setSharedDocPreview] = useState(null);
+  const [summaryDoc, setSummaryDoc] = useState(null);
   const [docSummary, setDocSummary] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -338,36 +338,31 @@ function SubjectsScreen({ subjects, userName, refreshData, onOpenStudy, onOpenQu
     } finally { setBusy(false); }
   };
 
-  const previewDocument = async (doc) => {
-    setBusy(true);
-    setError('');
-    setDocSummary('');
-    try {
-      const data = await api.documentDetail(doc.id);
-      setDocPreview(data.document);
-    } catch (err) {
-      setError(err.message || 'Không thể đọc tài liệu.');
-    } finally { setBusy(false); }
-  };
-
-  const previewSharedDocument = async (doc) => {
+  const openDocumentFile = async (doc, isShared = false) => {
+    if (busy) return;
     setBusy(true);
     setError('');
     try {
-      const data = await api.sharedDocumentDetail(doc.id);
-      setSharedDocPreview(data.document);
-      setMode('shared-preview');
+      const payload = isShared
+        ? await api.sharedDocumentFile(doc.id)
+        : await api.personalDocumentFile(doc.id);
+      await openOriginalDocument(payload,
+        `${isShared ? 'shared' : 'personal'}-${doc.id}`);
     } catch (err) {
-      setError(err.message || 'Không xem được tài liệu dùng chung.');
-    } finally { setBusy(false); }
+      const message = err.message || 'Không mở được file tài liệu gốc.';
+      setError(message);
+      Alert.alert('Không mở được tài liệu', message);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const summarizeDocument = async () => {
-    if (!docPreview) return;
+    if (!summaryDoc) return;
     setBusy(true);
     setError('');
     try {
-      const data = await api.summarizeDocument(docPreview.id);
+      const data = await api.summarizeDocument(summaryDoc.id);
       setDocSummary(data.summary || '');
     } catch (err) {
       setError(err.message || 'Không thể tóm tắt.');
@@ -425,12 +420,13 @@ function SubjectsScreen({ subjects, userName, refreshData, onOpenStudy, onOpenQu
     ]);
   };
 
-  if (mode === 'preview' && docPreview) return (
+  if (mode === 'summary' && summaryDoc) return (
     <ScrollView contentContainerStyle={styles.page}>
       <TouchableOpacity onPress={() => setMode('detail')}>
         <Text style={styles.backLink}>← Chi tiết môn học</Text>
       </TouchableOpacity>
-      <Header title="Nội dung tài liệu" subtitle={docPreview.original_name} userName={userName} />
+      <Header title="Tóm tắt tài liệu" subtitle={summaryDoc.original_name} userName={userName} />
+      <Text style={styles.muted}>AI dùng văn bản trích xuất để tóm tắt; bản PDF gốc được mở trực tiếp từ danh sách tài liệu.</Text>
       <ErrorCard message={error} />
       {busy && <ActivityIndicator />}
       <TouchableOpacity style={styles.primaryButton} onPress={summarizeDocument} disabled={busy}>
@@ -440,31 +436,6 @@ function SubjectsScreen({ subjects, userName, refreshData, onOpenStudy, onOpenQu
         <Text style={styles.cardTitle}>Tóm tắt tài liệu</Text>
         <ChatFormattedText value={docSummary} style={[styles.muted, { fontSize: 14, lineHeight: 23 }]} />
       </View>}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Văn bản đã trích xuất</Text>
-        <Text style={[styles.muted, { fontSize: 13, lineHeight: 22 }]}>
-          {docPreview.extracted_text || 'Không đọc được văn bản. PDF scan ảnh chưa hỗ trợ OCR.'}
-        </Text>
-      </View>
-    </ScrollView>
-  );
-
-  if (mode === 'shared-preview' && sharedDocPreview) return (
-    <ScrollView contentContainerStyle={styles.page}>
-      <TouchableOpacity onPress={() => setMode('detail')}>
-        <Text style={styles.backLink}>← Chi tiết môn học</Text>
-      </TouchableOpacity>
-      <Header title="Tài liệu dùng chung" subtitle={sharedDocPreview.original_name} userName={userName} />
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>{sharedDocPreview.subject_name} · Đã xử lý</Text>
-        <Text style={styles.muted}>Tài liệu do quản trị viên cung cấp, chỉ đọc.</Text>
-      </View>
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Nội dung trích xuất</Text>
-        <Text style={[styles.muted, { fontSize: 13, lineHeight: 22 }]}>
-          {sharedDocPreview.extracted_text || 'Chưa có nội dung văn bản.'}
-        </Text>
-      </View>
     </ScrollView>
   );
 
@@ -571,11 +542,17 @@ function SubjectsScreen({ subjects, userName, refreshData, onOpenStudy, onOpenQu
             <Text style={styles.cardTitle}>📄 {doc.original_name}</Text>
             <Text style={styles.muted}>{doc.extracted_chars ? `${doc.extracted_chars} ký tự đã trích xuất` : 'Chưa có nội dung văn bản trích xuất'}</Text>
             <View style={styles.actionRow}>
-              <TouchableOpacity style={styles.smallAction} onPress={async () => {
-                await previewDocument(doc);
-                setMode('preview');
+              <TouchableOpacity style={styles.smallAction} disabled={busy}
+                accessibilityRole="button" onPress={() => openDocumentFile(doc)}>
+                <Text style={styles.smallActionText}>↗ Mở file gốc</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.smallAction} onPress={() => {
+                setSummaryDoc({id:doc.id,original_name:doc.original_name});
+                setDocSummary('');
+                setError('');
+                setMode('summary');
               }}>
-                <Text style={styles.smallActionText}>Xem nội dung</Text>
+                <Text style={styles.smallActionText}>✦ Tóm tắt AI</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.smallAction} onPress={() => selectSyllabus(doc.id)}>
                 <Text style={styles.smallActionText}>{sub.personal_syllabus_document_id === doc.id ? '✓ Đề cương' : 'Chọn đề cương'}</Text>
@@ -607,8 +584,9 @@ function SubjectsScreen({ subjects, userName, refreshData, onOpenStudy, onOpenQu
           <View key={'shared-' + doc.id} style={styles.card}>
             <Text style={styles.cardTitle}>📚 {doc.original_name}</Text>
             <Text style={styles.muted}>{doc.is_syllabus ? 'Đề cương chuẩn · ' : ''}✓ {doc.extracted_chars || 0} ký tự đã trích xuất</Text>
-            <TouchableOpacity style={styles.secondaryAction} disabled={busy} onPress={() => previewSharedDocument(doc)}>
-              <Text style={styles.secondaryActionText}>◉ Xem tài liệu chung</Text>
+            <TouchableOpacity style={styles.secondaryAction} disabled={busy}
+              accessibilityRole="button" onPress={() => openDocumentFile(doc, true)}>
+              <Text style={styles.secondaryActionText}>↗ Mở file gốc</Text>
             </TouchableOpacity>
           </View>
         )) : <Text style={styles.muted}>Chưa có tài liệu chung cho mã môn này.</Text>}

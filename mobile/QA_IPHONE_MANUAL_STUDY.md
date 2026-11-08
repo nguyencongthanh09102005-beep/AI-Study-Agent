@@ -19,12 +19,19 @@
 | 2 | Bấm buổi tự học có gắn file từ Kế hoạch học | Mở Không gian tự học, hiện đúng tên môn / tiêu đề / tên file |
 | 3 | Vào Home, bấm cùng buổi tự học trong mục sắp tới | Mở đúng Không gian tự học, không chuyển sang buổi học lộ trình |
 | 4 | Bấm **Xem file gốc** với PDF (dưới 8 MB) | iOS mở file thật qua trình xem, không thấy chữ Base64, không bị hỏng PDF |
-| 5 | Xem tài liệu dài và bấm **Xem thêm / Thu gọn**; chạm ô câu hỏi | Chữ và nút không bị cắt, bàn phím không che nút Hỏi Study Agent |
+| 5 | Mở PDF gốc nhiều trang, trở về buổi tự học và chạm ô câu hỏi | PDF giữ nguyên bố cục; nút Hỏi Study Agent không bị bàn phím che |
 | 6 | Bấm **Bắt đầu học**, đợi 30 giây, **Tạm dừng**, rồi **Tiếp tục** | Trạng thái và thời gian không về 0, tăng theo thời gian học thực |
 | 7 | Khi timer đang chạy, tạo Quiz 10 câu và chọn **Mở Quiz** | Timer được tạm dừng **trên server** trước khi chuyển sang Quiz |
 | 8 | Từ Không gian tự học, mở lại Quiz đã tạo khi timer đang chạy | Cũng tạm dừng timer rồi mới chuyển trang; khi mất mạng thì không tự chuyển |
 | 9 | Hỏi AI một câu **có căn cứ trong PDF** và một câu **không có trong PDF** | Có dẫn tên file; với câu thiếu thông tin phải nói thiếu căn cứ, không bịa |
 | 10 | Tắt Wi-Fi trước lúc tạm dừng/hoàn thành, bật lại và tải lại | Hiện lỗi kết nối, không tự đánh dấu hoàn thành khi backend chưa xác nhận |
+
+## Kiểm tra thêm ở Môn học
+
+- [ ] Mở tài liệu cá nhân đã tải lên trước đây → **Mở file gốc** mở đúng PDF trên iPhone.
+- [ ] Mở tài liệu chung do Admin cung cấp → **Mở file gốc** đúng tên và số trang.
+- [ ] Không còn màn hình dán **Văn bản đã trích xuất / Nội dung trích xuất**; **Tóm tắt AI** vẫn sử dụng được.
+- [ ] Tài khoản khác không thể mở file cá nhân hoặc file chung của môn không đăng ký.
 
 ## Dữ liệu cần ghi nhận
 

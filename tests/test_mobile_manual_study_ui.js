@@ -44,9 +44,10 @@ assert(room.includes("onPress={()=>openPreparedQuiz({"),
        'Existing Quiz must use safe navigation');
 assert(room.includes("automaticallyAdjustKeyboardInsets={true}"),
        'iPhone keyboard must not hide the Chat AI send action');
-assert(room.includes("data.document.text.slice(0,4000)") &&
-       room.includes("setShowFullExtract(value=>!value)"),
-       'Large PDF extraction must be collapsible on small screens');
+assert(!room.includes('data.document.text') &&
+       !room.includes('setShowFullExtract') &&
+       room.includes('Bấm xem file gốc'),
+       'Do not dump extracted PDF text in the personal study room');
 assert(room.includes('data.document.extracted_chars<80'),
        'No AI or Quiz on text too short to support answers');
 assert(room.includes("if (await sendTimerAction('pause')) onBack()"));
