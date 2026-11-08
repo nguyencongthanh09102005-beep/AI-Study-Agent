@@ -213,6 +213,10 @@ jobs:
 
       - name: Final QA regression tests
         run: python tests/test_final_qa.py
+      - name: Final Web dashboard, roadmap and document UX regression
+        run: |
+          python tests/test_web_final_polish.py
+          node tests/test_web_final_polish_ui.js
 
       - name: Smoke test core web pages
         run: |
