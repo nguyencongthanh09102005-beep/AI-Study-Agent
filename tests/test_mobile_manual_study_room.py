@@ -80,7 +80,7 @@ def run():
             assert result.status_code==200,result.get_json()
             state=result.get_json()
             assert state["document"]["name"]=="figma-ui.txt"
-            assert state["document"]["text"].startswith("Tài liệu UI UX")
+            assert "text" not in state["document"], "Mobile should use file preview"
             assert state["document"]["extracted_chars"]==len(body)
             assert state["task"]["id"]==task and state["subject"]["id"]==sid
             token=state["csrf"]
