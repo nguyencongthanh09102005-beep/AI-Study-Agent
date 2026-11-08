@@ -28,8 +28,10 @@ assert(server.includes('if not attempt:') &&
   "Review must require a real submitted attempt");
 assert(server.includes('quiz_access(conn,project,uid,quiz_id)'),
   "Review must preserve stale-source restrictions");
-assert(back.includes('start <= at < end'),
-  "Quiz unlock must depend on actual server time");
+assert(back.includes('if at >= start:'),
+  "Quiz must stay accessible after its first opening time");
+assert(back.includes('datetime.fromisoformat(grant["started_at"]) <= at'),
+  "Earlier grants must not expire when the study window ends");
 assert(back.includes('review_unlocked'),
   "Submitted Quiz revision remains available");
 assert(room.includes("api.sessionQuizStatus(taskId)"),
@@ -45,6 +47,13 @@ assert(app.includes("initialQuizId={quizToOpenId}"),
   "Pass server-selected prepared Quiz to QuizScreen");
 assert(app.includes("api.quizDetail(initialQuizId)"),
   "Read questions after server opens Quiz");
+assert(app.includes("ref={quizScrollRef}") &&
+  app.includes("quizScrollRef.current?.scrollTo({ y: 0, animated: false })"),
+  "Opening a saved Quiz must reset its old list scroll offset");
+assert(app.includes("listQuizError?.id === item.id") &&
+  app.includes("setListQuizError({ id, message })") &&
+  app.includes("Alert.alert('Không thể mở Quiz', message)"),
+  "A saved Quiz access error must appear beside the tapped item");
 assert(app.includes("api.quizReview(id)"),
   "Previously submitted answers must be reviewable");
 assert(app.includes("api.quizSubmit(quiz.quiz_id,answers,submitKey.current)"),

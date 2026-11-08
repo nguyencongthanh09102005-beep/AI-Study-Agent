@@ -32,7 +32,7 @@
     </div>
   </div>
   {% if session_quiz_context.ready %}
-    <p class="session-quiz-description">Đã xác thực nguồn học liệu phù hợp. Quiz theo buổi được chuẩn bị ở trang Lộ trình theo chương, khóa theo lịch học hiện tại và mở khi đến giờ. Quiz luyện tập thông thường bên dưới vẫn hoạt động riêng.</p>
+    <p class="session-quiz-description">Đã xác thực nguồn học liệu phù hợp. Quiz theo buổi được chuẩn bị ở trang Lộ trình theo chương, khóa trước giờ học và mở vĩnh viễn sau khi đến giờ. Quiz luyện tập thông thường bên dưới vẫn hoạt động riêng.</p>
   {% else %}
     <p class="session-quiz-description warning">{{ session_quiz_context.reason }} Không thể tạo Quiz có căn cứ theo buổi khi chưa có nguồn hợp lệ.</p>
   {% endif %}
@@ -44,18 +44,18 @@
         {% if session_quiz_status.review_unlocked %}
           <p>✓ Bạn đã làm Quiz này. Bài đã lưu trong mục Quiz và luôn mở để ôn lại kiến thức cũ khi môn học vẫn còn hợp lệ.</p>
         {% else %}
-          <p>Quiz đang được mở theo giờ học. Chọn bài bên dưới để làm và nộp kết quả.</p>
+          <p>Quiz đã đến giờ mở và luôn sẵn sàng để làm hoặc ôn lại. Chọn bài bên dưới để bắt đầu.</p>
         {% endif %}
         <a href="#quiz-work-{{ session_quiz_status.quiz_id }}" class="session-quiz-back">↓ Đến bài kiểm tra</a>
       {% elif session_quiz_status.can_start %}
-        <p>Đã đến khung giờ kiểm tra. Hãy bắt đầu để mở câu hỏi.</p>
+        <p>Đã đến giờ mở Quiz. Bạn có thể bắt đầu và làm lại bất cứ lúc nào.</p>
         <form method="post" action="{{ url_for('session_quiz.open_quiz', quiz_id=session_quiz_status.quiz_id) }}">
           <input type="hidden" name="csrf_token" value="{{ session_quiz_csrf }}">
           <button type="submit" class="quiz-create-submit">▶ Bắt đầu Quiz {{ session_quiz_status.count }} câu</button>
         </form>
       {% else %}
         <p>🔒 {{ session_quiz_status.reason }}</p>
-        <p>Giờ hiện tại trong Kế hoạch học: {{ session_quiz_status.study_at }} – {{ session_quiz_status.ends_at }}. Nếu bạn dời lịch trước khi bắt đầu, giờ mở khóa sẽ tự cập nhật.</p>
+        <p>Giờ mở Quiz theo Kế hoạch học: {{ session_quiz_status.study_at }}. Nếu dời lịch trước giờ mở, hệ thống sẽ cập nhật thời điểm mở.</p>
       {% endif %}
     </div>
   {% else %}

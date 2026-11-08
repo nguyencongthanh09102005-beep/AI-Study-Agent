@@ -854,6 +854,7 @@ function QuizScreen({ subjects, userName, refreshData, initialSubjectId, initial
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
+  const [listQuizError, setListQuizError] = useState(null);
   const [saved, setSaved] = useState([]);
   const [personalDocs, setPersonalDocs] = useState([]);
   const [mode, setMode] = useState('subject');
@@ -862,6 +863,17 @@ function QuizScreen({ subjects, userName, refreshData, initialSubjectId, initial
   const [tab, setTab] = useState('create');
   const [currentQuestion,setCurrentQuestion] = useState(0);
   const submitKey=useRef('');
+  const quizScrollRef=useRef(null);
+
+  // Opening a Quiz replaces a long saved-list; do not leave the learner
+  // stranded at the old scroll offset, below the first question.
+  useEffect(() => {
+    if ((tab !== 'take' && tab !== 'result') || !quiz?.quiz_id) return;
+    const frame = requestAnimationFrame(() => {
+      quizScrollRef.current?.scrollTo({ y: 0, animated: false });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [tab, quiz?.quiz_id]);
 
   useEffect(() => {
     if (initialSubjectId) setSubjectId(initialSubjectId);
@@ -931,6 +943,7 @@ function QuizScreen({ subjects, userName, refreshData, initialSubjectId, initial
   const openQuiz = async (id) => {
     setLoading(true);
     setError('');
+    setListQuizError(null);
     setResult(null);
     try {
       const data = await api.quizDetail(id);
@@ -940,7 +953,11 @@ function QuizScreen({ subjects, userName, refreshData, initialSubjectId, initial
       submitKey.current='';
       setTab('take');
     } catch (err) {
-      setError(err.message || 'Không đọc được Quiz.');
+      // A native alert is visible even if the tapped item is at the bottom
+      // of the viewport; leave the same message inline for later reference.
+      const message = err.message || 'Không đọc được Quiz.';
+      setListQuizError({ id, message });
+      Alert.alert('Không thể mở Quiz', message);
     } finally {
       setLoading(false);
     }
@@ -978,7 +995,7 @@ function QuizScreen({ subjects, userName, refreshData, initialSubjectId, initial
        }}]);
   };
   const viewReview=async (id)=>{
-    setLoading(true);setError('');
+    setLoading(true);setError('');setListQuizError(null);
     try{
       const [q,review]=await Promise.all([api.quizDetail(id),api.quizReview(id)]);
       setQuiz(q);
@@ -989,7 +1006,11 @@ function QuizScreen({ subjects, userName, refreshData, initialSubjectId, initial
       setAnswers(Array.isArray(previous)?previous:[]);
       setCurrentQuestion(0);
       setTab('result');
-    }catch(err){setError(err.message||'Chưa xem được bài đã nộp.');}
+    }catch(err){
+      const message=err.message||'Chưa xem được bài đã nộp.';
+      setListQuizError({id,message});
+      Alert.alert('Không thể xem bài đã nộp',message);
+    }
     finally{setLoading(false);}
   };
 
@@ -1002,6 +1023,7 @@ function QuizScreen({ subjects, userName, refreshData, initialSubjectId, initial
     setResult(null);
     setSelectedDoc(null);
     setError('');
+    setListQuizError(null);
     setTab('create');
   };
 
@@ -1012,7 +1034,7 @@ function QuizScreen({ subjects, userName, refreshData, initialSubjectId, initial
   );
 
   return (
-    <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
+    <ScrollView ref={quizScrollRef} contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
       <TouchableOpacity onPress={onBack} accessibilityRole="button">
         <Text style={styles.backLink}>← Quay về môn học</Text>
       </TouchableOpacity>
@@ -1033,8 +1055,8 @@ function QuizScreen({ subjects, userName, refreshData, initialSubjectId, initial
         </View>
       )}
       <View style={styles.actionRow}>
-        <Choice label="Tạo Quiz" active={tab === 'create'} onPress={() => { setTab('create'); setQuiz(null); setResult(null); }} />
-        <Choice label={`Quiz đã lưu (${saved.length})`} active={tab === 'saved'} onPress={() => setTab('saved')} />
+        <Choice label="Tạo Quiz" active={tab === 'create'} onPress={() => { setTab('create'); setQuiz(null); setResult(null); setListQuizError(null); }} />
+        <Choice label={`Quiz đã lưu (${saved.length})`} active={tab === 'saved'} onPress={() => { setTab('saved'); setListQuizError(null); }} />
       </View>
       {tab === 'create' && (
         <>
@@ -1080,6 +1102,8 @@ function QuizScreen({ subjects, userName, refreshData, initialSubjectId, initial
                     <Text style={styles.smallActionText}>Xem bài đã nộp</Text>
                   </TouchableOpacity>}
               </View>
+              {listQuizError?.id === item.id &&
+                <ErrorCard message={listQuizError.message} />}
             </View>
           ))}
         </>

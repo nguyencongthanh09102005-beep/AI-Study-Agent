@@ -1,4 +1,4 @@
-"""7.2-7.4: offline regeneration, 15/60 scoring integration, live schedule lock.
+"""7.2-7.4: offline regeneration, 15/60 scoring, permanent scheduled unlock.
 
 All tests use a temporary database and mock Gemini. Never touch real data.
 """
@@ -352,17 +352,21 @@ def run():
                                    planned+timedelta(minutes=1))["can_start"]
             assert quiz_access(conn, project, student, first_quiz,
                                new_start+timedelta(minutes=1))["can_start"]
+            # Opening time is one-way; even an untouched, unsubmitted Quiz
+            # remains accessible long after its scheduled study session ends.
+            assert quiz_access(conn, project, student, first_quiz,
+                               new_start+timedelta(days=7))["allowed"]
             assert start_quiz(conn, project, student, first_quiz,
                               new_start+timedelta(minutes=1))["allowed"]
-            # The previously granted in-progress attempt survives further
-            # schedule changes until its originally granted window ends.
+            # Once a session was started, its permanent grant survives a
+            # reschedule (including dates after the old end time).
             conn.execute("UPDATE study_tasks SET study_at=? WHERE id=?",
                          ((new_start+timedelta(hours=2)).isoformat(timespec="minutes"),
                           task_rows[0]["id"]))
             assert quiz_access(conn, project, student, first_quiz,
                                new_start+timedelta(minutes=3))["allowed"]
-            assert not quiz_access(conn, project, student, first_quiz,
-                                   new_start+timedelta(hours=1))["allowed"]
+            assert quiz_access(conn, project, student, first_quiz,
+                               new_start+timedelta(hours=1))["allowed"]
             conn.commit()
             conn.close()
 
@@ -391,7 +395,14 @@ def run():
             conn.commit()
             conn.close()
             room_before = client.get(first_status).get_json()
-            assert room_before["state"] == "available", room_before
+            assert room_before["state"] == "active", room_before
+            # Web and Mobile use the same clock/source gate. A Quiz that
+            # already reached its opening date stays accessible without any
+            # prior submission or an explicit start-session POST.
+            with patch("study_session_quiz_runtime.study_now",
+                       return_value=current_slot+timedelta(days=1)):
+                assert client.get(f"/api/mobile/quizzes/{first_quiz}").status_code == 200
+                assert f'data-quiz-id="{first_quiz}"' in client.get("/quiz").get_data(as_text=True)
             with client.session_transaction() as sess:
                 csrf_for_start = sess["session_quiz_csrf"]
             opened_mobile = client.post(mobile_start,json={},
@@ -453,7 +464,9 @@ def run():
                        return_value=months_later):
                 previous_html = client.get("/quiz").get_data(as_text=True)
                 assert f'data-quiz-id="{first_quiz}"' in previous_html
-                assert f'data-quiz-id="{final_quiz}"' not in previous_html
+                # Both scheduled Quiz sets are visible once their opening
+                # dates have passed, even if the final Quiz was never submitted.
+                assert f'data-quiz-id="{final_quiz}"' in previous_html
                 assert "Đã làm" in previous_html
                 old_lesson = client.get(f"/quiz?task_id={task_rows[0]['id']}")
                 assert old_lesson.status_code == 200
@@ -522,7 +535,7 @@ def run():
             conn.close()
             final_status = client.get(mobile_final)
             assert final_status.status_code == 200
-            assert final_status.get_json()["state"] == "available", (
+            assert final_status.get_json()["state"] == "active", (
                 final_status.get_json()
             )
             assert final_status.get_json()["is_final"] is True

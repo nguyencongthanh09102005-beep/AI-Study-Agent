@@ -36,7 +36,8 @@ def run():
     assert "Vui lòng trả lời đủ" in mobile
     assert "Xác nhận nộp Quiz" in mobile
     assert "return quiz_access(conn, project, uid, quiz_id, at)" in runtime
-    assert "start <= at < end" in runtime
+    assert "if at >= start:" in runtime
+    assert 'datetime.fromisoformat(grant["started_at"]) <= at' in runtime
     assert "review_unlocked" in runtime
 
     # No access to answer keys until server verifies a stored submission.
@@ -66,7 +67,7 @@ def run():
         "tests/test_evaluation_harness_c5.py",
     ):
         assert automated in ci, f"Missing CI regression suite: {automated}"
-    print("Final release contract PASS: Web/Mobile, source, timed Quiz, privacy, honest QA")
+    print("Final release contract PASS: Web/Mobile, source, permanently-open Quiz, privacy, honest QA")
 
 
 if __name__ == "__main__":

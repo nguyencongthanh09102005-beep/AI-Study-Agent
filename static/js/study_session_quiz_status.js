@@ -32,8 +32,8 @@ document.addEventListener("DOMContentLoaded", () => {
       detail.textContent = "Kết quả đã lưu trong mục Quiz. Bạn có thể làm lại để củng cố kiến thức, không phụ thuộc giờ học.";
       go.textContent = "↻ Ôn lại Quiz đã làm";
     } else if (state === "active") {
-      status.textContent = "✓ Quiz " + label + "đang được mở";
-      detail.textContent = "Có thể vào bài kiểm tra và nộp kết quả.";
+      status.textContent = "✓ Quiz " + label + "đã mở · Có thể làm lại bất cứ lúc nào";
+      detail.textContent = "Đã đến giờ mở Quiz. Hết buổi học cũng không khóa lại bài này.";
       go.textContent = "▶ Làm Quiz theo buổi";
     } else if (state === "available") {
       status.textContent = "✓ Đã đến giờ mở Quiz " + label;
@@ -41,10 +41,9 @@ document.addEventListener("DOMContentLoaded", () => {
       go.textContent = "▶ Làm Quiz theo buổi";
     } else {
       status.textContent = "🔒 Quiz " + label + "đã chuẩn bị và đang khóa";
-      detail.textContent = "Giờ kiểm tra theo lịch mới nhất: " +
-        (data.study_at || "chưa xác định") + " – " +
-        (data.ends_at || "chưa xác định") +
-        ". Đổi lịch học sẽ tự đổi giờ mở Quiz.";
+      detail.textContent = "Giờ mở Quiz theo lịch mới nhất: " +
+        (data.study_at || "chưa xác định") +
+        ". Sau giờ này Quiz tiếp tục mở để ôn tập. Đổi lịch trước giờ mở sẽ cập nhật lịch Quiz.";
       go.textContent = "🔒 Xem lịch mở Quiz";
     }
     const times = Number(data.attempt_count) || 0;

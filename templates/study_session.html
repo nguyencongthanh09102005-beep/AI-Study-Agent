@@ -79,7 +79,7 @@
           {% elif quiz_status.state == 'review' %}
             ✓ Quiz đã làm · Có thể ôn lại bất cứ lúc nào.
           {% elif quiz_status.state == 'active' %}
-            ✓ Quiz đã mở và có thể làm bài.
+            ✓ Quiz đã mở vĩnh viễn để ôn tập.
           {% elif quiz_status.state == 'available' %}
             ✓ Đến giờ kiểm tra — có thể bắt đầu.
           {% else %}
@@ -98,9 +98,9 @@
           {% elif quiz_status.state == 'review' %}
             Kết quả đã lưu vào mục Quiz. Bạn có thể làm lại để ôn kiến thức cũ, không phụ thuộc giờ học.
           {% elif quiz_status.state == 'active' or quiz_status.state == 'available' %}
-            Bài kiểm tra được mở theo giờ học hiện tại; chọn vào Quiz để bắt đầu hoặc tiếp tục làm.
+            Quiz đã đến giờ mở và sẽ không tự khóa khi hết buổi. Bạn có thể làm bài hoặc ôn tập lại bất cứ lúc nào.
           {% else %}
-            Bài kiểm tra sẽ mở trong khung {{ start_text }}{% if end_text %}–{{ end_text }}{% endif %}. Nếu dời lịch học, thời gian mở Quiz cũng đổi theo.
+            Bài kiểm tra sẽ mở từ {{ start_text }}. Sau khi đến giờ, Quiz sẽ tiếp tục mở để ôn tập. Nếu đổi lịch trước giờ mở, giờ mở Quiz cũng đổi theo.
           {% endif %}
         </p>
         {% if quiz_status.attempt_count %}
