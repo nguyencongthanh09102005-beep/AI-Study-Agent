@@ -112,6 +112,31 @@ def run():
     ])
     assert text == "Recovered after non-JSON error" and len(calls) == 2
 
+    # A slow primary must not leave only a few seconds for the fallback.
+    clock = [100.0]
+    timeout_values = []
+    def timed_post(url, headers, json, timeout):
+        timeout_values.append(timeout)
+        if len(timeout_values) == 1:
+            clock[0] += timeout
+            raise project.requests.Timeout("primary stalled")
+        return Reply(200, answer="Backup recovered within remaining budget")
+    with patch.dict(os.environ, {
+        "GEMINI_API_KEY":"unit-test-key",
+        "GEMINI_MODEL":"primary-model",
+        "GEMINI_FALLBACK_MODELS":"backup-model",
+        "GEMINI_PRIMARY_RETRIES":"2",
+        "GEMINI_REQUEST_TIMEOUT":"25",
+        "GEMINI_TOTAL_TIMEOUT":"35",
+    }), patch.object(project.time,"monotonic",side_effect=lambda:clock[0]), \\
+         patch.object(project.requests,"post",side_effect=timed_post):
+        text, err = project.gemini_generate("test-question")
+    assert text == "Backup recovered within remaining budget" and err is None
+    assert len(timeout_values) == 2
+    assert timeout_values[0] <= 22, timeout_values
+    assert timeout_values[1] >= 12, timeout_values
+    assert sum(timeout_values) <= 36, timeout_values
+
     # Without any backup, bounded retry (not an unlimited hot loop).
     text, err, calls, sleeps = check([
         Reply(503, "busy"), Reply(200, answer="Retry succeeded"),
