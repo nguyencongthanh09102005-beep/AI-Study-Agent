@@ -2181,9 +2181,12 @@ def gemini_generate(prompt):
 
     Thứ tự mặc định:
     1) GEMINI_MODEL (mặc định gemini-3.8-flash)
-    2) GEMINI_FALLBACK_MODELS (mặc định 3.6 Flash, 3.5 Flash-Lite)
+    2) GEMINI_FALLBACK_MODELS (mặc định 3.5 Flash-Lite)
 
-    Chỉ retry các lỗi tạm thời: 408, 429 và 5xx.
+    Khi model chính 503/429, chuyển ngay sang model dự phòng thay vì
+    tốn hết thời gian vào cùng model; không lặp lại lỗi quota ngày.
+    404 model không tồn tại cũng được chuyển sang model dự phòng.
+    Tổng thời gian cho tất cả thử nghiệm luôn được giới hạn.
     """
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
 
@@ -2200,7 +2203,7 @@ def gemini_generate(prompt):
 
     fallback_raw = os.getenv(
         "GEMINI_FALLBACK_MODELS",
-        "gemini-3.6-flash,gemini-3.5-flash-lite"
+        "gemini-3.5-flash-lite"
     )
 
     models = [primary_model]
@@ -2210,9 +2213,9 @@ def gemini_generate(prompt):
             models.append(model)
 
     try:
-        primary_retries = int(os.getenv("GEMINI_PRIMARY_RETRIES", "2"))
+        primary_retries = int(os.getenv("GEMINI_PRIMARY_RETRIES", "1"))
     except ValueError:
-        primary_retries = 2
+        primary_retries = 1
     primary_retries = max(0, min(primary_retries, 4))
 
     transient_statuses = {408, 429, 500, 502, 503, 504}
@@ -2233,6 +2236,8 @@ def gemini_generate(prompt):
 
     last_error = ""
     rate_limited = False
+    overloaded = False
+    unavailable_models = 0
 
     for model_index, model in enumerate(models):
         # Model chính được retry thêm; model dự phòng thử 1 lần/model
@@ -2264,7 +2269,16 @@ def gemini_generate(prompt):
                             }
                         ]
                     },
-                    timeout=min(float(request_timeout), max(1.0, remaining)),
+                    # Reserve time for a fallback model, even when the
+                    # primary stalls until its network timeout. With the
+                    # default 35s budget, primary gets at most ~21s and the
+                    # final backup keeps ~14s.
+                    timeout=min(
+                        float(request_timeout),
+                        max(1.0, remaining - min(14.0, remaining / 2))
+                        if model_index < len(models) - 1
+                        else max(1.0, remaining),
+                    ),
                 )
 
                 if res.ok:
@@ -2297,43 +2311,82 @@ def gemini_generate(prompt):
                     break
 
                 detail = ""
+                error_data = None
                 try:
                     error_data = res.json()
-                    detail = (
-                        error_data.get("error", {}).get("message", "")
-                        if isinstance(error_data, dict)
-                        else ""
+                    error_payload = (
+                        error_data.get("error") if isinstance(error_data, dict)
+                        else None
                     )
+                    if isinstance(error_payload, dict):
+                        detail = str(error_payload.get("message") or "")
                 except ValueError:
-                    detail = res.text[:240]
+                    detail = str(getattr(res, "text", ""))[:240]
 
                 status = int(res.status_code)
-                if status == 429:
-                    rate_limited = True
                 last_error = (
                     f"{model}: HTTP {status}"
-                    + (f" - {detail}" if detail else "")
+                    + (f" - {detail[:240]}" if detail else "")
                 )
+                if status == 429:
+                    rate_limited = True
+                    # Daily limits or exhausted billing affect the project:
+                    # repeated calls to alternative models waste quota too.
+                    quota_error = (
+                        error_data.get("error")
+                        if isinstance(error_data, dict) else None
+                    )
+                    quota_status = (
+                        quota_error.get("status", "")
+                        if isinstance(quota_error, dict) else ""
+                    )
+                    details = (detail + " " + str(quota_status)).casefold()
+                    hard_quota = any(phrase in details for phrase in (
+                        "requests per day", "per day", "daily",
+                        "rpd", "spend cap", "billing",
+                        "quota_exceeded", "quota_exhausted",
+                    ))
+                    if hard_quota:
+                        print("AI provider quota exhausted (HTTP 429).")
+                        return None, (
+                            "Dịch vụ AI đã hết hạn mức API (HTTP 429). "
+                            "Hãy kiểm tra hạn mức hoặc thử lại sau."
+                        )
+
+                if status == 404:
+                    unavailable_models += 1
+                    print(f"AI model không khả dụng: {model} (HTTP 404); thử dự phòng.")
+                    break
+                if status == 503:
+                    overloaded = True
 
                 if status not in transient_statuses:
-                    # 400/401/403: log provider details privately, never display
-                    # model names, API metadata or provider credentials in UI.
+                    # Invalid key/permissions or bad payload cannot be healed by
+                    # switching models. Never expose provider details to clients.
                     print("AI provider request failed:", last_error)
+                    if status in (401, 403):
+                        return None, (
+                            "Khóa API AI không hợp lệ hoặc chưa được cấp quyền. "
+                            "Vui lòng kiểm tra cấu hình trên máy chủ."
+                        )
                     return None, "Dịch vụ AI hiện chưa khả dụng. Vui lòng thử lại sau."
 
-                # Retry model chính với exponential backoff + jitter.
+                # Fail over immediately on overload or rate limiting when a
+                # backup exists. Waiting/retrying the same broken model first
+                # consumes the shared synchronous Chat deadline.
+                if model_index < len(models) - 1:
+                    print(f"AI provider HTTP {status} trên {model}; chuyển model dự phòng.")
+                    break
+
+                # Only retry a transient failure when there is no backup left
+                # and this is the primary (the backup is always one attempt).
                 if model_index == 0 and attempt < max_attempts - 1:
                     delay = min(4.0, (2 ** attempt)) + random.uniform(0.1, 0.5)
-                    print(
-                        f"Gemini {model} tạm lỗi HTTP {status}; "
-                        f"retry sau {delay:.1f}s"
-                    )
                     if delay >= deadline - time.monotonic():
                         break
+                    print(f"AI retry HTTP {status} sau {delay:.1f}s.")
                     time.sleep(delay)
                     continue
-
-                # Hết retry model hiện tại -> thử model kế tiếp.
                 break
 
             except requests.Timeout:
@@ -2345,7 +2398,7 @@ def gemini_generate(prompt):
             except requests.RequestException as exc:
                 last_error = f"{model}: lỗi kết nối Gemini - {exc}"
 
-                if model_index == 0 and attempt < max_attempts - 1:
+                if model_index == 0 and attempt < max_attempts - 1 and len(models) == 1:
                     delay = min(4.0, (2 ** attempt)) + random.uniform(0.1, 0.5)
                     if delay >= deadline - time.monotonic():
                         break
@@ -2362,6 +2415,18 @@ def gemini_generate(prompt):
         print("AI provider exhausted retries:", last_error)
     if rate_limited:
         return None, "Dịch vụ AI đã chạm giới hạn API (HTTP 429). Vui lòng thử lại sau."
+    if unavailable_models == len(models):
+        return None, (
+            "Mô hình AI hiện không còn khả dụng. "
+            "Hãy kiểm tra tên model trong cấu hình máy chủ."
+        )
+    if overloaded:
+        return None, (
+            "Dịch vụ AI đang quá tải (HTTP 503). "
+            "Đã thử model dự phòng; vui lòng thử lại sau."
+        )
+    if "timeout" in last_error.casefold():
+        return None, "AI phản hồi quá thời gian chờ. Vui lòng thử lại."
     return None, (
         "AI đang bận hoặc kết nối chưa ổn định. "
         "Vui lòng thử lại sau."
@@ -2677,7 +2742,7 @@ def build_quiz(text, question_count=10, focus_topics=None, session_mode=False, a
     # GỌI GEMINI CHO 1 NHÓM NHỎ
     # =====================================================
     def generate_batch(batch_size, existing_questions, batch_number):
-        from quiz_provider_limits import QuizRateLimitError
+        from quiz_provider_limits import QuizRateLimitError, QuizProviderBusyError
         # Giới hạn context để request ổn định.
         document_content = clean_text[:16000]
 
@@ -2795,8 +2860,11 @@ Cấu trúc:
                 f"Gemini tạo Quiz nhóm {batch_number} thất bại:",
                 error
             )
-            if session_mode and allow_partial and "HTTP 429" in str(error):
-                raise QuizRateLimitError()
+            if session_mode and allow_partial:
+                if "HTTP 429" in str(error):
+                    raise QuizRateLimitError()
+                if "HTTP 503" in str(error):
+                    raise QuizProviderBusyError()
             return []
 
         try:
@@ -2835,9 +2903,11 @@ Cấu trúc:
 
             def checked_provider(prompt):
                 response, provider_error = gemini_generate(prompt)
-                if (not response and session_mode and allow_partial
-                        and "HTTP 429" in str(provider_error)):
-                    raise QuizRateLimitError()
+                if not response and session_mode and allow_partial:
+                    if "HTTP 429" in str(provider_error):
+                        raise QuizRateLimitError()
+                    if "HTTP 503" in str(provider_error):
+                        raise QuizProviderBusyError()
                 return response, provider_error
 
             return verify_quiz_batch(result, document_content, checked_provider)
@@ -2878,8 +2948,8 @@ Cấu trúc:
                 batch_number
             )
         except Exception as exc:
-            from quiz_provider_limits import QuizRateLimitError
-            if not isinstance(exc, QuizRateLimitError):
+            from quiz_provider_limits import QuizRateLimitError, QuizProviderBusyError
+            if not isinstance(exc, (QuizRateLimitError, QuizProviderBusyError)):
                 raise
             if session_mode and allow_partial and questions:
                 # Preserve verified items already collected in this run.

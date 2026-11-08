@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from chapter_chat_context import LessonContextError
-from quiz_provider_limits import QuizRateLimitError
+from quiz_provider_limits import QuizRateLimitError, QuizProviderBusyError
 from study_session_quiz_runtime import (
     ensure_quiz_runtime_schema, ordered_tasks, preparation_status, prepare_step
 )
@@ -147,24 +147,31 @@ def tick(project):
             message=""
             retry_after=''
             attempts=0
-        except QuizRateLimitError:
+        except (QuizRateLimitError, QuizProviderBusyError) as provider_error:
             conn.rollback()
             attempts=int(row['rate_limit_attempts'] or 0)+1
-            # Limit automatic retry cycles, so a daily quota exhaustion does
-            # not spin indefinitely. A manual resume resets this counter.
+            rate_limited=isinstance(provider_error, QuizRateLimitError)
+            code="HTTP 429" if rate_limited else "HTTP 503"
+            # Quota needs a longer cool-off; temporary overload can retry
+            # sooner, but never in a busy loop. Preserve partial Quiz drafts
+            # and stop automatically after three consecutive failures.
             if attempts>=3:
                 new_state='paused'
                 retry_after=''
-                message=('Dịch vụ AI tiếp tục giới hạn API (HTTP 429) sau 3 lần chờ. '
-                         'Đã tạm dừng để tránh gọi tốn quota; thử lại sau hoặc '
-                         'kiểm tra hạn mức API.')
+                message=(
+                    f'Dịch vụ AI vẫn trả {code} sau 3 lần chờ. '
+                    'Đã tạm dừng để tránh gọi API liên tục; '
+                    'thử lại sau hoặc kiểm tra trạng thái/hạn mức API.'
+                )
             else:
-                delay=180*(2**(attempts-1))
+                delay=(180 if rate_limited else 60)*(2**(attempts-1))
                 retry_after=(datetime.now(ZoneInfo('Asia/Ho_Chi_Minh'))+
                              timedelta(seconds=delay)).isoformat(timespec='seconds')
                 new_state='cooldown'
-                message=(f'Dịch vụ AI giới hạn API (HTTP 429). Tự thử lại sau '
-                         f'{delay} giây; đã giữ nguyên Quiz và câu hỏi nháp.')
+                message=(
+                    f'Dịch vụ AI đang trả {code}. Hệ thống tự thử lại sau '
+                    f'{delay} giây; các câu Quiz đã kiểm chứng vẫn được giữ.'
+                )
         except (LessonContextError,ValueError,RuntimeError) as error:
             retry_after=''
             attempts=0
