@@ -2302,15 +2302,17 @@ def gemini_generate(prompt):
                     break
 
                 detail = ""
+                error_data = None
                 try:
                     error_data = res.json()
-                    detail = (
-                        error_data.get("error", {}).get("message", "")
-                        if isinstance(error_data, dict)
-                        else ""
+                    error_payload = (
+                        error_data.get("error") if isinstance(error_data, dict)
+                        else None
                     )
+                    if isinstance(error_payload, dict):
+                        detail = str(error_payload.get("message") or "")
                 except ValueError:
-                    detail = res.text[:240]
+                    detail = str(getattr(res, "text", ""))[:240]
 
                 status = int(res.status_code)
                 last_error = (
@@ -2341,7 +2343,7 @@ def gemini_generate(prompt):
                     unavailable_models += 1
                     print(f"AI model không khả dụng: {model} (HTTP 404); thử dự phòng.")
                     break
-                if status in (500, 502, 503, 504):
+                if status == 503:
                     overloaded = True
 
                 if status not in transient_statuses:
@@ -2382,7 +2384,7 @@ def gemini_generate(prompt):
             except requests.RequestException as exc:
                 last_error = f"{model}: lỗi kết nối Gemini - {exc}"
 
-                if model_index == 0 and attempt < max_attempts - 1:
+                if model_index == 0 and attempt < max_attempts - 1 and len(models) == 1:
                     delay = min(4.0, (2 ** attempt)) + random.uniform(0.1, 0.5)
                     if delay >= deadline - time.monotonic():
                         break
