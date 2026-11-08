@@ -279,14 +279,14 @@ export default function StudyRoom({taskId,onBack,onOpenQuiz,onContext}) {
         {!!sessionQuiz && <>
           <Text style={styles.detail}>{
             sessionQuiz.state==='review'?'Đã nộp · có thể xem lại đáp án và ôn tập':
-            sessionQuiz.state==='active'?'Quiz đang mở trong khung giờ học':
+            sessionQuiz.state==='active'?'Quiz đã mở · có thể làm lại bất cứ lúc nào':
             sessionQuiz.state==='available'?'Đã đến giờ · có thể bắt đầu':
             sessionQuiz.state==='locked'?'Quiz đã chuẩn bị nhưng chưa đến giờ mở':
             sessionQuiz.state==='unprepared'?'Quiz chưa được chuẩn bị trên máy chủ':
             sessionQuiz.reason || 'Học liệu chung của chương chưa đủ điều kiện'
           }</Text>
           {!!sessionQuiz.study_at &&
-            <Text style={styles.faint}>Khung giờ: {sessionQuiz.study_at.replace('T',' ')}
+            <Text style={styles.faint}>Giờ học: {sessionQuiz.study_at.replace('T',' ')}
               {sessionQuiz.ends_at ? ' – '+sessionQuiz.ends_at.slice(11,16):''}
             </Text>}
           {!!sessionQuiz.reason && <Text style={styles.faint}>{sessionQuiz.reason}</Text>}
