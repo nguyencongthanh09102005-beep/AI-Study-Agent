@@ -27,7 +27,6 @@ export default function ManualStudyRoom({taskId,onBack,onOpenQuiz}) {
   const [chatBusy,setChatBusy]=useState(false);
   const [quizBusy,setQuizBusy]=useState(false);
   const [previewBusy,setPreviewBusy]=useState(false);
-  const [showFullExtract,setShowFullExtract]=useState(false);
   const csrf=useRef('');
   const lastSync=useRef(Date.now());
   const flight=useRef(false);
@@ -267,23 +266,11 @@ export default function ManualStudyRoom({taskId,onBack,onOpenQuiz}) {
           {previewBusy?<ActivityIndicator color="#5364C9"/>:
           <Text style={styles.outlineText}>↗ Xem file gốc (PDF / Word / văn bản)</Text>}
         </TouchableOpacity>
-        <Text style={styles.subhead}>Nội dung tài liệu</Text>
-        {data.document.text ?
-          <>
-            <Text style={styles.extractedText} selectable>{
-              showFullExtract ? data.document.text : data.document.text.slice(0,4000)
-            }</Text>
-            {data.document.text.length>4000 && <TouchableOpacity
-              accessibilityRole="button" style={styles.outline}
-              onPress={()=>setShowFullExtract(value=>!value)}>
-              <Text style={styles.outlineText}>{
-                showFullExtract?'Thu gọn nội dung':'Xem thêm nội dung tài liệu'
-              }</Text>
-            </TouchableOpacity>}
-          </>:
-          <Text style={styles.faint}>Không đọc được chữ từ tài liệu này. Nếu là PDF scan/ảnh, hãy mở file gốc; AI và Quiz cần văn bản đã trích xuất.</Text>}
-        {data.document.preview_truncated&&
-          <Text style={styles.faint}>Đang xem 18.000 ký tự đầu. File gốc chứa nhiều nội dung hơn.</Text>}
+        <Text style={styles.faint}>
+          Bấm xem file gốc để giữ nguyên bố cục, hình ảnh và số trang của tài liệu.
+        </Text>
+        {data.document.extracted_chars<80&&
+          <Text style={styles.faint}>PDF scan hoặc tài liệu thiếu chữ: vẫn xem được file gốc, nhưng Chat AI và Quiz cần văn bản có thể trích xuất.</Text>}
       </View>
 
       {!!data.task.note&&<View style={styles.card}>
