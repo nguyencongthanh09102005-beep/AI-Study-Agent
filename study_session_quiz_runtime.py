@@ -2,7 +2,7 @@
 
 No unbounded background worker or timer-based server task: the browser drives
 one bounded preparation step at a time; progress is durable in SQLite. Quiz
-answers are never returned before the server grants an in-window attempt.
+answers are never returned before the scheduled first opening time.
 """
 import hashlib
 import json
@@ -667,16 +667,23 @@ def quiz_access(conn, project, uid, quiz_id, at=None):
         SELECT started_at,valid_until FROM quiz_session_grants
         WHERE quiz_id=? AND user_id=?
     """, (quiz_id, uid)).fetchone()
-    if (grant and datetime.fromisoformat(grant["started_at"]) <= at
-            < datetime.fromisoformat(grant["valid_until"])):
+    # Grants issued by earlier versions no longer expire after the lesson.
+    # The stored start proves the learner already opened this validated Quiz.
+    if grant and datetime.fromisoformat(grant["started_at"]) <= at:
         return {"linked": True, "allowed": True, "count": count}
     start, end = _lesson_window(conn, uid, link["task_id"])
+    # The scheduled time is a one-way unlock, NOT a closing window. This
+    # applies equally to Web lists, Mobile saved Quiz and direct detail URLs.
+    if at >= start:
+        return {"linked": True, "allowed": True, "count": count,
+                "can_start": True,
+                "study_at": start.isoformat(timespec="minutes"),
+                "ends_at": end.isoformat(timespec="minutes")}
     return {"linked": True, "allowed": False, "count": count,
-            "can_start": start <= at < end,
+            "can_start": False,
             "study_at": start.isoformat(timespec="minutes"),
             "ends_at": end.isoformat(timespec="minutes"),
-            "reason": ("Chưa đến giờ mở bài kiểm tra." if at < start
-                       else "Đã hết khung giờ kiểm tra.")}
+            "reason": "Chưa đến giờ mở bài kiểm tra."}
 
 
 def start_quiz(conn, project, uid, quiz_id, at=None):
@@ -684,14 +691,17 @@ def start_quiz(conn, project, uid, quiz_id, at=None):
     status = quiz_access(conn, project, uid, quiz_id, at)
     if not status["linked"]:
         raise LessonContextError("Đây không phải Quiz theo buổi.", 404)
-    if status["allowed"]:
+    # Submitted Quiz and previously granted sessions are already durable.
+    if status["allowed"] and not status.get("can_start"):
         return status
-    if not status.get("can_start"):
+    if not status["allowed"] and not status.get("can_start"):
         raise LessonContextError(status.get("reason") or "Quiz đang khóa.", 409)
     link = conn.execute("""
         SELECT task_id FROM quiz_session_links WHERE quiz_id=? AND user_id=?
     """, (quiz_id, uid)).fetchone()
     _, end = _lesson_window(conn, uid, link["task_id"])
+    # Keep the legacy valid_until column for schema compatibility; access
+    # deliberately ignores it once started_at has been verified.
     conn.execute("""
         INSERT INTO quiz_session_grants(quiz_id,user_id,started_at,valid_until)
         VALUES(?,?,?,?)
