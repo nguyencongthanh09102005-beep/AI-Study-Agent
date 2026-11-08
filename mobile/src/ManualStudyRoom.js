@@ -43,7 +43,6 @@ export default function ManualStudyRoom({taskId,onBack,onOpenQuiz}) {
   useEffect(()=>{
     let active=true;
     setLoading(true);setError('');setData(null);setAnswer(null);
-    setShowFullExtract(false);
     api.manualRoom(taskId).then(result=>{
       if(!active)return;
       csrf.current=result.csrf||'';
