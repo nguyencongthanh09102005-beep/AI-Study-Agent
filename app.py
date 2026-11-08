@@ -2269,7 +2269,16 @@ def gemini_generate(prompt):
                             }
                         ]
                     },
-                    timeout=min(float(request_timeout), max(1.0, remaining)),
+                    # Reserve time for a fallback model, even when the
+                    # primary stalls until its network timeout. With the
+                    # default 35s budget, primary gets at most ~21s and the
+                    # final backup keeps ~14s.
+                    timeout=min(
+                        float(request_timeout),
+                        max(1.0, remaining - min(14.0, remaining / 2))
+                        if model_index < len(models) - 1
+                        else max(1.0, remaining),
+                    ),
                 )
 
                 if res.ok:
@@ -2323,10 +2332,15 @@ def gemini_generate(prompt):
                     rate_limited = True
                     # Daily limits or exhausted billing affect the project:
                     # repeated calls to alternative models waste quota too.
-                    details = (detail + " " + str(
-                        (error_data.get("error") or {}).get("status", "")
-                        if isinstance(error_data, dict) else ""
-                    )).casefold()
+                    quota_error = (
+                        error_data.get("error")
+                        if isinstance(error_data, dict) else None
+                    )
+                    quota_status = (
+                        quota_error.get("status", "")
+                        if isinstance(quota_error, dict) else ""
+                    )
+                    details = (detail + " " + str(quota_status)).casefold()
                     hard_quota = any(phrase in details for phrase in (
                         "requests per day", "per day", "daily",
                         "rpd", "spend cap", "billing",
