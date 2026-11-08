@@ -7,6 +7,7 @@ import sys
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import app as project
@@ -402,7 +403,6 @@ def run():
             # history and permanently unlocks this SAME prepared Quiz for
             # future revision, without generating another question set.
             from study_session_quiz_runtime import study_now
-            from unittest.mock import patch
             current_slot = (study_now() - timedelta(minutes=1)).replace(
                 second=0, microsecond=0)
             conn = project.db()
