@@ -118,6 +118,11 @@ def run():
             assert asked.get_json()["response"].startswith("Theo file cá nhân")
             assert body[:100] in prompts[-1]
             assert "không tự chế kiến thức" in prompts[-1]
+            assert "\\n=== BẮT ĐẦU TÀI LIỆU" not in prompts[-1], (
+                "AI prompt used literal escaped newlines, not real delimiters"
+            )
+            assert "\n=== BẮT ĐẦU TÀI LIỆU" in prompts[-1]
+            assert "\n=== KẾT THÚC TÀI LIỆU ===\nCÂU HỎI:" in prompts[-1]
             assert not client.get("/api/mobile/chat/"+str(sid)).get_json().get("messages")
 
             project.build_quiz=lambda _text,_count: [
@@ -135,6 +140,23 @@ def run():
             assert finished.get_json()["status"]=="completed"
             assert client.get(url).get_json()["task"]["done"] is True
             assert client.post(url+"/timer",headers=headers,json={"action":"resume"}).status_code==409
+            # API must preserve original binary bytes for PDF/Word preview:
+            # the native Quick Look renderer itself is a separate device test.
+            pdf_bytes = b"%PDF-1.4\n% original binary \x00\xff\n"
+            pdf_stored = "qa_mobile_manual_pdf.pdf"
+            (project.UPLOAD_DIR/pdf_stored).write_bytes(pdf_bytes)
+            check_db = project.db()
+            check_db.execute(
+                "UPDATE documents SET original_name=?,stored_name=? WHERE id=?",
+                ("figma-private.pdf",pdf_stored,document),
+            )
+            check_db.commit()
+            check_db.close()
+            pdf_result = client.get(url+"/file")
+            assert pdf_result.status_code==200,pdf_result.get_json()
+            assert pdf_result.get_json()["type"]=="application/pdf"
+            assert base64.b64decode(pdf_result.get_json()["base64"])==pdf_bytes
+            assert outsider.get(url+"/file").status_code==404
             conn=project.db()
             assert conn.execute(
                 "SELECT done FROM study_tasks WHERE id=?",(task,)
