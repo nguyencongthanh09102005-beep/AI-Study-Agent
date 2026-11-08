@@ -33,6 +33,22 @@ assert(room.includes('file.write(payload.base64') && room.includes('file.preview
 assert(room.includes('api.manualTimer(taskId,action,csrf.current)'));
 assert(room.includes('api.manualAsk(taskId,question.trim(),csrf.current)'));
 assert(room.includes('api.manualPrepareQuiz(taskId,csrf.current)'));
+assert(room.includes("const openPreparedQuiz=async ({subjectId,quizId})=>"));
+assert(room.includes("const latest=await reload()"));
+assert(room.includes("if(latest.timer?.status==='running')") &&
+       room.includes("if(!(await sendTimerAction('pause')))return"),
+       'Do not open Quiz while Mobile session timer remains active');
+assert(room.includes("{text:'Mở Quiz',onPress:()=>openPreparedQuiz("),
+       'Newly generated Quiz must use safe navigation');
+assert(room.includes("onPress={()=>openPreparedQuiz({"),
+       'Existing Quiz must use safe navigation');
+assert(room.includes("automaticallyAdjustKeyboardInsets={true}"),
+       'iPhone keyboard must not hide the Chat AI send action');
+assert(room.includes("data.document.text.slice(0,4000)") &&
+       room.includes("setShowFullExtract(value=>!value)"),
+       'Large PDF extraction must be collapsible on small screens');
+assert(room.includes('data.document.extracted_chars<80'),
+       'No AI or Quiz on text too short to support answers');
 assert(room.includes("if (await sendTimerAction('pause')) onBack()"));
 assert(backend.includes('def mobile_manual_timer(') &&
        backend.includes('def mobile_manual_ask('));
