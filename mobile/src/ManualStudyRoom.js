@@ -27,9 +27,11 @@ export default function ManualStudyRoom({taskId,onBack,onOpenQuiz}) {
   const [chatBusy,setChatBusy]=useState(false);
   const [quizBusy,setQuizBusy]=useState(false);
   const [previewBusy,setPreviewBusy]=useState(false);
+  const [showFullExtract,setShowFullExtract]=useState(false);
   const csrf=useRef('');
   const lastSync=useRef(Date.now());
   const flight=useRef(false);
+  const quizNavigation=useRef(false);
 
   const reload=async()=>{
     const result=await api.manualRoom(taskId);
@@ -42,6 +44,7 @@ export default function ManualStudyRoom({taskId,onBack,onOpenQuiz}) {
   useEffect(()=>{
     let active=true;
     setLoading(true);setError('');setData(null);setAnswer(null);
+    setShowFullExtract(false);
     api.manualRoom(taskId).then(result=>{
       if(!active)return;
       csrf.current=result.csrf||'';
@@ -114,6 +117,29 @@ export default function ManualStudyRoom({taskId,onBack,onOpenQuiz}) {
     } finally {setChatBusy(false);}
   };
 
+  // Used by both 'open existing Quiz' and 'open newly generated Quiz'.
+  // Always refresh server status before leaving; the displayed timer may
+  // be stale after a long AI generation or when iOS was in the background.
+  const openPreparedQuiz=async ({subjectId,quizId})=>{
+    if(quizNavigation.current)return;
+    quizNavigation.current=true;
+    setQuizBusy(true);
+    setError('');
+    try {
+      const latest=await reload();
+      if(latest.timer?.status==='running') {
+        // Do not navigate if the server cannot confirm the pause.
+        if(!(await sendTimerAction('pause')))return;
+      }
+      onOpenQuiz({subjectId,quizId});
+    }catch(err) {
+      setError(err.message||'Không đồng bộ được đồng hồ. Hãy thử mở Quiz lại.');
+    }finally{
+      quizNavigation.current=false;
+      setQuizBusy(false);
+    }
+  };
+
   const prepareQuiz=()=>{
     if(quizBusy||!csrf.current)return;
     Alert.alert(
@@ -128,7 +154,7 @@ export default function ManualStudyRoom({taskId,onBack,onOpenQuiz}) {
             await reload();
             Alert.alert('Quiz đã sẵn sàng','Đã tạo bài Quiz 10 câu từ tài liệu này.',[
               {text:'Để sau'},
-              {text:'Mở Quiz',onPress:()=>onOpenQuiz({
+              {text:'Mở Quiz',onPress:()=>openPreparedQuiz({
                 subjectId:result.subject_id,quizId:result.quiz_id,
               })},
             ]);
@@ -187,7 +213,8 @@ export default function ManualStudyRoom({taskId,onBack,onOpenQuiz}) {
   </View>;
 
   return <ScrollView style={styles.root} contentContainerStyle={styles.page}
-    keyboardShouldPersistTaps="handled">
+    keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive"
+    automaticallyAdjustKeyboardInsets={true}>
     <TouchableOpacity accessibilityRole="button" onPress={leave} style={styles.back}>
       <Text style={styles.link}>← Về Kế hoạch học</Text>
     </TouchableOpacity>
@@ -242,7 +269,18 @@ export default function ManualStudyRoom({taskId,onBack,onOpenQuiz}) {
         </TouchableOpacity>
         <Text style={styles.subhead}>Nội dung tài liệu</Text>
         {data.document.text ?
-          <Text style={styles.extractedText} selectable>{data.document.text}</Text>:
+          <>
+            <Text style={styles.extractedText} selectable>{
+              showFullExtract ? data.document.text : data.document.text.slice(0,4000)
+            }</Text>
+            {data.document.text.length>4000 && <TouchableOpacity
+              accessibilityRole="button" style={styles.outline}
+              onPress={()=>setShowFullExtract(value=>!value)}>
+              <Text style={styles.outlineText}>{
+                showFullExtract?'Thu gọn nội dung':'Xem thêm nội dung tài liệu'
+              }</Text>
+            </TouchableOpacity>}
+          </>:
           <Text style={styles.faint}>Không đọc được chữ từ tài liệu này. Nếu là PDF scan/ảnh, hãy mở file gốc; AI và Quiz cần văn bản đã trích xuất.</Text>}
         {data.document.preview_truncated&&
           <Text style={styles.faint}>Đang xem 18.000 ký tự đầu. File gốc chứa nhiều nội dung hơn.</Text>}
@@ -259,7 +297,9 @@ export default function ManualStudyRoom({taskId,onBack,onOpenQuiz}) {
         <TextInput multiline maxLength={700} value={question} onChangeText={setQuestion}
           placeholder="Ví dụ: Giải thích phần 1.1 trong file..."
           placeholderTextColor="#7D8BA9" style={styles.question}/>
-        <TouchableOpacity disabled={chatBusy||!question.trim()||!data.document.text}
+        {data.document.extracted_chars<80&&
+          <Text style={styles.faint}>Cần ít nhất 80 ký tự văn bản đã trích xuất để hỏi AI hoặc tạo Quiz.</Text>}
+        <TouchableOpacity disabled={chatBusy||!question.trim()||data.document.extracted_chars<80}
           accessibilityRole="button" style={styles.primary} onPress={askDocument}>
           {chatBusy?<ActivityIndicator color="white"/>:
           <Text style={styles.primaryText}>✦ Hỏi Study Agent</Text>}
@@ -274,14 +314,14 @@ export default function ManualStudyRoom({taskId,onBack,onOpenQuiz}) {
       <View style={styles.card}>
         <Text style={styles.heading}>📝 Quiz 10 câu theo tài liệu</Text>
         {data.quiz.id?<TouchableOpacity style={styles.primary} accessibilityRole="button"
-          onPress={async()=>{
-            if(timer.status==='running' && !(await sendTimerAction('pause'))) return;
-            onOpenQuiz({subjectId:data.task.subject_id,quizId:data.quiz.id});
-          }}>
+          disabled={quizBusy||busy}
+          onPress={()=>openPreparedQuiz({
+            subjectId:data.task.subject_id,quizId:data.quiz.id,
+          })}>
           <Text style={styles.primaryText}>▶ Mở Quiz đã chuẩn bị</Text>
         </TouchableOpacity>:<>
           <Text style={styles.faint}>Chỉ tạo bài khi bạn yêu cầu; không tự sinh Quiz mỗi lần mở buổi.</Text>
-          <TouchableOpacity disabled={quizBusy||!data.document.text} style={styles.outline}
+          <TouchableOpacity disabled={quizBusy||data.document.extracted_chars<80} style={styles.outline}
             accessibilityRole="button" onPress={prepareQuiz}>
             {quizBusy?<ActivityIndicator color="#5364C9"/>:
               <Text style={styles.outlineText}>✦ Chuẩn bị Quiz 10 câu</Text>}
