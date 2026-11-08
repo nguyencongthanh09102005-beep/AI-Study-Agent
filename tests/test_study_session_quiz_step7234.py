@@ -464,7 +464,9 @@ def run():
                        return_value=months_later):
                 previous_html = client.get("/quiz").get_data(as_text=True)
                 assert f'data-quiz-id="{first_quiz}"' in previous_html
-                assert f'data-quiz-id="{final_quiz}"' not in previous_html
+                # Both scheduled Quiz sets are visible once their opening
+                # dates have passed, even if the final Quiz was never submitted.
+                assert f'data-quiz-id="{final_quiz}"' in previous_html
                 assert "Đã làm" in previous_html
                 old_lesson = client.get(f"/quiz?task_id={task_rows[0]['id']}")
                 assert old_lesson.status_code == 200
