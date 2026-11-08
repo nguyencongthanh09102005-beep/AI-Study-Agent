@@ -2728,7 +2728,7 @@ def build_quiz(text, question_count=10, focus_topics=None, session_mode=False, a
     # GỌI GEMINI CHO 1 NHÓM NHỎ
     # =====================================================
     def generate_batch(batch_size, existing_questions, batch_number):
-        from quiz_provider_limits import QuizRateLimitError
+        from quiz_provider_limits import QuizRateLimitError, QuizProviderBusyError
         # Giới hạn context để request ổn định.
         document_content = clean_text[:16000]
 
@@ -2846,8 +2846,11 @@ Cấu trúc:
                 f"Gemini tạo Quiz nhóm {batch_number} thất bại:",
                 error
             )
-            if session_mode and allow_partial and "HTTP 429" in str(error):
-                raise QuizRateLimitError()
+            if session_mode and allow_partial:
+                if "HTTP 429" in str(error):
+                    raise QuizRateLimitError()
+                if "HTTP 503" in str(error):
+                    raise QuizProviderBusyError()
             return []
 
         try:
@@ -2886,9 +2889,11 @@ Cấu trúc:
 
             def checked_provider(prompt):
                 response, provider_error = gemini_generate(prompt)
-                if (not response and session_mode and allow_partial
-                        and "HTTP 429" in str(provider_error)):
-                    raise QuizRateLimitError()
+                if not response and session_mode and allow_partial:
+                    if "HTTP 429" in str(provider_error):
+                        raise QuizRateLimitError()
+                    if "HTTP 503" in str(provider_error):
+                        raise QuizProviderBusyError()
                 return response, provider_error
 
             return verify_quiz_batch(result, document_content, checked_provider)
@@ -2929,8 +2934,8 @@ Cấu trúc:
                 batch_number
             )
         except Exception as exc:
-            from quiz_provider_limits import QuizRateLimitError
-            if not isinstance(exc, QuizRateLimitError):
+            from quiz_provider_limits import QuizRateLimitError, QuizProviderBusyError
+            if not isinstance(exc, (QuizRateLimitError, QuizProviderBusyError)):
                 raise
             if session_mode and allow_partial and questions:
                 # Preserve verified items already collected in this run.
