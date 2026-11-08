@@ -64,7 +64,7 @@
     <div class="card-title-row">
       <div>
         <h3>▥ &nbsp; Tiến độ học tập trong tuần</h3>
-        <p>Số giờ học theo từng ngày, từ các buổi đã hoàn thành.</p>
+        <p>Buổi đã hoàn thành: dùng thời gian timer ghi nhận nếu có, nếu chưa có thì dùng thời lượng dự kiến.</p>
       </div>
       <div class="dashboard-week-summary">
         <strong>{{ weekly_total_hours | round(1) }} giờ</strong>
@@ -73,6 +73,14 @@
     </div>
     <div class="weekly-chart-wrap">
       <canvas id="weeklyStudyChart" role="img" aria-label="Biểu đồ cột số giờ học từ thứ Hai đến Chủ nhật"></canvas>
+      <div id="weeklyChartFallback" class="weekly-chart-fallback" hidden>
+        <p>Không tải được biểu đồ. Số giờ học theo từng ngày:</p>
+        <ul>
+          {% for hours in weekly_study_hours %}
+          <li><span>{{ ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'][loop.index0] }}</span><strong>{{ '%.2f'|format(hours) }} giờ</strong></li>
+          {% endfor %}
+        </ul>
+      </div>
     </div>
   </article>
 

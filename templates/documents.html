@@ -87,12 +87,13 @@
             <div class="library-file-actions">
               <a href="{{ url_for('personal_document_file', doc_id=d.id) }}?preview=1"
                  target="_blank" rel="noopener noreferrer" aria-label="Xem file {{ d.original_name }}">↗ Xem file</a>
+              <a class="library-download" href="{{ url_for('personal_document_file', doc_id=d.id) }}?download=1"
+                 aria-label="Tải file gốc {{ d.original_name }}">↓ Tải file</a>
               <details class="library-file-more">
                 <summary aria-label="Thêm thao tác với {{ d.original_name }}">Tùy chọn <span aria-hidden="true">⌄</span></summary>
                 <div class="library-file-more-body">
                   <a href="{{ url_for('document_summary', doc_id=d.id) }}">✦ Tóm tắt AI</a>
                   <a href="{{ url_for('quiz', document_id=d.id) }}">? Tạo Quiz</a>
-                  <a href="{{ url_for('personal_document_file', doc_id=d.id) }}?download=1">↓ Tải file gốc</a>
                   <form method="post" action="{{ url_for('update_document_subject', doc_id=d.id) }}" class="library-change-subject">
                     <label>Chuyển sang môn
                       <select name="subject_id" aria-label="Chuyển môn của {{ d.original_name }}">
@@ -156,7 +157,7 @@
               <a href="{{ url_for('shared_document_file', doc_id=d.id) }}?preview=1"
                  target="_blank" rel="noopener noreferrer" aria-label="Xem file dùng chung {{ d.original_name }}">↗ Xem file</a>
               <a class="library-download" href="{{ url_for('shared_document_file', doc_id=d.id) }}?download=1"
-                 aria-label="Tải {{ d.original_name }}">↓ Tải</a>
+                 aria-label="Tải file gốc {{ d.original_name }}">↓ Tải file</a>
             </div>
           </article>
           {% else %}
