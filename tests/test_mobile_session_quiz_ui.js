@@ -51,7 +51,8 @@ assert(app.includes("ref={quizScrollRef}") &&
   app.includes("quizScrollRef.current?.scrollTo({ y: 0, animated: false })"),
   "Opening a saved Quiz must reset its old list scroll offset");
 assert(app.includes("listQuizError?.id === item.id") &&
-  app.includes("setListQuizError({ id, message:"),
+  app.includes("setListQuizError({ id, message })") &&
+  app.includes("Alert.alert('Không thể mở Quiz', message)"),
   "A saved Quiz access error must appear beside the tapped item");
 assert(app.includes("api.quizReview(id)"),
   "Previously submitted answers must be reviewable");
