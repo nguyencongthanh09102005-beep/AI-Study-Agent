@@ -3703,7 +3703,7 @@ def dashboard():
 
     # =====================================================
     # BIỂU ĐỒ THỜI GIAN HỌC TUẦN NÀY
-    # Chỉ tính các study_tasks đã đánh dấu hoàn thành.
+    # Chỉ tính buổi đã hoàn thành: timer thực tế nếu có, nếu không thì thời lượng dự kiến.
     # =====================================================
     now_dt = datetime.now()
 
@@ -3720,17 +3720,34 @@ def dashboard():
     week_end = week_start + timedelta(days=7)
     previous_week_start = week_start - timedelta(days=7)
 
+    # A finished timer is the more reliable record of study time. For tasks
+    # marked done without using the timer, preserve the older planned-duration
+    # estimate so existing manually completed lessons are not silently erased.
+    has_tracking = bool(conn.execute(
+        "SELECT 1 FROM sqlite_master "
+        "WHERE type='table' AND name='study_session_tracking'"
+    ).fetchone())
+    tracking_join = (
+        "LEFT JOIN study_session_tracking tr "
+        "ON tr.task_id=t.id AND tr.user_id=t.user_id"
+        if has_tracking else ""
+    )
+    tracked_field = (
+        "tr.elapsed_seconds AS tracked_seconds"
+        if has_tracking else "NULL AS tracked_seconds"
+    )
     completed_task_rows = conn.execute(
-        """
-        SELECT completed_at, duration
-        FROM study_tasks
-        WHERE user_id=?
-          AND done=1
-          AND completed_at IS NOT NULL
-          AND completed_at<>''
-          AND completed_at>=?
-          AND completed_at<?
-        ORDER BY completed_at ASC
+        f"""
+        SELECT t.completed_at, t.duration, {tracked_field}
+        FROM study_tasks t
+        {tracking_join}
+        WHERE t.user_id=?
+          AND t.done=1
+          AND t.completed_at IS NOT NULL
+          AND t.completed_at<>''
+          AND t.completed_at>=?
+          AND t.completed_at<?
+        ORDER BY t.completed_at ASC
         """,
         (
             uid,
@@ -3739,8 +3756,8 @@ def dashboard():
         )
     ).fetchall()
 
-    weekly_minutes = [0, 0, 0, 0, 0, 0, 0]
-    previous_week_minutes = 0
+    weekly_seconds = [0] * 7
+    previous_week_seconds = 0
 
     for row in completed_task_rows:
         try:
@@ -3748,42 +3765,32 @@ def dashboard():
         except (TypeError, ValueError):
             continue
 
-        duration = _safe_int(
-            row["duration"],
-            45,
-            0,
-            1440
+        recorded = row["tracked_seconds"]
+        seconds = (
+            max(0, int(recorded))
+            if recorded is not None
+            else _safe_int(row["duration"], 45, 0, 1440) * 60
         )
 
         if week_start <= study_dt < week_end:
-            weekly_minutes[study_dt.weekday()] += duration
-
+            weekly_seconds[study_dt.weekday()] += seconds
         elif previous_week_start <= study_dt < week_start:
-            previous_week_minutes += duration
+            previous_week_seconds += seconds
 
     weekly_study_hours = [
-        round(minutes / 60, 2)
-        for minutes in weekly_minutes
+        round(seconds / 3600, 2) for seconds in weekly_seconds
     ]
+    weekly_total_hours = round(sum(weekly_seconds) / 3600, 1)
+    previous_week_hours = round(previous_week_seconds / 3600, 1)
 
-    weekly_total_hours = round(
-        sum(weekly_minutes) / 60,
-        1
-    )
-
-    previous_week_hours = round(
-        previous_week_minutes / 60,
-        1
-    )
-
-    if previous_week_minutes > 0:
+    if previous_week_seconds > 0:
         growth = round(
             (
                 (
-                    sum(weekly_minutes)
-                    - previous_week_minutes
+                    sum(weekly_seconds)
+                    - previous_week_seconds
                 )
-                / previous_week_minutes
+                / previous_week_seconds
             ) * 100
         )
 
@@ -3805,7 +3812,7 @@ def dashboard():
             )
             weekly_growth_class = "neutral"
 
-    elif sum(weekly_minutes) > 0:
+    elif sum(weekly_seconds) > 0:
         weekly_growth_text = (
             f"{weekly_total_hours:g} giờ tuần này"
         )
