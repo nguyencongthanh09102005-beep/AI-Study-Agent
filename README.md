@@ -166,14 +166,16 @@ Mở `.env` và điền:
 ```env
 GEMINI_API_KEY=YOUR_KEY
 GEMINI_MODEL=gemini-3.8-flash
-GEMINI_FALLBACK_MODELS=gemini-3.6-flash,gemini-3.5-flash-lite
-GEMINI_PRIMARY_RETRIES=2
+GEMINI_FALLBACK_MODELS=gemini-3.5-flash-lite
+GEMINI_PRIMARY_RETRIES=1
 GEMINI_REQUEST_TIMEOUT=25
 ```
 
 Sau đó khởi động lại Flask.
 
-Khi model chính gặp lỗi tạm thời như HTTP 429/503 hoặc timeout, hệ thống tự retry theo exponential backoff rồi chuyển sang các model dự phòng. Chat còn có fallback cục bộ từ tài liệu/kiến thức chung nếu toàn bộ model đều tạm thời không phản hồi.
+Khi model chính gặp HTTP 503 (quá tải), HTTP 429 (giới hạn yêu cầu) hoặc timeout, hệ thống ưu tiên chuyển nhanh sang model dự phòng có sẵn trong thời gian chờ tối đa (mặc định 35 giây). Nếu chỉ có một model được cấu hình, yêu cầu lỗi tạm thời có thể được thử lại với backoff ngắn. HTTP 404 của model sẽ thử model dự phòng; khóa API thiếu quyền hoặc hạn mức hằng ngày đã hết sẽ không bị gọi lại liên tục. Chat vẫn có cơ chế thông báo rõ ràng khi AI không khả dụng.
+
+**Lưu ý:** Đây là cách hạn chế lỗi, không thể bảo đảm API Google không trả 429/503. Hạn mức áp dụng theo dự án và model; xem Usage/Rate Limits trong AI Studio. Không đưa API key vào ảnh chụp log hoặc mã nguồn. Cấu hình trong `.env` cá nhân được giữ nguyên và có thể đang ghi đè các giá trị mặc định mới.
 
 ## Lưu ý khi nộp
 
