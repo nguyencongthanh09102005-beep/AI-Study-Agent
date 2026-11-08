@@ -14,3 +14,13 @@ class QuizRateLimitError(RuntimeError):
             "Quiz đã chuẩn bị được giữ nguyên; hệ thống sẽ tạm nghỉ "
             "trước khi tiếp tục."
         )
+
+
+class QuizProviderBusyError(RuntimeError):
+    """All available AI models are temporarily busy (HTTP 503) for this step."""
+
+    def __init__(self):
+        super().__init__(
+            "Dịch vụ AI đang quá tải (HTTP 503). "
+            "Câu Quiz đã kiểm chứng được giữ nguyên; hệ thống sẽ thử lại sau."
+        )
