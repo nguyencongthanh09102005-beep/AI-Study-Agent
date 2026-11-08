@@ -8,7 +8,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import app as project
 from course_schedule_sync import ensure_session_schedule_schema
 from quiz_preparation_jobs import enqueue, pause, status, tick
-from quiz_provider_limits import QuizRateLimitError
+from quiz_provider_limits import QuizRateLimitError, QuizProviderBusyError
 
 
 def login(client,uid):
@@ -174,6 +174,30 @@ def run():
                 assert fresh["rate_limit_attempts"]==0
                 assert fresh["retry_after"]==""
                 conn.close()
+            # Provider overload 503 has its own shorter cooldown. This must
+            # never throw away the job or hot-loop against a saturated model.
+            with patch("quiz_preparation_jobs.preparation_status",
+                       return_value=[{"status":"pending"}]):
+                conn=project.db()
+                assert enqueue(conn,project,uid,sid)=="queued"
+                conn.close()
+            with patch("quiz_preparation_jobs.prepare_step",
+                       side_effect=QuizProviderBusyError()):
+                assert tick(project) is True
+                conn=project.db()
+                busy=status(conn,uid,sid)
+                assert busy["state"]=="cooldown",busy
+                assert busy["rate_limit_attempts"]==1,busy
+                assert "HTTP 503" in busy["message"],busy
+                assert busy["retry_after"],busy
+                conn.close()
+                assert tick(project) is False
+            conn=project.db()
+            # The user can resume manually without waiting for the cooldown
+            # and without losing already verified quiz questions.
+            assert enqueue(conn,project,uid,sid)=="queued"
+            assert status(conn,uid,sid)["rate_limit_attempts"]==0
+            conn.close()
             conn=project.db()
             # Pause a queued job and keep its retry metadata / queue durable.
             assert pause(conn,uid,sid)=="paused"
