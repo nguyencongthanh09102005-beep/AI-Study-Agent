@@ -375,7 +375,7 @@ def mobile_quiz_preparation(subject_id):
 @mobile_learning_bp.route("/api/mobile/study-room/<int:task_id>/quiz-start",
                           methods=["POST"])
 def mobile_start_session_quiz(task_id):
-    """Only start a prepared Quiz in the current server-approved time window."""
+    """Start a prepared Quiz at or after its server-approved opening time."""
     project = _project()
     uid, error = _student(project)
     if error:
