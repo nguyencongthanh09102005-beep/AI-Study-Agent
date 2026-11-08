@@ -861,7 +861,16 @@ function QuizScreen({ subjects, userName, refreshData, initialSubjectId, initial
   const [selectedDoc, setSelectedDoc] = useState(null);
   const [tab, setTab] = useState('create');
   const [currentQuestion,setCurrentQuestion] = useState(0);
+  const [failedSavedQuizId,setFailedSavedQuizId] = useState(null);
+  const quizScrollRef=useRef(null);
   const submitKey=useRef('');
+
+  const showQuizTop=()=>requestAnimationFrame(()=>{
+    quizScrollRef.current?.scrollTo({y:0,animated:true});
+  });
+  useEffect(()=>{
+    showQuizTop();
+  },[tab]);
 
   useEffect(() => {
     if (initialSubjectId) setSubjectId(initialSubjectId);
@@ -931,6 +940,7 @@ function QuizScreen({ subjects, userName, refreshData, initialSubjectId, initial
   const openQuiz = async (id) => {
     setLoading(true);
     setError('');
+    setFailedSavedQuizId(null);
     setResult(null);
     try {
       const data = await api.quizDetail(id);
@@ -941,6 +951,8 @@ function QuizScreen({ subjects, userName, refreshData, initialSubjectId, initial
       setTab('take');
     } catch (err) {
       setError(err.message || 'Không đọc được Quiz.');
+      setFailedSavedQuizId(id);
+      showQuizTop();
     } finally {
       setLoading(false);
     }
@@ -1012,7 +1024,8 @@ function QuizScreen({ subjects, userName, refreshData, initialSubjectId, initial
   );
 
   return (
-    <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
+    <ScrollView ref={quizScrollRef} contentContainerStyle={styles.page}
+      keyboardShouldPersistTaps="handled">
       <TouchableOpacity onPress={onBack} accessibilityRole="button">
         <Text style={styles.backLink}>← Quay về môn học</Text>
       </TouchableOpacity>
@@ -1080,6 +1093,10 @@ function QuizScreen({ subjects, userName, refreshData, initialSubjectId, initial
                     <Text style={styles.smallActionText}>Xem bài đã nộp</Text>
                   </TouchableOpacity>}
               </View>
+              {failedSavedQuizId===item.id && !!error &&
+                <Text accessibilityRole="alert" style={[styles.muted,{color:'#AD3B4E'}]}>
+                  {error}
+                </Text>}
             </View>
           ))}
         </>
