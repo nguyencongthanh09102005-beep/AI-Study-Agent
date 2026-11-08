@@ -128,7 +128,7 @@ def run():
         "GEMINI_PRIMARY_RETRIES":"2",
         "GEMINI_REQUEST_TIMEOUT":"25",
         "GEMINI_TOTAL_TIMEOUT":"35",
-    }), patch.object(project.time,"monotonic",side_effect=lambda:clock[0]), \\
+    }), patch.object(project.time,"monotonic",side_effect=lambda:clock[0]), \
          patch.object(project.requests,"post",side_effect=timed_post):
         text, err = project.gemini_generate("test-question")
     assert text == "Backup recovered within remaining budget" and err is None
