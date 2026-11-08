@@ -953,8 +953,11 @@ function QuizScreen({ subjects, userName, refreshData, initialSubjectId, initial
       submitKey.current='';
       setTab('take');
     } catch (err) {
-      // The tapped Quiz can be far down a long list. Show its error in place.
-      setListQuizError({ id, message: err.message || 'Không đọc được Quiz.' });
+      // A native alert is visible even if the tapped item is at the bottom
+      // of the viewport; leave the same message inline for later reference.
+      const message = err.message || 'Không đọc được Quiz.';
+      setListQuizError({ id, message });
+      Alert.alert('Không thể mở Quiz', message);
     } finally {
       setLoading(false);
     }
@@ -1003,7 +1006,11 @@ function QuizScreen({ subjects, userName, refreshData, initialSubjectId, initial
       setAnswers(Array.isArray(previous)?previous:[]);
       setCurrentQuestion(0);
       setTab('result');
-    }catch(err){setListQuizError({id,message:err.message||'Chưa xem được bài đã nộp.'});}
+    }catch(err){
+      const message=err.message||'Chưa xem được bài đã nộp.';
+      setListQuizError({id,message});
+      Alert.alert('Không thể xem bài đã nộp',message);
+    }
     finally{setLoading(false);}
   };
 
