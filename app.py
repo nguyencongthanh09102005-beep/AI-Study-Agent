@@ -28,10 +28,14 @@ except Exception:
     requests = None
 load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent
-UPLOAD_DIR = BASE_DIR / "uploads"
-DB_PATH = BASE_DIR / "data" / "study_agent.db"
-UPLOAD_DIR.mkdir(exist_ok=True)
-DB_PATH.parent.mkdir(exist_ok=True)
+# Vercel Functions have a read-only deployment directory. Local development
+# deliberately keeps its existing persistent paths and data unchanged.
+IS_VERCEL = os.getenv("VERCEL") == "1"
+RUNTIME_DIR = Path("/tmp/ai-study-agent") if IS_VERCEL else BASE_DIR
+UPLOAD_DIR = RUNTIME_DIR / "uploads"
+DB_PATH = RUNTIME_DIR / "data" / "study_agent.db"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 app = Flask(__name__)
 
@@ -9136,6 +9140,11 @@ def uploaded_file(filename):
         return "Không tìm thấy tài liệu.", 404
 
     return send_from_directory(UPLOAD_DIR, filename)
+
+# Vercel imports this module as a WSGI app and never runs __main__.
+# Initialize only the ephemeral database in /tmp; never copy local user data.
+if IS_VERCEL:
+    init_db()
 
 if __name__ == "__main__":
     init_db()
